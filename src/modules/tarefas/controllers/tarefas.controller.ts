@@ -79,10 +79,14 @@ export class TarefasController {
     @Request() req: any,
   ): Promise<{
     data: Tarefa[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
   }> {
     return this.tarefasService.findWithFilters(queryDto, req.user.id);
   }
