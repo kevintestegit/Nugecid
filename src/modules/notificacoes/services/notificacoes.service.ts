@@ -5,10 +5,16 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindManyOptions, Between } from 'typeorm';
-import { Notificacao, TipoNotificacao, PrioridadeNotificacao } from '../entities';
+import { Repository, LessThan } from 'typeorm';
+import {
+  Notificacao,
+  TipoNotificacao,
+  PrioridadeNotificacao,
+} from '../entities';
 import { User } from '../../users/entities/user.entity';
 import { Tarefa } from '../../tarefas/entities/tarefa.entity';
+import { DesarquivamentoTypeOrmEntity } from '../../nugecid/infrastructure/entities/desarquivamento.typeorm-entity';
+import { StatusDesarquivamentoEnum } from '../../nugecid/domain/enums/status-desarquivamento.enum';
 
 export interface CreateNotificacaoDto {
   tipo: TipoNotificacao;
@@ -40,9 +46,13 @@ export class NotificacoesService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Tarefa)
     private readonly tarefaRepository: Repository<Tarefa>,
+    @InjectRepository(DesarquivamentoTypeOrmEntity)
+    private readonly desarquivamentoRepository: Repository<DesarquivamentoTypeOrmEntity>,
   ) {}
 
-  async create(createNotificacaoDto: CreateNotificacaoDto): Promise<Notificacao> {
+  async create(
+    createNotificacaoDto: CreateNotificacaoDto,
+  ): Promise<Notificacao> {
     // Verificar se o usuário existe
     const usuario = await this.userRepository.findOne({
       where: { id: createNotificacaoDto.usuarioId },
@@ -65,7 +75,8 @@ export class NotificacoesService {
 
     const notificacao = this.notificacaoRepository.create({
       ...createNotificacaoDto,
-      prioridade: createNotificacaoDto.prioridade || PrioridadeNotificacao.MEDIA,
+      prioridade:
+        createNotificacaoDto.prioridade || PrioridadeNotificacao.MEDIA,
     });
 
     return this.notificacaoRepository.save(notificacao);
@@ -103,11 +114,15 @@ export class NotificacoesService {
 
     // Aplicar filtros
     if (queryDto.lida !== undefined) {
-      queryBuilder.andWhere('notificacao.lida = :lida', { lida: queryDto.lida });
+      queryBuilder.andWhere('notificacao.lida = :lida', {
+        lida: queryDto.lida,
+      });
     }
 
     if (queryDto.tipo) {
-      queryBuilder.andWhere('notificacao.tipo = :tipo', { tipo: queryDto.tipo });
+      queryBuilder.andWhere('notificacao.tipo = :tipo', {
+        tipo: queryDto.tipo,
+      });
     }
 
     if (queryDto.prioridade) {
@@ -166,14 +181,14 @@ export class NotificacoesService {
 
   async marcarComoLida(id: number, usuarioId: number): Promise<Notificacao> {
     const notificacao = await this.findOne(id, usuarioId);
-    
+
     notificacao.marcarComoLida();
     return this.notificacaoRepository.save(notificacao);
   }
 
   async marcarComoNaoLida(id: number, usuarioId: number): Promise<Notificacao> {
     const notificacao = await this.findOne(id, usuarioId);
-    
+
     notificacao.marcarComoNaoLida();
     return this.notificacaoRepository.save(notificacao);
   }
@@ -189,7 +204,7 @@ export class NotificacoesService {
 
   async delete(id: number, usuarioId: number): Promise<void> {
     const notificacao = await this.findOne(id, usuarioId);
-    
+
     await this.notificacaoRepository.softDelete(id);
   }
 
@@ -208,15 +223,21 @@ export class NotificacoesService {
     const naoLidas = notificacoes.filter(n => !n.lida).length;
     const lidas = notificacoes.filter(n => n.lida).length;
 
-    const porTipo = notificacoes.reduce((acc, n) => {
-      acc[n.tipo] = (acc[n.tipo] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const porTipo = notificacoes.reduce(
+      (acc, n) => {
+        acc[n.tipo] = (acc[n.tipo] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
-    const porPrioridade = notificacoes.reduce((acc, n) => {
-      acc[n.prioridade] = (acc[n.prioridade] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const porPrioridade = notificacoes.reduce(
+      (acc, n) => {
+        acc[n.prioridade] = (acc[n.prioridade] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
       total,
@@ -234,7 +255,8 @@ export class NotificacoesService {
     diasPendentes: number,
   ): Promise<Notificacao> {
     const titulo = `Solicitação Pendente há ${diasPendentes} dias`;
-    const descricao = 'Uma solicitação está pendente há mais de 5 dias sem movimentação.';
+    const descricao =
+      'Uma solicitação está pendente há mais de 5 dias sem movimentação.';
     const detalhes = {
       dias_pendentes: diasPendentes,
       data_limite: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // +2 dias
@@ -282,15 +304,61 @@ export class NotificacoesService {
     const cincoDiasAtras = new Date();
     cincoDiasAtras.setDate(cincoDiasAtras.getDate() - 5);
 
+    const notificacoesCriadas: Notificacao[] = [];
+
+    // Buscar desarquivamentos com status SOLICITADO há mais de 5 dias
+    const desarquivamentosPendentes = await this.desarquivamentoRepository.find(
+      {
+        where: {
+          status: StatusDesarquivamentoEnum.SOLICITADO,
+          dataSolicitacao: LessThan(cincoDiasAtras),
+        },
+      },
+    );
+
+    for (const desarquivamento of desarquivamentosPendentes) {
+      const notificacaoExistente = await this.notificacaoRepository.findOne({
+        where: {
+          tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
+          processoId: desarquivamento.id,
+          lida: false,
+        },
+      });
+
+      if (notificacaoExistente) {
+        continue;
+      }
+
+      const diasPendentes = Math.floor(
+        (Date.now() - new Date(desarquivamento.dataSolicitacao).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      const usuarioId =
+        desarquivamento.responsavelId || desarquivamento.criadoPorId;
+
+      if (!usuarioId) {
+        continue;
+      }
+
+      const notificacao = await this.criarNotificacaoArquivoSolicitado(
+        usuarioId,
+        desarquivamento,
+        diasPendentes,
+      );
+
+      notificacoesCriadas.push(notificacao);
+    }
+
     // Buscar tarefas que não foram movimentadas há mais de 5 dias
     const solicitacoesPendentes = await this.tarefaRepository
       .createQueryBuilder('tarefa')
-      .leftJoinAndSelect('tarefa.projeto', 'projeto')
-      .leftJoinAndSelect('projeto.membros', 'membros')
+      .leftJoin('tarefa.coluna', 'coluna')
       .where('tarefa.updatedAt < :cincoDiasAtras', { cincoDiasAtras })
+      .andWhere('coluna.nome ILIKE :colunaSolicitada', {
+        colunaSolicitada: '%solicit%',
+      })
       .getMany();
-
-    const notificacoesCriadas: Notificacao[] = [];
 
     for (const solicitacao of solicitacoesPendentes) {
       // Verificar se já existe notificação para esta solicitação
@@ -304,12 +372,13 @@ export class NotificacoesService {
 
       if (!notificacaoExistente) {
         const diasPendentes = Math.floor(
-          (Date.now() - solicitacao.updatedAt.getTime()) / (1000 * 60 * 60 * 24),
+          (Date.now() - solicitacao.updatedAt.getTime()) /
+            (1000 * 60 * 60 * 24),
         );
 
         // Criar notificação para o responsável ou criador
         const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;
-        
+
         if (usuarioId) {
           const notificacao = await this.criarNotificacaoSolicitacaoPendente(
             usuarioId,
@@ -322,5 +391,33 @@ export class NotificacoesService {
     }
 
     return notificacoesCriadas;
+  }
+
+  private async criarNotificacaoArquivoSolicitado(
+    usuarioId: number,
+    desarquivamento: DesarquivamentoTypeOrmEntity,
+    diasPendentes: number,
+  ): Promise<Notificacao> {
+    const titulo = `Desarquivamento aguardando há ${diasPendentes} dias`;
+    const descricao =
+      'Um desarquivamento permanece com status SOLICITADO há mais de 5 dias.';
+    const detalhes = {
+      dias_pendentes: diasPendentes,
+      numero_processo: desarquivamento.numeroProcesso,
+      tipo_documento: desarquivamento.tipoDocumento,
+      nome_completo: desarquivamento.nomeCompleto,
+      data_solicitacao: desarquivamento.dataSolicitacao,
+      acao_requerida: 'Verificar andamento do desarquivamento',
+    };
+
+    return this.create({
+      tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
+      titulo,
+      descricao,
+      detalhes,
+      prioridade: PrioridadeNotificacao.ALTA,
+      usuarioId,
+      processoId: desarquivamento.id,
+    });
   }
 }

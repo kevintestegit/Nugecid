@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, FileText, ClipboardList, Calendar, User, AlertTriangle, MessageCircle, Send, Loader2, Printer } from 'lucide-react'
 import { useDesarquivamento, useDesarquivamentoComments, useAddDesarquivamentoComment } from '@/hooks/useDesarquivamentos'
@@ -48,6 +48,16 @@ export const DesarquivamentoDetailModal: React.FC<DesarquivamentoDetailModalProp
     onClose()
     navigate(`/desarquivamentos/${id}/editar`)
   }
+
+  const placeholderTemplate = useMemo(
+    () => ({
+      processoEletronico: '{{processo_eletronico}}',
+      tipoDocumentoPrimeiroItem: '{{tipo_documento_1}}',
+      nomePrimeiroItem: '{{nome_1}}',
+      numeroPrimeiroItem: '{{numero_1}}',
+    }),
+    [],
+  )
 
   const handlePrintTerm = () => {
     if (!item) {
@@ -110,17 +120,24 @@ export const DesarquivamentoDetailModal: React.FC<DesarquivamentoDetailModalProp
     const nomeRegistro = escapeHtml(item.nomeCompleto ?? '-')
 
     const rowsHtml = detailRows
-      .map(row => `
+      .map(row => {
+        const isFirstRow = row.index === 1
+        const typeCell = isFirstRow ? placeholderTemplate.tipoDocumentoPrimeiroItem : row.type
+        const nameCell = isFirstRow ? placeholderTemplate.nomePrimeiroItem : row.name
+        const numberCell = isFirstRow ? placeholderTemplate.numeroPrimeiroItem : row.code
+
+        return `
       <tr>
         <td>${row.index}</td>
-        <td>${row.type}</td>
-        <td>${row.name}</td>
-        <td>${row.code}</td>
+        <td>${typeCell}</td>
+        <td>${nameCell}</td>
+        <td>${numberCell}</td>
         <td>${row.observation || '-'}</td>
-      </tr>`)
+      </tr>`
+      })
       .join('')
 
-    const html = `<!DOCTYPE html>
+    const templateHtml = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
@@ -172,7 +189,7 @@ export const DesarquivamentoDetailModal: React.FC<DesarquivamentoDetailModalProp
     </thead>
     <tbody>
       <tr>
-        <td colspan="4" class="process-number">${processNumber}</td>
+        <td colspan="4" class="process-number">${placeholderTemplate.processoEletronico}</td>
       </tr>
       <tr class="summary-row">
         <td colspan="4" class="summary-cell">
@@ -241,6 +258,17 @@ export const DesarquivamentoDetailModal: React.FC<DesarquivamentoDetailModalProp
   <p class="note">* Observar as orientacoes da portaria no 188/2023-GDG/ITEP no DOE no 15433 de 25/05/2023, que dispoe quanto aos prazos e instrucoes normativas.</p>
 </body>
 </html>`
+
+    const placeholderValues: Record<string, string> = {
+      [placeholderTemplate.processoEletronico]: processNumber,
+      [placeholderTemplate.tipoDocumentoPrimeiroItem]: detailRows[0]?.type ?? '-',
+      [placeholderTemplate.nomePrimeiroItem]: detailRows[0]?.name ?? '-',
+      [placeholderTemplate.numeroPrimeiroItem]: detailRows[0]?.code ?? '-',
+    }
+
+    const html = Object.entries(placeholderValues).reduce((result, [placeholder, value]) => {
+      return result.split(placeholder).join(value)
+    }, templateHtml)
 
     const printWindow = window.open('', '_blank', 'width=900,height=650')
     if (!printWindow) {
@@ -420,6 +448,13 @@ export const DesarquivamentoDetailModal: React.FC<DesarquivamentoDetailModalProp
 
         {/* Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+          <button
+            onClick={handlePrintTerm}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+          >
+            <Printer className="h-4 w-4" />
+            Imprimir Termo
+          </button>
           <button
             onClick={handleEdit}
             className="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"

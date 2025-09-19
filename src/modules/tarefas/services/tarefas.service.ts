@@ -3,9 +3,11 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 import {
   Tarefa,
   Projeto,
@@ -23,6 +25,8 @@ import { User } from '../../users/entities/user.entity';
 
 @Injectable()
 export class TarefasService {
+  private readonly logger = new Logger(TarefasService.name);
+
   constructor(
     @InjectRepository(Tarefa)
     private readonly tarefaRepository: Repository<Tarefa>,
@@ -154,7 +158,17 @@ export class TarefasService {
   async findWithFilters(
     queryDto: QueryTarefaDto,
     userId: number,
-  ): Promise<{ data: Tarefa[]; total: number; page: number; limit: number; totalPages: number }> {
+  ): Promise<{
+    data: Tarefa[];
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     // Verificar se o projeto existe e se o usuário tem acesso
     if (queryDto.projetoId) {
       const projeto = await this.projetoRepository.findOne({
@@ -175,7 +189,9 @@ export class TarefasService {
 
     // Verificar se o repositório está inicializado corretamente
     if (!this.tarefaRepository || !this.tarefaRepository.metadata) {
-      throw new Error('Repositório de tarefas não está inicializado corretamente');
+      throw new Error(
+        'Repositório de tarefas não está inicializado corretamente',
+      );
     }
 
     const queryBuilder = this.tarefaRepository
@@ -286,38 +302,53 @@ export class TarefasService {
     }
 
     // Contar total
-    let total: number;
-    let tarefas: Tarefa[];
-    
+    let total = 0;
+    let tarefas: Tarefa[] = [];
+
     // Aplicar paginação
     const page = queryDto.page || 1;
     const limit = queryDto.limit && queryDto.limit > 0 ? queryDto.limit : 10;
     const skip = (page - 1) * limit;
-    
+
     try {
-      // Verificar se a conexão está ativa
-      if (!this.tarefaRepository.manager.connection.isInitialized) {
-        throw new Error('Conexão com o banco de dados não está inicializada');
-      }
-      
       total = await queryBuilder.getCount();
 
       queryBuilder.skip(skip).take(limit);
 
       tarefas = await queryBuilder.getMany();
     } catch (error) {
-      console.error('Erro ao executar query de tarefas:', error);
-      throw new Error(`Erro interno do servidor: ${error.message}`);
+      this.logger.error(
+        'Erro ao executar query de tarefas',
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      if (error instanceof QueryFailedError) {
+        throw new InternalServerErrorException(
+          'Não foi possível carregar as tarefas no momento. Tente novamente mais tarde.',
+        );
+      }
+
+      throw new InternalServerErrorException(
+        error instanceof Error
+          ? error.message
+          : 'Erro interno ao consultar tarefas.',
+      );
     }
-    
+
     const totalPages = limit > 0 ? Math.max(1, Math.ceil(total / limit)) : 1;
 
-    return {
-      data: tarefas,
+    const meta = {
       total,
       page,
       limit,
       totalPages,
+      hasNext: page < totalPages,
+      hasPrev: page > 1,
+    };
+
+    return {
+      data: tarefas,
+      meta,
     };
   }
 

@@ -5,6 +5,7 @@ import { NotificacoesService, NotificacoesSchedulerService } from './services';
 import { Notificacao } from './entities';
 import { User } from '../users/entities/user.entity';
 import { Tarefa } from '../tarefas/entities/tarefa.entity';
+import { DesarquivamentoTypeOrmEntity } from '../nugecid/infrastructure/entities/desarquivamento.typeorm-entity';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { Tarefa } from '../tarefas/entities/tarefa.entity';
       Notificacao,
       User,
       Tarefa,
+      DesarquivamentoTypeOrmEntity,
     ]),
   ],
   controllers: [NotificacoesController],
