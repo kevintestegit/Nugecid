@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -53,6 +53,23 @@ import { RolesGuard } from './guards/roles.guard';
     JwtAuthGuard,
     RolesGuard,
   ],
-  exports: [AuthService],
+  exports: [
+    AuthService,
+    JwtAuthGuard,
+    RolesGuard,
+  ],
 })
-export class AuthModule {}
+export class AuthModule implements OnModuleInit {
+  constructor(private readonly authService: AuthService) {}
+
+  async onModuleInit() {
+    // Inicializa limpeza periódica de usuários inativos
+    setInterval(() => {
+      this.authService.cleanupInactiveUsers().catch(error => {
+        console.error('Erro na limpeza periódica de usuários inativos:', error);
+      });
+    }, 60000); // Executa a cada 1 minuto
+
+    console.log('✅ [AUTH MODULE] Sistema de rastreamento de usuários online inicializado');
+  }
+}

@@ -242,6 +242,11 @@ export class ProjetosService {
   }
 
   private async createDefaultColumns(projetoId: number): Promise<void> {
+    const projeto = await this.projetoRepository.findOne({ where: { id: projetoId } });
+    if (!projeto) {
+      throw new NotFoundException(`Projeto com ID ${projetoId} não encontrado.`);
+    }
+
     const defaultColumns = [
       { nome: 'A Fazer', cor: '#6B7280', ordem: 1 },
       { nome: 'Em Progresso', cor: '#3B82F6', ordem: 2 },
@@ -251,7 +256,7 @@ export class ProjetosService {
 
     for (const coluna of defaultColumns) {
       const newColuna = this.colunaRepository.create({
-        projetoId,
+        projeto,
         ...coluna,
       });
       await this.colunaRepository.save(newColuna);

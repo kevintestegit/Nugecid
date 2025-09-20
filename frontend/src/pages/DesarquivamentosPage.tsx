@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useMemo, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   useDesarquivamentos,
   useDeleteDesarquivamento,
@@ -59,6 +59,7 @@ import { apiService } from '@/services/api'
 
 const DesarquivamentosPage: React.FC = () => {
   const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [tipoFilter, setTipoFilter] = useState<string>('all')
@@ -74,6 +75,14 @@ const DesarquivamentosPage: React.FC = () => {
     isOpen: false,
     item: null,
   })
+
+  // Read URL query parameters on component mount
+  useEffect(() => {
+    const statusFromUrl = searchParams.get('status')
+    if (statusFromUrl && statusFromUrl !== 'all') {
+      setStatusFilter(statusFromUrl)
+    }
+  }, [searchParams])
 
   const queryClient = useQueryClient()
 
@@ -240,6 +249,15 @@ const DesarquivamentosPage: React.FC = () => {
   const handleStatusFilter = (value: string) => {
     setStatusFilter(value)
     setCurrentPage(1)
+
+    // Update URL query parameters
+    const newSearchParams = new URLSearchParams(searchParams)
+    if (value === 'all') {
+      newSearchParams.delete('status')
+    } else {
+      newSearchParams.set('status', value)
+    }
+    setSearchParams(newSearchParams)
   }
 
   const handleTipoFilter = (value: string) => {

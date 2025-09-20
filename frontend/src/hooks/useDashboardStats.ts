@@ -4,14 +4,8 @@ import { Desarquivamento } from '@/types';
 
 export interface DashboardStatsData {
   totalDesarquivamentos: number;
-  pendentes: number;
-  emAndamento: number;
-  concluidos: number;
-  cancelados: number;
-  urgentes: number;
-  vencidos: number;
-  porTipo: Record<string, number>;
-  porStatus: Record<string, number>;
+  atendimentosPendentes: number;
+  atendimentosEsteMes: number;
   recentes: Desarquivamento[];
 }
 

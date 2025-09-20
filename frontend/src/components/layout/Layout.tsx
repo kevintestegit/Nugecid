@@ -26,7 +26,17 @@ const Layout: React.FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  // Load sidebar state from localStorage or default to false
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed')
+    return saved ? JSON.parse(saved) : false
+  })
+
+  // Save sidebar state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed))
+  }, [sidebarCollapsed])
 
   const userInitial = user?.nome?.charAt(0)?.toUpperCase() ?? '?'
   const userAvatar = user?.avatarUrl
@@ -190,6 +200,32 @@ const Layout: React.FC = () => {
         )}
       >
         <div className="relative flex flex-col flex-grow border-r border-border bg-card shadow-lg">
+          {/* Toggle Button - Minimalist Design */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className={cn(
+              "group absolute top-20 z-40 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-300 ease-in-out hover:h-7 hover:w-7 hover:bg-card hover:text-foreground hover:shadow-md hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95",
+              sidebarCollapsed ? "-right-3" : "-right-3"
+            )}
+            title={sidebarCollapsed ? "Expandir sidebar" : "Recolher sidebar"}
+          >
+            <div className="relative flex items-center justify-center">
+              {/* Background ripple effect */}
+              <div className="absolute inset-0 rounded-full bg-primary/10 opacity-0 transition-opacity duration-200 group-active:opacity-100" />
+
+              {/* Icon with rotation animation */}
+              <div className={cn(
+                "relative z-10 transition-transform duration-300 ease-in-out",
+                sidebarCollapsed ? "rotate-180" : "rotate-0"
+              )}>
+                <ChevronLeft className="h-3 w-3 transition-all duration-200 group-hover:scale-110" />
+              </div>
+
+              {/* Subtle indicator dot */}
+              <div className="absolute -bottom-1 left-1/2 h-0.5 w-0.5 -translate-x-1/2 rounded-full bg-primary/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+            </div>
+          </button>
+
           <div className="flex h-16 flex-shrink-0 items-center border-b border-border/80 px-4">
             <Link to="/" className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">

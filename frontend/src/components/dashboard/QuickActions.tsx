@@ -143,21 +143,21 @@ const QuickActions: React.FC = () => {
         <div className="mt-6 pt-4 border-t border-gray-100">
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/desarquivamentos?status=PENDENTE" className="flex items-center gap-2">
+              <Link to="/desarquivamentos?status=SOLICITADO" className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
-                Pendentes
+                Solicitado
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/desarquivamentos?status=EM_ANALISE" className="flex items-center gap-2">
+              <Link to="/desarquivamentos?status=REARQUIVAMENTO_SOLICITADO" className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
-                Em Análise
+                Rearquivamento Solicitado
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/desarquivamentos?vencidas=true" className="flex items-center gap-2">
+              <Link to="/desarquivamentos?status=RETIRADO_PELO_SETOR" className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
-                Vencidas
+                Retirado pelo Setor
               </Link>
             </Button>
           </div>

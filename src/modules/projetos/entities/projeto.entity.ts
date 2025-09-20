@@ -11,7 +11,7 @@ import {
 
 import { User } from '../../users/entities/user.entity';
 import { Coluna } from './coluna.entity';
-import { Tarefa } from './tarefa.entity';
+import { Tarefa } from '../../tarefas/entities/tarefa.entity';
 import { MembroProjeto } from './membro-projeto.entity';
 
 @Entity('projetos')
