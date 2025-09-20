@@ -11,7 +11,7 @@ import {
 
 import { User } from '../../users/entities/user.entity';
 import { Projeto } from '../../projetos/entities/projeto.entity';
-import { Coluna } from '../../projetos/entities/coluna.entity';
+import { Coluna } from './coluna.entity';
 import { Comentario } from './comentario.entity';
 import { Anexo } from './anexo.entity';
 import { Checklist } from './checklist.entity';

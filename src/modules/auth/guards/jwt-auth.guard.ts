@@ -7,10 +7,14 @@ import { AuthGuard } from '@nestjs/passport';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/is-public.decorator';
+import { AuthService } from '../auth.service';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private reflector: Reflector) {
+  constructor(
+    private reflector: Reflector,
+    private readonly authService: AuthService,
+  ) {
     super();
   }
 
@@ -48,6 +52,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
       throw new UnauthorizedException(message);
     }
+
+    // Atualiza a atividade do usuário para cada requisição autenticada
+    if (user && user.id) {
+      this.authService.updateUserActivity(user.id).catch(error => {
+        console.error('Erro ao atualizar atividade do usuário:', error);
+      });
+    }
+
     return user;
   }
 }

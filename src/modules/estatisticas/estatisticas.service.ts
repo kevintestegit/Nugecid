@@ -5,10 +5,10 @@ import { DesarquivamentoTypeOrmEntity } from '../nugecid/infrastructure/entities
 import { StatusDesarquivamentoEnum } from '../nugecid/domain/enums/status-desarquivamento.enum';
 
 export interface CardData {
-  totalAtendimentos: number;
   totalDesarquivamentos: number;
   atendimentosPendentes: number;
   atendimentosEsteMes: number;
+  recentes: any[];
 }
 
 export interface ChartData {
@@ -37,7 +37,7 @@ export class EstatisticasService {
       999,
     );
 
-    const [total, pendentes, esteMes] = await Promise.all([
+    const [total, pendentes, esteMes, recentes] = await Promise.all([
       this.desarquivamentoRepo.count(),
       this.desarquivamentoRepo.count({
         where: { status: StatusDesarquivamentoEnum.SOLICITADO },
@@ -49,13 +49,49 @@ export class EstatisticasService {
           end: endOfMonth,
         })
         .getCount(),
+      // Buscar últimas 10 atividades recentes
+      this.desarquivamentoRepo
+        .createQueryBuilder('d')
+        .leftJoinAndSelect('d.criadoPor', 'criadoPor')
+        .leftJoinAndSelect('d.responsavel', 'responsavel')
+        .orderBy('d.createdAt', 'DESC')
+        .take(10)
+        .getMany(),
     ]);
 
     return {
-      totalAtendimentos: total,
       totalDesarquivamentos: total,
       atendimentosPendentes: pendentes,
       atendimentosEsteMes: esteMes,
+      recentes: recentes.map(item => ({
+        id: item.id,
+        nomeCompleto: item.nomeCompleto,
+        numeroNicLaudoAuto: item.numeroNicLaudoAuto,
+        numeroProcesso: item.numeroProcesso,
+        tipoDocumento: item.tipoDocumento,
+        status: item.status,
+        tipoDesarquivamento: item.tipoDesarquivamento,
+        dataSolicitacao: item.dataSolicitacao,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        setorDemandante: item.setorDemandante,
+        servidorResponsavel: item.servidorResponsavel,
+        finalidadeDesarquivamento: item.finalidadeDesarquivamento,
+        solicitacaoProrrogacao: item.solicitacaoProrrogacao,
+        urgente: item.urgente,
+        criadoPorId: item.criadoPorId,
+        responsavelId: item.responsavelId,
+        usuario: item.criadoPor ? {
+          id: (item.criadoPor as any).id,
+          nome: (item.criadoPor as any).nome,
+          usuario: (item.criadoPor as any).usuario,
+        } : null,
+        responsavel: item.responsavel ? {
+          id: (item.responsavel as any).id,
+          nome: (item.responsavel as any).nome,
+          usuario: (item.responsavel as any).usuario,
+        } : null,
+      })),
     };
   }
 

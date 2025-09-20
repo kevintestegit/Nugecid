@@ -14,6 +14,21 @@ const DashboardPage: React.FC = () => {
   const { data: stats, isLoading, error } = useDashboardStats()
   const { data: onlineUsers, isLoading: loadingOnline, error: errorOnline } = useOnlineUsers()
 
+  // Debug logs para usuários online
+  React.useEffect(() => {
+    console.log('🔄 [DASHBOARD] Estado do hook useOnlineUsers atualizado:', {
+      onlineUsers: onlineUsers?.length || 0,
+      loading: loadingOnline,
+      error: errorOnline?.message,
+      hasData: !!onlineUsers,
+      dataType: typeof onlineUsers
+    });
+
+    if (onlineUsers) {
+      console.log('👥 [DASHBOARD] Usuários online recebidos:', onlineUsers.map(u => `${u.nome} (${u.role})`));
+    }
+  }, [onlineUsers, loadingOnline, errorOnline]);
+
   if (isLoading) {
     return <PageLoading />
   }
@@ -68,12 +83,13 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <DashboardStats 
+      <DashboardStats
         data={{
-          total: stats?.data?.totalRequests || 0,
-          pendentes: stats?.data.pendentes || 0,
-          porTipo: stats?.data.porTipo || {},
-          porStatus: stats?.data.porStatus || {},
+          total: stats?.data?.totalDesarquivamentos || 0,
+          pendentes: stats?.data.atendimentosPendentes || 0,
+          urgentes: 0, // Will be implemented later if needed
+          porTipo: {}, // Will be implemented later if needed
+          porStatus: {}, // Will be implemented later if needed
           recentes: stats?.data.recentes || []
         }}
         isLoading={isLoading}

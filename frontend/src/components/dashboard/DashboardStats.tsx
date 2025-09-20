@@ -47,16 +47,16 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-1 max-w-4xl">
         {Array.from({ length: 2 }).map((_, index) => (
           <Card key={index} className="animate-pulse">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-              <div className="h-1 bg-gray-200 rounded w-8"></div>
-              <div className="h-8 w-8 bg-gray-200 rounded-md"></div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-1">
+              <div className="h-1 bg-gray-200 rounded w-3"></div>
+              <div className="h-6 w-6 bg-gray-200 rounded-md"></div>
             </CardHeader>
-            <CardContent className="p-3 pt-1">
-              <div className="h-3 bg-gray-200 rounded w-8 mb-1"></div>
-              <div className="h-3 bg-gray-200 rounded w-8"></div>
+            <CardContent className="p-1 pt-0">
+              <div className="h-1.5 bg-gray-200 rounded w-3 mb-0.5"></div>
+              <div className="h-1.5 bg-gray-200 rounded w-2"></div>
             </CardContent>
           </Card>
         ))}
@@ -65,32 +65,32 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-1 max-w-4xl">
       {statsCards.map((stat, index) => {
         const Icon = stat.icon
         return (
-          <Card 
-            key={index} 
+          <Card
+            key={index}
             className={cn(
               "hover:shadow-md transition-all duration-200 border-l-4",
               stat.borderColor,
               index === 1 && stat.value > 0 && "ring-2 ring-red-200 shadow-md"
             )}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-              <CardTitle className="text-base font-medium text-gray-600">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-1">
+              <CardTitle className="text-xs font-medium text-gray-600">
                 {stat.title}
               </CardTitle>
-              <div className={cn("p-2 rounded-md", stat.bgColor)}>
-                <Icon className={cn("h-4 w-4", stat.color)} />
+              <div className={cn("p-1 rounded-md", stat.bgColor)}>
+                <Icon className={cn("h-3 w-3", stat.color)} />
               </div>
             </CardHeader>
-            <CardContent className="p-3 pt-1">
-              <div className="text-2xl font-bold text-gray-900">
+            <CardContent className="p-1 pt-0">
+              <div className="text-lg font-bold text-gray-900">
                 {(stat.value ?? 0).toLocaleString()}
               </div>
               {index === 1 && stat.value > 0 && (
-                <Badge variant="destructive" className="mt-2 text-xs">
+                <Badge variant="destructive" className="mt-0.5 text-xs">
                   Atenção necessária
                 </Badge>
               )}

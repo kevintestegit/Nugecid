@@ -2,11 +2,11 @@ import { api } from './api';
 
 export interface Notificacao {
   id: number;
-  tipo: 'SOLICITACAO_PENDENTE' | 'NOVO_PROCESSO';
+  tipo: 'solicitacao_pendente' | 'novo_processo';
   titulo: string;
   descricao: string;
   detalhes?: Record<string, any>;
-  prioridade: 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAIXA';
+  prioridade: 'critica' | 'alta' | 'media' | 'baixa';
   lida: boolean;
   usuarioId: number;
   solicitacaoId?: number;
@@ -32,11 +32,11 @@ export interface EstatisticasNotificacoes {
 }
 
 export interface CreateNotificacaoDto {
-  tipo: 'SOLICITACAO_PENDENTE' | 'NOVO_PROCESSO';
+  tipo: 'solicitacao_pendente' | 'novo_processo';
   titulo: string;
   descricao: string;
   detalhes?: Record<string, any>;
-  prioridade: 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAIXA';
+  prioridade: 'critica' | 'alta' | 'media' | 'baixa';
   usuarioId: number;
   solicitacaoId?: number;
   processoId?: number;
@@ -65,8 +65,18 @@ export class NotificacoesService {
    * Buscar apenas notificações não lidas
    */
   async buscarNaoLidas(): Promise<Notificacao[]> {
-    const response = await api.get<NotificacoesResponse>(`${this.baseUrl}/nao-lidas`);
-    return response.data.data;
+    try {
+      const response = await api.get<NotificacoesResponse>(`${this.baseUrl}/nao-lidas`);
+      return response.data.data;
+    } catch (err: any) {
+      console.error('Erro detalhado ao buscar não lidas:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        url: `${this.baseUrl}/nao-lidas`
+      });
+      throw err;
+    }
   }
 
   /**
@@ -120,8 +130,18 @@ export class NotificacoesService {
    * Buscar estatísticas das notificações
    */
   async buscarEstatisticas(): Promise<EstatisticasNotificacoes> {
-    const response = await api.get<EstatisticasNotificacoes>(`${this.baseUrl}/estatisticas`);
-    return response.data;
+    try {
+      const response = await api.get<EstatisticasNotificacoes>(`${this.baseUrl}/estatisticas`);
+      return response.data;
+    } catch (err: any) {
+      console.error('Erro detalhado ao buscar estatísticas:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        url: `${this.baseUrl}/estatisticas`
+      });
+      throw err;
+    }
   }
 
   /**

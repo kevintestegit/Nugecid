@@ -4,6 +4,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 // Controller
 import { UsersController } from './users.controller';
 
+// Modules
+import { AuthModule } from '../auth/auth.module';
+
 // Legacy Service (manter para compatibilidade)
 // import { UsersService } from './users.service'; // Removido - arquivo contém UsersController
 
@@ -34,7 +37,10 @@ import {
 } from './infrastructure/repositories';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Role, Auditoria])],
+  imports: [
+    TypeOrmModule.forFeature([User, Role, Auditoria]),
+    AuthModule,
+  ],
   controllers: [UsersController],
   providers: [
     // Legacy Service (manter para compatibilidade)

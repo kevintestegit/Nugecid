@@ -465,12 +465,18 @@ export class AuthService {
    * Obtém lista de usuários online
    */
   async getOnlineUsers(): Promise<
-    { id: number; nome: string; usuario: string; role: string }[]
+    { id: number; nome: string; usuario: string; role: string; lastActivity: Date }[]
   > {
+    // Limpa usuários inativos antes de retornar
+    await this.cleanupInactiveUsers();
+
     const onlineUserIds = Array.from(this.onlineUsers.keys());
     if (onlineUserIds.length === 0) {
+      this.logger.debug('Nenhum usuário online encontrado');
       return [];
     }
+
+    this.logger.debug(`Encontrados ${onlineUserIds.length} usuários online: ${onlineUserIds.join(', ')}`);
 
     const users = await this.userRepository.find({
       where: { id: In(onlineUserIds) },
@@ -478,12 +484,49 @@ export class AuthService {
       select: ['id', 'nome', 'usuario'],
     });
 
-    return users.map(user => ({
+    const result = users.map(user => ({
       id: user.id,
       nome: user.nome,
       usuario: user.usuario,
       role: user.role?.name || 'user',
+      lastActivity: this.onlineUsers.get(user.id)?.lastActivity || new Date(),
     }));
+
+    this.logger.debug(`Retornando ${result.length} usuários online`);
+    return result;
+  }
+
+  /**
+   * Atualiza a atividade do usuário
+   */
+  async updateUserActivity(userId: number): Promise<void> {
+    if (this.onlineUsers.has(userId)) {
+      this.onlineUsers.set(userId, { lastActivity: new Date() });
+      this.logger.debug(`Atividade atualizada para usuário ${userId}`);
+    }
+  }
+
+  /**
+   * Limpa usuários inativos (mais de 5 minutos sem atividade)
+   */
+  async cleanupInactiveUsers(): Promise<void> {
+    const now = new Date();
+    const inactiveThreshold = 5 * 60 * 1000; // 5 minutos
+    const inactiveUsers: number[] = [];
+
+    for (const [userId, data] of this.onlineUsers.entries()) {
+      const timeDiff = now.getTime() - data.lastActivity.getTime();
+      if (timeDiff > inactiveThreshold) {
+        inactiveUsers.push(userId);
+      }
+    }
+
+    if (inactiveUsers.length > 0) {
+      inactiveUsers.forEach(userId => {
+        this.onlineUsers.delete(userId);
+      });
+      this.logger.log(`Removidos ${inactiveUsers.length} usuários inativos: ${inactiveUsers.join(', ')}`);
+    }
   }
 
   /**

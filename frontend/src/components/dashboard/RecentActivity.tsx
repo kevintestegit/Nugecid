@@ -12,7 +12,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { formatDate, getStatusLabel, getTipoLabel } from '@/utils/format'
+import { formatDate, getStatusLabel, getTipoDesarquivamentoLabel } from '@/utils/format'
 import { Desarquivamento } from '@/types'
 import { cn } from '@/utils/cn'
 
@@ -56,14 +56,16 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities, isLoading =
   if (isLoading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Atividades Recentes
-          </CardTitle>
-          <CardDescription>
-            Últimas solicitações de desarquivamento
-          </CardDescription>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col space-y-2">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold leading-tight tracking-tight">
+              <Clock className="h-5 w-5" />
+              Atividades Recentes
+            </CardTitle>
+            <CardDescription className="text-sm text-muted-foreground/80 leading-relaxed">
+              Últimas solicitações de desarquivamento
+            </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -107,14 +109,14 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities, isLoading =
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
+          <div className="flex flex-col space-y-2">
+            <CardTitle className="flex items-center gap-2 text-xl font-bold leading-tight tracking-tight">
               <Clock className="h-5 w-5" />
               Atividades Recentes
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm text-muted-foreground/80 leading-relaxed">
               Últimas {activities.length} solicitações de desarquivamento
             </CardDescription>
           </div>
@@ -135,14 +137,14 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities, isLoading =
             >
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="bg-blue-100 text-blue-700 text-sm font-medium">
-                  {getInitials(activity.nomeRequerente)}
+                  {getInitials(activity.nomeCompleto)}
                 </AvatarFallback>
               </Avatar>
-              
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {activity.nomeRequerente || 'Nome não informado'}
+                    {activity.nomeCompleto || 'Nome não informado'}
                   </p>
                   <Badge 
                     variant="outline" 
@@ -155,15 +157,15 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities, isLoading =
                 <div className="flex items-center gap-4 text-xs text-gray-600">
                   <span className="flex items-center gap-1">
                     <FileText className="h-3 w-3" />
-                    {getTipoLabel(activity.tipo)}
+                    {getTipoDesarquivamentoLabel(activity.tipoDesarquivamento)}
                   </span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
                     {formatDate(activity.createdAt)}
                   </span>
-                  {activity.prazoAtendimento && isExpired(activity.prazoAtendimento) && (
+                  {activity.urgente && (
                     <Badge variant="destructive" className="text-xs">
-                      Vencido
+                      Urgente
                     </Badge>
                   )}
                 </div>

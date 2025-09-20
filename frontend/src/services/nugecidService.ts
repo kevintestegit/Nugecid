@@ -8,8 +8,8 @@ const getById = (id: number): Promise<Nugecid> => {
   return api.get(`${API_URL}/${id}`);
 };
 
-const getPaginated = (page: number, pageSize: number, filters: any): Promise<NugecidPage> => {
-  return api.get(API_URL, { params: { page, pageSize, ...filters } });
+const getPaginated = (page: number, limit: number, filters: any): Promise<NugecidPage> => {
+  return api.get(API_URL, { params: { page, limit, ...filters } });
 };
 
 const create = (data: Partial<Nugecid>): Promise<Nugecid> => {
@@ -24,15 +24,8 @@ const remove = (id: number): Promise<void> => {
   return api.delete(`${API_URL}/${id}`);
 };
 
-const exportPdf = (filters: any): Promise<Blob> => {
-  return api.get(`${API_URL}/export/pdf`, { 
-    params: filters,
-    responseType: 'blob' 
-  });
-};
-
-const exportXlsx = (filters: any): Promise<Blob> => {
-  return api.get(`${API_URL}/export/xlsx`, { 
+const exportToExcel = (filters: any): Promise<Blob> => {
+  return api.get(`${API_URL}/export`, { 
     params: filters,
     responseType: 'blob' 
   });
@@ -57,7 +50,6 @@ export const nugecidService = {
   create,
   update,
   remove,
-  exportPdf,
-  exportXlsx,
+  exportToExcel,
   importPlanilha
 };

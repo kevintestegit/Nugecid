@@ -60,13 +60,13 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className = '' }) =
 
   const getPriorityColor = (prioridade: string) => {
     switch (prioridade) {
-      case 'CRITICA':
+      case 'critica':
         return 'text-red-600 bg-red-50';
-      case 'ALTA':
+      case 'alta':
         return 'text-orange-600 bg-orange-50';
-      case 'MEDIA':
+      case 'media':
         return 'text-yellow-600 bg-yellow-50';
-      case 'BAIXA':
+      case 'baixa':
         return 'text-blue-600 bg-blue-50';
       default:
         return 'text-gray-600 bg-gray-50';
@@ -75,13 +75,13 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className = '' }) =
 
   const getPriorityIcon = (prioridade: string) => {
     switch (prioridade) {
-      case 'CRITICA':
+      case 'critica':
         return <AlertTriangle className="w-4 h-4" />;
-      case 'ALTA':
+      case 'alta':
         return <AlertTriangle className="w-4 h-4" />;
-      case 'MEDIA':
+      case 'media':
         return <Info className="w-4 h-4" />;
-      case 'BAIXA':
+      case 'baixa':
         return <CheckCircle className="w-4 h-4" />;
       default:
         return <Info className="w-4 h-4" />;

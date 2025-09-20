@@ -391,6 +391,7 @@ export class AuthController {
           nome: { type: 'string' },
           usuario: { type: 'string' },
           role: { type: 'string' },
+          lastActivity: { type: 'string', format: 'date-time' },
         },
       },
     },
@@ -399,10 +400,42 @@ export class AuthController {
   async getOnlineUsers() {
     try {
       const onlineUsers = await this.authService.getOnlineUsers();
-      this.logger.debug(`Usuários online: ${onlineUsers.length}`);
+      this.logger.debug(`[ONLINE-USERS] Retornando ${onlineUsers.length} usuários online`);
       return onlineUsers;
     } catch (error) {
-      this.logger.error(`Erro ao obter usuários online: ${error.message}`);
+      this.logger.error(`[ONLINE-USERS] Erro ao obter usuários online: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  @Get('online-users/debug')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Debug - Informações detalhadas sobre usuários online' })
+  @ApiResponse({
+    status: 200,
+    description: 'Informações de debug sobre usuários online',
+  })
+  async getOnlineUsersDebug() {
+    try {
+      const onlineUsers = await this.authService.getOnlineUsers();
+      const debugInfo = {
+        totalUsers: onlineUsers.length,
+        users: onlineUsers.map(u => ({
+          id: u.id,
+          nome: u.nome,
+          usuario: u.usuario,
+          role: u.role,
+          lastActivity: u.lastActivity,
+          minutesSinceActivity: Math.floor((Date.now() - u.lastActivity.getTime()) / (1000 * 60))
+        })),
+        serverTime: new Date().toISOString(),
+        mapSize: (this.authService as any).onlineUsers?.size || 0,
+      };
+
+      this.logger.debug(`[DEBUG] Informações de debug:`, debugInfo);
+      return debugInfo;
+    } catch (error) {
+      this.logger.error(`[DEBUG] Erro no endpoint de debug: ${error.message}`);
       throw error;
     }
   }

@@ -6,6 +6,9 @@ import * as multer from 'multer';
 // Controller
 import { NugecidController } from './nugecid.controller';
 
+// Modules
+import { AuthModule } from '../auth/auth.module';
+
 // Use Cases
 import {
   CreateDesarquivamentoUseCase,
@@ -55,6 +58,7 @@ import { NugecidService } from './nugecid.service';
       User,
       Auditoria,
     ]),
+    AuthModule,
     MulterModule.register({
       storage: multer.memoryStorage(),
       fileFilter: (req, file, cb) => {

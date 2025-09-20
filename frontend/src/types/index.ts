@@ -17,7 +17,7 @@ export enum TipoDesarquivamento {
 }
 
 export enum TipoSolicitacao {
-  DESARQUIVAMENTO = 'DESARQUIVamento',
+  DESARQUIVAMENTO = 'DESARQUIVAMENTO',
   COPIA = 'COPIA',
   VISTA = 'VISTA',
   CERTIDAO = 'CERTIDAO',
@@ -116,7 +116,7 @@ export interface DesarquivamentoComment {
 // DTOs
 export interface CreateDesarquivamentoDto {
   tipoDesarquivamento: string
-  desarquivamentoFisicoDigital: TipoDesarquivamento
+  desarquivamentoFisicoDigital?: TipoDesarquivamento
   status?: StatusDesarquivamento
   nomeCompleto: string
   numeroNicLaudoAuto: string
@@ -134,7 +134,8 @@ export interface CreateDesarquivamentoDto {
 
 export interface UpdateDesarquivamentoDto extends Partial<CreateDesarquivamentoDto> {
   status?: StatusDesarquivamento
-  dataAtendimento?: string
+  dataDesarquivamentoSAG?: string
+  responsavelId?: number
 }
 
 export interface QueryDesarquivamentoDto {

@@ -1,7 +1,6 @@
 import { api } from './api';
 
 export interface CardData {
-  totalAtendimentos: number;
   totalDesarquivamentos: number;
   atendimentosPendentes: number;
   atendimentosEsteMes: number;
