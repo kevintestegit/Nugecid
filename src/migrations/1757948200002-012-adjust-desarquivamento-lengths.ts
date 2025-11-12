@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AdjustDesarquivamentoLengths1757948200002
   implements MigrationInterface
 {
-  name = 'AdjustDesarquivamentoLengths1757948200002';
+  name = "AdjustDesarquivamentoLengths1757948200002";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

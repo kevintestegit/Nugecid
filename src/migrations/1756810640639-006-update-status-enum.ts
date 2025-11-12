@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class UpdateStatusEnum1756810640639 implements MigrationInterface {
-  name = 'UpdateStatusEnum1756810640639';
+  name = "UpdateStatusEnum1756810640639";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Remover o índice conflitante

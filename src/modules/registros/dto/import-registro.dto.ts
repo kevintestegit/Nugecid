@@ -5,7 +5,7 @@ import {
   IsDateString,
   IsOptional,
   IsNumber,
-} from 'class-validator';
+} from "class-validator";
 
 export class ImportRegistroDto {
   @IsString()

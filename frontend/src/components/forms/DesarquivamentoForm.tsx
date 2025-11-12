@@ -52,6 +52,9 @@ const desarquivamentoSchema = z.object({
     .min(10, 'A finalidade deve ter pelo menos 10 caracteres')
     .max(1000, 'A finalidade deve ter no máximo 1000 caracteres'),
   solicitacaoProrrogacao: z.boolean().default(false),
+  solicitacaoProrrogacaoTexto: z.string().optional(),
+  dadosAdicionais: z.string().optional(),
+  urgente: z.boolean().optional(),
 })
 
 type DesarquivamentoFormData = z.infer<typeof desarquivamentoSchema>
@@ -79,20 +82,32 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
     resolver: zodResolver(desarquivamentoSchema),
     defaultValues: initialData || {
       solicitacaoProrrogacao: false,
-      dataSolicitacao: new Date().toLocaleDateString('sv-SE'),
+      solicitacaoProrrogacaoTexto: '',
+      dadosAdicionais: '',
+      urgente: false,
+      dataSolicitacao: new Date().toISOString().split('T')[0],
     },
   })
 
+  const normalizeDate = (value?: string) => {
+    if (!value) return undefined
+    const trimmed = value.trim()
+    if (!trimmed) return undefined
+    const parsed = new Date(`${trimmed}T00:00:00`)
+    if (Number.isNaN(parsed.getTime())) return undefined
+    return parsed.toISOString()
+  }
   const onFormSubmit = async (data: DesarquivamentoFormData) => {
     // Garantir que as datas estejam no formato correto (YYYY-MM-DD) quando preenchidas
+    const dataSolicitacaoISO = normalizeDate(data.dataSolicitacao)
     const formattedData = {
       ...data,
-      dataSolicitacao: data.dataSolicitacao,
-      dataDesarquivamentoSAG: data.dataDesarquivamentoSAG || undefined,
-      dataDevolucaoSetor: data.dataDevolucaoSetor || undefined,
+      numeroNicLaudoAuto: data.numeroNicLaudoAuto || '',
+      dataSolicitacao: dataSolicitacaoISO ?? data.dataSolicitacao,
+      dataDesarquivamentoSAG: normalizeDate(data.dataDesarquivamentoSAG) ?? undefined,
+      dataDevolucaoSetor: normalizeDate(data.dataDevolucaoSetor) ?? undefined,
     }
-    
-    await onSubmit(formattedData)
+    await onSubmit(formattedData as CreateDesarquivamentoDto)
   }
 
   return (
@@ -249,12 +264,45 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
             {errors.finalidadeDesarquivamento && <p className="text-sm text-red-600">{errors.finalidadeDesarquivamento.message}</p>}
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox 
+            <Checkbox
               id="solicitacaoProrrogacao"
               checked={watch('solicitacaoProrrogacao')}
               onCheckedChange={(checked) => setValue('solicitacaoProrrogacao', !!checked)}
             />
             <Label htmlFor="solicitacaoProrrogacao">Solicitação de Prorrogação de Prazo de Desarquivamento</Label>
+          </div>
+
+          {watch('solicitacaoProrrogacao') && (
+            <div className="space-y-2">
+              <Label htmlFor="solicitacaoProrrogacaoTexto">Texto da Solicitação de Prorrogação</Label>
+              <textarea
+                id="solicitacaoProrrogacaoTexto"
+                placeholder="Descreva os detalhes da solicitação de prorrogação..."
+                {...register('solicitacaoProrrogacaoTexto')}
+                className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                rows={3}
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="dadosAdicionais">Dados Adicionais</Label>
+            <textarea
+              id="dadosAdicionais"
+              placeholder="Informações complementares (filiação, naturalidade, etc.)..."
+              {...register('dadosAdicionais')}
+              className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="urgente"
+              checked={watch('urgente')}
+              onCheckedChange={(checked) => setValue('urgente', !!checked)}
+            />
+            <Label htmlFor="urgente">Solicitação Urgente</Label>
           </div>
         </CardContent>
       </Card>

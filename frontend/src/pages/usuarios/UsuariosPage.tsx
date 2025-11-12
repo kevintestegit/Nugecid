@@ -22,6 +22,15 @@ const UsuariosPage: React.FC = () => {
 
   // Redirecionar se não tiver permissão
   if (!canViewUsers) {
+    // DEBUG: Log detalhado
+    console.error('❌ Acesso negado à página de usuários', {
+      canViewUsers,
+      canManageUsers,
+      authUser: (window as any).__authUser,
+      localStorage_user: localStorage.getItem('user'),
+      localStorage_token: localStorage.getItem('accessToken') ? 'EXISTS' : 'NOT_FOUND'
+    })
+    
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -32,6 +41,9 @@ const UsuariosPage: React.FC = () => {
           <p className="text-gray-600">
             Você não tem permissão para acessar esta página.
           </p>
+          <div className="mt-4 text-xs text-gray-500">
+            <p>Abra o Console (F12) para ver detalhes do erro</p>
+          </div>
         </div>
       </div>
     )

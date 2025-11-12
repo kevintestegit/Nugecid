@@ -1,0 +1,546 @@
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
+import * as XLSX from "xlsx";
+import { validate } from "class-validator";
+
+import { User } from "../users/entities/user.entity";
+import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
+import { ImportResultDto } from "./dto/import-result.dto";
+import { ImportRegistroDto } from "./dto/import-registro.dto";
+import { NugecidService } from "./nugecid.service";
+import { TipoDesarquivamentoEnum } from "./domain/value-objects/tipo-desarquivamento.vo";
+import { StatusDesarquivamentoEnum } from "./domain/enums/status-desarquivamento.enum";
+
+@Injectable()
+export class NugecidImportService {
+  private readonly logger = new Logger(NugecidImportService.name);
+
+  constructor(private readonly nugecidService: NugecidService) {}
+
+  async importFromXLSX(
+    file: Express.Multer.File,
+    currentUser: User,
+  ): Promise<ImportResultDto> {
+    return this.importRegistrosFromXLSX(file, currentUser);
+  }
+
+  // Normaliza strings: remove acentos/diacríticos, deixa minúsculo e trim
+  private normalize(value: string): string {
+    return value
+      ?.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+  async importRegistrosFromXLSX(
+    file: Express.Multer.File,
+    currentUser: User,
+  ): Promise<ImportResultDto> {
+    // Validações iniciais do arquivo
+    if (!file) {
+      throw new BadRequestException("Arquivo não enviado.");
+    }
+
+    if (!file.buffer || file.buffer.length === 0) {
+      throw new BadRequestException("O arquivo enviado está vazio.");
+    }
+
+    this.logger.log(
+      `Iniciando importação de registros do arquivo: ${file.originalname}`,
+    );
+    this.logger.log(`Tamanho do arquivo: ${file.size} bytes`);
+    this.logger.log(`Tipo MIME: ${file.mimetype}`);
+
+    try {
+      // Tentar ler o arquivo Excel
+      const workbook = XLSX.read(file.buffer, {
+        type: "buffer",
+        cellDates: true,
+        dateNF: "yyyy-mm-dd",
+      });
+
+      // Pega a primeira planilha
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) {
+        throw new BadRequestException(
+          "O arquivo Excel não contém planilhas válidas.",
+        );
+      }
+
+      const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) {
+        throw new BadRequestException("A planilha está vazia.");
+      }
+
+      // Converte a planilha para JSON
+      const data = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1, // Usa a numeração das linhas
+        defval: "", // Valor padrão para células vazias
+      });
+
+      if (!data || data.length === 0) {
+        throw new BadRequestException("Nenhum dado encontrado na planilha.");
+      }
+
+      this.logger.log(
+        `Planilha "${sheetName}" carregada com ${data.length - 1} linhas de dados`,
+      );
+
+      const result = new ImportResultDto();
+      result.totalRows = data.length - 1; // Remove o cabeçalho
+      result.successCount = 0;
+      result.errorCount = 0;
+      result.errors = [];
+
+      // Estado para células mescladas (últimos valores válidos)
+      let ultimoTipoDesarquivamento = "";
+      let ultimoStatus = "";
+      let ultimoNumProcesso = "";
+      let ultimoTipoDocumento = "";
+      let ultimaDataSolicitacao = "";
+      let ultimaDataDesarquivamento = "";
+      let ultimaDataDevolucao = "";
+      let ultimoSetorDemandante = "";
+      let ultimoServidorResponsavel = "";
+      let ultimaFinalidade = "";
+
+      // Remove o cabeçalho da primeira linha
+      const rows = data.slice(1);
+
+      for (let i = 0; i < rows.length; i++) {
+        const originalRow = rows[i] as any[];
+        const rowData = Array.isArray(originalRow) ? [...originalRow] : [];
+        const rowNumber = i + 2; // +2 para contar cabeçalho + índice base 0
+
+        try {
+          // 1. ATUALIZAR VALORES DAS CÉLULAS MESCLADAS
+          // Se as colunas mescladas tiverem valores, atualizar o estado
+          const tipoAtual = (rowData[0] || "").toString().trim();
+          if (tipoAtual) {
+            ultimoTipoDesarquivamento =
+              this.normalizeTipoDesarquivamento(tipoAtual);
+          }
+
+          const statusAtual = (rowData[1] || "").toString().trim();
+          if (statusAtual) {
+            ultimoStatus = this.normalizeStatus(statusAtual);
+          }
+
+          const processoAtual = (rowData[4] || "").toString().trim();
+          if (processoAtual) {
+            ultimoNumProcesso = processoAtual;
+          }
+
+          const tipoDocAtual = (rowData[5] || "").toString().trim();
+          if (tipoDocAtual) {
+            ultimoTipoDocumento = tipoDocAtual;
+          }
+
+          const dataSolicitacaoAtual = (rowData[6] || "").toString().trim();
+          if (dataSolicitacaoAtual) {
+            ultimaDataSolicitacao = this.parseDateSafely(dataSolicitacaoAtual);
+          }
+
+          const dataDesarquivamentoAtual = (rowData[7] || "").toString().trim();
+          if (dataDesarquivamentoAtual) {
+            ultimaDataDesarquivamento = this.parseDateSafely(
+              dataDesarquivamentoAtual,
+            );
+          }
+
+          const dataDevolucaoAtual = (rowData[8] || "").toString().trim();
+          if (dataDevolucaoAtual) {
+            ultimaDataDevolucao = this.parseDateSafely(dataDevolucaoAtual);
+          }
+
+          const setorAtual = (rowData[9] || "").toString().trim();
+          if (setorAtual) {
+            ultimoSetorDemandante = setorAtual;
+          }
+
+          const servidorAtual = (rowData[10] || "").toString().trim();
+          if (servidorAtual) {
+            ultimoServidorResponsavel = servidorAtual;
+          }
+
+          const finalidadeAtual = (rowData[11] || "").toString().trim();
+          if (finalidadeAtual) {
+            ultimaFinalidade = finalidadeAtual;
+          }
+
+          // 2. EXTRAIR MÚLTIPLOS REGISTROS DA COLUNA DE NOMES
+          const nomesRaw = (rowData[2] || "").toString();
+          const documentosRaw = (rowData[3] || "").toString();
+
+          const registrosExtraidos = this.extrairRegistrosDeNomes(
+            nomesRaw,
+            documentosRaw,
+          );
+
+          if (registrosExtraidos.length === 0) {
+            // Se não encontrou registros, pular linha
+            this.logger.warn(
+              `Linha ${rowNumber}: Nenhum registro válido encontrado`,
+            );
+            continue;
+          }
+
+          // 3. CRIAR UM DESARQUIVAMENTO PARA CADA REGISTRO EXTRAÍDO
+          for (
+            let regIndex = 0;
+            regIndex < registrosExtraidos.length;
+            regIndex++
+          ) {
+            const registro = registrosExtraidos[regIndex];
+            try {
+              // Para múltiplos registros na mesma linha, garantir documentos únicos
+              let documentoFinal = registro.documento;
+              if (registrosExtraidos.length > 1 && regIndex > 0) {
+                // Se há múltiplos registros, adicionar sufixo para evitar duplicatas
+                documentoFinal = `${registro.documento}_${regIndex + 1}`;
+              }
+
+              // Criar DTO para criação usando valores mesclados + dados individuais
+              const createDto: CreateDesarquivamentoDto = {
+                tipoDesarquivamento:
+                  ultimoTipoDesarquivamento || TipoDesarquivamentoEnum.FISICO,
+                desarquivamentoFisicoDigital:
+                  (ultimoTipoDesarquivamento as any) ||
+                  TipoDesarquivamentoEnum.FISICO,
+                status:
+                  (ultimoStatus as any) || StatusDesarquivamentoEnum.SOLICITADO,
+                nomeCompleto: registro.nome,
+                numeroNicLaudoAuto: documentoFinal,
+                numeroProcesso: ultimoNumProcesso || "",
+                tipoDocumento: ultimoTipoDocumento || "Não especificado",
+                dataSolicitacao:
+                  ultimaDataSolicitacao || new Date().toISOString(),
+                dataDesarquivamentoSAG: ultimaDataDesarquivamento,
+                dataDevolucaoSetor: ultimaDataDevolucao,
+                setorDemandante: ultimoSetorDemandante || "A verificar",
+                servidorResponsavel: ultimoServidorResponsavel || "A verificar",
+                finalidadeDesarquivamento:
+                  ultimaFinalidade || "Não especificado",
+                solicitacaoProrrogacao: false, // Valor padrão
+              };
+
+              // Criar registro no banco
+              await this.nugecidService.create(createDto, currentUser);
+              result.successCount++;
+
+              this.logger.log(
+                `✅ Registro criado: ${registro.nome} (${documentoFinal})`,
+              );
+            } catch (registroError) {
+              // Se erro de duplicata, tentar com documento modificado
+              if (
+                registroError.message.includes("duplicate key") ||
+                registroError.message.includes("violates unique constraint")
+              ) {
+                try {
+                  const ts = new Date()
+                    .toISOString()
+                    .slice(0, 10)
+                    .replace(/-/g, "");
+                  const rand = Math.random()
+                    .toString(36)
+                    .slice(2, 6)
+                    .toUpperCase();
+                  const documentoUnico = `${registro.documento}_DUP_${ts}_${rand}`;
+
+                  const createDto: CreateDesarquivamentoDto = {
+                    tipoDesarquivamento:
+                      ultimoTipoDesarquivamento ||
+                      TipoDesarquivamentoEnum.FISICO,
+                    desarquivamentoFisicoDigital:
+                      (ultimoTipoDesarquivamento as any) ||
+                      TipoDesarquivamentoEnum.FISICO,
+                    status:
+                      (ultimoStatus as any) ||
+                      StatusDesarquivamentoEnum.SOLICITADO,
+                    nomeCompleto: registro.nome,
+                    numeroNicLaudoAuto: documentoUnico,
+                    numeroProcesso: ultimoNumProcesso || "",
+                    tipoDocumento: ultimoTipoDocumento || "Não especificado",
+                    dataSolicitacao:
+                      ultimaDataSolicitacao || new Date().toISOString(),
+                    dataDesarquivamentoSAG: ultimaDataDesarquivamento,
+                    dataDevolucaoSetor: ultimaDataDevolucao,
+                    setorDemandante: ultimoSetorDemandante || "A verificar",
+                    servidorResponsavel:
+                      ultimoServidorResponsavel || "A verificar",
+                    finalidadeDesarquivamento:
+                      ultimaFinalidade || "Não especificado",
+                    solicitacaoProrrogacao: false,
+                  };
+
+                  await this.nugecidService.create(createDto, currentUser);
+                  result.successCount++;
+
+                  this.logger.log(
+                    `✅ Registro criado (com documento único): ${registro.nome} (${documentoUnico})`,
+                  );
+                } catch (retryError) {
+                  this.logger.error(
+                    `Erro ao criar registro com documento único ${registro.nome}:`,
+                    retryError,
+                  );
+                  result.errorCount++;
+                  result.errors.push({
+                    row: rowNumber,
+                    details: {
+                      message: `Erro ao criar registro ${registro.nome} (mesmo com documento único): ${retryError.message}`,
+                      data: originalRow,
+                    },
+                  });
+                }
+              } else {
+                this.logger.error(
+                  `Erro ao criar registro ${registro.nome}:`,
+                  registroError,
+                );
+                result.errorCount++;
+                result.errors.push({
+                  row: rowNumber,
+                  details: {
+                    message: `Erro ao criar registro ${registro.nome}: ${registroError.message}`,
+                    data: originalRow,
+                  },
+                });
+              }
+            }
+          }
+        } catch (error) {
+          this.logger.error(`❌ Erro ao processar linha ${rowNumber}:`, error);
+
+          result.errorCount++;
+          result.errors.push({
+            row: rowNumber,
+            details: {
+              message: error.message || "Erro desconhecido",
+              data: originalRow,
+            },
+          });
+        }
+      }
+
+      this.logger.log(
+        `📊 Importação finalizada: ${result.successCount} sucessos, ${result.errorCount} erros`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `❌ Erro crítico na importação: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Erro ao processar arquivo Excel: ${error.message}`,
+      );
+    }
+  }
+
+  private mapTipoDesarquivamentoFromExcel(
+    tipo: string,
+  ): TipoDesarquivamentoEnum {
+    if (!tipo) return TipoDesarquivamentoEnum.FISICO;
+
+    const tipoLower = tipo.toString().toLowerCase().trim();
+
+    if (tipoLower.includes("digital")) {
+      return TipoDesarquivamentoEnum.DIGITAL;
+    }
+    if (
+      tipoLower.includes("nao localizado") ||
+      tipoLower.includes("não localizado")
+    ) {
+      return TipoDesarquivamentoEnum.NAO_LOCALIZADO;
+    }
+
+    return TipoDesarquivamentoEnum.FISICO;
+  }
+
+  // Utilitários para trabalhar com datas do Excel
+  private isValidDate(value: any): boolean {
+    if (!value) return false;
+    const date = new Date(value);
+    return !isNaN(date.getTime()) && date.getFullYear() > 1970;
+  }
+
+  private parseDate(value: any): Date {
+    let date: Date;
+
+    if (value instanceof Date) {
+      date = new Date(value);
+    } else if (typeof value === "number") {
+      // Excel date serial number
+      date = new Date((value - 25569) * 86400 * 1000);
+    } else {
+      // Try parsing as string
+      date = new Date(value);
+    }
+
+    if (!this.isValidDate(date)) {
+      throw new Error(`Data inválida: ${value}`);
+    }
+
+    return date;
+  }
+
+  private formatDate(value: any): string {
+    const date = this.parseDate(value);
+    return date.toISOString().split("T")[0]; // YYYY-MM-DD format
+  }
+
+  private normalizeTipoDesarquivamento(value: string): TipoDesarquivamentoEnum {
+    const normalized = this.normalize(value);
+    if (normalized.includes("digital")) {
+      return TipoDesarquivamentoEnum.DIGITAL;
+    }
+    if (
+      normalized.includes("não localizado") ||
+      normalized.includes("nao localizado")
+    ) {
+      return TipoDesarquivamentoEnum.NAO_LOCALIZADO;
+    }
+    return TipoDesarquivamentoEnum.FISICO;
+  }
+
+  private normalizeStatus(value: string): StatusDesarquivamentoEnum {
+    const normalized = this.normalize(value);
+    if (normalized.includes("finalizado"))
+      return StatusDesarquivamentoEnum.FINALIZADO;
+    if (normalized.includes("desarquivado"))
+      return StatusDesarquivamentoEnum.DESARQUIVADO;
+    if (
+      normalized.includes("não coletado") ||
+      normalized.includes("nao coletado")
+    )
+      return StatusDesarquivamentoEnum.NAO_COLETADO;
+    if (normalized.includes("rearquivamento solicitado"))
+      return StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO;
+    if (normalized.includes("retirado pelo setor"))
+      return StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR;
+    if (
+      normalized.includes("não localizado") ||
+      normalized.includes("nao localizado")
+    )
+      return StatusDesarquivamentoEnum.NAO_LOCALIZADO;
+    return StatusDesarquivamentoEnum.SOLICITADO;
+  }
+
+  private parseDateSafely(value: any): string | undefined {
+    if (!value) return undefined;
+    try {
+      if (this.isValidDate(value)) {
+        return this.formatDate(value);
+      }
+      const date = this.parseDate(value);
+      return date.toISOString().split("T")[0];
+    } catch {
+      return undefined;
+    }
+  }
+
+  private extrairRegistrosDeNomes(
+    nomesRaw: string,
+    documentosRaw: string,
+  ): Array<{ nome: string; documento: string }> {
+    const registros: Array<{ nome: string; documento: string }> = [];
+
+    // Primeiro, tentar extrair múltiplos registros da coluna de nomes (padrão "nº XXX NOME")
+    const nomesRegex = /n[ºo]\s*([\d\.\-\/]+)\s+([^nº]+?)(?=\s*n[ºo]|$)/gi;
+    let match;
+    const nomesExtraidos: Array<{ documento: string; nome: string }> = [];
+
+    while ((match = nomesRegex.exec(nomesRaw)) !== null) {
+      const documento = match[1].trim();
+      const nome = match[2].trim();
+      if (documento && nome) {
+        nomesExtraidos.push({ documento, nome });
+      }
+    }
+
+    // Se encontrou múltiplos nomes na coluna 3, usar eles
+    if (nomesExtraidos.length > 0) {
+      // Para cada nome extraído, tentar encontrar uma descrição correspondente na coluna 4
+      // ou usar o documento do próprio nome
+      for (const nomeItem of nomesExtraidos) {
+        registros.push({
+          nome: nomeItem.nome,
+          documento: nomeItem.documento, // Já tem o documento no próprio nome
+        });
+      }
+      return registros;
+    }
+
+    // Se não encontrou múltiplos na coluna 3, verificar se a coluna 4 tem múltiplas descrições
+    const descricoes = documentosRaw
+      .split("\n")
+      .map((d) => d.trim())
+      .filter((d) => d);
+    const nomesUnicos = nomesRaw
+      .split("\n")
+      .map((n) => n.trim())
+      .filter((n) => n);
+
+    // Se tem múltiplas descrições mas apenas um nome, pode ser erro
+    if (descricoes.length > 1 && nomesUnicos.length === 1) {
+      // Tentar extrair documentos das descrições
+      const docsDasDescricoes: string[] = [];
+      for (const desc of descricoes) {
+        const docMatch = desc.match(/n[ºo]\s*([\d\.\-\/]+)/i);
+        if (docMatch) {
+          docsDasDescricoes.push(docMatch[1].trim());
+        }
+      }
+
+      if (docsDasDescricoes.length === descricoes.length) {
+        // Tem documentos para cada descrição
+        for (let i = 0; i < docsDasDescricoes.length; i++) {
+          registros.push({
+            nome: nomesUnicos[0], // Mesmo nome para todos
+            documento: docsDasDescricoes[i],
+          });
+        }
+        return registros;
+      }
+    }
+
+    // Caso padrão: um registro único
+    const nomeLimpo = nomesRaw.replace(/n[ºo]\s*[\d\.\-\/]+\s*/i, "").trim();
+    let documentoLimpo = documentosRaw.trim();
+
+    // Tentar extrair documento da descrição se não estiver limpo
+    if (!documentoLimpo || documentoLimpo.length < 3) {
+      const docMatch = documentosRaw.match(/n[ºo]\s*([\d\.\-\/]+)/i);
+      if (docMatch) {
+        documentoLimpo = docMatch[1].trim();
+      }
+    }
+
+    // Tentar extrair documento do nome se ainda não tem
+    if (!documentoLimpo || documentoLimpo.length < 3) {
+      const docMatch = nomesRaw.match(/n[ºo]\s*([\d\.\-\/]+)/i);
+      if (docMatch) {
+        documentoLimpo = docMatch[1].trim();
+      }
+    }
+
+    if (nomeLimpo) {
+      if (documentoLimpo && documentoLimpo.length >= 3) {
+        registros.push({ nome: nomeLimpo, documento: documentoLimpo });
+      } else {
+        // Gerar documento faltante
+        const ts = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+        registros.push({
+          nome: nomeLimpo,
+          documento: `MISSING-${ts}-${rand}`,
+        });
+      }
+    }
+
+    return registros;
+  }
+}

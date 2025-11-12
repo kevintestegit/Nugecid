@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import * as xlsx from 'xlsx';
-import { validate } from 'class-validator';
-import { plainToClass } from 'class-transformer';
-import { CreateDesarquivamentoDto } from '../../../dto/create-desarquivamento.dto';
-import { TipoDesarquivamentoEnum } from '../../../domain/enums/tipo-desarquivamento.enum';
+import { Injectable } from "@nestjs/common";
+import * as xlsx from "xlsx";
+import { validate } from "class-validator";
+import { plainToClass } from "class-transformer";
+import { CreateDesarquivamentoDto } from "../../../dto/create-desarquivamento.dto";
+import { TipoDesarquivamentoEnum } from "../../../domain/enums/tipo-desarquivamento.enum";
 import {
   CreateDesarquivamentoUseCase,
   CreateDesarquivamentoRequest,
-} from '../create-desarquivamento/create-desarquivamento.use-case';
+} from "../create-desarquivamento/create-desarquivamento.use-case";
 
 interface ImportResult {
   totalRows: number;
@@ -26,7 +26,7 @@ export class ImportDesarquivamentoUseCase {
     fileBuffer: Buffer,
     criadoPorId: number = 1,
   ): Promise<ImportResult> {
-    const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+    const workbook = xlsx.read(fileBuffer, { type: "buffer" });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const data = xlsx.utils.sheet_to_json(worksheet);
@@ -54,7 +54,7 @@ export class ImportDesarquivamentoUseCase {
               dto.tipoDesarquivamento || TipoDesarquivamentoEnum.FISICO,
             nomeCompleto: dto.nomeCompleto,
             numeroNicLaudoAuto: dto.numeroNicLaudoAuto,
-            numeroProcesso: dto.numeroProcesso || '',
+            numeroProcesso: dto.numeroProcesso || "",
             tipoDocumento: dto.tipoDocumento,
             dataSolicitacao: dto.dataSolicitacao,
             setorDemandante: dto.setorDemandante,

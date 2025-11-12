@@ -1,19 +1,25 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import * as XLSX from 'xlsx';
-import { validate } from 'class-validator';
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
+import { DataSource } from "typeorm";
+import * as XLSX from "xlsx";
+import { validate, ValidationError } from "class-validator";
+import { plainToClass } from "class-transformer";
 
-import { User } from '../users/entities/user.entity';
-import { CreateDesarquivamentoDto } from './dto/create-desarquivamento.dto';
-import { ImportResultDto } from './dto/import-result.dto';
-import { ImportRegistroDto } from './dto/import-registro.dto';
-import { NugecidService } from './nugecid.service';
-import { TipoDesarquivamentoEnum } from './domain/value-objects/tipo-desarquivamento.vo';
+import { User } from "../users/entities/user.entity";
+import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
+import { ImportResultDto } from "./dto/import-result.dto";
+import { NugecidService } from "./nugecid.service";
+import { TipoDesarquivamentoEnum } from "./domain/value-objects/tipo-desarquivamento.vo";
+import { StatusDesarquivamentoEnum } from "./domain/enums/status-desarquivamento.enum";
 
 @Injectable()
 export class NugecidImportService {
   private readonly logger = new Logger(NugecidImportService.name);
+  private readonly BATCH_SIZE = 100;
 
-  constructor(private readonly nugecidService: NugecidService) {}
+  constructor(
+    private readonly nugecidService: NugecidService,
+    private readonly dataSource: DataSource,
+  ) {}
 
   async importFromXLSX(
     file: Express.Multer.File,
@@ -22,12 +28,16 @@ export class NugecidImportService {
     return this.importRegistrosFromXLSX(file, currentUser);
   }
 
-  // Normaliza strings: remove acentos/diacríticos, deixa minúsculo e trim
+  /**
+   * Normaliza strings: remove acentos, converte para uppercase e trim
+   * Usado para padronizar entrada conforme backend espera
+   */
   private normalize(value: string): string {
+    if (!value) return "";
     return value
-      ?.normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
       .trim();
   }
 
@@ -35,448 +45,429 @@ export class NugecidImportService {
     file: Express.Multer.File,
     currentUser: User,
   ): Promise<ImportResultDto> {
-    // Validações iniciais do arquivo
+    // Validações iniciais
     if (!file) {
-      throw new BadRequestException('Arquivo não enviado.');
+      throw new BadRequestException("Arquivo não enviado.");
     }
 
     if (!file.buffer || file.buffer.length === 0) {
-      throw new BadRequestException('O arquivo enviado está vazio.');
+      throw new BadRequestException("O arquivo enviado está vazio.");
     }
 
     this.logger.log(
-      `Iniciando importação de registros do arquivo: ${file.originalname}`,
+      `📁 Iniciando importação: ${file.originalname} (${file.size} bytes)`,
     );
-    this.logger.log(`Tamanho do arquivo: ${file.size} bytes`);
-    this.logger.log(`Tipo MIME: ${file.mimetype}`);
 
     try {
-      // Tentar ler o arquivo Excel
+      // Ler arquivo Excel
       const workbook = XLSX.read(file.buffer, {
-        type: 'buffer',
+        type: "buffer",
         cellDates: true,
-        dateNF: 'yyyy-mm-dd',
+        dateNF: "yyyy-mm-dd",
       });
 
-      // Pega a primeira planilha
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
-        throw new BadRequestException(
-          'O arquivo Excel não contém planilhas válidas.',
-        );
+        throw new BadRequestException("O arquivo não contém planilhas válidas.");
       }
 
       const worksheet = workbook.Sheets[sheetName];
       if (!worksheet) {
-        throw new BadRequestException('A planilha está vazia.');
+        throw new BadRequestException("A planilha está vazia.");
       }
 
-      // Converte a planilha para JSON
+      // Converter para JSON (array de arrays)
       const data = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1, // Usa a numeração das linhas
-        defval: '', // Valor padrão para células vazias
-      });
+        header: 1,
+        defval: "",
+        raw: false, // Converter tudo para string primeiro
+      }) as any[][];
 
-      if (!data || data.length === 0) {
-        throw new BadRequestException('Nenhum dado encontrado na planilha.');
+      if (!data || data.length <= 1) {
+        throw new BadRequestException(
+          "A planilha não contém dados. Verifique se há pelo menos uma linha de cabeçalho e uma linha de dados.",
+        );
       }
 
       this.logger.log(
-        `Planilha "${sheetName}" carregada com ${data.length - 1} linhas de dados`,
+        `📊 Planilha "${sheetName}" carregada: ${data.length - 1} linhas de dados`,
       );
 
-      const result = new ImportResultDto();
-      result.totalRows = data.length - 1; // Remove o cabeçalho
-      result.successCount = 0;
-      result.errorCount = 0;
-      result.errors = [];
+      // FASE 1: VALIDAÇÃO E PREPARAÇÃO (sem salvar)
+      const { registrosValidos, erros } = await this.validarEPreparar(
+        data,
+        currentUser,
+      );
 
-      // Remove o cabeçalho da primeira linha
-      const rows = data.slice(1);
-
-      for (let i = 0; i < rows.length; i++) {
-        const originalRow = rows[i] as any[];
-        const rowData = Array.isArray(originalRow) ? [...originalRow] : [];
-        if (rowData.length > 0) {
-          const firstCell = (rowData[0] ?? '').toString().trim();
-          if (!firstCell || /^\d+$/.test(firstCell)) {
-            rowData.shift();
-          }
-        }
-        const rowNumber = i + 2; // +2 para contar cabeçalho + índice base 0
-
-        try {
-          // Mapeamento das colunas baseado na estrutura esperada
-          const importDto = new ImportRegistroDto();
-
-          try {
-            // Mapear dados da coluna baseada na estrutura original da planilha
-
-            // TIPO DE DESARQUIVAMENTO (Coluna A - DESARQUIVAMENTO FÍSICO/DIGITAL)
-            const tipoValue = this.normalize((rowData[0] || '').toString());
-            if (tipoValue.includes('digital')) {
-              importDto.desarquivamentoTipo = 'DIGITAL' as any;
-            } else if (
-              tipoValue.includes('não localizado') ||
-              tipoValue.includes('nao localizado')
-            ) {
-              importDto.desarquivamentoTipo = 'NAO_LOCALIZADO' as any;
-            } else {
-              importDto.desarquivamentoTipo = 'FÍSICO' as any;
-            }
-
-            // STATUS (Coluna B - Status)
-            const statusValue = this.normalize((rowData[1] || '').toString());
-            this.logger.log(`Debug status: "${statusValue}"`);
-
-            if (statusValue.includes('finalizado')) {
-              importDto.status = 'FINALIZADO' as any;
-            } else if (statusValue.includes('desarquivado')) {
-              importDto.status = 'DESARQUIVADO' as any;
-            } else if (
-              statusValue.includes('não coletado') ||
-              statusValue.includes('nao coletado')
-            ) {
-              importDto.status = 'NAO_COLETADO' as any;
-            } else if (statusValue.includes('rearquivamento solicitado')) {
-              importDto.status = 'REARQUIVAMENTO_SOLICITADO' as any;
-            } else if (statusValue.includes('retirado pelo setor')) {
-              importDto.status = 'RETIRADO_PELO_SETOR' as any;
-            } else if (
-              statusValue.includes('não localizado') ||
-              statusValue.includes('nao localizado')
-            ) {
-              importDto.status = 'NAO_LOCALIZADO' as any;
-            } else {
-              // Valor padrão
-              importDto.status = 'SOLICITADO' as any;
-            }
-
-            // NOME COMPLETO (Coluna C)
-            let nomeRaw = (rowData[2] || '').toString().trim();
-            // Alguns arquivos trazem vários nomes concatenados com "nº <doc> NOME ... nº <doc> NOME ..."
-            // Se começar com "nº", tente extrair apenas o primeiro nome após o primeiro número
-            if (/^n[ºo]/i.test(nomeRaw)) {
-              const m = nomeRaw.match(
-                /n[ºo]\s*[\d\.\-\/]+\s+([^nº]+?)(?=\s*n[ºo]|$)/i,
-              );
-              if (m && m[1]) {
-                nomeRaw = m[1].trim();
-              }
-            }
-            const nomeClean = nomeRaw.replace(/\s+/g, ' ').trim();
-            const nomeUpperNoAccent = nomeClean
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toUpperCase();
-            const isNomeVazio =
-              !nomeClean ||
-              ['NA', 'N/A', 'N.A', '-', '--', 'N'].includes(nomeUpperNoAccent);
-            // Regra: nome vazio NÃO deve ser importado; exceção: "*" é permitido
-            if (isNomeVazio && nomeClean !== '*') {
-              result.errorCount++;
-              result.errors.push({
-                row: rowNumber,
-                details: {
-                  message: 'Nome completo vazio/indefinido. Linha ignorada.',
-                  data: originalRow,
-                },
-              });
-              continue; // pula esta linha
-            }
-            // Limite de 255 caracteres (compatível com schema)
-            importDto.nomeCompleto = (nomeClean || '*').slice(0, 255);
-
-            // DOCUMENTO (Coluna D - Nº DO NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA)
-            {
-              const nicRaw = (rowData[3] || '').toString().trim();
-              const cleaned = nicRaw.replace(/\s+/g, ' ').trim();
-              // Tenta extrair o primeiro número (após opcional "nº")
-              const match = cleaned.match(/(?:n[ºo]\s*)?([0-9][0-9.\-\/]*)/i);
-              let nic = match ? match[1] : '';
-              // Limpa espaços e limita tamanho conforme coluna (100)
-              nic = (nic || '').trim().slice(0, 100);
-              const cleanedUpper = (nic || '')
-                .replace(/\s+/g, '')
-                .toUpperCase();
-              const isMissingNic = !nic || cleanedUpper.length < 3;
-              if (isMissingNic) {
-                const ts = new Date()
-                  .toISOString()
-                  .slice(0, 10)
-                  .replace(/-/g, '');
-                const rand = Math.random()
-                  .toString(36)
-                  .slice(2, 6)
-                  .toUpperCase();
-                importDto.numDocumento = `MISSING-${ts}-${rowNumber}-${rand}`;
-              } else {
-                importDto.numDocumento = nic;
-              }
-            }
-
-            // PROCESSO (Coluna E - Nº do Processo)
-            importDto.numProcesso = (rowData[4] || '').toString().trim() || '';
-
-            // TIPO DE DOCUMENTO (Coluna F)
-            importDto.tipoDocumento =
-              (rowData[5] || '').toString().trim() || 'Não especificado';
-
-            // DATA DE SOLICITAÇÃO (Coluna G)
-            const dataSolicitacaoRaw = rowData[6];
-            if (dataSolicitacaoRaw && this.isValidDate(dataSolicitacaoRaw)) {
-              importDto.dataSolicitacao = this.formatDate(dataSolicitacaoRaw);
-            } else if (dataSolicitacaoRaw) {
-              try {
-                const date = this.parseDate(dataSolicitacaoRaw);
-                importDto.dataSolicitacao = date.toISOString().split('T')[0];
-              } catch {
-                importDto.dataSolicitacao = new Date()
-                  .toISOString()
-                  .split('T')[0];
-              }
-            } else {
-              importDto.dataSolicitacao = new Date()
-                .toISOString()
-                .split('T')[0];
-            }
-
-            // DATA DO DESARQUIVAMENTO (Coluna H) - OPCIONAL
-            const dataDesarquivamentoRaw = rowData[7];
-            if (
-              dataDesarquivamentoRaw &&
-              this.isValidDate(dataDesarquivamentoRaw)
-            ) {
-              importDto.dataDesarquivamento = this.formatDate(
-                dataDesarquivamentoRaw,
-              );
-            } else if (dataDesarquivamentoRaw) {
-              try {
-                const date = this.parseDate(dataDesarquivamentoRaw);
-                importDto.dataDesarquivamento = date
-                  .toISOString()
-                  .split('T')[0];
-              } catch {
-                importDto.dataDesarquivamento = undefined;
-              }
-            }
-
-            // DATA DA DEVOLUÇÃO (Coluna I) - OPCIONAL
-            const dataDevolucaoRaw = rowData[8];
-            if (dataDevolucaoRaw && this.isValidDate(dataDevolucaoRaw)) {
-              importDto.dataDevolucao = this.formatDate(dataDevolucaoRaw);
-            } else if (dataDevolucaoRaw) {
-              try {
-                const date = this.parseDate(dataDevolucaoRaw);
-                importDto.dataDevolucao = date.toISOString().split('T')[0];
-              } catch {
-                importDto.dataDevolucao = undefined;
-              }
-            }
-
-            // SETOR DEMANDANTE (Coluna J)
-            importDto.setorDemandante =
-              (rowData[9] || '').toString().trim() || 'A verificar';
-
-            // SERVIDOR RESPONSÁVEL (Coluna K)
-            importDto.servidorResponsavel =
-              (rowData[10] || '').toString().trim() || 'A verificar';
-
-            // FINALIDADE (Coluna L)
-            importDto.finalidade =
-              (rowData[11] || '').toString().trim() || 'Não especificado';
-
-            // PRORROGAÇÃO (Coluna M) - OPCIONAL
-            const prorrogacaoValue = (rowData[12] || '')
-              .toString()
-              .toLowerCase()
-              .trim();
-            if (
-              prorrogacaoValue === 'sim' ||
-              prorrogacaoValue === 's' ||
-              prorrogacaoValue === 'true' ||
-              prorrogacaoValue === '1' ||
-              prorrogacaoValue === 's'
-            ) {
-              importDto.prorrogacao = true;
-            } else if (
-              prorrogacaoValue === 'não' ||
-              prorrogacaoValue === 'n' ||
-              prorrogacaoValue === 'false' ||
-              prorrogacaoValue === '0' ||
-              prorrogacaoValue === 'não'
-            ) {
-              importDto.prorrogacao = false;
-            } else {
-              importDto.prorrogacao = false; // Valor padrão
-            }
-          } catch (mappingError) {
-            this.logger.error(
-              `Erro ao mapear linha ${rowNumber}:`,
-              mappingError,
-            );
-            const fallbackRow = Array.isArray(originalRow)
-              ? [...originalRow]
-              : [];
-            if (fallbackRow.length > 0) {
-              const firstCell = (fallbackRow[0] ?? '').toString().trim();
-              if (!firstCell || /^\d+$/.test(firstCell)) {
-                fallbackRow.shift();
-              }
-            }
-            importDto.desarquivamentoTipo = 'FÍSICO' as any;
-            importDto.status = 'SOLICITADO' as any;
-            importDto.nomeCompleto =
-              (fallbackRow[2] || '').toString().trim() || 'Erro de Mapeamento';
-            importDto.numDocumento =
-              (fallbackRow[3] || '').toString().trim() || 'ERRO';
-            importDto.numProcesso =
-              (fallbackRow[4] || '').toString().trim() || '';
-            importDto.tipoDocumento =
-              (fallbackRow[5] || '').toString().trim() || 'Não especificado';
-            importDto.dataSolicitacao = new Date().toISOString().split('T')[0];
-            importDto.dataDesarquivamento = undefined;
-            importDto.dataDevolucao = undefined;
-            importDto.setorDemandante = 'A verificar';
-            importDto.servidorResponsavel = 'A verificar';
-            importDto.finalidade = 'Erro no mapeamento de dados';
-            importDto.prorrogacao = false;
-          }
-
-          this.logger.log(`Linha ${rowNumber} - Dados mapeados:`, {
-            nome: importDto.nomeCompleto,
-            documento: importDto.numDocumento,
-            processo: importDto.numProcesso,
-            tipo: importDto.desarquivamentoTipo,
-          });
-
-          // Validação dos dados
-          const errors = await validate(importDto);
-          if (errors.length > 0) {
-            this.logger.warn(`Erro de validação na linha ${rowNumber}:`);
-            errors.forEach(err => this.logger.warn(err));
-
-            result.errorCount++;
-            result.errors.push({
-              row: rowNumber,
-              details: {
-                message: `Erro de validação: ${errors.map(err => Object.values(err.constraints).join(', ')).join('; ')}`,
-                data: originalRow,
-              },
-            });
-            continue;
-          }
-
-          // Criar DTO para criação
-          const createDto: CreateDesarquivamentoDto = {
-            tipoDesarquivamento: this.mapTipoDesarquivamentoFromExcel(
-              importDto.desarquivamentoTipo,
-            ),
-            desarquivamentoFisicoDigital: this.mapTipoDesarquivamentoFromExcel(
-              importDto.desarquivamentoTipo,
-            ),
-            status: importDto.status as any,
-            nomeCompleto: importDto.nomeCompleto,
-            numeroNicLaudoAuto: importDto.numDocumento || 'N/A',
-            numeroProcesso: importDto.numProcesso || '',
-            tipoDocumento: importDto.tipoDocumento || 'Não especificado',
-            dataSolicitacao:
-              importDto.dataSolicitacao || new Date().toISOString(),
-            dataDesarquivamentoSAG: importDto.dataDesarquivamento,
-            dataDevolucaoSetor: importDto.dataDevolucao,
-            setorDemandante: importDto.setorDemandante || 'A verificar',
-            servidorResponsavel: importDto.servidorResponsavel || 'A verificar',
-            finalidadeDesarquivamento:
-              importDto.finalidade || 'Não especificado',
-            solicitacaoProrrogacao: importDto.prorrogacao || false,
-          };
-
-          // Criar registro no banco
-          await this.nugecidService.create(createDto, currentUser);
-          result.successCount++;
-
-          this.logger.log(
-            `✅ Linha ${rowNumber} importada com sucesso: ${importDto.nomeCompleto}`,
+      // Se houver erros, retornar sem salvar nada
+      if (erros.length > 0) {
+        this.logger.warn(
+          `❌ Validação falhou: ${erros.length} erros encontrados. Nenhum registro foi importado.`,
+        );
+        
+        // Mostrar os primeiros 5 erros no log para debug
+        const primeirosErros = erros.slice(0, 5);
+        primeirosErros.forEach((erro) => {
+          this.logger.warn(
+            `   Linha ${erro.row}: ${erro.details.message}`,
           );
-        } catch (error) {
-          this.logger.error(`❌ Erro ao processar linha ${rowNumber}:`, error);
-
-          result.errorCount++;
-          result.errors.push({
-            row: rowNumber,
-            details: {
-              message: error.message || 'Erro desconhecido',
-              data: originalRow,
-            },
-          });
+        });
+        
+        if (erros.length > 5) {
+          this.logger.warn(`   ... e mais ${erros.length - 5} erros`);
         }
+        
+        return {
+          totalRows: data.length - 1,
+          successCount: 0,
+          errorCount: erros.length,
+          errors: erros,
+        };
       }
 
+      // FASE 2: IMPORTAÇÃO COM TRANSAÇÃO (tudo ou nada)
+      const result = await this.importarComTransacao(registrosValidos, currentUser);
+
       this.logger.log(
-        `📊 Importação finalizada: ${result.successCount} sucessos, ${result.errorCount} erros`,
+        `✅ Importação concluída: ${result.successCount} registros salvos`,
       );
 
       return result;
     } catch (error) {
-      this.logger.error(
-        `❌ Erro crítico na importação: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`❌ Erro na importação: ${error.message}`, error.stack);
       throw new BadRequestException(
-        `Erro ao processar arquivo Excel: ${error.message}`,
+        `Erro ao processar arquivo: ${error.message}`,
       );
     }
   }
 
-  private mapTipoDesarquivamentoFromExcel(
-    tipo: string,
-  ): TipoDesarquivamentoEnum {
-    if (!tipo) return TipoDesarquivamentoEnum.FISICO;
+  /**
+   * FASE 1: Validar e preparar registros SEM SALVAR
+   * Retorna lista de registros válidos e lista de erros
+   */
+  private async validarEPreparar(
+    data: any[][],
+    currentUser: User,
+  ): Promise<{
+    registrosValidos: CreateDesarquivamentoDto[];
+    erros: Array<{ row: number; details: any }>;
+  }> {
+    const registrosValidos: CreateDesarquivamentoDto[] = [];
+    const erros: Array<{ row: number; details: any }> = [];
+    const rows = data.slice(1); // Remove cabeçalho
 
-    const tipoLower = tipo.toString().toLowerCase().trim();
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNumber = i + 2; // +2 (cabeçalho + índice base 0)
 
-    if (tipoLower.includes('digital')) {
-      return TipoDesarquivamentoEnum.DIGITAL;
+      try {
+        // Extrair dados da linha
+        // Planilha antiga: Status | Nome | NIC/Laudo | Processo | Tipo Doc | Data Sol | ...
+        const statusRaw = this.getCell(row, 0); // Status (Finalizado, etc)
+        const nomeRaw = this.getCell(row, 1);   // Nome Completo
+        const documentoRaw = this.getCell(row, 2); // NIC/Laudo/Auto
+        const processoRaw = this.getCell(row, 3);  // Nº Processo
+        const tipoDocRaw = this.getCell(row, 4);   // Tipo de Documento
+        const dataSolicitacaoRaw = this.getCell(row, 5); // Data Solicitação
+        const dataDesarquivamentoRaw = this.getCell(row, 6); // Data Desarquivamento SAG
+        const dataDevolucaoRaw = this.getCell(row, 7); // Data Devolução
+        const setorRaw = this.getCell(row, 8);     // Setor Demandante
+        const servidorRaw = this.getCell(row, 9);  // Servidor Responsável
+        const finalidadeRaw = this.getCell(row, 10); // Finalidade
+        const prorrogacaoRaw = this.getCell(row, 11); // Solicitação de Prorrogação
+
+        // Log detalhado para debug (apenas primeira e última linha para não poluir)
+        if (i === 0 || i === rows.length - 1) {
+          this.logger.debug(`🔍 Linha ${rowNumber} dados brutos: status="${statusRaw}", nome="${nomeRaw}", doc="${documentoRaw}", data="${dataSolicitacaoRaw}"`);
+        }
+
+        // Validar campos obrigatórios VAZIOS
+        const camposVazios: string[] = [];
+        if (!nomeRaw || nomeRaw.trim() === "") camposVazios.push("Nome Completo (coluna B)");
+        if (!documentoRaw || documentoRaw.trim() === "") camposVazios.push("Número NIC/Laudo/Auto (coluna C)");
+        // numeroProcesso e setorDemandante agora são OPCIONAIS
+        if (!tipoDocRaw || tipoDocRaw.trim() === "") camposVazios.push("Tipo de Documento (coluna E)");
+        if (!dataSolicitacaoRaw || dataSolicitacaoRaw.toString().trim() === "") camposVazios.push("Data Solicitação (coluna F)");
+
+        if (camposVazios.length > 0) {
+          erros.push({
+            row: rowNumber,
+            details: {
+              message: `Campos obrigatórios vazios: ${camposVazios.join(", ")}. Preencha estes campos na planilha e reimporte.`,
+              data: row,
+            },
+          });
+          continue;
+        }
+
+        // Processar numeroNicLaudoAuto
+        let documentoLimpo = documentoRaw.trim();
+        
+        // Validar tamanho máximo do campo (500 caracteres)
+        if (documentoLimpo.length > 500) {
+          erros.push({
+            row: rowNumber,
+            details: {
+              message: `Número NIC/Laudo/Auto excede 500 caracteres (tem ${documentoLimpo.length}). Reduza o tamanho na planilha: "${documentoLimpo.substring(0, 100)}..."`,
+              data: row,
+            },
+          });
+          continue;
+        }
+        
+        // REMOVIDA a validação de duplicatas - agora permite mesmo BIC/NIC para nomes diferentes
+        // Exemplo: João Silva - BIC Nº 146.040 e Maria Santos - BIC Nº 146.040 são permitidos
+
+        // Tipo de desarquivamento: planilha antiga não tem essa coluna, usar FISICO como padrão
+        const tipo = TipoDesarquivamentoEnum.FISICO;
+
+        // Normalizar status
+        const status = statusRaw ? this.normalizarStatus(statusRaw) : StatusDesarquivamentoEnum.SOLICITADO;
+
+        // Converter datas (permitir vazio para campos opcionais)
+        const dataSolicitacao = this.converterData(dataSolicitacaoRaw);
+        if (!dataSolicitacao) {
+          erros.push({
+            row: rowNumber,
+            details: {
+              message: `Data de solicitação inválida: "${dataSolicitacaoRaw}". Use formatos: DD/MM/AAAA, AAAA-MM-DD, DD-MM-AAAA ou números do Excel.`,
+              data: row,
+            },
+          });
+          continue;
+        }
+
+        const dataDesarquivamento = dataDesarquivamentoRaw ? this.converterData(dataDesarquivamentoRaw) : undefined;
+        const dataDevolucao = dataDevolucaoRaw ? this.converterData(dataDevolucaoRaw) : undefined;
+
+        // Criar DTO como objeto plain
+        const dtoPlain = {
+          tipoDesarquivamento: tipo,
+          desarquivamentoFisicoDigital: tipo as TipoDesarquivamentoEnum,
+          status: status,
+          nomeCompleto: nomeRaw.trim().substring(0, 255), // MaxLength 255
+          numeroNicLaudoAuto: documentoLimpo.substring(0, 500), // MaxLength 500
+          numeroProcesso: processoRaw ? processoRaw.trim().substring(0, 255) : null, // OPCIONAL
+          tipoDocumento: tipoDocRaw.trim().substring(0, 100), // MaxLength 100
+          dataSolicitacao: dataSolicitacao,
+          dataDesarquivamentoSAG: dataDesarquivamento,
+          dataDevolucaoSetor: dataDevolucao,
+          setorDemandante: setorRaw ? setorRaw.trim().substring(0, 255) : null, // OPCIONAL
+          servidorResponsavel: servidorRaw ? servidorRaw.trim().substring(0, 255) : "Não informado", // MaxLength 255
+          finalidadeDesarquivamento: finalidadeRaw ? finalidadeRaw.trim().substring(0, 1000) : "Importação de dados históricos", // MaxLength 1000
+          solicitacaoProrrogacao: false,
+          urgente: false,
+        };
+
+        // Transformar em instância de DTO e validar
+        const dto = plainToClass(CreateDesarquivamentoDto, dtoPlain);
+        const validationErrors: ValidationError[] = await validate(dto);
+
+        if (validationErrors.length > 0) {
+          const errorMessages = validationErrors
+            .map((error) => {
+              const constraints = Object.values(error.constraints || {});
+              return `Campo "${error.property}": ${constraints.join(", ")}`;
+            })
+            .join("; ");
+
+          erros.push({
+            row: rowNumber,
+            details: {
+              message: `Validação falhou: ${errorMessages}`,
+              data: dtoPlain,
+            },
+          });
+          continue;
+        }
+
+        registrosValidos.push(dto);
+      } catch (error) {
+        erros.push({
+          row: rowNumber,
+          details: {
+            message: `Erro ao processar linha: ${error.message}`,
+            data: row,
+          },
+        });
+      }
     }
-    if (
-      tipoLower.includes('nao localizado') ||
-      tipoLower.includes('não localizado')
-    ) {
+
+    return { registrosValidos, erros };
+  }
+
+  /**
+   * FASE 2: Importar registros validados com TRANSAÇÃO
+   * Se qualquer registro falhar, faz ROLLBACK de todos
+   */
+  private async importarComTransacao(
+    registros: CreateDesarquivamentoDto[],
+    currentUser: User,
+  ): Promise<ImportResultDto> {
+    const result = new ImportResultDto();
+    result.totalRows = registros.length;
+    result.successCount = 0;
+    result.errorCount = 0;
+    result.errors = [];
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Processar SEQUENCIALMENTE para evitar conflito de numero_solicitacao
+      for (let i = 0; i < registros.length; i++) {
+        const dto = registros[i];
+        
+        try {
+          await this.nugecidService.create(dto, currentUser);
+          result.successCount++;
+          
+          // Log a cada 10 registros
+          if ((i + 1) % 10 === 0) {
+            this.logger.log(
+              `📦 Processados: ${i + 1}/${registros.length}`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(`Erro ao importar registro ${i + 1}: ${error.message}`);
+          throw error; // Lançar erro para fazer rollback
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      this.logger.log(`✅ Transação confirmada: ${result.successCount} registros salvos`);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`❌ ROLLBACK: Erro ao salvar registros`, error.stack);
+      
+      throw new BadRequestException(
+        `Erro ao salvar registros no banco de dados: ${error.message}. ` +
+        `Nenhum registro foi importado. Verifique os dados e tente novamente.`
+      );
+    } finally {
+      await queryRunner.release();
+    }
+
+    return result;
+  }
+
+  /**
+   * Obter valor de célula (trata undefined/null)
+   */
+  private getCell(row: any[], index: number): string {
+    const value = row[index];
+    if (value === undefined || value === null || value === "") return "";
+    return String(value).trim();
+  }
+
+  /**
+   * Normalizar tipo de desarquivamento conforme backend espera
+   */
+  private normalizarTipoDesarquivamento(value: string): string | null {
+    if (!value) return TipoDesarquivamentoEnum.FISICO;
+
+    const normalized = this.normalize(value);
+
+    if (normalized.includes("DIGITAL")) return TipoDesarquivamentoEnum.DIGITAL;
+    if (normalized.includes("NAO") && normalized.includes("LOCALIZADO"))
       return TipoDesarquivamentoEnum.NAO_LOCALIZADO;
-    }
+    if (normalized.includes("FISICO")) return TipoDesarquivamentoEnum.FISICO;
 
-    return TipoDesarquivamentoEnum.FISICO;
+    // Se não reconheceu, retornar null para erro
+    return null;
   }
 
-  // Utilitários para trabalhar com datas do Excel
-  private isValidDate(value: any): boolean {
-    if (!value) return false;
-    const date = new Date(value);
-    return !isNaN(date.getTime()) && date.getFullYear() > 1970;
+  /**
+   * Normalizar status conforme backend espera
+   */
+  private normalizarStatus(value: string): StatusDesarquivamentoEnum {
+    if (!value) return StatusDesarquivamentoEnum.SOLICITADO;
+
+    const normalized = this.normalize(value);
+
+    if (normalized.includes("FINALIZADO"))
+      return StatusDesarquivamentoEnum.FINALIZADO;
+    if (normalized.includes("DESARQUIVADO"))
+      return StatusDesarquivamentoEnum.DESARQUIVADO;
+    if (normalized.includes("NAO") && normalized.includes("COLETADO"))
+      return StatusDesarquivamentoEnum.NAO_COLETADO;
+    if (normalized.includes("REARQUIVAMENTO"))
+      return StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO;
+    if (normalized.includes("RETIRADO"))
+      return StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR;
+    if (normalized.includes("NAO") && normalized.includes("LOCALIZADO"))
+      return StatusDesarquivamentoEnum.NAO_LOCALIZADO;
+
+    return StatusDesarquivamentoEnum.SOLICITADO;
   }
 
-  private parseDate(value: any): Date {
-    let date: Date;
+  /**
+   * Converter data para formato ISO (aceita múltiplos formatos)
+   */
+  private converterData(value: any): string | undefined {
+    if (!value || value === "") return undefined;
 
-    if (value instanceof Date) {
-      date = new Date(value);
-    } else if (typeof value === 'number') {
-      // Excel date serial number
-      date = new Date((value - 25569) * 86400 * 1000);
-    } else {
-      // Try parsing as string
-      date = new Date(value);
+    try {
+      // 1. Se já é Date object
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+
+      // 2. Se é número (serial do Excel)
+      if (!isNaN(Number(value))) {
+        const numValue = Number(value);
+        // Excel serial date (dias desde 1900-01-01)
+        if (numValue > 1 && numValue < 100000) {
+          const date = new Date((numValue - 25569) * 86400 * 1000);
+          if (!isNaN(date.getTime())) {
+            return date.toISOString();
+          }
+        }
+      }
+
+      // 3. Se é string, tentar diversos formatos
+      const strValue = String(value).trim();
+
+      // Formato DD/MM/AAAA ou DD-MM-AAAA
+      const ddmmyyyyMatch = strValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (ddmmyyyyMatch) {
+        const [, day, month, year] = ddmmyyyyMatch;
+        const date = new Date(Number(year), Number(month) - 1, Number(day));
+        if (!isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+      }
+
+      // Formato AAAA-MM-DD
+      const yyyymmddMatch = strValue.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (yyyymmddMatch) {
+        const date = new Date(strValue);
+        if (!isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+      }
+
+      // Formato DD/MM/AA (ano com 2 dígitos)
+      const ddmmyyMatch = strValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/);
+      if (ddmmyyMatch) {
+        const [, day, month, year] = ddmmyyMatch;
+        const fullYear = Number(year) < 50 ? 2000 + Number(year) : 1900 + Number(year);
+        const date = new Date(fullYear, Number(month) - 1, Number(day));
+        if (!isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+      }
+
+      // Tentar parse direto
+      const date = new Date(strValue);
+      if (!isNaN(date.getTime())) {
+        return date.toISOString();
+      }
+
+      return undefined;
+    } catch {
+      return undefined;
     }
-
-    if (!this.isValidDate(date)) {
-      throw new Error(`Data inválida: ${value}`);
-    }
-
-    return date;
-  }
-
-  private formatDate(value: any): string {
-    const date = this.parseDate(value);
-    return date.toISOString().split('T')[0]; // YYYY-MM-DD format
   }
 }

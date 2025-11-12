@@ -50,6 +50,12 @@
 }
 
 @layer base {
+  html, body {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+  }
+
   * {
     @apply border-border;
   }

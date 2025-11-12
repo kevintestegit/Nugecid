@@ -20,7 +20,6 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ userId, onClose, onSu
       onSuccess?.()
       onClose()
     } catch (error) {
-      // Erro já tratado no hook
       console.error('Erro ao desativar usuário:', error)
     }
   }

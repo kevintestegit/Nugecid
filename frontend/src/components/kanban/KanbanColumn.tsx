@@ -92,14 +92,55 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               <Settings className="w-4 h-4" />
             </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              title="Mais opções"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // Fechar outros menus abertos
+                  document.querySelectorAll('.kanban-menu').forEach(menu => {
+                    if (menu !== e.currentTarget.nextElementSibling) {
+                      menu.classList.add('hidden');
+                    }
+                  });
+                  const menu = e.currentTarget.nextElementSibling as HTMLElement;
+                  menu?.classList.toggle('hidden');
+                }}
+                title="Mais opções"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+
+              {/* Menu dropdown */}
+              <div className="kanban-menu absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50 hidden min-w-32">
+                <button
+                  onClick={(e) => {
+                    onEditColumn?.(coluna);
+                    const menu = (e.currentTarget as HTMLElement)?.parentElement?.querySelector('.kanban-menu') as HTMLElement;
+                    menu?.classList.add('hidden');
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                >
+                  <Settings className="w-4 h-4" />
+                  Editar
+                </button>
+                <button
+                  onClick={(e) => {
+                    onDeleteColumn?.(coluna.id);
+                    const menu = (e.currentTarget as HTMLElement)?.parentElement?.querySelector('.kanban-menu') as HTMLElement;
+                    menu?.classList.add('hidden');
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Excluir
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

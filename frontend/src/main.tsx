@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import App from './App.tsx'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
 
 // Configuração do React Query
@@ -30,15 +31,17 @@ window.addEventListener('unhandledrejection', (event) => {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ThemeProvider>
-          <BrowserRouter>
-            <App />
-            <Toaster position="top-right" richColors />
-          </BrowserRouter>
-        </ThemeProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <ThemeProvider>
+            <BrowserRouter>
+              <App />
+              <Toaster position="top-right" richColors />
+            </BrowserRouter>
+          </ThemeProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 )

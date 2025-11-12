@@ -46,4 +46,20 @@ export { Alert, AlertTitle, AlertDescription } from './Alert';
 export { Textarea } from './Textarea';
 export { Switch } from './Switch';
 export { DateRangePicker } from './DateRangePicker';
-export type { DateRange } from './DateRangePicker';
+export { DateRangeInput } from './DateRangeInput';
+export type { DateRange } from './DateRangeInput';
+export { Popover, PopoverContent, PopoverTrigger } from './Popover';
+export { Calendar } from './Calendar';
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from './Dialog';
+export { NugecidLogo } from './NugecidLogo';

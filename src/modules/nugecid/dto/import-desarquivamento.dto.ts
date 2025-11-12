@@ -5,7 +5,7 @@ import {
   IsOptional,
   IsInt,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
 export class ImportDesarquivamentoDto {
   @IsString()

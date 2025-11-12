@@ -10,166 +10,189 @@ import {
   BeforeInsert,
   BeforeUpdate,
   Index,
-} from 'typeorm';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Exclude } from 'class-transformer';
+} from "typeorm";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Exclude } from "class-transformer";
 
-import { User } from '../../users/entities/user.entity';
-import { RoleType } from '../../users/enums/role-type.enum';
+import { User } from "../../users/entities/user.entity";
+import { RoleType } from "../../users/enums/role-type.enum";
 
 // Enums imports
-import { StatusDesarquivamentoEnum } from '../domain/enums/status-desarquivamento.enum';
-import { TipoDesarquivamentoEnum } from '../domain/enums/tipo-desarquivamento.enum';
+import { StatusDesarquivamentoEnum } from "../domain/enums/status-desarquivamento.enum";
+import { TipoDesarquivamentoEnum } from "../domain/enums/tipo-desarquivamento.enum";
 
-@Entity('desarquivamentos')
-@Index(['numeroNicLaudoAuto'], { unique: true })
-@Index(['numeroProcesso'])
-@Index(['status'])
-@Index(['desarquivamentoFisicoDigital'])
-@Index(['dataSolicitacao'])
-@Index(['createdBy'])
+@Entity("desarquivamentos")
+@Index(["numeroNicLaudoAuto"])
+@Index(["numeroExtraido"])
+@Index(["numeroProcesso"])
+@Index(["status"])
+@Index(["desarquivamentoFisicoDigital"])
+@Index(["dataSolicitacao"])
+@Index(["createdBy"])
 export class Desarquivamento {
   @ApiProperty({
-    description: 'ID único do desarquivamento',
+    description: "ID único do desarquivamento",
     example: 1,
   })
   @PrimaryGeneratedColumn()
   id: number;
 
   @ApiProperty({
-    description: 'Desarquivamento Físico/Digital ou não localizado',
-    example: 'FISICO',
+    description: "Número sequencial da solicitação",
+    example: 1,
+  })
+  @Column({
+    name: "numero_solicitacao",
+    type: "integer",
+    nullable: false,
+    unique: true,
+  })
+  numeroSolicitacao: number;
+
+  @ApiProperty({
+    description: "Desarquivamento Físico/Digital ou não localizado",
+    example: "FISICO",
     enum: TipoDesarquivamentoEnum,
   })
   @Column({
-    name: 'desarquivamento_fisico_digital',
-    type: 'enum',
+    name: "desarquivamento_fisico_digital",
+    type: "enum",
     enum: TipoDesarquivamentoEnum,
     nullable: false,
   })
   desarquivamentoFisicoDigital: TipoDesarquivamentoEnum;
 
   @ApiProperty({
-    description: 'Status atual da solicitação',
+    description: "Status atual da solicitação",
     enum: StatusDesarquivamentoEnum,
     example: StatusDesarquivamentoEnum.SOLICITADO,
   })
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: StatusDesarquivamentoEnum,
     default: StatusDesarquivamentoEnum.SOLICITADO,
   })
   status: StatusDesarquivamentoEnum;
 
   @ApiProperty({
-    description: 'Nome completo do solicitante',
-    example: 'João Silva Santos',
+    description: "Nome completo do solicitante",
+    example: "João Silva Santos",
   })
-  @Column({ name: 'nome_completo', length: 255, nullable: false })
+  @Column({ name: "nome_completo", length: 255, nullable: false })
   nomeCompleto: string;
 
   @ApiProperty({
-    description: 'Número do NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA',
-    example: '2024.001.123456',
+    description: "Número do NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA",
+    example: "BIC Nº 146.040 - João Silva",
   })
   @Column({
-    name: 'numero_nic_laudo_auto',
-    length: 100,
+    name: "numero_nic_laudo_auto",
+    length: 500,
     nullable: false,
-    unique: true,
   })
   numeroNicLaudoAuto: string;
 
   @ApiProperty({
-    description: 'Número do processo',
-    example: '2024.001.123456',
+    description: "Número extraído automaticamente do NIC/LAUDO/AUTO (4+ dígitos)",
+    example: "146040",
   })
-  @Column({ name: 'numero_processo', length: 255, nullable: false })
-  numeroProcesso: string;
+  @Column({
+    name: "numero_extraido",
+    length: 50,
+    nullable: true,
+  })
+  numeroExtraido?: string;
+
+  @ApiPropertyOptional({
+    description: "Número do processo",
+    example: "2024.001.123456",
+  })
+  @Column({ name: "numero_processo", length: 255, nullable: true })
+  numeroProcesso?: string;
 
   @ApiProperty({
-    description: 'Tipo do documento',
-    example: 'Laudo Pericial',
+    description: "Tipo do documento",
+    example: "Laudo Pericial",
   })
-  @Column({ name: 'tipo_documento', length: 100, nullable: false })
+  @Column({ name: "tipo_documento", length: 100, nullable: false })
   tipoDocumento: string;
 
   @ApiProperty({
-    description: 'Data de solicitação',
-    example: '2024-01-15T08:30:00Z',
+    description: "Data de solicitação",
+    example: "2024-01-15T08:30:00Z",
   })
-  @Column({ name: 'data_solicitacao', type: 'timestamp', nullable: false })
+  @Column({ name: "data_solicitacao", type: "timestamp", nullable: false })
   dataSolicitacao: Date;
 
   @ApiPropertyOptional({
-    description: 'Data do desarquivamento - SAG',
-    example: '2024-02-10T14:30:00Z',
-    type: 'string',
-    format: 'date-time',
+    description: "Data do desarquivamento - SAG",
+    example: "2024-02-10T14:30:00Z",
+    type: "string",
+    format: "date-time",
   })
   @Column({
-    name: 'data_desarquivamento_sag',
-    type: 'timestamp',
+    name: "data_desarquivamento_sag",
+    type: "timestamp",
     nullable: true,
   })
   dataDesarquivamentoSAG?: Date;
 
   @ApiPropertyOptional({
-    description: 'Data da devolução pelo setor',
-    example: '2024-02-15T10:00:00Z',
-    type: 'string',
-    format: 'date-time',
+    description: "Data da devolução pelo setor",
+    example: "2024-02-15T10:00:00Z",
+    type: "string",
+    format: "date-time",
   })
-  @Column({ name: 'data_devolucao_setor', type: 'timestamp', nullable: true })
+  @Column({ name: "data_devolucao_setor", type: "timestamp", nullable: true })
   dataDevolucaoSetor?: Date;
 
-  @ApiProperty({
-    description: 'Setor demandante',
-    example: 'Perícia Criminal',
+  @ApiPropertyOptional({
+    description: "Setor demandante",
+    example: "Perícia Criminal",
   })
-  @Column({ name: 'setor_demandante', length: 255, nullable: false })
-  setorDemandante: string;
+  @Column({ name: "setor_demandante", length: 255, nullable: true })
+  setorDemandante?: string;
 
   @ApiProperty({
-    description: 'Servidor do ITEP responsável (matrícula)',
-    example: '12345',
+    description: "Servidor do ITEP responsável (matrícula)",
+    example: "12345",
   })
-  @Column({ name: 'servidor_responsavel', length: 255, nullable: false })
+  @Column({ name: "servidor_responsavel", length: 255, nullable: false })
   servidorResponsavel: string;
 
   @ApiProperty({
-    description: 'Finalidade do desarquivamento',
-    example: 'Processo judicial em andamento',
+    description: "Finalidade do desarquivamento",
+    example: "Processo judicial em andamento",
   })
-  @Column({ name: 'finalidade_desarquivamento', type: 'text', nullable: false })
+  @Column({ name: "finalidade_desarquivamento", type: "text", nullable: false })
   finalidadeDesarquivamento: string;
 
   @ApiProperty({
-    description: 'Solicitação de prorrogação de prazo',
+    description: "Solicitação de prorrogação de prazo",
     example: false,
   })
-  @Column({ name: 'solicitacao_prorrogacao', type: 'boolean', default: false })
+  @Column({ name: "solicitacao_prorrogacao", type: "boolean", default: false })
   solicitacaoProrrogacao: boolean;
 
   @ApiPropertyOptional({
-    description: 'Indica se a solicitação é urgente',
+    description: "Indica se a solicitação é urgente",
     example: false,
   })
-  @Column({ name: 'urgente', type: 'boolean', nullable: true, default: false })
+  @Column({ name: "urgente", type: "boolean", nullable: true, default: false })
   urgente?: boolean;
 
   @ApiPropertyOptional({
-    description: 'ID do usuário responsável pelo atendimento',
+    description: "ID do usuário responsável pelo atendimento",
     example: 2,
   })
-  @Column({ name: 'responsavel_id', nullable: true })
+  @Column({ name: "responsavel_id", nullable: true })
   responsavelId?: number;
 
   @ApiProperty({
-    description: 'ID do usuário que criou o registro',
+    description: "ID do usuário que criou o registro",
     example: 1,
   })
-  @Column({ name: 'created_by', nullable: false })
+  @Column({ name: "created_by", nullable: false })
   createdBy: number;
 
   // Alias para compatibilidade
@@ -182,53 +205,72 @@ export class Desarquivamento {
   }
 
   @ApiProperty({
-    description: 'Data de criação do registro',
-    example: '2024-01-15T08:30:00Z',
+    description: "Data de criação do registro",
+    example: "2024-01-15T08:30:00Z",
   })
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
   @ApiProperty({
-    description: 'Data da última atualização',
-    example: '2024-01-15T10:45:00Z',
+    description: "Data da última atualização",
+    example: "2024-01-15T10:45:00Z",
   })
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 
   @ApiPropertyOptional({
-    description: 'Data de exclusão (soft delete)',
+    description: "Data de exclusão (soft delete)",
     example: null,
   })
-  @DeleteDateColumn({ name: 'deleted_at' })
+  @DeleteDateColumn({ name: "deleted_at" })
   @Exclude()
   deletedAt?: Date;
 
   // Relacionamentos
   @ApiProperty({
-    description: 'Usuário solicitante',
+    description: "Usuário solicitante",
     type: () => User,
   })
   @ManyToOne(() => User, { eager: false })
-  @JoinColumn({ name: 'created_by' })
+  @JoinColumn({ name: "created_by" })
   criadoPor: User;
 
   @ApiPropertyOptional({
-    description: 'Usuário responsável pelo atendimento',
+    description: "Usuário responsável pelo atendimento",
     type: () => User,
   })
   @ManyToOne(() => User, { eager: false })
-  @JoinColumn({ name: 'responsavel_id' })
+  @JoinColumn({ name: "responsavel_id" })
   responsavel?: User;
 
   // Hooks
   @BeforeInsert()
   setDefaultValues() {
-    // Set default values if needed
+    // Extrai número automaticamente do campo numeroNicLaudoAuto
+    this.numeroExtraido = this.extractMainNumber(this.numeroNicLaudoAuto);
   }
 
   @BeforeUpdate()
   updateTimestamp() {
-    // Update timestamp automatically
+    // Extrai número automaticamente se o campo foi alterado
+    this.numeroExtraido = this.extractMainNumber(this.numeroNicLaudoAuto);
+  }
+
+  /**
+   * Extrai o número principal (4+ dígitos consecutivos) do campo numeroNicLaudoAuto
+   * Exemplo: "BIC Nº 146.040" -> "146040"
+   * Exemplo: "NIC-2024-12345" -> "12345"
+   */
+  private extractMainNumber(value: string): string | null {
+    if (!value) return null;
+
+    // Remove pontos, vírgulas, traços e espaços para facilitar busca
+    const cleaned = value.replace(/[.,\-\s]/g, '');
+    
+    // Busca por sequências de 4 ou mais dígitos
+    const match = cleaned.match(/\d{4,}/);
+    
+    return match ? match[0] : null;
   }
 
   /**
@@ -298,14 +340,14 @@ export class Desarquivamento {
    */
   getStatusDisplay(): string {
     const statusMap = {
-      [StatusDesarquivamentoEnum.FINALIZADO]: 'Finalizado',
-      [StatusDesarquivamentoEnum.DESARQUIVADO]: 'Desarquivado',
-      [StatusDesarquivamentoEnum.NAO_COLETADO]: 'Não Coletado',
-      [StatusDesarquivamentoEnum.SOLICITADO]: 'Solicitado',
+      [StatusDesarquivamentoEnum.FINALIZADO]: "Finalizado",
+      [StatusDesarquivamentoEnum.DESARQUIVADO]: "Desarquivado",
+      [StatusDesarquivamentoEnum.NAO_COLETADO]: "Não Coletado",
+      [StatusDesarquivamentoEnum.SOLICITADO]: "Solicitado",
       [StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO]:
-        'Rearquivamento Solicitado',
-      [StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR]: 'Retirado pelo Setor',
-      [StatusDesarquivamentoEnum.NAO_LOCALIZADO]: 'Não Localizado',
+        "Rearquivamento Solicitado",
+      [StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR]: "Retirado pelo Setor",
+      [StatusDesarquivamentoEnum.NAO_LOCALIZADO]: "Não Localizado",
     };
 
     return statusMap[this.status] || this.status;
@@ -313,15 +355,15 @@ export class Desarquivamento {
 
   getStatusColor(): string {
     const colors = {
-      [StatusDesarquivamentoEnum.FINALIZADO]: 'success',
-      [StatusDesarquivamentoEnum.DESARQUIVADO]: 'info',
-      [StatusDesarquivamentoEnum.NAO_COLETADO]: 'warning',
-      [StatusDesarquivamentoEnum.SOLICITADO]: 'primary',
-      [StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO]: 'secondary',
-      [StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR]: 'info',
-      [StatusDesarquivamentoEnum.NAO_LOCALIZADO]: 'danger',
+      [StatusDesarquivamentoEnum.FINALIZADO]: "success",
+      [StatusDesarquivamentoEnum.DESARQUIVADO]: "info",
+      [StatusDesarquivamentoEnum.NAO_COLETADO]: "warning",
+      [StatusDesarquivamentoEnum.SOLICITADO]: "primary",
+      [StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO]: "secondary",
+      [StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR]: "info",
+      [StatusDesarquivamentoEnum.NAO_LOCALIZADO]: "danger",
     };
-    return colors[this.status] || 'secondary';
+    return colors[this.status] || "secondary";
   }
 
   getStatusLabel(): string {
@@ -361,8 +403,8 @@ export class Desarquivamento {
   /**
    * Retorna a prioridade baseada na urgência
    */
-  getPriority(): 'ALTA' | 'MEDIA' | 'BAIXA' {
-    if (this.urgente) return 'ALTA';
-    return 'MEDIA';
+  getPriority(): "ALTA" | "MEDIA" | "BAIXA" {
+    if (this.urgente) return "ALTA";
+    return "MEDIA";
   }
 }

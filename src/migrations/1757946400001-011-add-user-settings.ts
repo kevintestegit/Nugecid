@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AddUserSettings1757946400001 implements MigrationInterface {
-  name = 'AddUserSettings1757946400001';
+  name = "AddUserSettings1757946400001";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
@@ -24,7 +24,7 @@ export class AddUserSettings1757946400001 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_USUARIOS_SETTINGS"');
     await queryRunner.query(
-      'ALTER TABLE usuarios DROP COLUMN IF EXISTS settings',
+      "ALTER TABLE usuarios DROP COLUMN IF EXISTS settings",
     );
   }
 }

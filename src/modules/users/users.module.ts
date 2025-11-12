@@ -1,19 +1,23 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
 
 // Controller
-import { UsersController } from './users.controller';
+import { UsersController } from "./users.controller";
 
 // Modules
-import { AuthModule } from '../auth/auth.module';
+import { AuthModule } from "../auth/auth.module";
 
 // Legacy Service (manter para compatibilidade)
 // import { UsersService } from './users.service'; // Removido - arquivo contém UsersController
 
 // Entities
-import { User } from './entities/user.entity';
-import { Role } from './entities/role.entity';
-import { Auditoria } from '../audit/entities/auditoria.entity';
+import { User } from "./entities/user.entity";
+import { Role } from "./entities/role.entity";
+import { UserPreference } from "./entities/user-preference.entity";
+import { Auditoria } from "../audit/entities/auditoria.entity";
+
+// Services
+import { UserPreferencesService } from "./services/user-preferences.service";
 
 // Use Cases
 import {
@@ -25,34 +29,32 @@ import {
   RestoreUserUseCase,
   GetUserStatisticsUseCase,
   GetRolesUseCase,
-} from './application/use-cases';
+} from "./application/use-cases";
 
 // Repository Interfaces
-import { IUserRepository, IRoleRepository } from './domain/repositories';
+import { IUserRepository, IRoleRepository } from "./domain/repositories";
 
 // Repository Implementations
 import {
   TypeOrmUserRepository,
   TypeOrmRoleRepository,
-} from './infrastructure/repositories';
+} from "./infrastructure/repositories";
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, Role, Auditoria]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([User, Role, UserPreference, Auditoria]), AuthModule],
   controllers: [UsersController],
   providers: [
+    UserPreferencesService,
     // Legacy Service (manter para compatibilidade)
     // UsersService, // Removido - não existe essa classe
 
     // Repository Implementations
     {
-      provide: 'IUserRepository',
+      provide: "IUserRepository",
       useClass: TypeOrmUserRepository,
     },
     {
-      provide: 'IRoleRepository',
+      provide: "IRoleRepository",
       useClass: TypeOrmRoleRepository,
     },
 

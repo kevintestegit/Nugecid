@@ -1,23 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Download, Upload, Filter } from 'lucide-react'
--import { Button } from '@/components/ui/button'
-+import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/hooks/useAuth'
 import { useDesarquivamentos, useDeleteDesarquivamento } from '@/hooks/useDesarquivamentos'
 import { useDesarquivamentosImport } from '@/hooks/useDesarquivamentosImport'
-import { StatusDesarquivamento } from '@/types/desarquivamento'
+import { StatusDesarquivamento, TipoSolicitacao } from '@/types/desarquivamento'
 import { Desarquivamento } from '@/types/desarquivamento'
--import { Breadcrumb } from '@/components/ui/breadcrumb'
-+import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 import { AdvancedFilters } from '@/components/filters/AdvancedFilters'
 import { ListingStats } from '@/components/desarquivamentos/ListingStats'
 import { DesarquivamentosTable } from '@/components/desarquivamentos/DesarquivamentosTable'
--import { Pagination } from '@/components/ui/pagination'
-+import { Pagination } from '@/components/ui/Pagination'
+import { Pagination } from '@/components/ui/Pagination'
 import { ImportModal } from '@/components/desarquivamentos/ImportModal'
--import { AdminConfirmDialog } from '@/components/ui/admin-confirm-dialog'
-+import { AdminConfirmDialog } from '@/components/ui/AdminConfirmDialog'
+import { AdminConfirmDialog } from '@/components/ui/AdminConfirmDialog'
 import { toast } from 'sonner'
 
 interface FilterState {
@@ -74,7 +70,17 @@ const ListaDesarquivamentosPage: React.FC = () => {
     if (filters.status) params.status = filters.status
     if (filters.tipo) params.tipo = filters.tipo
     if (filters.dataInicio) params.dataInicio = filters.dataInicio
-    if (filters.dataFim) params.dataFim = filters.dataFim
+
+    // Adiciona 1 dia à data final para incluir o dia completo
+    if (filters.dataFim) {
+      const endDate = new Date(filters.dataFim + 'T00:00:00')
+      endDate.setDate(endDate.getDate() + 1)
+      const yyyy = endDate.getFullYear()
+      const mm = String(endDate.getMonth() + 1).padStart(2, '0')
+      const dd = String(endDate.getDate()).padStart(2, '0')
+      params.dataFim = `${yyyy}-${mm}-${dd}`
+    }
+
     if (filters.requerente) params.requerente = filters.requerente
     if (filters.vencidas) params.vencidos = 'true'
 
@@ -224,14 +230,14 @@ const ListaDesarquivamentosPage: React.FC = () => {
     return {
       total: items.length,
       pendente: items.filter((item: Desarquivamento) => item.status === StatusDesarquivamento.SOLICITADO).length,
-      emAnalise: items.filter((item: Desarquivamento) => item.status === StatusDesarquivamento.EM_ANDAMENTO).length,
+      emAnalise: items.filter((item: Desarquivamento) => item.status === StatusDesarquivamento.DESARQUIVADO).length,
       aprovado: items.filter((item: Desarquivamento) => item.status === StatusDesarquivamento.FINALIZADO).length,
       expirados: items.filter((item: Desarquivamento) => {
         // Calculate expiration based on dataSolicitacao + 30 days
         if (!item.dataSolicitacao) return false
         const deadline = new Date(item.dataSolicitacao)
         deadline.setDate(deadline.getDate() + 30)
-        return now > deadline && item.status !== StatusDesarquivamento.FINALIZADO && item.status !== StatusDesarquivamento.CANCELADO
+        return now > deadline && item.status !== StatusDesarquivamento.FINALIZADO && item.status !== StatusDesarquivamento.NAO_COLETADO && item.status !== StatusDesarquivamento.NAO_LOCALIZADO
       }).length
     }
   }, [data?.data])

@@ -1,6 +1,6 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IDesarquivamentoRepository, DashboardStats } from '../../../domain';
-import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from '../../../domain/nugecid.constants';
+import { Injectable, Inject } from "@nestjs/common";
+import { IDesarquivamentoRepository, DashboardStats } from "../../../domain";
+import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
 
 export interface GetDashboardStatsRequest {
   userId?: number;
@@ -68,28 +68,28 @@ export class GetDashboardStatsUseCase {
       const { startDate, endDate } = request.dateRange;
 
       if (!(startDate instanceof Date) || !(endDate instanceof Date)) {
-        throw new Error('Datas devem ser objetos Date válidos');
+        throw new Error("Datas devem ser objetos Date válidos");
       }
 
       if (startDate >= endDate) {
-        throw new Error('Data de início deve ser anterior à data de fim');
+        throw new Error("Data de início deve ser anterior à data de fim");
       }
 
       // Limitar range máximo a 2 anos
       const maxRange = 2 * 365 * 24 * 60 * 60 * 1000; // 2 anos em ms
       if (endDate.getTime() - startDate.getTime() > maxRange) {
-        throw new Error('Range de datas não pode exceder 2 anos');
+        throw new Error("Range de datas não pode exceder 2 anos");
       }
     }
 
     // Validar IDs de usuário
     if (request.userId !== undefined && request.userId <= 0) {
-      throw new Error('ID do usuário deve ser positivo');
+      throw new Error("ID do usuário deve ser positivo");
     }
 
     // Validar roles
     if (request.userRoles !== undefined && !Array.isArray(request.userRoles)) {
-      throw new Error('Roles do usuário devem ser um array');
+      throw new Error("Roles do usuário devem ser um array");
     }
   }
 
@@ -103,9 +103,9 @@ export class GetDashboardStatsUseCase {
       vencidos: stats.vencidos,
       urgentes: stats.urgentes,
       porTipo: {
-        fisico: stats.porTipo['FISICO'] || 0,
-        digital: stats.porTipo['DIGITAL'] || 0,
-        naoLocalizado: stats.porTipo['NAO_LOCALIZADO'] || 0,
+        fisico: stats.porTipo["FISICO"] || 0,
+        digital: stats.porTipo["DIGITAL"] || 0,
+        naoLocalizado: stats.porTipo["NAO_LOCALIZADO"] || 0,
       },
       porMes: stats.porMes,
       taxaConclusao: stats.taxaConclusao,

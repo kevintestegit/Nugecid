@@ -1,8 +1,8 @@
 export enum TipoSolicitacaoEnum {
-  DESARQUIVAMENTO = 'DESARQUIVAMENTO',
-  COPIA = 'COPIA',
-  VISTA = 'VISTA',
-  CERTIDAO = 'CERTIDAO',
+  DESARQUIVAMENTO = "DESARQUIVAMENTO",
+  COPIA = "COPIA",
+  VISTA = "VISTA",
+  CERTIDAO = "CERTIDAO",
 }
 
 export class TipoSolicitacao {
@@ -71,15 +71,15 @@ export class TipoSolicitacao {
   getDescription(): string {
     switch (this._value) {
       case TipoSolicitacaoEnum.DESARQUIVAMENTO:
-        return 'Solicitação de desarquivamento de documento';
+        return "Solicitação de desarquivamento de documento";
       case TipoSolicitacaoEnum.COPIA:
-        return 'Solicitação de cópia de documento';
+        return "Solicitação de cópia de documento";
       case TipoSolicitacaoEnum.VISTA:
-        return 'Solicitação de vista de documento';
+        return "Solicitação de vista de documento";
       case TipoSolicitacaoEnum.CERTIDAO:
-        return 'Solicitação de certidão';
+        return "Solicitação de certidão";
       default:
-        return 'Tipo de solicitação desconhecido';
+        return "Tipo de solicitação desconhecido";
     }
   }
 
@@ -116,15 +116,15 @@ export class TipoSolicitacao {
   getColor(): string {
     switch (this._value) {
       case TipoSolicitacaoEnum.DESARQUIVAMENTO:
-        return '#3b82f6'; // azul
+        return "#3b82f6"; // azul
       case TipoSolicitacaoEnum.COPIA:
-        return '#10b981'; // verde
+        return "#10b981"; // verde
       case TipoSolicitacaoEnum.VISTA:
-        return '#f59e0b'; // amarelo
+        return "#f59e0b"; // amarelo
       case TipoSolicitacaoEnum.CERTIDAO:
-        return '#8b5cf6'; // roxo
+        return "#8b5cf6"; // roxo
       default:
-        return '#6b7280'; // cinza
+        return "#6b7280"; // cinza
     }
   }
 }

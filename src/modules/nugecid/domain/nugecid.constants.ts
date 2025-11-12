@@ -1,1 +1,1 @@
-export const DESARQUIVAMENTO_REPOSITORY_TOKEN = 'IDesarquivamentoRepository';
+export const DESARQUIVAMENTO_REPOSITORY_TOKEN = "IDesarquivamentoRepository";

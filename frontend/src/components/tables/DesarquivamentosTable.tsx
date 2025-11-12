@@ -62,12 +62,17 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
     switch (status) {
       case StatusDesarquivamento.SOLICITADO:
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case StatusDesarquivamento.EM_ANDAMENTO:
+      case StatusDesarquivamento.DESARQUIVADO:
         return 'bg-blue-100 text-blue-800 border-blue-200'
       case StatusDesarquivamento.FINALIZADO:
         return 'bg-green-100 text-green-800 border-green-200'
-      case StatusDesarquivamento.CANCELADO:
+      case StatusDesarquivamento.NAO_COLETADO:
+      case StatusDesarquivamento.NAO_LOCALIZADO:
         return 'bg-red-100 text-red-800 border-red-200'
+      case StatusDesarquivamento.RETIRADO_PELO_SETOR:
+        return 'bg-purple-100 text-purple-800 border-purple-200'
+      case StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO:
+        return 'bg-orange-100 text-orange-800 border-orange-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }

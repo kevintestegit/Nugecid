@@ -17,9 +17,12 @@ import TarefasPage from '@/pages/TarefasPage'
 import NovaTarefaPage from '@/pages/tarefas/NovaTarefaPage'
 import DetalheTarefaPage from '@/pages/tarefas/DetalheTarefaPage'
 import ArquivoPage from '@/pages/ArquivoPage'
+import PrateleiraDetailPage from '@/pages/PrateleiraDetailPage'
 import ProjetosPage from '@/pages/ProjetosPage'
 import KanbanPage from '@/pages/KanbanPage'
 import SearchIconTest from '@/components/test/SearchIconTest'
+import CustodiaVestigiosPage from '@/pages/CustodiaVestigiosPage'
+import { RelatoriosPage } from '@/pages/RelatoriosPage'
 import { UserRole } from '@/types'
 
 const App: React.FC = () => {
@@ -56,8 +59,15 @@ const App: React.FC = () => {
           <Route path="projetos" element={<ProjetosPage />} />
           <Route path="kanban/:id" element={<KanbanPage />} />
           
+          {/* Custódia de Vestígios */}
+          <Route path="custodia" element={<CustodiaVestigiosPage />} />
+
+          {/* Relatórios */}
+          <Route path="relatorios" element={<RelatoriosPage />} />
+
           {/* Arquivo */}
           <Route path="arquivo" element={<ArquivoPage />} />
+          <Route path="arquivo/:id" element={<PrateleiraDetailPage />} />
           
           {/* Usuários - apenas para coordenadores e admins */}
           <Route path="usuarios" element={

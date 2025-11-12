@@ -71,13 +71,12 @@ class TarefasService {
 
   // Operações específicas
   async moveTarefa(id: number, data: MoveTarefaDto): Promise<Tarefa> {
-    const response = await api.patch<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}/move`, data)
+    const response = await api.patch<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}/mover`, data)
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Erro ao mover tarefa')
     }
     return response.data.data
   }
-
   async getTarefasAtrasadas(projetoId: number): Promise<Tarefa[]> {
     const response = await api.get<ApiResponse<Tarefa[]>>(
       `${this.baseUrl}/atrasadas?projetoId=${projetoId}`
@@ -250,3 +249,6 @@ class TarefasService {
 
 export const tarefasService = new TarefasService()
 export default tarefasService
+
+
+

@@ -1,6 +1,6 @@
-import { Role as DomainRole } from '../../domain/entities/role';
-import { RoleId } from '../../domain/value-objects/role-id';
-import { Role as RoleEntity } from '../../entities/role.entity';
+import { Role as DomainRole } from "../../domain/entities/role";
+import { RoleId } from "../../domain/value-objects/role-id";
+import { Role as RoleEntity } from "../../entities/role.entity";
 
 export class RoleMapper {
   static toDomain(entity: RoleEntity): DomainRole {
@@ -33,10 +33,10 @@ export class RoleMapper {
   }
 
   static toDomainArray(entities: RoleEntity[]): DomainRole[] {
-    return entities.map(entity => this.toDomain(entity));
+    return entities.map((entity) => this.toDomain(entity));
   }
 
   static toEntityArray(domains: DomainRole[]): RoleEntity[] {
-    return domains.map(domain => this.toEntity(domain));
+    return domains.map((domain) => this.toEntity(domain));
   }
 }

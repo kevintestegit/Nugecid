@@ -1,6 +1,6 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { DataSource } from "typeorm";
+import { InjectDataSource } from "@nestjs/typeorm";
 
 @Injectable()
 export class DatabaseConnectionListener implements OnModuleInit {
@@ -30,7 +30,7 @@ export class DatabaseConnectionListener implements OnModuleInit {
       if (driver && driver.master) {
         const connection = driver.master;
         if (connection && connection.pool) {
-          connection.pool.on('error', (err: any) => {
+          connection.pool.on("error", (err: any) => {
             this.logger.error(`[DB] Erro na conexão: ${err.message}`);
           });
         }
@@ -47,7 +47,7 @@ export class DatabaseConnectionListener implements OnModuleInit {
         this.logger.warn(`[DB] DataSource não inicializado.`);
         return false;
       }
-      await this.dataSource.query('SELECT 1');
+      await this.dataSource.query("SELECT 1");
       return true;
     } catch (error: any) {
       this.logger.error(`[DB] Falha na conexão: ${error.message}`);

@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { DesarquivamentoDomain } from '../../domain/entities/desarquivamento.entity';
-import { DesarquivamentoTypeOrmEntity } from '../entities/desarquivamento.typeorm-entity';
+import { Injectable } from "@nestjs/common";
+import { DesarquivamentoDomain } from "../../domain/entities/desarquivamento.entity";
+import { DesarquivamentoTypeOrmEntity } from "../entities/desarquivamento.typeorm-entity";
 import {
   DesarquivamentoId,
   StatusDesarquivamento,
-} from '../../domain/value-objects';
-import { StatusDesarquivamentoEnum } from '../../domain/value-objects/status-desarquivamento.vo';
+} from "../../domain/value-objects";
+import { StatusDesarquivamentoEnum } from "../../domain/value-objects/status-desarquivamento.vo";
+import { TipoDesarquivamentoEnum } from "../../domain/enums/tipo-desarquivamento.enum";
 
 @Injectable()
 export class DesarquivamentoMapper {
@@ -51,7 +52,22 @@ export class DesarquivamentoMapper {
     }
 
     // Propriedades simplificadas
-    entity.tipoDesarquivamento = domain.tipoDesarquivamento;
+    entity.numeroSolicitacao = domain.numeroSolicitacao;
+    const tipoValor = domain.tipoDesarquivamento
+      ? domain.tipoDesarquivamento
+          .toString()
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toUpperCase()
+      : TipoDesarquivamentoEnum.FISICO;
+    const tipoNormalizado = Object.values(TipoDesarquivamentoEnum).includes(
+      tipoValor as TipoDesarquivamentoEnum,
+    )
+      ? (tipoValor as TipoDesarquivamentoEnum)
+      : TipoDesarquivamentoEnum.FISICO;
+    entity.tipoDesarquivamento = tipoNormalizado;
+    entity.desarquivamentoFisicoDigital = tipoNormalizado; // Mapear para o campo obrigatório do banco
     entity.status = domain.status.value;
     entity.nomeCompleto = domain.nomeCompleto;
     entity.numeroNicLaudoAuto = domain.numeroNicLaudoAuto;
@@ -59,7 +75,13 @@ export class DesarquivamentoMapper {
     entity.tipoDocumento = domain.tipoDocumento;
     entity.dataSolicitacao = domain.dataSolicitacao;
     entity.dataDesarquivamentoSAG = domain.dataDesarquivamentoSAG;
-    entity.dataDevolucaoSetor = domain.dataDevolucaoSetor;
+    // Converter undefined para null para forçar atualização no banco de dados
+    const dataDevolucao = domain.dataDevolucaoSetor === undefined ? null : domain.dataDevolucaoSetor;
+    console.log('[Mapper] toTypeOrm - Convertendo dataDevolucaoSetor:', {
+      domain: domain.dataDevolucaoSetor,
+      entity: dataDevolucao,
+    });
+    entity.dataDevolucaoSetor = dataDevolucao;
     entity.setorDemandante = domain.setorDemandante;
     entity.servidorResponsavel = domain.servidorResponsavel;
     entity.finalidadeDesarquivamento = domain.finalidadeDesarquivamento;
@@ -100,11 +122,13 @@ export class DesarquivamentoMapper {
       entity.numeroProcesso &&
       entity.numeroProcesso.toString().trim().length > 0
         ? entity.numeroProcesso
-        : 'N/A';
+        : "N/A";
 
     const domainData = {
       id,
-      tipoDesarquivamento: entity.tipoDesarquivamento,
+      numeroSolicitacao: entity.numeroSolicitacao,
+      tipoDesarquivamento:
+        entity.desarquivamentoFisicoDigital || entity.tipoDesarquivamento,
       status,
       nomeCompleto: entity.nomeCompleto,
       numeroNicLaudoAuto: entity.numeroNicLaudoAuto,
@@ -134,7 +158,7 @@ export class DesarquivamentoMapper {
   toDomainList(
     entities: DesarquivamentoTypeOrmEntity[],
   ): DesarquivamentoDomain[] {
-    return entities.map(entity => this.toDomain(entity));
+    return entities.map((entity) => this.toDomain(entity));
   }
 
   /**
@@ -143,7 +167,7 @@ export class DesarquivamentoMapper {
   toTypeOrmList(
     domains: DesarquivamentoDomain[],
   ): DesarquivamentoTypeOrmEntity[] {
-    return domains.map(domain => this.toTypeOrm(domain));
+    return domains.map((domain) => this.toTypeOrm(domain));
   }
 
   /**
@@ -157,9 +181,25 @@ export class DesarquivamentoMapper {
       );
     }
 
+    const tipoValor = domain.tipoDesarquivamento
+      ? domain.tipoDesarquivamento
+          .toString()
+          .trim()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toUpperCase()
+      : TipoDesarquivamentoEnum.FISICO;
+    const tipoNormalizado = Object.values(TipoDesarquivamentoEnum).includes(
+      tipoValor as TipoDesarquivamentoEnum,
+    )
+      ? (tipoValor as TipoDesarquivamentoEnum)
+      : TipoDesarquivamentoEnum.FISICO;
+
     return {
       id: domain.id.value,
-      tipoDesarquivamento: domain.tipoDesarquivamento,
+      numeroSolicitacao: domain.numeroSolicitacao,
+      tipoDesarquivamento: tipoNormalizado,
+      desarquivamentoFisicoDigital: tipoNormalizado,
       status: domain.status.value,
       nomeCompleto: domain.nomeCompleto,
       numeroNicLaudoAuto: domain.numeroNicLaudoAuto,
@@ -188,7 +228,7 @@ export class DesarquivamentoMapper {
    * Converte uma lista de entidades de domínio para objetos planos
    */
   toPlainObjectList(domains: DesarquivamentoDomain[]): any[] {
-    return domains.map(domain => this.toPlainObject(domain));
+    return domains.map((domain) => this.toPlainObject(domain));
   }
 
   /**

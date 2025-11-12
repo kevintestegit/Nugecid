@@ -97,67 +97,60 @@ const QuickActions: React.FC = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <FileText className="h-5 w-5" />
           Ações Rápidas
         </CardTitle>
-        <CardDescription>
-          Acesso rápido às principais funcionalidades
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {filteredActions.map((action, index) => {
             const Icon = action.icon
             return (
               <Button
                 key={index}
-                variant="ghost"
+                variant="outline"
                 className={cn(
-                  "h-auto p-4 flex flex-col items-center justify-center gap-3 border border-gray-200 transition-all duration-200 min-h-[140px]",
+                  "h-auto p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200",
                   action.hoverColor,
-                  "hover:border-gray-300 hover:shadow-sm"
+                  "hover:shadow-md hover:scale-105"
                 )}
                 asChild
               >
-                <Link to={action.href} className="w-full h-full flex flex-col items-center justify-center gap-4">
-                  <div className={cn("p-3 rounded-lg flex-shrink-0", action.bgColor)}>
-                    <Icon className={cn("h-6 w-6", action.color)} />
+                <Link to={action.href} className="w-full">
+                  <div className={cn("p-2 rounded-lg", action.bgColor)}>
+                    <Icon className={cn("h-5 w-5", action.color)} />
                   </div>
-                  <div className="text-center flex-1 flex flex-col justify-center">
-                    <h3 className="font-medium text-gray-900 text-sm leading-tight mb-2 text-wrap break-words">
-                      {action.title}
-                    </h3>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      {action.description}
-                    </p>
-                  </div>
+                  <span className="font-medium text-xs text-center leading-tight mt-1">
+                    {action.title}
+                  </span>
                 </Link>
               </Button>
             )
           })}
         </div>
         
-        {/* Ações secundárias */}
-        <div className="mt-6 pt-4 border-t border-gray-100">
+        {/* Filtros rápidos */}
+        <div className="mt-4 pt-4 border-t border-border/50">
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Filtros Rápidos:</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link to="/desarquivamentos?status=SOLICITADO" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Solicitado
+              <Link to="/desarquivamentos?status=SOLICITADO" className="flex items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                <span className="text-xs">Solicitado</span>
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/desarquivamentos?status=REARQUIVAMENTO_SOLICITADO" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Rearquivamento Solicitado
+              <Link to="/desarquivamentos?status=REARQUIVAMENTO_SOLICITADO" className="flex items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                <span className="text-xs">Rearquivamento</span>
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link to="/desarquivamentos?status=RETIRADO_PELO_SETOR" className="flex items-center gap-2">
-                <Filter className="h-4 w-4" />
-                Retirado pelo Setor
+              <Link to="/desarquivamentos?status=RETIRADO_PELO_SETOR" className="flex items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                <span className="text-xs">Retirado</span>
               </Link>
             </Button>
           </div>

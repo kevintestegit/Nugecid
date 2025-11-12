@@ -5,11 +5,11 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
+} from "typeorm";
 
-import { User } from './user.entity';
+import { User } from "./user.entity";
 
-@Entity('roles')
+@Entity("roles")
 export class Role {
   @PrimaryGeneratedColumn()
   id: number;
@@ -21,14 +21,14 @@ export class Role {
   description: string;
 
   @Column({
-    name: 'settings',
-    type: 'jsonb',
+    name: "settings",
+    type: "jsonb",
     nullable: true,
     default: () => "'{}'::jsonb",
     select: false,
   })
   settings?: {
-    theme?: 'light' | 'dark';
+    theme?: "light" | "dark";
     notifications?: {
       email?: boolean;
       push?: boolean;
@@ -38,14 +38,14 @@ export class Role {
   };
 
   @Column({
-    type: 'text',
+    type: "text",
     nullable: true,
     transformer: {
       to: (value: string[]) => (value ? JSON.stringify(value) : null),
       from: (value: any) => {
         if (!value) return [];
         if (Array.isArray(value)) return value;
-        if (typeof value === 'string') {
+        if (typeof value === "string") {
           try {
             return JSON.parse(value);
           } catch {
@@ -59,17 +59,17 @@ export class Role {
   })
   permissions: string[];
 
-  @Column({ name: 'ativo', type: 'boolean', default: true })
+  @Column({ name: "ativo", type: "boolean", default: true })
   ativo: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 
   // Relacionamentos
-  @OneToMany(() => User, user => user.role)
+  @OneToMany(() => User, (user) => user.role)
   users: User[];
 
   // Métodos
@@ -78,10 +78,10 @@ export class Role {
   }
 
   isAdmin(): boolean {
-    return this.name === 'admin';
+    return this.name === "admin";
   }
 
   isEditor(): boolean {
-    return this.name === 'editor';
+    return this.name === "editor";
   }
 }

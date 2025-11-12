@@ -1,4 +1,4 @@
-import { RoleId } from '../value-objects/role-id';
+import { RoleId } from "../value-objects/role-id";
 
 export interface RoleProps {
   id?: RoleId;
@@ -34,7 +34,7 @@ export class Role {
 
   private validateProps(props: RoleProps): void {
     if (!props.nome || props.nome.trim().length === 0) {
-      throw new Error('Nome da role é obrigatório');
+      throw new Error("Nome da role é obrigatório");
     }
 
     // Permissões serão sempre normalizadas para array no construtor;

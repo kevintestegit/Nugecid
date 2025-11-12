@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { InjectDataSource } from '@nestjs/typeorm';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from "@nestjs/common";
+import { DataSource } from "typeorm";
+import { InjectDataSource } from "@nestjs/typeorm";
+import { ConfigService } from "@nestjs/config";
 
 export interface DatabaseHealthStatus {
-  status: 'healthy' | 'unhealthy' | 'degraded';
+  status: "healthy" | "unhealthy" | "degraded";
   connection: boolean;
   lastCheck: Date;
   responseTime: number;
@@ -33,11 +33,11 @@ export class DatabaseHealthService {
 
   async checkHealth(): Promise<DatabaseHealthStatus> {
     const startTime = Date.now();
-    const host = this.configService.get<string>('DATABASE_HOST', 'localhost');
-    const port = this.configService.get<number>('DATABASE_PORT', 5432);
+    const host = this.configService.get<string>("DATABASE_HOST", "localhost");
+    const port = this.configService.get<number>("DATABASE_PORT", 5432);
     const database = this.configService.get<string>(
-      'DATABASE_NAME',
-      'sgc_itep',
+      "DATABASE_NAME",
+      "sgc_itep",
     );
 
     this.logger.debug(
@@ -53,13 +53,13 @@ export class DatabaseHealthService {
           host,
           port,
           database,
-          'DataSource não inicializado',
+          "DataSource não inicializado",
         );
       }
 
       // Teste de conectividade simples
       const queryResult = await this.dataSource.query(
-        'SELECT 1 as status, NOW() as current_time',
+        "SELECT 1 as status, NOW() as current_time",
       );
       const responseTime = Date.now() - startTime;
 
@@ -71,7 +71,7 @@ export class DatabaseHealthService {
       const connectionStats = await this.getConnectionStats();
 
       const healthStatus: DatabaseHealthStatus = {
-        status: 'healthy',
+        status: "healthy",
         connection: true,
         lastCheck: new Date(),
         responseTime,
@@ -140,7 +140,7 @@ export class DatabaseHealthService {
     const responseTime = Date.now() - startTime;
 
     const healthStatus: DatabaseHealthStatus = {
-      status: 'unhealthy',
+      status: "unhealthy",
       connection: false,
       lastCheck: new Date(),
       responseTime,
@@ -169,7 +169,7 @@ export class DatabaseHealthService {
 
     try {
       // Teste 1: Query básica
-      results.basicQuery = await this.dataSource.query('SELECT 1 as test');
+      results.basicQuery = await this.dataSource.query("SELECT 1 as test");
       this.logger.log(`✅ [TEST_QUERIES] Query básica: OK`);
 
       // Teste 2: Verificar tabelas principais
@@ -186,7 +186,7 @@ export class DatabaseHealthService {
       // Teste 3: Verificar usuários
       try {
         results.userCount = await this.dataSource.query(
-          'SELECT COUNT(*) as count FROM users',
+          "SELECT COUNT(*) as count FROM users",
         );
         this.logger.log(
           `✅ [TEST_QUERIES] Usuários na base: ${results.userCount[0]?.count || 0}`,
@@ -201,7 +201,7 @@ export class DatabaseHealthService {
       // Teste 4: Verificar desarquivamentos
       try {
         results.desarquivamentoCount = await this.dataSource.query(
-          'SELECT COUNT(*) as count FROM desarquivamentos',
+          "SELECT COUNT(*) as count FROM desarquivamentos",
         );
         this.logger.log(
           `✅ [TEST_QUERIES] Desarquivamentos na base: ${results.desarquivamentoCount[0]?.count || 0}`,
@@ -216,7 +216,7 @@ export class DatabaseHealthService {
       // Teste 5: Verificar roles
       try {
         results.roleCount = await this.dataSource.query(
-          'SELECT COUNT(*) as count FROM roles',
+          "SELECT COUNT(*) as count FROM roles",
         );
         this.logger.log(
           `✅ [TEST_QUERIES] Roles na base: ${results.roleCount[0]?.count || 0}`,
@@ -263,10 +263,10 @@ export class DatabaseHealthService {
       `);
 
       this.logger.log(
-        `📊 [DB_INFO] PostgreSQL Version: ${dbInfo[0]?.postgres_version || 'N/A'}`,
+        `📊 [DB_INFO] PostgreSQL Version: ${dbInfo[0]?.postgres_version || "N/A"}`,
       );
       this.logger.log(
-        `📊 [DB_INFO] Database: ${dbInfo[0]?.database_name || 'N/A'}`,
+        `📊 [DB_INFO] Database: ${dbInfo[0]?.database_name || "N/A"}`,
       );
       this.logger.log(`📊 [DB_INFO] Tabelas encontradas: ${tableInfo.length}`);
 

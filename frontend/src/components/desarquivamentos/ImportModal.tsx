@@ -96,16 +96,59 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
                   
                   {importResult.errors && importResult.errors.length > 0 && (
                     <div className="mt-3">
-                      <h4 className="font-bold text-sm">Detalhes dos Erros:</h4>
-                      <div className="max-h-40 overflow-y-auto mt-2 p-2 bg-gray-50 rounded">
-                        <ul className="list-disc pl-5 space-y-1">
-                          {importResult.errors.map((err, index) => (
-                            <li key={index} className="text-sm">
-                              <strong>Linha {err.line}:</strong> {err.error}
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-sm">Detalhes dos Erros ({importResult.errors.length}):</h4>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const errosTexto = importResult.errors
+                                .map((err: any) => `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`)
+                                .join('\n');
+                              navigator.clipboard.writeText(errosTexto);
+                              alert('Erros copiados para área de transferência!');
+                            }}
+                          >
+                            📋 Copiar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const errosTexto = importResult.errors
+                                .map((err: any) => `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`)
+                                .join('\n');
+                              const blob = new Blob([errosTexto], { type: 'text/plain' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `erros_importacao_${new Date().toISOString().slice(0, 10)}.txt`;
+                              a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                          >
+                            📥 Baixar
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                        <ul className="space-y-2">
+                          {importResult.errors.map((err: any, index: number) => (
+                            <li key={index} className="text-sm border-b border-red-100 pb-2 last:border-0">
+                              <div className="font-semibold text-red-700">
+                                📍 Linha {err.line || err.row}:
+                              </div>
+                              <div className="text-red-600 mt-1">
+                                {err.error || err.details?.message || JSON.stringify(err.details)}
+                              </div>
                             </li>
                           ))}
                         </ul>
                       </div>
+                      <p className="text-sm text-red-600 mt-2 font-semibold">
+                        ⚠️ Nenhum registro foi importado. Corrija os erros na planilha e tente novamente.
+                      </p>
                     </div>
                   )}
                 </div>

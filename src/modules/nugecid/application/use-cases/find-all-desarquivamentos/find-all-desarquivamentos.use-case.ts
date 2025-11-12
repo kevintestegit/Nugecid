@@ -1,17 +1,17 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from "@nestjs/common";
 import {
   DesarquivamentoDomain,
   IDesarquivamentoRepository,
   FindAllOptions,
   FindAllResult,
-} from '../../../domain';
-import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from '../../../domain/nugecid.constants';
+} from "../../../domain";
+import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
 
 export interface FindAllDesarquivamentosRequest {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
+  sortOrder?: "ASC" | "DESC";
   filters?: {
     status?: string | string[];
     statusList?: string[];
@@ -80,8 +80,8 @@ export class FindAllDesarquivamentosUseCase {
     const options: FindAllOptions = {
       page: request.page || 1,
       limit: Math.min(request.limit || 10, 100), // Limitar a 100 registros por página
-      sortBy: request.sortBy || 'dataSolicitacao',
-      sortOrder: request.sortOrder || 'DESC',
+      sortBy: request.sortBy || "dataSolicitacao",
+      sortOrder: request.sortOrder || "DESC",
       filters: {
         ...request.filters,
         incluirExcluidos: request.filters?.incluirExcluidos || false,
@@ -104,7 +104,7 @@ export class FindAllDesarquivamentosUseCase {
     // Filtrar registros baseado em permissões de acesso
     const filteredData =
       request.userId && request.userRoles
-        ? result.data.filter(desarquivamento =>
+        ? result.data.filter((desarquivamento) =>
             desarquivamento.canBeAccessedBy(
               request.userId!,
               request.userRoles!,
@@ -113,7 +113,7 @@ export class FindAllDesarquivamentosUseCase {
         : result.data;
 
     // Mapear para resposta
-    const mappedData = filteredData.map(desarquivamento =>
+    const mappedData = filteredData.map((desarquivamento) =>
       this.mapToResponse(desarquivamento),
     );
 
@@ -129,7 +129,7 @@ export class FindAllDesarquivamentosUseCase {
   private validateRequest(request: FindAllDesarquivamentosRequest): void {
     // Validar página
     if (request.page && (request.page < 1 || !Number.isInteger(request.page))) {
-      throw new Error('Página deve ser um número inteiro positivo');
+      throw new Error("Página deve ser um número inteiro positivo");
     }
 
     // Validar limite
@@ -139,111 +139,111 @@ export class FindAllDesarquivamentosUseCase {
         request.limit > 100 ||
         !Number.isInteger(request.limit))
     ) {
-      throw new Error('Limite deve ser um número inteiro entre 1 e 100');
+      throw new Error("Limite deve ser um número inteiro entre 1 e 100");
     }
 
     // Validar ordem de classificação
-    if (request.sortOrder && !['ASC', 'DESC'].includes(request.sortOrder)) {
-      throw new Error('Ordem de classificação deve ser ASC ou DESC');
+    if (request.sortOrder && !["ASC", "DESC"].includes(request.sortOrder)) {
+      throw new Error("Ordem de classificação deve ser ASC ou DESC");
     }
 
     // Validar campos de classificação permitidos
     const allowedSortFields = [
-      'id',
-      'codigoBarras',
-      'tipoDesarquivamento',
-      'status',
-      'nomeCompleto',
-      'numeroNicLaudoAuto',
-      'numeroProcesso',
-      'dataSolicitacao',
-      'dataDesarquivamentoSAG',
-      'dataDevolucaoSetor',
-      'urgente',
-      'criadoPorId',
-      'responsavelId',
-      'createdAt',
-      'updatedAt',
+      "id",
+      "codigoBarras",
+      "tipoDesarquivamento",
+      "status",
+      "nomeCompleto",
+      "numeroNicLaudoAuto",
+      "numeroProcesso",
+      "dataSolicitacao",
+      "dataDesarquivamentoSAG",
+      "dataDevolucaoSetor",
+      "urgente",
+      "criadoPorId",
+      "responsavelId",
+      "createdAt",
+      "updatedAt",
     ];
 
     if (request.sortBy && !allowedSortFields.includes(request.sortBy)) {
       throw new Error(
-        `Campo de classificação inválido. Campos permitidos: ${allowedSortFields.join(', ')}`,
+        `Campo de classificação inválido. Campos permitidos: ${allowedSortFields.join(", ")}`,
       );
     }
 
     // Validar filtros de data
     if (request.filters?.dataInicio && request.filters?.dataFim) {
       if (request.filters.dataInicio > request.filters.dataFim) {
-        throw new Error('Data de início deve ser anterior à data de fim');
+        throw new Error("Data de início deve ser anterior à data de fim");
       }
     }
 
     // Validar status (aceita string ou array)
     if (request.filters?.status) {
       const validStatuses = [
-        'FINALIZADO',
-        'DESARQUIVADO',
-        'NAO_COLETADO',
-        'SOLICITADO',
-        'REARQUIVAMENTO_SOLICITADO',
-        'RETIRADO_PELO_SETOR',
-        'NAO_LOCALIZADO',
+        "FINALIZADO",
+        "DESARQUIVADO",
+        "NAO_COLETADO",
+        "SOLICITADO",
+        "REARQUIVAMENTO_SOLICITADO",
+        "RETIRADO_PELO_SETOR",
+        "NAO_LOCALIZADO",
       ];
       const statuses = Array.isArray(request.filters.status)
         ? request.filters.status
         : [request.filters.status];
-      const allValid = statuses.every(s => validStatuses.includes(s));
+      const allValid = statuses.every((s) => validStatuses.includes(s));
       if (!allValid) {
         throw new Error(
-          `Status inválido. Status válidos: ${validStatuses.join(', ')}`,
+          `Status inválido. Status válidos: ${validStatuses.join(", ")}`,
         );
       }
     }
 
     // Validar tipo de desarquivamento (aceita string ou array)
     if (request.filters?.tipoDesarquivamento) {
-      const validTypes = ['FISICO', 'DIGITAL', 'NAO_LOCALIZADO'];
+      const validTypes = ["FISICO", "DIGITAL", "NAO_LOCALIZADO"];
       const tipos = Array.isArray(request.filters.tipoDesarquivamento)
         ? request.filters.tipoDesarquivamento
         : [request.filters.tipoDesarquivamento];
-      const allValidTipos = tipos.every(t => validTypes.includes(t));
+      const allValidTipos = tipos.every((t) => validTypes.includes(t));
       if (!allValidTipos) {
         throw new Error(
-          `Tipo de desarquivamento inválido. Tipos válidos: ${validTypes.join(', ')}`,
+          `Tipo de desarquivamento inválido. Tipos válidos: ${validTypes.join(", ")}`,
         );
       }
     }
 
     // Validar IDs de usuário
     if (request.filters?.criadoPorId && request.filters.criadoPorId <= 0) {
-      throw new Error('ID do usuário criador deve ser positivo');
+      throw new Error("ID do usuário criador deve ser positivo");
     }
 
     if (request.filters?.responsavelId && request.filters.responsavelId <= 0) {
-      throw new Error('ID do responsável deve ser positivo');
+      throw new Error("ID do responsável deve ser positivo");
     }
   }
 
   private applySecurityFilters(
-    filters: FindAllOptions['filters'],
+    filters: FindAllOptions["filters"],
     userId: number,
     userRoles: string[],
-  ): FindAllOptions['filters'] {
+  ): FindAllOptions["filters"] {
     // Normaliza roles para maiúsculas para evitar problemas de case-sensitive
     const upperCaseUserRoles = (userRoles || []).map(
-      r => r?.toUpperCase?.() || '',
+      (r) => r?.toUpperCase?.() || "",
     );
 
     // Administradores podem ver tudo
-    if (upperCaseUserRoles.includes('ADMIN')) {
+    if (upperCaseUserRoles.includes("ADMIN")) {
       return filters;
     }
 
     // Usuários com role NUGECID_VIEWER/OPERATOR podem ver todos os registros
     if (
-      upperCaseUserRoles.includes('NUGECID_VIEWER') ||
-      upperCaseUserRoles.includes('NUGECID_OPERATOR')
+      upperCaseUserRoles.includes("NUGECID_VIEWER") ||
+      upperCaseUserRoles.includes("NUGECID_OPERATOR")
     ) {
       return filters;
     }
@@ -257,7 +257,7 @@ export class FindAllDesarquivamentosUseCase {
 
   private mapToResponse(
     desarquivamento: DesarquivamentoDomain,
-  ): FindAllDesarquivamentosResponse['data'][0] {
+  ): FindAllDesarquivamentosResponse["data"][0] {
     // Garantir que o ID seja válido
     if (!desarquivamento.id?.value || desarquivamento.id.value <= 0) {
       throw new Error(

@@ -3,18 +3,18 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan } from "typeorm";
 import {
   Notificacao,
   TipoNotificacao,
   PrioridadeNotificacao,
-} from '../entities';
-import { User } from '../../users/entities/user.entity';
-import { Tarefa } from '../../tarefas/entities/tarefa.entity';
-import { DesarquivamentoTypeOrmEntity } from '../../nugecid/infrastructure/entities/desarquivamento.typeorm-entity';
-import { StatusDesarquivamentoEnum } from '../../nugecid/domain/enums/status-desarquivamento.enum';
+} from "../entities";
+import { User } from "../../users/entities/user.entity";
+import { Tarefa } from "../../tarefas/entities/tarefa.entity";
+import { DesarquivamentoTypeOrmEntity } from "../../nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
+import { StatusDesarquivamentoEnum } from "../../nugecid/domain/enums/status-desarquivamento.enum";
 
 export interface CreateNotificacaoDto {
   tipo: TipoNotificacao;
@@ -25,6 +25,10 @@ export interface CreateNotificacaoDto {
   usuarioId: number;
   solicitacaoId?: number;
   processoId?: number;
+  tarefaId?: number;
+  projetoId?: number;
+  remetenteId?: number;
+  link?: string;
 }
 
 export interface QueryNotificacoesDto {
@@ -59,7 +63,7 @@ export class NotificacoesService {
     });
 
     if (!usuario) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException("Usuário não encontrado");
     }
 
     // Verificar se a solicitação existe (se especificada)
@@ -69,7 +73,7 @@ export class NotificacoesService {
       });
 
       if (!solicitacao) {
-        throw new NotFoundException('Solicitação não encontrada');
+        throw new NotFoundException("Solicitação não encontrada");
       }
     }
 
@@ -98,7 +102,7 @@ export class NotificacoesService {
     });
 
     if (!usuario) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException("Usuário não encontrado");
     }
 
     const page = queryDto.page || 1;
@@ -106,34 +110,34 @@ export class NotificacoesService {
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.notificacaoRepository
-      .createQueryBuilder('notificacao')
-      .leftJoinAndSelect('notificacao.usuario', 'usuario')
-      .leftJoinAndSelect('notificacao.solicitacao', 'solicitacao')
-      .where('notificacao.usuarioId = :usuarioId', { usuarioId })
-      .andWhere('notificacao.deletedAt IS NULL');
+      .createQueryBuilder("notificacao")
+      .leftJoinAndSelect("notificacao.usuario", "usuario")
+      .leftJoinAndSelect("notificacao.solicitacao", "solicitacao")
+      .where("notificacao.usuarioId = :usuarioId", { usuarioId })
+      .andWhere("notificacao.deletedAt IS NULL");
 
     // Aplicar filtros
     if (queryDto.lida !== undefined) {
-      queryBuilder.andWhere('notificacao.lida = :lida', {
+      queryBuilder.andWhere("notificacao.lida = :lida", {
         lida: queryDto.lida,
       });
     }
 
     if (queryDto.tipo) {
-      queryBuilder.andWhere('notificacao.tipo = :tipo', {
+      queryBuilder.andWhere("notificacao.tipo = :tipo", {
         tipo: queryDto.tipo,
       });
     }
 
     if (queryDto.prioridade) {
-      queryBuilder.andWhere('notificacao.prioridade = :prioridade', {
+      queryBuilder.andWhere("notificacao.prioridade = :prioridade", {
         prioridade: queryDto.prioridade,
       });
     }
 
     if (queryDto.dataInicio && queryDto.dataFim) {
       queryBuilder.andWhere(
-        'notificacao.createdAt BETWEEN :dataInicio AND :dataFim',
+        "notificacao.createdAt BETWEEN :dataInicio AND :dataFim",
         {
           dataInicio: queryDto.dataInicio,
           dataFim: queryDto.dataFim,
@@ -145,10 +149,10 @@ export class NotificacoesService {
     queryBuilder
       .addSelect(
         "CASE notificacao.prioridade WHEN 'critica' THEN 1 WHEN 'alta' THEN 2 WHEN 'media' THEN 3 WHEN 'baixa' THEN 4 ELSE 5 END",
-        'prioridade_order',
+        "prioridade_order",
       )
-      .orderBy('prioridade_order', 'ASC')
-      .addOrderBy('notificacao.createdAt', 'DESC');
+      .orderBy("prioridade_order", "ASC")
+      .addOrderBy("notificacao.createdAt", "DESC");
 
     const [data, total] = await queryBuilder
       .skip(skip)
@@ -169,11 +173,11 @@ export class NotificacoesService {
   async findOne(id: number, usuarioId: number): Promise<Notificacao> {
     const notificacao = await this.notificacaoRepository.findOne({
       where: { id, usuarioId },
-      relations: ['usuario', 'solicitacao'],
+      relations: ["usuario", "solicitacao"],
     });
 
     if (!notificacao) {
-      throw new NotFoundException('Notificação não encontrada');
+      throw new NotFoundException("Notificação não encontrada");
     }
 
     return notificacao;
@@ -216,12 +220,12 @@ export class NotificacoesService {
     porPrioridade: Record<string, number>;
   }> {
     const notificacoes = await this.notificacaoRepository.find({
-      where: { usuarioId },
+      where: { usuarioId, deletedAt: null },
     });
 
     const total = notificacoes.length;
-    const naoLidas = notificacoes.filter(n => !n.lida).length;
-    const lidas = notificacoes.filter(n => n.lida).length;
+    const naoLidas = notificacoes.filter((n) => !n.lida).length;
+    const lidas = notificacoes.filter((n) => n.lida).length;
 
     const porTipo = notificacoes.reduce(
       (acc, n) => {
@@ -256,11 +260,11 @@ export class NotificacoesService {
   ): Promise<Notificacao> {
     const titulo = `Solicitação Pendente há ${diasPendentes} dias`;
     const descricao =
-      'Uma solicitação está pendente há mais de 5 dias sem movimentação.';
+      "Uma solicitação está pendente há mais de 5 dias sem movimentação.";
     const detalhes = {
       dias_pendentes: diasPendentes,
       data_limite: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // +2 dias
-      acao_requerida: 'Verificar status da solicitação',
+      acao_requerida: "Verificar status da solicitação",
     };
 
     return this.create({
@@ -279,13 +283,13 @@ export class NotificacoesService {
     processoId: number,
     numeroProcesso: string,
   ): Promise<Notificacao> {
-    const titulo = 'Novo Processo de Desarquivamento';
+    const titulo = "Novo Processo de Desarquivamento";
     const descricao = `Um novo processo de desarquivamento foi extraído do SEIRN: ${numeroProcesso}`;
     const detalhes = {
       numero_processo: numeroProcesso,
-      fonte: 'SEIRN',
+      fonte: "SEIRN",
       data_extracao: new Date(),
-      acao_requerida: 'Analisar novo processo',
+      acao_requerida: "Analisar novo processo",
     };
 
     return this.create({
@@ -316,47 +320,63 @@ export class NotificacoesService {
       },
     );
 
-    for (const desarquivamento of desarquivamentosPendentes) {
-      const notificacaoExistente = await this.notificacaoRepository.findOne({
-        where: {
-          tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
-          processoId: desarquivamento.id,
-          lida: false,
-        },
-      });
+    const gestores = await this.userRepository.find({
+      where: [
+        { role: { name: "coordenador" } },
+        { role: { name: "admin" } },
+      ],
+      relations: ["role"],
+    });
+    const gestoresIds = gestores.map((g) => g.id);
 
-      if (notificacaoExistente) {
-        continue;
-      }
+    for (const desarquivamento of desarquivamentosPendentes) {
 
       const diasPendentes = Math.floor(
         (Date.now() - new Date(desarquivamento.dataSolicitacao).getTime()) /
           (1000 * 60 * 60 * 24),
       );
 
-      const usuarioId =
-        desarquivamento.responsavelId || desarquivamento.criadoPorId;
-
-      if (!usuarioId) {
-        continue;
+      const destinatarios = new Set<number>(gestoresIds);
+      if (desarquivamento.criadoPorId) {
+        destinatarios.add(desarquivamento.criadoPorId);
+      }
+      if (desarquivamento.responsavelId) {
+        destinatarios.add(desarquivamento.responsavelId);
       }
 
-      const notificacao = await this.criarNotificacaoArquivoSolicitado(
-        usuarioId,
-        desarquivamento,
-        diasPendentes,
-      );
+      for (const usuarioId of destinatarios) {
+        if (!usuarioId) continue;
 
-      notificacoesCriadas.push(notificacao);
+        const notificacaoExistente = await this.notificacaoRepository.findOne({
+          where: {
+            tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
+            processoId: desarquivamento.id,
+            usuarioId,
+            lida: false,
+          },
+        });
+
+        if (notificacaoExistente) {
+          continue;
+        }
+
+        const notificacao = await this.criarNotificacaoArquivoSolicitado(
+          usuarioId,
+          desarquivamento,
+          diasPendentes,
+        );
+
+        notificacoesCriadas.push(notificacao);
+      }
     }
 
     // Buscar tarefas que não foram movimentadas há mais de 5 dias
     const solicitacoesPendentes = await this.tarefaRepository
-      .createQueryBuilder('tarefa')
-      .leftJoin('tarefa.coluna', 'coluna')
-      .where('tarefa.updatedAt < :cincoDiasAtras', { cincoDiasAtras })
-      .andWhere('coluna.nome ILIKE :colunaSolicitada', {
-        colunaSolicitada: '%solicit%',
+      .createQueryBuilder("tarefa")
+      .leftJoin("tarefa.coluna", "coluna")
+      .where("tarefa.updatedAt < :cincoDiasAtras", { cincoDiasAtras })
+      .andWhere("coluna.nome ILIKE :colunaSolicitada", {
+        colunaSolicitada: "%solicit%",
       })
       .getMany();
 
@@ -398,16 +418,33 @@ export class NotificacoesService {
     desarquivamento: DesarquivamentoTypeOrmEntity,
     diasPendentes: number,
   ): Promise<Notificacao> {
-    const titulo = `Desarquivamento aguardando há ${diasPendentes} dias`;
-    const descricao =
-      'Um desarquivamento permanece com status SOLICITADO há mais de 5 dias.';
+    const dataSolicitacaoFormatada = desarquivamento.dataSolicitacao
+      ? new Intl.DateTimeFormat("pt-BR").format(
+          new Date(desarquivamento.dataSolicitacao),
+        )
+      : "Data não informada";
+
+    const titulo = `${
+      desarquivamento.nomeCompleto || "Desarquivamento"
+    } — aguardando há ${diasPendentes} dia${diasPendentes === 1 ? "" : "s"}`;
+
+    const descricao = [
+      desarquivamento.numeroProcesso
+        ? `Processo ${desarquivamento.numeroProcesso}`
+        : null,
+      desarquivamento.tipoDocumento,
+      `Solicitado em ${dataSolicitacaoFormatada}`,
+    ]
+      .filter(Boolean)
+      .join(" • ") || "Desarquivamento permanece sem retorno.";
+
     const detalhes = {
       dias_pendentes: diasPendentes,
       numero_processo: desarquivamento.numeroProcesso,
       tipo_documento: desarquivamento.tipoDocumento,
       nome_completo: desarquivamento.nomeCompleto,
       data_solicitacao: desarquivamento.dataSolicitacao,
-      acao_requerida: 'Verificar andamento do desarquivamento',
+      acao_requerida: "Verificar andamento do desarquivamento",
     };
 
     return this.create({
@@ -419,5 +456,472 @@ export class NotificacoesService {
       usuarioId,
       processoId: desarquivamento.id,
     });
+  }
+
+  // ========== NOVOS MÉTODOS PARA TAREFAS ==========
+
+  async notificarMencao(
+    usuarioMencionadoId: number,
+    remetenteId: number,
+    tarefaId: number,
+    comentario: string,
+  ): Promise<Notificacao> {
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+      relations: ["projeto"],
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    const remetente = await this.userRepository.findOne({
+      where: { id: remetenteId },
+    });
+
+    const notificacao = this.notificacaoRepository.create({
+      tipo: TipoNotificacao.MENCAO,
+      titulo: `${remetente?.nome || "Alguém"} mencionou você`,
+      descricao: `Você foi mencionado em um comentário na tarefa "${tarefa.titulo}"`,
+      detalhes: {
+        comentario: comentario.substring(0, 200),
+        projeto: tarefa.projeto?.nome,
+      },
+      prioridade: PrioridadeNotificacao.MEDIA,
+      usuarioId: usuarioMencionadoId,
+      tarefaId,
+      remetenteId,
+      link: `/tarefas/${tarefaId}`,
+    });
+
+    return this.notificacaoRepository.save(notificacao);
+  }
+
+  async notificarTarefaAtribuida(
+    usuarioAtribuidoId: number,
+    remetenteId: number,
+    tarefaId: number,
+  ): Promise<Notificacao> {
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+      relations: ["projeto"],
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    const remetente = await this.userRepository.findOne({
+      where: { id: remetenteId },
+    });
+
+    const notificacao = this.notificacaoRepository.create({
+      tipo: TipoNotificacao.TAREFA_ATRIBUIDA,
+      titulo: "Nova tarefa atribuída",
+      descricao: `${remetente?.nome || "Alguém"} atribuiu você à tarefa "${tarefa.titulo}"`,
+      detalhes: {
+        prioridade: tarefa.prioridade,
+        prazo: tarefa.prazo,
+        projeto: tarefa.projeto?.nome,
+      },
+      prioridade: this.mapPrioridadeTarefaParaNotificacao(tarefa.prioridade),
+      usuarioId: usuarioAtribuidoId,
+      tarefaId,
+      remetenteId,
+      projetoId: tarefa.projetoId,
+      link: `/tarefas/${tarefaId}`,
+    });
+
+    return this.notificacaoRepository.save(notificacao);
+  }
+
+  async notificarTarefaAlterada(
+    usuarioId: number,
+    remetenteId: number,
+    tarefaId: number,
+    mudancas: string[],
+  ): Promise<Notificacao> {
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    const remetente = await this.userRepository.findOne({
+      where: { id: remetenteId },
+    });
+
+    const notificacao = this.notificacaoRepository.create({
+      tipo: TipoNotificacao.TAREFA_ALTERADA,
+      titulo: "Tarefa atualizada",
+      descricao: `${remetente?.nome || "Alguém"} atualizou a tarefa "${tarefa.titulo}"`,
+      detalhes: {
+        mudancas,
+      },
+      prioridade: PrioridadeNotificacao.BAIXA,
+      usuarioId,
+      tarefaId,
+      remetenteId,
+      link: `/tarefas/${tarefaId}`,
+    });
+
+    return this.notificacaoRepository.save(notificacao);
+  }
+
+  async notificarComentario(
+    usuarioId: number,
+    remetenteId: number,
+    tarefaId: number,
+    comentario: string,
+  ): Promise<Notificacao> {
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    const remetente = await this.userRepository.findOne({
+      where: { id: remetenteId },
+    });
+
+    const notificacao = this.notificacaoRepository.create({
+      tipo: TipoNotificacao.TAREFA_COMENTADA,
+      titulo: "Novo comentário",
+      descricao: `${remetente?.nome || "Alguém"} comentou na tarefa "${tarefa.titulo}"`,
+      detalhes: {
+        comentario: comentario.substring(0, 200),
+      },
+      prioridade: PrioridadeNotificacao.BAIXA,
+      usuarioId,
+      tarefaId,
+      remetenteId,
+      link: `/tarefas/${tarefaId}`,
+    });
+
+    return this.notificacaoRepository.save(notificacao);
+  }
+
+  async notificarPrazoProximo(
+    usuarioId: number,
+    tarefaId: number,
+    diasRestantes: number,
+  ): Promise<Notificacao> {
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    const notificacao = this.notificacaoRepository.create({
+      tipo: TipoNotificacao.PRAZO_PROXIMO,
+      titulo: `Prazo se aproximando`,
+      descricao: `A tarefa "${tarefa.titulo}" vence em ${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"}`,
+      detalhes: {
+        prazo: tarefa.prazo,
+        diasRestantes,
+        prioridade: tarefa.prioridade,
+      },
+      prioridade:
+        diasRestantes <= 1
+          ? PrioridadeNotificacao.ALTA
+          : PrioridadeNotificacao.MEDIA,
+      usuarioId,
+      tarefaId,
+      link: `/tarefas/${tarefaId}`,
+    });
+
+    return this.notificacaoRepository.save(notificacao);
+  }
+
+  async notificarTarefaAtrasada(
+    usuarioId: number,
+    tarefaId: number,
+    diasAtrasados: number,
+  ): Promise<Notificacao> {
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    const notificacao = this.notificacaoRepository.create({
+      tipo: TipoNotificacao.TAREFA_ATRASADA,
+      titulo: "Tarefa atrasada",
+      descricao: `A tarefa "${tarefa.titulo}" está atrasada há ${diasAtrasados} ${diasAtrasados === 1 ? "dia" : "dias"}`,
+      detalhes: {
+        prazo: tarefa.prazo,
+        diasAtrasados,
+        prioridade: tarefa.prioridade,
+      },
+      prioridade: PrioridadeNotificacao.CRITICA,
+      usuarioId,
+      tarefaId,
+      link: `/tarefas/${tarefaId}`,
+    });
+
+    return this.notificacaoRepository.save(notificacao);
+  }
+
+  async verificarTarefasComPrazoProximo(): Promise<Notificacao[]> {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const doisDiasDepois = new Date(hoje);
+    doisDiasDepois.setDate(doisDiasDepois.getDate() + 2);
+
+    const tarefas = await this.tarefaRepository
+      .createQueryBuilder("tarefa")
+      .where("tarefa.prazo >= :hoje", { hoje })
+      .andWhere("tarefa.prazo <= :doisDias", { doisDias: doisDiasDepois })
+      .andWhere("tarefa.deletedAt IS NULL")
+      .getMany();
+
+    const notificacoes: Notificacao[] = [];
+
+    for (const tarefa of tarefas) {
+      if (!tarefa.responsavelId) continue;
+
+      // Verificar se já existe notificação recente
+      const notificacaoExistente = await this.notificacaoRepository.findOne({
+        where: {
+          tipo: TipoNotificacao.PRAZO_PROXIMO,
+          tarefaId: tarefa.id,
+          lida: false,
+        },
+      });
+
+      if (notificacaoExistente) continue;
+
+      const diasRestantes = Math.ceil(
+        (new Date(tarefa.prazo).getTime() - hoje.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      const notificacao = await this.notificarPrazoProximo(
+        tarefa.responsavelId,
+        tarefa.id,
+        diasRestantes,
+      );
+
+      notificacoes.push(notificacao);
+    }
+
+    return notificacoes;
+  }
+
+  async verificarTarefasAtrasadas(): Promise<Notificacao[]> {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const tarefas = await this.tarefaRepository
+      .createQueryBuilder("tarefa")
+      .where("tarefa.prazo < :hoje", { hoje })
+      .andWhere("tarefa.deletedAt IS NULL")
+      .getMany();
+
+    const notificacoes: Notificacao[] = [];
+
+    for (const tarefa of tarefas) {
+      if (!tarefa.responsavelId) continue;
+
+      // Verificar se já existe notificação recente (últimas 24h)
+      const umDiaAtras = new Date();
+      umDiaAtras.setDate(umDiaAtras.getDate() - 1);
+
+      const notificacaoExistente = await this.notificacaoRepository.findOne({
+        where: {
+          tipo: TipoNotificacao.TAREFA_ATRASADA,
+          tarefaId: tarefa.id,
+          createdAt: LessThan(umDiaAtras),
+        },
+      });
+
+      if (notificacaoExistente) continue;
+
+      const diasAtrasados = Math.floor(
+        (hoje.getTime() - new Date(tarefa.prazo).getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      const notificacao = await this.notificarTarefaAtrasada(
+        tarefa.responsavelId,
+        tarefa.id,
+        diasAtrasados,
+      );
+
+      notificacoes.push(notificacao);
+    }
+
+    return notificacoes;
+  }
+
+  private async getAdministradoresIds(
+    excludeIds: number[] = [],
+  ): Promise<number[]> {
+    const qb = this.userRepository
+      .createQueryBuilder("usuario")
+      .leftJoin("usuario.role", "role")
+      .where("usuario.deletedAt IS NULL")
+      .andWhere("LOWER(role.name) = :role", { role: "admin" });
+
+    if (excludeIds.length > 0) {
+      qb.andWhere("usuario.id NOT IN (:...excludeIds)", { excludeIds });
+    }
+
+    const administradores = await qb.getMany();
+    return administradores.map((admin) => admin.id);
+  }
+
+  async notificarNovoRegistro(
+    autorId: number | null,
+    registroId?: string,
+    resumo?: {
+      numeroProcesso?: string;
+      delegacia?: string;
+      totalImportado?: number;
+    },
+  ): Promise<void> {
+    const destinatarios = await this.getAdministradoresIds(
+      autorId ? [autorId] : [],
+    );
+
+    if (!destinatarios.length) {
+      return;
+    }
+
+    const autor = autorId
+      ? await this.userRepository.findOne({ where: { id: autorId } })
+      : null;
+
+    const descricaoBase = autor
+      ? `${autor.nome} adicionou um novo registro ao sistema.`
+      : "Um novo registro foi adicionado ao sistema.";
+
+    await Promise.all(
+      destinatarios.map((usuarioId) =>
+        this.create({
+          tipo: TipoNotificacao.NOVO_REGISTRO,
+          titulo: "Novo registro cadastrado",
+          descricao: descricaoBase,
+          detalhes: {
+            registroId,
+            ...resumo,
+          },
+          prioridade: PrioridadeNotificacao.MEDIA,
+          usuarioId,
+          link: "/registros",
+        }),
+      ),
+    );
+  }
+
+  async notificarPastaCriada(
+    autorId: number | null,
+    pastaId: string,
+    nomePasta: string,
+  ): Promise<void> {
+    const destinatarios = await this.getAdministradoresIds(
+      autorId ? [autorId] : [],
+    );
+
+    if (!destinatarios.length) {
+      return;
+    }
+
+    const autor = autorId
+      ? await this.userRepository.findOne({
+          where: { id: autorId },
+        })
+      : null;
+
+    const descricao = autor
+      ? `${autor.nome} criou a prateleira "${nomePasta}".`
+      : `Uma nova prateleira "${nomePasta}" foi criada.`;
+
+    await Promise.all(
+      destinatarios.map((usuarioId) =>
+        this.create({
+          tipo: TipoNotificacao.PASTA_CRIADA,
+          titulo: "Nova prateleira cadastrada",
+          descricao,
+          detalhes: {
+            pastaId,
+            nome: nomePasta,
+          },
+          prioridade: PrioridadeNotificacao.MEDIA,
+          usuarioId,
+          link: `/arquivo/${pastaId}`,
+        }),
+      ),
+    );
+  }
+
+  async notificarEventoAuditoria(
+    autorId: number,
+    entidade: string,
+    acao: string,
+    entityId?: number | string,
+    detalhesExtras?: Record<string, any>,
+  ): Promise<void> {
+    const destinatarios = await this.getAdministradoresIds([autorId]);
+
+    if (!destinatarios.length) {
+      return;
+    }
+
+    const autor = await this.userRepository.findOne({
+      where: { id: autorId },
+    });
+
+    const acaoNormalizada = acao.toLowerCase();
+    const descricao = autor
+      ? `${autor.nome} realizou a ação ${acaoNormalizada} em ${entidade}.`
+      : `Uma ação ${acaoNormalizada} foi registrada em ${entidade}.`;
+
+    const detalhes = {
+      entidade,
+      acao,
+      entityId,
+      ...detalhesExtras,
+    };
+
+    await Promise.all(
+      destinatarios.map((usuarioId) =>
+        this.create({
+          tipo: TipoNotificacao.EVENTO_AUDITORIA,
+          titulo: `Alteração em ${entidade}`,
+          descricao,
+          detalhes,
+          prioridade: PrioridadeNotificacao.MEDIA,
+          usuarioId,
+          link: "/auditoria",
+        }),
+      ),
+    );
+  }
+
+  private mapPrioridadeTarefaParaNotificacao(
+    prioridade: string,
+  ): PrioridadeNotificacao {
+    switch (prioridade?.toLowerCase()) {
+      case "critica":
+        return PrioridadeNotificacao.CRITICA;
+      case "alta":
+        return PrioridadeNotificacao.ALTA;
+      case "media":
+        return PrioridadeNotificacao.MEDIA;
+      case "baixa":
+        return PrioridadeNotificacao.BAIXA;
+      default:
+        return PrioridadeNotificacao.MEDIA;
+    }
   }
 }

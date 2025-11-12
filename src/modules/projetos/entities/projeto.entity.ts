@@ -7,14 +7,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   JoinColumn,
-} from 'typeorm';
+} from "typeorm";
 
-import { User } from '../../users/entities/user.entity';
-import { Coluna } from './coluna.entity';
-import { Tarefa } from '../../tarefas/entities/tarefa.entity';
-import { MembroProjeto } from './membro-projeto.entity';
+import { User } from "../../users/entities/user.entity";
+import { Coluna } from "./coluna.entity";
+import { Tarefa } from "../../tarefas/entities/tarefa.entity";
+import { MembroProjeto } from "./membro-projeto.entity";
 
-@Entity('projetos')
+@Entity("projetos")
 export class Projeto {
   @PrimaryGeneratedColumn()
   id: number;
@@ -22,30 +22,30 @@ export class Projeto {
   @Column({ length: 255, nullable: false })
   nome: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   descricao: string;
 
-  @Column({ name: 'criador_id', nullable: false })
+  @Column({ name: "criador_id", nullable: false })
   criadorId: number;
 
   @ManyToOne(() => User, { eager: true })
-  @JoinColumn({ name: 'criador_id' })
+  @JoinColumn({ name: "criador_id" })
   criador: User;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 
   // Relacionamentos
-  @OneToMany(() => Coluna, coluna => coluna.projeto, { cascade: true })
+  @OneToMany(() => Coluna, (coluna) => coluna.projeto, { cascade: true })
   colunas: Coluna[];
 
-  @OneToMany(() => Tarefa, tarefa => tarefa.projeto)
+  @OneToMany(() => Tarefa, (tarefa) => tarefa.projeto)
   tarefas: Tarefa[];
 
-  @OneToMany(() => MembroProjeto, membro => membro.projeto, { cascade: true })
+  @OneToMany(() => MembroProjeto, (membro) => membro.projeto, { cascade: true })
   membros: MembroProjeto[];
 
   // Métodos
@@ -54,18 +54,18 @@ export class Projeto {
   }
 
   hasMember(userId: number): boolean {
-    return this.membros?.some(membro => membro.usuarioId === userId) || false;
+    return this.membros?.some((membro) => membro.usuarioId === userId) || false;
   }
 
   getMemberRole(userId: number): string | null {
-    const membro = this.membros?.find(m => m.usuarioId === userId);
+    const membro = this.membros?.find((m) => m.usuarioId === userId);
     return membro?.papel || null;
   }
 
   canUserEdit(userId: number): boolean {
     if (this.isOwner(userId)) return true;
     const role = this.getMemberRole(userId);
-    return role === 'admin' || role === 'editor';
+    return role === "admin" || role === "editor";
   }
 
   canUserView(userId: number): boolean {

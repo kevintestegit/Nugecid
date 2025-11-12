@@ -1,14 +1,14 @@
-import { DesarquivamentoDomain } from '../entities';
-import { DesarquivamentoId } from '../value-objects';
-import { StatusDesarquivamentoEnum } from '../enums/status-desarquivamento.enum';
+import { DesarquivamentoDomain } from "../entities";
+import { DesarquivamentoId } from "../value-objects";
+import { StatusDesarquivamentoEnum } from "../enums/status-desarquivamento.enum";
 
-export const DESARQUIVAMENTO_REPOSITORY = 'DesarquivamentoRepository';
+export const DESARQUIVAMENTO_REPOSITORY = "DesarquivamentoRepository";
 
 export interface FindAllOptions {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
+  sortOrder?: "ASC" | "DESC";
   filters?: {
     search?: string;
     status?: string | string[];

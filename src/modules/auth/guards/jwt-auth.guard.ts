@@ -2,15 +2,15 @@ import {
   Injectable,
   ExecutionContext,
   UnauthorizedException,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
-import { Observable } from 'rxjs';
-import { IS_PUBLIC_KEY } from '../../../common/decorators/is-public.decorator';
-import { AuthService } from '../auth.service';
+} from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { Reflector } from "@nestjs/core";
+import { Observable } from "rxjs";
+import { IS_PUBLIC_KEY } from "../../../common/decorators/is-public.decorator";
+import { AuthService } from "../auth.service";
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtAuthGuard extends AuthGuard("jwt") {
   constructor(
     private reflector: Reflector,
     private readonly authService: AuthService,
@@ -35,14 +35,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     if (err || !user) {
-      let message = 'Token JWT inválido ou expirado';
+      let message = "Token JWT inválido ou expirado";
 
       // Provide more specific error messages
       if (info) {
-        if (info.name === 'TokenExpiredError') {
-          message = 'jwt expired';
-        } else if (info.name === 'JsonWebTokenError') {
-          message = 'jwt malformed';
+        if (info.name === "TokenExpiredError") {
+          message = "jwt expired";
+        } else if (info.name === "JsonWebTokenError") {
+          message = "jwt malformed";
         } else if (info.message) {
           message = info.message;
         }
@@ -55,8 +55,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
     // Atualiza a atividade do usuário para cada requisição autenticada
     if (user && user.id) {
-      this.authService.updateUserActivity(user.id).catch(error => {
-        console.error('Erro ao atualizar atividade do usuário:', error);
+      this.authService.updateUserActivity(user.id).catch((error) => {
       });
     }
 

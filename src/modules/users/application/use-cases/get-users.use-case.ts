@@ -1,10 +1,10 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { User } from '../../domain/entities/user';
+import { Injectable, Inject } from "@nestjs/common";
+import { User } from "../../domain/entities/user";
 import {
   IUserRepository,
   UserFilters,
-} from '../../domain/repositories/user.repository.interface';
-import { QueryUsersDto } from '../dto/query-users.dto';
+} from "../../domain/repositories/user.repository.interface";
+import { QueryUsersDto } from "../dto/query-users.dto";
 
 export interface PaginatedUsersResult {
   users: User[];
@@ -17,7 +17,7 @@ export interface PaginatedUsersResult {
 @Injectable()
 export class GetUsersUseCase {
   constructor(
-    @Inject('IUserRepository') private readonly userRepository: IUserRepository,
+    @Inject("IUserRepository") private readonly userRepository: IUserRepository,
   ) {}
 
   /**

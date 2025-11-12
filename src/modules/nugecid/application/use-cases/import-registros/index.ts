@@ -1,1 +1,1 @@
-export * from './import-registros.use-case';
+export * from "./import-registros.use-case";

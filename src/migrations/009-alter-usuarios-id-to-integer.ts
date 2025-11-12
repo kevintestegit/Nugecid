@@ -1,16 +1,16 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AlterUsuariosIdToInteger1757339200000
   implements MigrationInterface
 {
-  name = 'AlterUsuariosIdToInteger1757339200000';
+  name = "AlterUsuariosIdToInteger1757339200000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const tableCheck = await queryRunner.query(
       `SELECT to_regclass('public.usuarios') AS exists`,
     );
     if (!tableCheck?.length || tableCheck[0].exists === null) {
-      console.log('Tabela usuarios inexistente - nada a alterar.');
+      console.log("Tabela usuarios inexistente - nada a alterar.");
       return;
     }
 
@@ -20,16 +20,16 @@ export class AlterUsuariosIdToInteger1757339200000
     `);
     if (
       columnType?.length &&
-      ['integer', 'bigint'].includes(
-        (columnType[0].data_type || '').toLowerCase(),
+      ["integer", "bigint"].includes(
+        (columnType[0].data_type || "").toLowerCase(),
       )
     ) {
-      console.log('Coluna usuarios.id já é inteira - migração ignorada.');
+      console.log("Coluna usuarios.id já é inteira - migração ignorada.");
       return;
     }
 
     console.log(
-      '🔄 Iniciando migração: Alterando ID da tabela usuarios de UUID para INTEGER...',
+      "🔄 Iniciando migração: Alterando ID da tabela usuarios de UUID para INTEGER...",
     );
 
     // Verificar se existem dados na tabela
@@ -41,7 +41,7 @@ export class AlterUsuariosIdToInteger1757339200000
     console.log(`📊 Encontrados ${recordCount} registros na tabela usuarios`);
 
     if (recordCount > 0) {
-      console.log('⚠️  ATENÇÃO: Existem dados na tabela. Criando backup...');
+      console.log("⚠️  ATENÇÃO: Existem dados na tabela. Criando backup...");
 
       // Criar tabela de backup
       await queryRunner.query(`
@@ -49,11 +49,11 @@ export class AlterUsuariosIdToInteger1757339200000
         SELECT * FROM usuarios
       `);
 
-      console.log('✅ Backup criado com sucesso!');
+      console.log("✅ Backup criado com sucesso!");
     }
 
     // Remover foreign keys que referenciam usuarios
-    console.log('🔗 Removendo foreign keys...');
+    console.log("🔗 Removendo foreign keys...");
 
     const foreignKeys = await queryRunner.query(`
       SELECT tc.table_name as "table", tc.constraint_name as "constraint"
@@ -71,7 +71,7 @@ export class AlterUsuariosIdToInteger1757339200000
     }
 
     // Remover índices
-    console.log('📇 Removendo índices...');
+    console.log("📇 Removendo índices...");
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_USUARIOS_USUARIO"');
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_USUARIOS_ATIVO"');
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_USUARIOS_ROLE_ID"');
@@ -79,10 +79,10 @@ export class AlterUsuariosIdToInteger1757339200000
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_USUARIOS_TOKEN_RESET"');
 
     // Remover a tabela original
-    await queryRunner.query('DROP TABLE usuarios');
+    await queryRunner.query("DROP TABLE usuarios");
 
     // Criar nova tabela com ID integer
-    console.log('🏗️  Criando nova tabela usuarios com ID integer...');
+    console.log("🏗️  Criando nova tabela usuarios com ID integer...");
     await queryRunner.query(`
       CREATE TABLE usuarios (
         id SERIAL PRIMARY KEY,
@@ -104,7 +104,7 @@ export class AlterUsuariosIdToInteger1757339200000
 
     if (recordCount > 0) {
       // Migrar dados do backup para a nova tabela
-      console.log('📦 Migrando dados do backup...');
+      console.log("📦 Migrando dados do backup...");
       await queryRunner.query(`
         INSERT INTO usuarios (
           nome, usuario, senha, role_id, ultimo_login, ativo,
@@ -125,14 +125,14 @@ export class AlterUsuariosIdToInteger1757339200000
         ORDER BY created_at
       `);
 
-      console.log('✅ Dados migrados com sucesso!');
+      console.log("✅ Dados migrados com sucesso!");
 
       // Remover tabela de backup
-      await queryRunner.query('DROP TABLE usuarios_backup');
+      await queryRunner.query("DROP TABLE usuarios_backup");
     }
 
     // Recriar foreign key para roles (agora com integer)
-    console.log('🔗 Recriando foreign keys...');
+    console.log("🔗 Recriando foreign keys...");
     await queryRunner.query(`
       ALTER TABLE usuarios 
       ADD CONSTRAINT "FK_usuarios_role_id" 
@@ -164,7 +164,7 @@ export class AlterUsuariosIdToInteger1757339200000
     `);
 
     // Recriar índices
-    console.log('📇 Recriando índices...');
+    console.log("📇 Recriando índices...");
     await queryRunner.query(
       'CREATE UNIQUE INDEX "IDX_USUARIOS_USUARIO" ON "usuarios" ("usuario")',
     );
@@ -181,12 +181,12 @@ export class AlterUsuariosIdToInteger1757339200000
       'CREATE INDEX "IDX_USUARIOS_TOKEN_RESET" ON "usuarios" ("token_reset")',
     );
 
-    console.log('✅ Migração concluída com sucesso!');
+    console.log("✅ Migração concluída com sucesso!");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     console.log(
-      '⚠️  ATENÇÃO: Reverter esta migração pode causar perda de dados!',
+      "⚠️  ATENÇÃO: Reverter esta migração pode causar perda de dados!",
     );
 
     // Remover foreign keys
@@ -218,7 +218,7 @@ export class AlterUsuariosIdToInteger1757339200000
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_USUARIOS_TOKEN_RESET"');
 
     // Recriar tabela com UUID
-    await queryRunner.query('DROP TABLE usuarios');
+    await queryRunner.query("DROP TABLE usuarios");
 
     await queryRunner.query(`
       CREATE TABLE usuarios (

@@ -1,10 +1,10 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { ConfigService } from "@nestjs/config";
 
-import { AuthService, JwtPayload } from '../auth.service';
-import { User } from '../../users/entities/user.entity';
+import { AuthService, JwtPayload } from "../auth.service";
+import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -20,7 +20,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           this.logger.debug(`[JwtStrategy] Tentando extrair token JWT`);
 
           if (request && request.cookies) {
-            token = request.cookies['access_token'];
+            token = request.cookies["access_token"];
             if (token) {
               this.logger.debug(
                 `[JwtStrategy] Token encontrado no cookie 'access_token'`,
@@ -59,8 +59,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       // Usar a mesma chave do módulo de configuração (auth.jwt.secret)
       secretOrKey:
-        configService.get<string>('auth.jwt.secret') ||
-        configService.get<string>('JWT_SECRET'),
+        configService.get<string>("auth.jwt.secret") ||
+        configService.get<string>("JWT_SECRET"),
     });
   }
 
@@ -72,7 +72,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         `Validação de JWT falhou para payload: ${JSON.stringify(payload)}`,
       );
       throw new UnauthorizedException(
-        'Usuário não encontrado ou token inválido',
+        "Usuário não encontrado ou token inválido",
       );
     }
     return user;

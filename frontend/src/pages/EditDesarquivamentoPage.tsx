@@ -4,7 +4,8 @@ import { useDesarquivamento, useUpdateDesarquivamento } from '@/hooks/useDesarqu
 import DesarquivamentoForm from '@/components/forms/DesarquivamentoForm'
 import { PageLoading } from '@/components/ui/Loading'
 import { Button } from '@/components/ui/Button'
-import { CreateDesarquivamentoDto } from '@/types'
+import { CreateDesarquivamentoDto, UpdateDesarquivamentoDto, TipoDesarquivamento } from '@/types'
+import { normalizeDesarquivamentoData } from '@/utils/normalization'
 import { toast } from 'sonner'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 
@@ -51,20 +52,69 @@ const EditDesarquivamentoPage: React.FC = () => {
       servidorResponsavel: desarquivamento.servidorResponsavel,
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: !!desarquivamento.solicitacaoProrrogacao,
-    } as CreateDesarquivamentoDto
+    }
   }, [desarquivamento])
 
   const handleSubmit = async (data: CreateDesarquivamentoDto) => {
+    const {
+      tipoDesarquivamento,
+      numeroNicLaudoAuto,
+      dataDesarquivamentoSAG,
+      dataDevolucaoSetor,
+      dataSolicitacao,
+      ...rest
+    } = data
+
+    if (!dataSolicitacao) {
+      toast.error('Data da solicita\u00e7\u00e3o inv\u00e1lida.')
+      return
+    }
+
+    const payload: UpdateDesarquivamentoDto = {
+      desarquivamentoFisicoDigital: tipoDesarquivamento as TipoDesarquivamento,
+      nomeCompleto: rest.nomeCompleto.trim(),
+      numeroProcesso: rest.numeroProcesso.trim(),
+      tipoDocumento: rest.tipoDocumento.trim(),
+      dataSolicitacao,
+      setorDemandante: rest.setorDemandante.trim(),
+      servidorResponsavel: rest.servidorResponsavel.trim(),
+      finalidadeDesarquivamento: rest.finalidadeDesarquivamento.trim(),
+      solicitacaoProrrogacao: rest.solicitacaoProrrogacao,
+    }
+
+    if (numeroNicLaudoAuto && numeroNicLaudoAuto.trim()) {
+      payload.numeroNicLaudoAuto = numeroNicLaudoAuto.trim()
+    }
+
+    if (dataDesarquivamentoSAG) {
+      payload.dataDesarquivamentoSAG = dataDesarquivamentoSAG
+    }
+
+    // Sempre incluir dataDevolucaoSetor (null se vazio) para permitir remoção
+    payload.dataDevolucaoSetor = dataDevolucaoSetor || null
+
+    if ('urgente' in rest && typeof rest.urgente !== 'undefined') {
+      payload.urgente = rest.urgente
+    }
+
+    // Aplica normalização completa antes de enviar
+    const normalizedPayload = normalizeDesarquivamentoData(payload)
+
+    console.log('[EditDesarquivamento] Payload original:', payload)
+    console.log('[EditDesarquivamento] Payload normalizado:', normalizedPayload)
+
     try {
-      await updateDesarquivamento.mutateAsync({ id: id!, data })
-      toast.success('Solicitação atualizada com sucesso!')
+      await updateDesarquivamento.mutateAsync({ id: id!, data: normalizedPayload })
+      toast.success('Solicita\u00e7\u00e3o atualizada com sucesso!')
       navigate(`/desarquivamentos/${id}`)
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Erro ao atualizar solicitação'
+      const message =
+        error?.response?.data?.message || error?.message || 'Erro ao atualizar solicita\u00e7\u00e3o'
       toast.error(message)
       throw error
     }
   }
+
 
   if (isLoading) {
     return <PageLoading />
@@ -99,7 +149,7 @@ const EditDesarquivamentoPage: React.FC = () => {
           Voltar
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Editar Solicitação #{desarquivamento?.codigoBarras}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Editar Solicitação #{desarquivamento?.numeroSolicitacao}</h1>
           <p className="text-gray-600 mt-1">Modifique os dados da solicitação de desarquivamento</p>
         </div>
       </div>

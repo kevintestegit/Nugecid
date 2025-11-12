@@ -1,10 +1,10 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from "@nestjs/common";
 import {
   DesarquivamentoDomain,
   DesarquivamentoId,
   IDesarquivamentoRepository,
-} from '../../../domain';
-import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from '../../../domain/nugecid.constants';
+} from "../../../domain";
+import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
 
 export interface GenerateTermoEntregaRequest {
   id: number;
@@ -89,7 +89,7 @@ export class GenerateTermoEntregaUseCase {
     // Verificar permissões
     if (!desarquivamento.canBeAccessedBy(request.userId, request.userRoles)) {
       throw new Error(
-        'Acesso negado: você não tem permissão para gerar termo deste desarquivamento',
+        "Acesso negado: você não tem permissão para gerar termo deste desarquivamento",
       );
     }
 
@@ -111,7 +111,7 @@ export class GenerateTermoEntregaUseCase {
     return {
       pdfBuffer,
       fileName,
-      contentType: 'application/pdf',
+      contentType: "application/pdf",
       generatedAt: new Date(),
     };
   }
@@ -119,26 +119,26 @@ export class GenerateTermoEntregaUseCase {
   private validateRequest(request: GenerateTermoEntregaRequest): void {
     // Validar ID
     if (!request.id || request.id <= 0 || !Number.isInteger(request.id)) {
-      throw new Error('ID deve ser um número inteiro positivo');
+      throw new Error("ID deve ser um número inteiro positivo");
     }
 
     // Validar usuário
     if (!request.userId || request.userId <= 0) {
-      throw new Error('ID do usuário é obrigatório');
+      throw new Error("ID do usuário é obrigatório");
     }
 
     if (!request.userRoles || !Array.isArray(request.userRoles)) {
-      throw new Error('Roles do usuário são obrigatórias');
+      throw new Error("Roles do usuário são obrigatórias");
     }
 
     // Validar opções de template
     if (request.templateOptions?.assinatura) {
       const { nome, cargo } = request.templateOptions.assinatura;
       if (!nome || nome.trim().length === 0) {
-        throw new Error('Nome do responsável pela assinatura é obrigatório');
+        throw new Error("Nome do responsável pela assinatura é obrigatório");
       }
       if (!cargo || cargo.trim().length === 0) {
-        throw new Error('Cargo do responsável pela assinatura é obrigatório');
+        throw new Error("Cargo do responsável pela assinatura é obrigatório");
       }
     }
   }
@@ -149,20 +149,20 @@ export class GenerateTermoEntregaUseCase {
     // Verificar se está em status apropriado
     if (desarquivamento.status.isPending()) {
       throw new Error(
-        'Não é possível gerar termo para desarquivamento pendente',
+        "Não é possível gerar termo para desarquivamento pendente",
       );
     }
 
     // Check if status is appropriate for generating termo
-    if (desarquivamento.status.value === 'NAO_LOCALIZADO') {
+    if (desarquivamento.status.value === "NAO_LOCALIZADO") {
       throw new Error(
-        'Não é possível gerar termo para desarquivamento não localizado',
+        "Não é possível gerar termo para desarquivamento não localizado",
       );
     }
 
     if (desarquivamento.isDeleted()) {
       throw new Error(
-        'Não é possível gerar termo para desarquivamento excluído',
+        "Não é possível gerar termo para desarquivamento excluído",
       );
     }
   }
@@ -175,17 +175,17 @@ export class GenerateTermoEntregaUseCase {
 
     // Dados da instituição (normalmente viriam de configuração)
     const instituicao = {
-      nome: 'Instituto Técnico-Científico de Perícia - ITEP',
-      endereco: 'Rua Exemplo, 123 - Centro - Natal/RN',
-      telefone: '(84) 3232-3232',
-      email: 'contato@itep.rn.gov.br',
+      nome: "Instituto Técnico-Científico de Perícia - ITEP",
+      endereco: "Rua Exemplo, 123 - Centro - Natal/RN",
+      telefone: "(84) 3232-3232",
+      email: "contato@itep.rn.gov.br",
       logo: request.templateOptions?.logoPath,
     };
 
     // Dados do responsável (normalmente viria do banco de usuários)
     const responsavel = {
-      nome: request.templateOptions?.assinatura?.nome || 'Responsável NUGECID',
-      cargo: request.templateOptions?.assinatura?.cargo || 'Servidor Público',
+      nome: request.templateOptions?.assinatura?.nome || "Responsável NUGECID",
+      cargo: request.templateOptions?.assinatura?.cargo || "Servidor Público",
     };
 
     return {
@@ -207,8 +207,8 @@ export class GenerateTermoEntregaUseCase {
         responsavel,
         recebedor: {
           nome: plainObject.nomeCompleto,
-          documento: '', // Seria preenchido manualmente
-          assinatura: '', // Seria preenchido manualmente
+          documento: "", // Seria preenchido manualmente
+          assinatura: "", // Seria preenchido manualmente
         },
       },
       instituicao,
@@ -217,7 +217,7 @@ export class GenerateTermoEntregaUseCase {
 
   private async generatePDF(
     termoData: TermoEntregaData,
-    templateOptions?: GenerateTermoEntregaRequest['templateOptions'],
+    templateOptions?: GenerateTermoEntregaRequest["templateOptions"],
   ): Promise<Buffer> {
     // Aqui seria implementada a geração do PDF usando uma biblioteca como puppeteer, jsPDF, ou PDFKit
     // Por simplicidade, vou retornar um buffer simulado
@@ -237,7 +237,7 @@ export class GenerateTermoEntregaUseCase {
       Número do Processo: ${termoData.desarquivamento.numeroProcesso}
       Tipo: ${termoData.desarquivamento.tipoDesarquivamento}
       Nome Completo: ${termoData.desarquivamento.nomeCompleto}
-      Data de Entrega: ${termoData.entrega.dataEntrega.toLocaleDateString('pt-BR')}
+      Data de Entrega: ${termoData.entrega.dataEntrega.toLocaleDateString("pt-BR")}
       
       Responsável: ${termoData.entrega.responsavel.nome}
       Cargo: ${termoData.entrega.responsavel.cargo}
@@ -247,12 +247,12 @@ export class GenerateTermoEntregaUseCase {
     `;
 
     // Converter string para Buffer (simulação)
-    return Buffer.from(mockPdfContent, 'utf-8');
+    return Buffer.from(mockPdfContent, "utf-8");
   }
 
   private generateHTMLTemplate(
     termoData: TermoEntregaData,
-    templateOptions?: GenerateTermoEntregaRequest['templateOptions'],
+    templateOptions?: GenerateTermoEntregaRequest["templateOptions"],
   ): string {
     return `
       <!DOCTYPE html>
@@ -273,10 +273,10 @@ export class GenerateTermoEntregaUseCase {
       </head>
       <body>
         <div class="header">
-          ${templateOptions?.logoPath ? `<img src="${templateOptions.logoPath}" class="logo" alt="Logo">` : ''}
+          ${templateOptions?.logoPath ? `<img src="${templateOptions.logoPath}" class="logo" alt="Logo">` : ""}
           <h1>${termoData.instituicao.nome}</h1>
           <p>${termoData.instituicao.endereco}</p>
-          ${termoData.instituicao.telefone ? `<p>Tel: ${termoData.instituicao.telefone}</p>` : ''}
+          ${termoData.instituicao.telefone ? `<p>Tel: ${termoData.instituicao.telefone}</p>` : ""}
         </div>
         
         <div class="title">TERMO DE ENTREGA DE DOCUMENTO</div>
@@ -289,9 +289,9 @@ export class GenerateTermoEntregaUseCase {
           <div class="field"><strong>Tipo de Documento:</strong> ${termoData.desarquivamento.tipoDocumento}</div>
           <div class="field"><strong>Setor Demandante:</strong> ${termoData.desarquivamento.setorDemandante}</div>
           <div class="field"><strong>Servidor Responsável:</strong> ${termoData.desarquivamento.servidorResponsavel}</div>
-          ${termoData.desarquivamento.finalidadeDesarquivamento ? `<div class="field"><strong>Finalidade:</strong> ${termoData.desarquivamento.finalidadeDesarquivamento}</div>` : ''}
-          <div class="field"><strong>Data de Entrega:</strong> ${termoData.entrega.dataEntrega.toLocaleDateString('pt-BR')}</div>
-          ${termoData.desarquivamento.urgente ? '<div class="field"><strong>URGENTE</strong></div>' : ''}
+          ${termoData.desarquivamento.finalidadeDesarquivamento ? `<div class="field"><strong>Finalidade:</strong> ${termoData.desarquivamento.finalidadeDesarquivamento}</div>` : ""}
+          <div class="field"><strong>Data de Entrega:</strong> ${termoData.entrega.dataEntrega.toLocaleDateString("pt-BR")}</div>
+          ${termoData.desarquivamento.urgente ? '<div class="field"><strong>URGENTE</strong></div>' : ""}
         </div>
         
         <div class="signature-area">
@@ -316,10 +316,10 @@ export class GenerateTermoEntregaUseCase {
 
   private generateFileName(desarquivamento: DesarquivamentoDomain): string {
     const plainObject = desarquivamento.toPlainObject();
-    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const sanitizedNumber = plainObject.numeroNicLaudoAuto.replace(
       /[^a-zA-Z0-9]/g,
-      '_',
+      "_",
     );
     return `termo_entrega_${sanitizedNumber}_${timestamp}.pdf`;
   }

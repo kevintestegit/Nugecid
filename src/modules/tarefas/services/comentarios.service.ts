@@ -2,19 +2,19 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import {
-  Comentario,
-  Tarefa,
-  HistoricoTarefa,
-  TipoAcaoHistorico,
-} from '../entities';
-import { CreateComentarioDto, UpdateComentarioDto } from '../dto';
+  Logger,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import { Comentario, Tarefa, HistoricoTarefa } from "../entities";
+import { CreateComentarioDto, UpdateComentarioDto } from "../dto";
+import { User } from "../../users/entities/user.entity";
+import { NotificacoesService } from "../../notificacoes/services";
 
 @Injectable()
 export class ComentariosService {
+  private readonly logger = new Logger(ComentariosService.name);
+
   constructor(
     @InjectRepository(Comentario)
     private readonly comentarioRepository: Repository<Comentario>,
@@ -22,6 +22,9 @@ export class ComentariosService {
     private readonly tarefaRepository: Repository<Tarefa>,
     @InjectRepository(HistoricoTarefa)
     private readonly historicoRepository: Repository<HistoricoTarefa>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly notificacoesService: NotificacoesService,
   ) {}
 
   async create(
@@ -31,16 +34,16 @@ export class ComentariosService {
     // Verificar se a tarefa existe e se o usuário tem acesso
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: createComentarioDto.tarefaId },
-      relations: ['projeto', 'projeto.membros'],
+      relations: ["projeto", "projeto.membros"],
     });
 
     if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada');
+      throw new NotFoundException("Tarefa não encontrada");
     }
 
     if (!tarefa.projeto.canUserView(autorId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para comentar nesta tarefa',
+        "Você não tem permissão para comentar nesta tarefa",
       );
     }
 
@@ -50,13 +53,22 @@ export class ComentariosService {
     });
 
     const savedComentario = await this.comentarioRepository.save(comentario);
-
+    try {
+      await this.handleMentions(
+        createComentarioDto.conteudo,
+        createComentarioDto.tarefaId,
+        autorId,
+      );
+    } catch (error) {
+      this.logger.warn("Falha ao processar men��es em coment�rio", { error });
+    }
     // Criar histórico
     await this.createHistoryEntry(
       createComentarioDto.tarefaId,
       autorId,
-      TipoAcaoHistorico.COMENTARIO,
-      'Comentário adicionado',
+      "comentario",
+      null,
+      "Comentário adicionado",
     );
 
     return this.findOne(savedComentario.id, autorId);
@@ -66,23 +78,23 @@ export class ComentariosService {
     // Verificar se a tarefa existe e se o usuário tem acesso
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
-      relations: ['projeto', 'projeto.membros'],
+      relations: ["projeto", "projeto.membros"],
     });
 
     if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada');
+      throw new NotFoundException("Tarefa não encontrada");
     }
 
     if (!tarefa.projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar os comentários desta tarefa',
+        "Você não tem permissão para acessar os comentários desta tarefa",
       );
     }
 
     return this.comentarioRepository.find({
       where: { tarefaId },
-      relations: ['autor'],
-      order: { createdAt: 'ASC' },
+      relations: ["autor"],
+      order: { createdAt: "ASC" },
     });
   }
 
@@ -90,20 +102,20 @@ export class ComentariosService {
     const comentario = await this.comentarioRepository.findOne({
       where: { id },
       relations: [
-        'autor',
-        'tarefa',
-        'tarefa.projeto',
-        'tarefa.projeto.membros',
+        "autor",
+        "tarefa",
+        "tarefa.projeto",
+        "tarefa.projeto.membros",
       ],
     });
 
     if (!comentario) {
-      throw new NotFoundException('Comentário não encontrado');
+      throw new NotFoundException("Comentário não encontrado");
     }
 
     if (!comentario.tarefa.projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar este comentário',
+        "Você não tem permissão para acessar este comentário",
       );
     }
 
@@ -120,7 +132,7 @@ export class ComentariosService {
     // Apenas o autor do comentário pode editá-lo
     if (comentario.autorId !== userId) {
       throw new ForbiddenException(
-        'Você só pode editar seus próprios comentários',
+        "Você só pode editar seus próprios comentários",
       );
     }
 
@@ -133,7 +145,7 @@ export class ComentariosService {
 
     if (diferencaHoras > horasLimite) {
       throw new ForbiddenException(
-        'Não é possível editar comentários após 24 horas',
+        "Não é possível editar comentários após 24 horas",
       );
     }
 
@@ -147,9 +159,9 @@ export class ComentariosService {
     await this.createHistoryEntry(
       comentario.tarefaId,
       userId,
-      TipoAcaoHistorico.EDICAO,
-      'Comentário editado',
-      { conteudoAnterior },
+      "edicao",
+      conteudoAnterior,
+      comentario.conteudo,
     );
 
     return this.findOne(id, userId);
@@ -163,12 +175,12 @@ export class ComentariosService {
     const isProjectAdmin =
       comentario.tarefa.projeto.isOwner(userId) ||
       comentario.tarefa.projeto.membros?.some(
-        m => m.usuarioId === userId && m.canManageMembers(),
+        (m) => m.usuarioId === userId && m.canManageMembers(),
       );
 
     if (!isAuthor && !isProjectAdmin) {
       throw new ForbiddenException(
-        'Você não tem permissão para deletar este comentário',
+        "Você não tem permissão para deletar este comentário",
       );
     }
 
@@ -182,7 +194,7 @@ export class ComentariosService {
 
       if (diferencaHoras > horasLimite) {
         throw new ForbiddenException(
-          'Não é possível deletar comentários após 24 horas',
+          "Não é possível deletar comentários após 24 horas",
         );
       }
     }
@@ -193,8 +205,9 @@ export class ComentariosService {
     await this.createHistoryEntry(
       comentario.tarefaId,
       userId,
-      TipoAcaoHistorico.EXCLUSAO,
-      'Comentário removido',
+      "exclusao",
+      comentario.conteudo,
+      null,
     );
   }
 
@@ -207,26 +220,26 @@ export class ComentariosService {
     // Verificar se a tarefa existe e se o usuário tem acesso
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
-      relations: ['projeto', 'projeto.membros'],
+      relations: ["projeto", "projeto.membros"],
     });
 
     if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada');
+      throw new NotFoundException("Tarefa não encontrada");
     }
 
     if (!tarefa.projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar os comentários desta tarefa',
+        "Você não tem permissão para acessar os comentários desta tarefa",
       );
     }
 
     return this.comentarioRepository
-      .createQueryBuilder('comentario')
-      .leftJoinAndSelect('comentario.autor', 'autor')
-      .where('comentario.tarefaId = :tarefaId', { tarefaId })
-      .andWhere('comentario.createdAt >= :dataInicio', { dataInicio })
-      .andWhere('comentario.createdAt <= :dataFim', { dataFim })
-      .orderBy('comentario.createdAt', 'ASC')
+      .createQueryBuilder("comentario")
+      .leftJoinAndSelect("comentario.autor", "autor")
+      .where("comentario.tarefaId = :tarefaId", { tarefaId })
+      .andWhere("comentario.createdAt >= :dataInicio", { dataInicio })
+      .andWhere("comentario.createdAt <= :dataFim", { dataFim })
+      .orderBy("comentario.createdAt", "ASC")
       .getMany();
   }
 
@@ -234,27 +247,27 @@ export class ComentariosService {
     // Verificar se a tarefa existe e se o usuário tem acesso
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
-      relations: ['projeto', 'projeto.membros'],
+      relations: ["projeto", "projeto.membros"],
     });
 
     if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada');
+      throw new NotFoundException("Tarefa não encontrada");
     }
 
     if (!tarefa.projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar as estatísticas desta tarefa',
+        "Você não tem permissão para acessar as estatísticas desta tarefa",
       );
     }
 
     const comentarios = await this.comentarioRepository.find({
       where: { tarefaId },
-      relations: ['autor'],
+      relations: ["autor"],
     });
 
     const stats = {
       totalComentarios: comentarios.length,
-      comentariosEditados: comentarios.filter(c => c.editado).length,
+      comentariosEditados: comentarios.filter((c) => c.editado).length,
       autorMaisAtivo: null as string | null,
       ultimoComentario: null as Date | null,
       comentariosPorAutor: {} as Record<string, number>,
@@ -268,7 +281,7 @@ export class ComentariosService {
       stats.ultimoComentario = ultimoComentario.createdAt;
 
       // Comentários por autor
-      comentarios.forEach(comentario => {
+      comentarios.forEach((comentario) => {
         const nomeAutor = comentario.autor.nome;
         stats.comentariosPorAutor[nomeAutor] =
           (stats.comentariosPorAutor[nomeAutor] || 0) + 1;
@@ -284,19 +297,68 @@ export class ComentariosService {
     return stats;
   }
 
+  private extractMentions(text: string): string[] {
+    if (!text) {
+      return [];
+    }
+
+    const regex = /@([a-zA-Z0-9._-]+)/g;
+    const mentions = new Set<string>();
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(text)) !== null) {
+      mentions.add(match[1]);
+    }
+
+    return Array.from(mentions);
+  }
+
+  private async handleMentions(
+    conteudo: string,
+    tarefaId: number,
+    autorId: number,
+  ): Promise<void> {
+    const mencoes = this.extractMentions(conteudo);
+
+    if (mencoes.length === 0) {
+      return;
+    }
+
+    const usuarios = await this.userRepository.find({
+      where: { usuario: In(mencoes) },
+    });
+
+    if (!usuarios.length) {
+      return;
+    }
+
+    await Promise.all(
+      usuarios
+        .filter((usuario) => usuario.id !== autorId)
+        .map((usuario) =>
+          this.notificacoesService.notificarMencao(
+            usuario.id,
+            autorId,
+            tarefaId,
+            conteudo,
+          ),
+        ),
+    );
+  }
   private async createHistoryEntry(
     tarefaId: number,
     usuarioId: number,
-    tipo: TipoAcaoHistorico,
-    descricao: string,
-    dadosAnteriores?: any,
+    acao: string,
+    valorAnterior?: string,
+    valorNovo?: string,
   ): Promise<void> {
     const historico = this.historicoRepository.create({
       tarefaId,
       usuarioId,
-      acao: tipo,
-      descricao,
-      dadosAnteriores,
+      acao,
+      campoAlterado: "comentario",
+      valorAnterior,
+      valorNovo,
     });
 
     await this.historicoRepository.save(historico);

@@ -1,9 +1,9 @@
-import { ValueObject } from './value-object';
+import { ValueObject } from "./value-object";
 
 export enum TipoDesarquivamentoEnum {
-  FISICO = 'FISICO',
-  DIGITAL = 'DIGITAL',
-  NAO_LOCALIZADO = 'NAO_LOCALIZADO',
+  FISICO = "FISICO",
+  DIGITAL = "DIGITAL",
+  NAO_LOCALIZADO = "NAO_LOCALIZADO",
 }
 
 interface TipoDesarquivamentoProps {

@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AlterTipoDocumentoToVarchar1756820000000
   implements MigrationInterface
 {
-  name = 'AlterTipoDocumentoToVarchar1756820000000';
+  name = "AlterTipoDocumentoToVarchar1756820000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Alterar o campo tipo_documento de enum para varchar

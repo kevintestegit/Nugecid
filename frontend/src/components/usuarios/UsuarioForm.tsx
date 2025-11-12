@@ -13,6 +13,7 @@ interface UsuarioFormProps {
 interface FormData {
   nome: string
   usuario: string
+  matricula: string
   senha: string
   confirmSenha: string
   role: UserRole
@@ -22,6 +23,7 @@ interface FormData {
 interface FormErrors {
   nome?: string
   usuario?: string
+  matricula?: string
   senha?: string
   confirmSenha?: string
   role?: string
@@ -37,6 +39,7 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
   const [formData, setFormData] = useState<FormData>({
     nome: initialData?.nome || '',
     usuario: initialData?.usuario || '',
+    matricula: initialData?.matricula || '',
     senha: '',
     confirmSenha: '',
     role: initialData?.role || UserRole.USUARIO,
@@ -53,6 +56,7 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
         ...prev,
         nome: initialData.nome || '',
         usuario: initialData.usuario || '',
+        matricula: initialData.matricula || '',
         role: (initialData.role as UserRole) || UserRole.USUARIO,
         ativo: initialData.ativo ?? true
       }))
@@ -79,6 +83,15 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
       newErrors.usuario = 'Usuário deve ter no máximo 50 caracteres'
     } else if (!usuarioRegex.test(formData.usuario)) {
       newErrors.usuario = 'Usuário deve conter apenas letras, números, pontos, hífens e underscores'
+    }
+
+    // Validação da matrícula
+    if (!formData.matricula.trim()) {
+      newErrors.matricula = 'Matrícula é obrigatória'
+    } else if (formData.matricula.trim().length < 3) {
+      newErrors.matricula = 'Matrícula deve ter pelo menos 3 caracteres'
+    } else if (formData.matricula.trim().length > 50) {
+      newErrors.matricula = 'Matrícula deve ter no máximo 50 caracteres'
     }
 
     // Validação da senha (obrigatória apenas na criação)
@@ -125,7 +138,8 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
         nome: formData.nome.trim(),
         usuario: formData.usuario.trim().toLowerCase(),
         senha: formData.senha,
-        role: formData.role
+        role: formData.role,
+        matricula: formData.matricula.trim()
       }
       onSubmit(createData)
     } else {
@@ -133,7 +147,8 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
         nome: formData.nome.trim(),
         usuario: formData.usuario.trim().toLowerCase(),
         role: formData.role,
-        ativo: formData.ativo
+        ativo: formData.ativo,
+        matricula: formData.matricula.trim()
       }
       
       // Incluir senha apenas se foi preenchida
@@ -198,6 +213,28 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
           />
           {errors.usuario && (
             <p className="text-sm text-red-600">{errors.usuario}</p>
+          )}
+        </div>
+
+        {/* Matrícula */}
+        <div className="space-y-2">
+          <label htmlFor="matricula" className="block text-sm font-medium text-gray-700">
+            <User className="inline h-4 w-4 mr-1" />
+            Matrícula *
+          </label>
+          <input
+            id="matricula"
+            type="text"
+            value={formData.matricula}
+            onChange={(e) => handleInputChange('matricula', e.target.value)}
+            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+              errors.matricula ? 'border-red-300' : 'border-gray-300'
+            }`}
+            placeholder="Informe a matrícula"
+            disabled={isLoading}
+          />
+          {errors.matricula && (
+            <p className="text-sm text-red-600">{errors.matricula}</p>
           )}
         </div>
 

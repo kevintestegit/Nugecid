@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Card,
@@ -22,17 +22,36 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiService } from '@/services/api';
+import { UserSettings as UserSettingsType } from '@/types';
 
 export const UserSettings: React.FC = () => {
   const { user, updateUser } = useAuth();
+  const derivePreferences = useCallback((settings?: UserSettingsType | null) => ({
+    showEmail: settings?.showEmail ?? true,
+    showPhone: settings?.showPhone ?? false,
+    autoSave: settings?.autoSave ?? true,
+    compactView: settings?.compactView ?? false,
+    itemsPerPage: settings?.itemsPerPage ?? 10,
+  }), []);
+
   const [isLoading, setIsLoading] = useState(false);
-  const [userConfig, setUserConfig] = useState({
-    showEmail: true,
-    showPhone: false,
-    autoSave: true,
-    compactView: false,
-    itemsPerPage: 10
-  });
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [userConfig, setUserConfig] = useState(() => derivePreferences(user?.settings));
+
+  const baselinePreferences = useMemo(
+    () => derivePreferences(user?.settings),
+    [derivePreferences, user?.settings],
+  );
+
+  useEffect(() => {
+    setUserConfig(baselinePreferences);
+  }, [baselinePreferences]);
+
+  const preferencesChanged = useMemo(
+    () => JSON.stringify(userConfig) !== JSON.stringify(baselinePreferences),
+    [userConfig, baselinePreferences],
+  );
   
   const [avatarPreview, setAvatarPreview] = useState<string | undefined>(user?.avatarUrl);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -46,7 +65,7 @@ export const UserSettings: React.FC = () => {
 
   useEffect(() => {
     if (!avatarFile) {
-      setAvatarPreview(user?.avatarUrl);
+      setAvatarPreview(user?.avatarUrl ?? undefined);
     }
   }, [user?.avatarUrl, avatarFile]);
 
@@ -80,7 +99,7 @@ export const UserSettings: React.FC = () => {
       setAvatarFile(file);
     };
     reader.onerror = () => {
-      toast.error('Nao foi possivel carregar a imagem selecionada');
+      toast.error('Nao foi possível carregar a imagem selecionada');
     };
     reader.readAsDataURL(file);
 
@@ -93,25 +112,44 @@ export const UserSettings: React.FC = () => {
     if (!user) {
       return;
     }
-    if (!avatarPreview || !avatarFile) {
+    if (!avatarFile) {
       toast.error('Selecione uma imagem antes de salvar');
       return;
     }
 
     setIsSavingAvatar(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      updateUser({ ...user, avatarUrl: avatarPreview });
+      const response = await apiService.uploadMyAvatar(avatarFile);
+      if (!response.success || !response.data?.avatarUrl) {
+        throw new Error(response.message || 'Erro ao atualizar avatar');
+      }
+
+      // Buscar dados atualizados do usuário do backend
+      const userResponse = await apiService.getCurrentUser();
+      if (userResponse.success && userResponse.data) {
+        updateUser(userResponse.data);
+        setAvatarPreview(userResponse.data.avatarUrl ?? undefined);
+      } else {
+        // Fallback: atualizar apenas localmente
+        const nextUser = {
+          ...user,
+          avatarUrl: response.data.avatarUrl,
+        };
+        updateUser(nextUser);
+        setAvatarPreview(response.data.avatarUrl);
+      }
+
       setAvatarFile(null);
       toast.success('Foto de perfil atualizada!');
     } catch (error) {
+      console.error('Erro ao atualizar a foto de perfil', error);
       toast.error('Erro ao atualizar a foto de perfil');
     } finally {
       setIsSavingAvatar(false);
     }
   };
 
-  const handleAvatarRemove = () => {
+  const handleAvatarRemove = async () => {
     if (avatarFile) {
       setAvatarFile(null);
       setAvatarPreview(user?.avatarUrl);
@@ -122,9 +160,70 @@ export const UserSettings: React.FC = () => {
       return;
     }
 
-    updateUser({ ...user, avatarUrl: undefined });
-    setAvatarPreview(undefined);
-    toast.success('Foto de perfil removida');
+    setIsSavingAvatar(true);
+    try {
+      const response = await apiService.deleteMyAvatar();
+      if (!response.success) {
+        throw new Error(response.message || 'Erro ao remover avatar');
+      }
+
+      // Buscar dados atualizados do usuário do backend
+      const userResponse = await apiService.getCurrentUser();
+      if (userResponse.success && userResponse.data) {
+        updateUser(userResponse.data);
+        setAvatarPreview(userResponse.data.avatarUrl ?? undefined);
+      } else {
+        // Fallback: atualizar apenas localmente
+        updateUser({ ...user, avatarUrl: null });
+        setAvatarPreview(undefined);
+      }
+
+      toast.success('Foto de perfil removida');
+    } catch (error) {
+      console.error('Erro ao remover foto de perfil', error);
+      toast.error('Erro ao remover a foto de perfil');
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
+
+  const handlePreferencesSave = async () => {
+    if (!user) {
+      return;
+    }
+
+    setIsSavingPreferences(true);
+    try {
+      const response = await apiService.updateMySettings({
+        showEmail: userConfig.showEmail,
+        showPhone: userConfig.showPhone,
+        autoSave: userConfig.autoSave,
+        compactView: userConfig.compactView,
+        itemsPerPage: userConfig.itemsPerPage,
+      });
+
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Erro ao atualizar preferências');
+      }
+
+      const updatedSettings: UserSettingsType = {
+        ...(user.settings || {}),
+        ...response.data,
+      };
+
+      updateUser({
+        ...user,
+        settings: updatedSettings,
+      });
+
+      setUserConfig(derivePreferences(updatedSettings));
+      toast.success('Preferências atualizadas!');
+    } catch (error) {
+      console.error('Erro ao atualizar preferências', error);
+      toast.error('Erro ao atualizar preferências');
+    } finally {
+      setIsSavingPreferences(false);
+    }
   };
 
   const handlePasswordChange = async () => {
@@ -179,8 +278,9 @@ export const UserSettings: React.FC = () => {
                 </div>
               )}
               <div>
-                <p className="text-sm font-semibold text-foreground">Foto do usuario</p>
-                <p className="text-xs text-muted-foreground">PNG ou JPG ate 2 MB.</p>
+                <p className="text-sm font-semibold text-foreground">Foto do usuá
+                  rio</p>
+                <p className="text-xs text-muted-foreground">PNG ou JPG até 2 MB.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -326,6 +426,32 @@ export const UserSettings: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
+              <Label className="text-sm font-medium">Exibir e-mail</Label>
+              <p className="text-sm text-gray-500">Mostrar seu e-mail para outros usuários autorizados</p>
+            </div>
+            <Switch
+              checked={userConfig.showEmail}
+              onCheckedChange={(checked) =>
+                setUserConfig(prev => ({ ...prev, showEmail: !!checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">Exibir telefone</Label>
+              <p className="text-sm text-gray-500">Compartilhar telefone em perfis e detalhes de tarefas</p>
+            </div>
+            <Switch
+              checked={userConfig.showPhone}
+              onCheckedChange={(checked) =>
+                setUserConfig(prev => ({ ...prev, showPhone: !!checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
               <Label className="text-sm font-medium">Salvamento automático</Label>
               <p className="text-sm text-gray-500">Salvar alterações automaticamente</p>
             </div>
@@ -366,6 +492,17 @@ export const UserSettings: React.FC = () => {
               <option value={25}>25 itens</option>
               <option value={50}>50 itens</option>
             </select>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <Button
+              type="button"
+              onClick={handlePreferencesSave}
+              disabled={!preferencesChanged || isSavingPreferences}
+              className="w-full md:w-auto"
+            >
+              {isSavingPreferences ? 'Salvando...' : 'Salvar preferências'}
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -1,307 +1,695 @@
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui'
-import { Button } from '@/components/ui'
-import { Badge } from '@/components/ui'
-import { Input } from '@/components/ui'
-import { 
-  CheckSquare, 
-  Plus, 
-  Filter,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Trash2,
-  Edit,
-  User,
-  Calendar,
-  Eye
-} from 'lucide-react'
-import { SearchInput } from '@/components/ui/SearchInput'
-import { cn } from '@/utils/cn'
-import { useTarefas } from '@/hooks/useTarefas'
-import { Tarefa, StatusTarefa, PrioridadeTarefa, QueryTarefaDto } from '@/types'
-import { toast } from 'sonner'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TarefaFilters from '@/components/tarefas/TarefaFilters'
+import { KanbanBoard, Coluna as KanbanColuna, Tarefa as KanbanTarefa, Projeto as KanbanProjeto } from '@/components/kanban'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Button,
+  Badge,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui'
+import { Loader2, RefreshCw, Plus, Columns, Users } from 'lucide-react'
+import { toast } from 'sonner'
+import { api } from '@/services/api'
+import tarefasService from '@/services/tarefasService'
+import { useAuth } from '@/contexts/AuthContext'
+
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  message?: string
+}
+
+interface ProjetoResumo {
+  id: number
+  nome: string
+  descricao?: string
+  cor?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+interface ColunaResponse {
+  id: number
+  nome: string
+  cor?: string
+  ordem?: number
+  projetoId?: number
+  ativa?: boolean
+  limiteWip?: number
+  limite_wip?: number
+}
+
+interface TarefaResponse {
+  id: number
+  titulo: string
+  descricao?: string
+  prioridade?: string
+  prazo?: string
+  ordem?: number
+  colunaId?: number
+  coluna_id?: number
+  coluna?: { id: number }
+  responsavel?: { id: number; nome: string; avatarUrl?: string; avatar?: string }
+  tags?: string[]
+  comentarios?: unknown[]
+}
+
+interface ProjetoDetalhado extends ProjetoResumo {
+  colunas?: ColunaResponse[]
+  tarefas?: TarefaResponse[]
+}
+
+type BoardTask = KanbanTarefa & { coluna_id: number; colunaId?: number }
+
+type ResponsibleFilter = 'all' | 'mine' | number
+
+const STORAGE_KEY = 'tarefas.selectedProjectId'
+
+const normalizePriority = (value?: string): KanbanTarefa['prioridade'] => {
+  if (!value) return 'media'
+  const normalized = value.toLowerCase()
+  if (normalized === 'baixa' || normalized === 'media' || normalized === 'alta' || normalized === 'critica') {
+    return normalized
+  }
+  return 'media'
+}
+
+const mapColumns = (data: ColunaResponse[] | undefined, fallbackProjectId: number): KanbanColuna[] => {
+  if (!data) return []
+  return data
+    .map(coluna => ({
+      id: coluna.id,
+      nome: coluna.nome,
+      cor: coluna.cor ?? '#3B82F6',
+      ordem: coluna.ordem ?? 1,
+      projeto_id: coluna.projetoId ?? fallbackProjectId,
+      limite_wip: coluna.limiteWip ?? coluna.limite_wip,
+    }))
+    .sort((a, b) => a.ordem - b.ordem)
+}
+
+const mapTasks = (data: TarefaResponse[] | undefined): BoardTask[] => {
+  if (!data) return []
+
+  const grouped = new Map<number, BoardTask[]>()
+
+  data.forEach(item => {
+    const columnId = item.colunaId ?? item.coluna_id ?? item.coluna?.id ?? 0
+    if (!columnId) return
+
+    const base: BoardTask = {
+      id: item.id,
+      titulo: item.titulo,
+      descricao: item.descricao ?? '',
+      prioridade: normalizePriority(item.prioridade),
+      prazo: item.prazo ?? undefined,
+      responsavel: item.responsavel
+        ? {
+            id: item.responsavel.id,
+            nome: item.responsavel.nome,
+            avatar: item.responsavel.avatarUrl ?? item.responsavel.avatar,
+          }
+        : undefined,
+      comentarios: Array.isArray(item.comentarios) ? item.comentarios.length : undefined,
+      ordem: item.ordem ?? 0,
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      coluna_id: columnId,
+      colunaId: columnId,
+    }
+
+    const list = grouped.get(columnId) ?? []
+    list.push(base)
+    grouped.set(columnId, list)
+  })
+
+  const result: BoardTask[] = []
+  grouped.forEach(list => {
+    list
+      .sort((a, b) => a.ordem - b.ordem || a.id - b.id)
+      .forEach((task, index) => {
+        task.ordem = index + 1
+        result.push(task)
+      })
+  })
+
+  return result
+}
 
 const TarefasPage: React.FC = () => {
   const navigate = useNavigate()
-  const {
-    tarefas,
-    loading,
-    error,
-    fetchTarefas,
-    deleteTarefa,
-    estatisticas
-  } = useTarefas()
+  const { user } = useAuth()
 
-  const [filtros, setFiltros] = useState<QueryTarefaDto>({
-    page: 1,
-    limit: 10
-  })
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const [filtroStatus, setFiltroStatus] = useState<string>('todos')
-  const [busca, setBusca] = useState('')
-  const [mostrarFormulario, setMostrarFormulario] = useState(false)
+  const [projects, setProjects] = useState<ProjetoResumo[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
+  const [projectDetails, setProjectDetails] = useState<ProjetoDetalhado | null>(null)
+  const [columns, setColumns] = useState<KanbanColuna[]>([])
+  const [tasks, setTasks] = useState<BoardTask[]>([])
+  const [selectedResponsibleId, setSelectedResponsibleId] = useState<ResponsibleFilter>('all')
+  const [loadingProjects, setLoadingProjects] = useState(false)
+  const [loadingBoard, setLoadingBoard] = useState(false)
+  const [isMutating, setIsMutating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadProjects = useCallback(async () => {
+    setLoadingProjects(true)
+    try {
+      const response = await api.get<ApiResponse<ProjetoResumo[]>>('/projetos')
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Não foi possível carregar os projetos.')
+      }
+
+      const lista = response.data.data ?? []
+      setProjects(lista)
+
+      if (!lista.length) {
+        setSelectedProjectId(null)
+        setProjectDetails(null)
+        setColumns([])
+        setTasks([])
+        localStorage.removeItem(STORAGE_KEY)
+        return
+      }
+
+      const storedId = localStorage.getItem(STORAGE_KEY)
+      let nextId: number | null = storedId ? Number(storedId) : null
+      if (nextId && !lista.some(proj => proj.id === nextId)) {
+        nextId = null
+      }
+      if (!nextId) {
+        nextId = lista[0].id
+      }
+
+      setSelectedProjectId(nextId)
+    } catch (err) {
+      console.error('Erro ao carregar projetos:', err)
+      setError('Não foi possível carregar os projetos no momento.')
+      toast.error('Não foi possível carregar os projetos.')
+    } finally {
+      setLoadingProjects(false)
+    }
+  }, [])
+
+  const loadBoardData = useCallback(async (projectId: number) => {
+    console.log('📥 Carregando dados do projeto:', projectId)
+    setLoadingBoard(true)
+    try {
+      setError(null)
+      const response = await api.get<ApiResponse<ProjetoDetalhado>>(`/projetos/${projectId}`)
+      if (!response.data.success || !response.data.data) {
+        throw new Error(response.data.message || 'Não foi possível carregar o quadro de tarefas.')
+      }
+
+      const project = response.data.data
+      console.log('📦 Dados recebidos:', {
+        projeto: project.nome,
+        colunas: project.colunas?.length,
+        tarefas: project.tarefas?.length
+      })
+      
+      setProjectDetails(project)
+      const mappedColumns = mapColumns(project.colunas, project.id)
+      const mappedTasks = mapTasks(project.tarefas)
+      
+      console.log('📊 Dados mapeados:', {
+        columns: mappedColumns.length,
+        tasks: mappedTasks.length,
+        tasksByColumn: mappedTasks.reduce((acc, task) => {
+          acc[task.coluna_id] = (acc[task.coluna_id] || 0) + 1
+          return acc
+        }, {} as Record<number, number>)
+      })
+      
+      setColumns(mappedColumns)
+      setTasks(mappedTasks)
+    } catch (err) {
+      console.error('❌ Erro ao carregar quadro de tarefas:', err)
+      setError('Não foi possível carregar o quadro de tarefas.')
+      toast.error('Não foi possível carregar o quadro de tarefas.')
+      setColumns([])
+      setTasks([])
+    } finally {
+      setLoadingBoard(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const queryParams: QueryTarefaDto = {
-      ...filtros,
-      search: busca || undefined,
-      status: filtroStatus !== 'todos' ? filtroStatus as StatusTarefa : undefined
-    }
-    fetchTarefas(queryParams)
-  }, [filtros, busca, filtroStatus, fetchTarefas])
+    loadProjects()
+  }, [loadProjects])
 
-  const getStatusIcon = (status: StatusTarefa) => {
-    switch (status) {
-      case StatusTarefa.PENDENTE:
-        return <Clock className="h-4 w-4" />
-      case StatusTarefa.EM_ANDAMENTO:
-        return <AlertCircle className="h-4 w-4" />
-      case StatusTarefa.CONCLUIDA:
-        return <CheckCircle className="h-4 w-4" />
-      case StatusTarefa.CANCELADA:
-        return <Trash2 className="h-4 w-4" />
-      default:
-        return <Clock className="h-4 w-4" />
+  useEffect(() => {
+    if (selectedProjectId) {
+      localStorage.setItem(STORAGE_KEY, String(selectedProjectId))
+      loadBoardData(selectedProjectId)
+      setSelectedResponsibleId('all')
     }
-  }
+  }, [selectedProjectId]) // Removido loadBoardData da dependência
 
-  const getStatusLabel = (status: Tarefa['status']) => {
-    switch (status) {
-      case 'pendente':
-        return 'Pendente'
-      case 'em_andamento':
-        return 'Em Andamento'
-      case 'concluida':
-        return 'Concluída'
+  const responsibleOptions = useMemo(() => {
+    const unique = new Map<number, { id: number; nome: string }>()
+    tasks.forEach(task => {
+      if (task.responsavel) {
+        unique.set(task.responsavel.id, {
+          id: task.responsavel.id,
+          nome: task.responsavel.nome,
+        })
+      }
+    })
+    return Array.from(unique.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [tasks])
+
+  useEffect(() => {
+    if (typeof selectedResponsibleId === 'number' && !responsibleOptions.some(option => option.id === selectedResponsibleId)) {
+      setSelectedResponsibleId('all')
     }
-  }
+  }, [responsibleOptions, selectedResponsibleId])
 
-  const getStatusColor = (status: StatusTarefa) => {
-    switch (status) {
-      case StatusTarefa.PENDENTE:
-        return 'bg-yellow-100 text-yellow-800'
-      case StatusTarefa.EM_ANDAMENTO:
-        return 'bg-blue-100 text-blue-800'
-      case StatusTarefa.CONCLUIDA:
-        return 'bg-green-100 text-green-800'
-      case StatusTarefa.CANCELADA:
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  const boardTasks = useMemo(() => {
+    if (selectedResponsibleId === 'all') {
+      return tasks
     }
-  }
 
-  const getPrioridadeColor = (prioridade: PrioridadeTarefa) => {
-    switch (prioridade) {
-      case PrioridadeTarefa.BAIXA:
-        return 'bg-green-100 text-green-800'
-      case PrioridadeTarefa.MEDIA:
-        return 'bg-yellow-100 text-yellow-800'
-      case PrioridadeTarefa.ALTA:
-        return 'bg-orange-100 text-orange-800'
-      case PrioridadeTarefa.CRITICA:
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+    if (selectedResponsibleId === 'mine') {
+      if (!user) return []
+      return tasks.filter(task => task.responsavel?.id === user.id)
     }
-  }
 
-  const handleDeleteTarefa = async (id: number) => {
+    return tasks.filter(task => task.responsavel?.id === selectedResponsibleId)
+  }, [tasks, selectedResponsibleId, user])
+
+  const stats = useMemo(() => {
+    const total = tasks.length
+    const now = new Date()
+    let overdue = 0
+    let upcomingWeek = 0
+    const priorities: Record<KanbanTarefa['prioridade'], number> = {
+      baixa: 0,
+      media: 0,
+      alta: 0,
+      critica: 0,
+    }
+
+    tasks.forEach(task => {
+      priorities[task.prioridade] = (priorities[task.prioridade] ?? 0) + 1
+
+      if (task.prazo) {
+        const dueDate = new Date(task.prazo)
+        if (!Number.isNaN(dueDate.getTime())) {
+          if (dueDate < now) {
+            overdue += 1
+          } else {
+            const diffMs = dueDate.getTime() - now.getTime()
+            if (diffMs <= 7 * 24 * 60 * 60 * 1000) {
+              upcomingWeek += 1
+            }
+          }
+        }
+      }
+    })
+
+    return { total, overdue, upcomingWeek, priorities }
+  }, [tasks])
+
+  const handleProjectChange = useCallback((value: string) => {
+    const parsed = Number(value)
+    setSelectedProjectId(Number.isNaN(parsed) ? null : parsed)
+  }, [])
+
+  const handleResponsibleChange = useCallback((value: string) => {
+    if (value === 'all' || value === 'mine') {
+      setSelectedResponsibleId(value)
+      return
+    }
+
+    const parsed = Number(value)
+    setSelectedResponsibleId(Number.isNaN(parsed) ? 'all' : parsed)
+  }, [])
+
+  const handleMoveTask = useCallback(
+    async (taskId: number, _sourceColumnId: number, targetColumnId: number, targetIndex: number) => {
+      if (!selectedProjectId) return
+      
+      console.log('🔄 handleMoveTask chamado:', {
+        taskId,
+        sourceColumnId: _sourceColumnId,
+        targetColumnId,
+        targetIndex,
+      })
+      
+      setIsMutating(true)
+      
+      try {
+        await tarefasService.moveTarefa(taskId, {
+          colunaId: targetColumnId,
+          ordem: targetIndex + 1,
+        })
+        
+        console.log('✅ API retornou sucesso, recarregando dados...')
+        
+        // Recarregar dados do servidor para garantir sincronização
+        await loadBoardData(selectedProjectId)
+        
+        toast.success('Tarefa movida com sucesso!')
+      } catch (error) {
+        console.error('❌ Erro ao mover tarefa:', error)
+        toast.error('Não foi possível mover a tarefa.')
+        await loadBoardData(selectedProjectId)
+      } finally {
+        setIsMutating(false)
+      }
+    },
+    [selectedProjectId, loadBoardData]
+  )
+
+  const handleReorderTasks = useCallback(
+    async (colunaId: number, orderedIds: number[], movedTaskId?: number) => {
+      if (!selectedProjectId || movedTaskId === undefined) return
+      const newIndex = orderedIds.findIndex(id => id === movedTaskId)
+      if (newIndex === -1) return
+
+      setIsMutating(true)
+      
+      try {
+        await tarefasService.moveTarefa(movedTaskId, {
+          colunaId,
+          ordem: newIndex + 1,
+        })
+        
+        // Recarregar dados do servidor
+        await loadBoardData(selectedProjectId)
+      } catch (error) {
+        console.error('Erro ao reordenar tarefas:', error)
+        toast.error('Não foi possível reordenar as tarefas.')
+        await loadBoardData(selectedProjectId)
+      } finally {
+        setIsMutating(false)
+      }
+    },
+    [selectedProjectId, loadBoardData]
+  )
+
+  const handleAddColumn = useCallback(async () => {
+    if (!selectedProjectId) return
+    const nome = window.prompt('Nome da nova coluna')
+    if (!nome || !nome.trim()) {
+      return
+    }
+
+    setIsMutating(true)
     try {
-      await deleteTarefa(id)
-      toast.success('Tarefa excluída com sucesso!')
+      const response = await api.post<ApiResponse<ColunaResponse>>('/colunas', {
+        projetoId: selectedProjectId,
+        nome: nome.trim(),
+      })
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Não foi possível criar a coluna.')
+      }
+      toast.success('Coluna criada com sucesso!')
+      await loadBoardData(selectedProjectId)
     } catch (error) {
-      toast.error('Erro ao excluir tarefa')
+      console.error('Erro ao criar coluna:', error)
+      toast.error('Não foi possível criar a coluna.')
+    } finally {
+      setIsMutating(false)
     }
-  }
+  }, [loadBoardData, selectedProjectId])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
+  const handleEditColumn = useCallback(async (coluna: KanbanColuna) => {
+    if (!selectedProjectId) return
+    const novoNome = window.prompt('Renomear coluna', coluna.nome)
+    if (!novoNome || !novoNome.trim() || novoNome.trim() === coluna.nome) {
+      return
+    }
 
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Erro ao carregar tarefas</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <Button onClick={() => fetchTarefas(filtros)}>Tentar novamente</Button>
-      </div>
-    )
-  }
+    setIsMutating(true)
+    try {
+      const response = await api.patch<ApiResponse<ColunaResponse>>(`/colunas/${coluna.id}`, {
+        nome: novoNome.trim(),
+      })
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Não foi possível atualizar a coluna.')
+      }
+      toast.success('Coluna atualizada com sucesso!')
+      await loadBoardData(selectedProjectId)
+    } catch (error) {
+      console.error('Erro ao atualizar coluna:', error)
+      toast.error('Não foi possível atualizar a coluna.')
+    } finally {
+      setIsMutating(false)
+    }
+  }, [loadBoardData, selectedProjectId])
+
+  const handleDeleteColumn = useCallback(async (colunaId: number) => {
+    if (!selectedProjectId) return
+    const confirmed = window.confirm('Deseja realmente excluir esta coluna? Certifique-se de que não há tarefas importantes nela.')
+    if (!confirmed) return
+
+    setIsMutating(true)
+    try {
+      const response = await api.delete<ApiResponse<unknown>>(`/colunas/${colunaId}`)
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Não foi possível excluir a coluna.')
+      }
+      toast.success('Coluna excluída com sucesso!')
+      await loadBoardData(selectedProjectId)
+    } catch (error) {
+      console.error('Erro ao excluir coluna:', error)
+      toast.error('Não foi possível excluir a coluna.')
+      await loadBoardData(selectedProjectId)
+    } finally {
+      setIsMutating(false)
+    }
+  }, [loadBoardData, selectedProjectId])
+
+  const handleAddTask = useCallback(
+    (colunaId?: number) => {
+      if (!selectedProjectId) {
+        toast.error('Selecione um projeto para criar tarefas.')
+        return
+      }
+
+      navigate('/tarefas/nova', {
+        state: {
+          projetoId: selectedProjectId,
+          colunaId: colunaId ?? null,
+        },
+      })
+    },
+    [navigate, selectedProjectId]
+  )
+
+  const handleTaskClick = useCallback((tarefa: KanbanTarefa) => {
+    navigate(`/tarefas/${tarefa.id}`)
+  }, [navigate])
+
+  const handleTaskEdit = useCallback((tarefa: KanbanTarefa) => {
+    navigate(`/tarefas/${tarefa.id}`)
+  }, [navigate])
+
+  const handleTaskDelete = useCallback(
+    async (taskId: number) => {
+      if (!selectedProjectId) return
+      const confirmed = window.confirm('Deseja realmente excluir esta tarefa?')
+      if (!confirmed) return
+
+      setIsMutating(true)
+      try {
+        await tarefasService.deleteTarefa(taskId)
+        toast.success('Tarefa removida com sucesso!')
+        await loadBoardData(selectedProjectId)
+      } catch (error) {
+        console.error('Erro ao excluir tarefa:', error)
+        toast.error('Não foi possível excluir a tarefa.')
+        await loadBoardData(selectedProjectId)
+      } finally {
+        setIsMutating(false)
+      }
+    },
+    [loadBoardData, selectedProjectId]
+  )
+
+  const handleRefresh = useCallback(() => {
+    if (selectedProjectId) {
+      loadBoardData(selectedProjectId)
+    } else {
+      loadProjects()
+    }
+  }, [loadBoardData, loadProjects, selectedProjectId])
+
+  const handleProjectSettings = useCallback(() => {
+    navigate('/projetos')
+  }, [navigate])
+
+  const boardLoading = loadingBoard || loadingProjects
+  const disableActions = boardLoading || isMutating
+
+  const projetoResumo: KanbanProjeto = projectDetails
+    ? {
+        id: projectDetails.id,
+        nome: projectDetails.nome,
+        descricao: projectDetails.descricao ?? '',
+        cor: projectDetails.cor,
+        data_criacao: projectDetails.createdAt ?? '',
+        data_atualizacao: projectDetails.updatedAt ?? '',
+      }
+    : {
+        id: 0,
+        nome: 'Projeto',
+        descricao: '',
+        cor: '#3B82F6',
+        data_criacao: '',
+        data_atualizacao: '',
+      }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto px-4 py-6">
+      <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Tarefas</h1>
-          <p className="text-gray-600 mt-1">Gerencie suas tarefas e acompanhe o progresso</p>
+          <h1 className="text-2xl font-bold text-gray-900">Quadro de Tarefas</h1>
+          <p className="text-gray-600">Organize e acompanhe as atividades da equipe em tempo real.</p>
         </div>
-        <Button 
-          onClick={() => navigate('/tarefas/nova')}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Tarefa
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/tarefas/nova')} disabled={disableActions || !selectedProjectId}
+            className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Nova tarefa
+          </Button>
+          <Button variant="outline" onClick={handleAddColumn} disabled={disableActions || !selectedProjectId}
+            className="flex items-center gap-2">
+            <Columns className="h-4 w-4" />
+            Nova coluna
+          </Button>
+          <Button variant="ghost" onClick={handleRefresh} disabled={boardLoading} className="flex items-center gap-2">
+            {boardLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Atualizar
+          </Button>
+        </div>
       </div>
 
-      {/* Estatísticas */}
-      {estatisticas && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total</p>
-                  <p className="text-2xl font-bold text-gray-900">{estatisticas.total}</p>
-                </div>
-                <CheckSquare className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Pendentes</p>
-                  <p className="text-2xl font-bold text-yellow-600">{estatisticas.pendentes}</p>
-                </div>
-                <Clock className="h-8 w-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Em Andamento</p>
-                  <p className="text-2xl font-bold text-blue-600">{estatisticas.emAndamento}</p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Concluídas</p>
-                  <p className="text-2xl font-bold text-green-600">{estatisticas.concluidas}</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      {error && (
+        <Alert variant="warning" className="mb-6">
+          <AlertTitle>Algo deu errado</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Filtros */}
-      <TarefaFilters
-        filters={filtros}
-        onFiltersChange={setFiltros}
-        onClearFilters={() => setFiltros({ page: 1, limit: 10 })}
-        loading={loading}
-        showAdvanced={showAdvancedFilters}
-        onToggleAdvanced={() => setShowAdvancedFilters(!showAdvancedFilters)}
-      />
+      <Card className="mb-4">
+        <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={selectedProjectId?.toString() ?? ''} onValueChange={handleProjectChange}>
+              <SelectTrigger className="w-64">
+                <SelectValue placeholder="Selecione um projeto" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map(projeto => (
+                  <SelectItem key={projeto.id} value={projeto.id.toString()}>
+                    {projeto.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-      {/* Lista de Tarefas */}
-      <div className="space-y-4">
-        {!tarefas || tarefas.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <CheckSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma tarefa encontrada</h3>
-              <p className="text-gray-600 mb-4">
-                {busca || filtroStatus !== 'todos' 
-                  ? 'Tente ajustar os filtros para encontrar tarefas.' 
-                  : 'Comece criando sua primeira tarefa.'}
-              </p>
-              <Button onClick={() => setMostrarFormulario(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Tarefa
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          tarefas.map((tarefa) => (
-            <Card key={tarefa.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{tarefa.titulo}</h3>
-                      <Badge className={cn(getStatusColor(tarefa.coluna?.nome as StatusTarefa || StatusTarefa.PENDENTE))}>
-                        <div className="flex items-center gap-1">
-                          {getStatusIcon(tarefa.coluna?.nome as StatusTarefa || StatusTarefa.PENDENTE)}
-                          <span className="capitalize">{tarefa.coluna?.nome || 'Pendente'}</span>
-                        </div>
-                      </Badge>
-                      <Badge className={cn(getPrioridadeColor(tarefa.prioridade))}>
-                        <span className="capitalize">{tarefa.prioridade.toLowerCase()}</span>
-                      </Badge>
-                    </div>
-                    <p className="text-gray-600 mb-3">{tarefa.descricao}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>Criado em: {new Date(tarefa.createdAt).toLocaleDateString('pt-BR')}</span>
-                      {tarefa.prazo && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          Vence em: {new Date(tarefa.prazo).toLocaleDateString('pt-BR')}
-                        </span>
-                      )}
-                      {tarefa.responsavel && (
-                        <span className="flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          {tarefa.responsavel.nome}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/tarefas/${tarefa.id}`)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/tarefas/${tarefa.id}/editar`)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="text-red-600 hover:text-red-700"
-                      onClick={() => handleDeleteTarefa(tarefa.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+            <Select value={String(selectedResponsibleId)} onValueChange={handleResponsibleChange}>
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os responsáveis</SelectItem>
+                <SelectItem value="mine">Minhas tarefas</SelectItem>
+                {responsibleOptions.map(option => (
+                  <SelectItem key={option.id} value={option.id.toString()}>
+                    {option.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              {responsibleOptions.length} responsável(is)
+            </div>
+            <Badge variant="secondary">{tasks.length} tarefa(s)</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-500">Total de tarefas</p>
+            <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-500">Atrasadas</p>
+            <p className="text-2xl font-semibold text-red-600">{stats.overdue}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-500">Próximos 7 dias</p>
+            <p className="text-2xl font-semibold text-blue-600">{stats.upcomingWeek}</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4 space-y-1 text-sm text-gray-600">
+            <p className="font-semibold text-gray-900">Por prioridade</p>
+            <p>Crítica: <span className="font-medium text-red-600">{stats.priorities.critica}</span></p>
+            <p>Alta: <span className="font-medium text-orange-600">{stats.priorities.alta}</span></p>
+            <p>Média: <span className="font-medium text-yellow-600">{stats.priorities.media}</span></p>
+            <p>Baixa: <span className="font-medium text-green-600">{stats.priorities.baixa}</span></p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {loadingProjects && !projects.length ? (
+        <Card className="py-16 text-center text-gray-600">
+          <CardContent>
+            <Loader2 className="mb-4 h-6 w-6 animate-spin text-gray-400" />
+            <p>Carregando projetos...</p>
+          </CardContent>
+        </Card>
+      ) : projects.length === 0 ? (
+        <Card className="py-16 text-center text-gray-600">
+          <CardContent>
+            <p className="mb-4 text-lg">Nenhum projeto encontrado.</p>
+            <Button onClick={() => navigate('/projetos')} className="gap-2">
+              <Columns className="h-4 w-4" />
+              Criar primeiro projeto
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="min-h-[500px] rounded-lg border border-gray-200 bg-white p-4">
+          <KanbanBoard
+            projeto={projetoResumo}
+            colunas={columns}
+            tarefas={boardTasks}
+            onMoveTask={handleMoveTask}
+            onReorderTasks={handleReorderTasks}
+            onAddColumn={handleAddColumn}
+            onEditColumn={handleEditColumn}
+            onDeleteColumn={handleDeleteColumn}
+            onAddTask={handleAddTask}
+            onTaskClick={handleTaskClick}
+            onTaskEdit={handleTaskEdit}
+            onTaskDelete={handleTaskDelete}
+            onProjectSettings={handleProjectSettings}
+            loading={boardLoading || isMutating}
+          />
+        </div>
+      )}
     </div>
   )
 }
 
 export default TarefasPage
+
+
+

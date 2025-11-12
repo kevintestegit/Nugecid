@@ -3,17 +3,17 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Projeto, MembroProjeto, PapelMembro, Coluna } from '../entities';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Projeto, MembroProjeto, PapelMembro, Coluna } from "../entities";
 import {
   CreateProjetoDto,
   UpdateProjetoDto,
   AddMembroProjetoDto,
   UpdateMembroProjetoDto,
-} from '../dto';
-import { User } from '../../users/entities/user.entity';
+} from "../dto";
+import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class ProjetosService {
@@ -37,7 +37,7 @@ export class ProjetosService {
       where: { id: criadorId },
     });
     if (!criador) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException("Usuário não encontrado");
     }
 
     // Criar o projeto
@@ -56,13 +56,13 @@ export class ProjetosService {
 
   async findAll(userId: number): Promise<Projeto[]> {
     return this.projetoRepository
-      .createQueryBuilder('projeto')
-      .leftJoinAndSelect('projeto.criador', 'criador')
-      .leftJoinAndSelect('projeto.membros', 'membros')
-      .leftJoinAndSelect('membros.usuario', 'membroUsuario')
-      .where('projeto.criadorId = :userId', { userId })
-      .orWhere('membros.usuarioId = :userId', { userId })
-      .orderBy('projeto.updatedAt', 'DESC')
+      .createQueryBuilder("projeto")
+      .leftJoinAndSelect("projeto.criador", "criador")
+      .leftJoinAndSelect("projeto.membros", "membros")
+      .leftJoinAndSelect("membros.usuario", "membroUsuario")
+      .where("projeto.criadorId = :userId", { userId })
+      .orWhere("membros.usuarioId = :userId", { userId })
+      .orderBy("projeto.updatedAt", "DESC")
       .getMany();
   }
 
@@ -70,23 +70,23 @@ export class ProjetosService {
     const projeto = await this.projetoRepository.findOne({
       where: { id },
       relations: [
-        'criador',
-        'membros',
-        'membros.usuario',
-        'colunas',
-        'tarefas',
-        'tarefas.responsavel',
+        "criador",
+        "membros",
+        "membros.usuario",
+        "colunas",
+        "tarefas",
+        "tarefas.responsavel",
       ],
     });
 
     if (!projeto) {
-      throw new NotFoundException('Projeto não encontrado');
+      throw new NotFoundException("Projeto não encontrado");
     }
 
     // Verificar se o usuário tem acesso ao projeto
     if (!projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar este projeto',
+        "Você não tem permissão para acessar este projeto",
       );
     }
 
@@ -103,7 +103,7 @@ export class ProjetosService {
     // Verificar se o usuário pode editar o projeto
     if (!projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para editar este projeto',
+        "Você não tem permissão para editar este projeto",
       );
     }
 
@@ -118,7 +118,7 @@ export class ProjetosService {
 
     // Apenas o criador pode deletar o projeto
     if (!projeto.isOwner(userId)) {
-      throw new ForbiddenException('Apenas o criador pode deletar o projeto');
+      throw new ForbiddenException("Apenas o criador pode deletar o projeto");
     }
 
     await this.projetoRepository.remove(projeto);
@@ -132,13 +132,13 @@ export class ProjetosService {
     const projeto = await this.findOne(projetoId, userId);
 
     // Verificar se o usuário pode gerenciar membros
-    const userMember = projeto.membros?.find(m => m.usuarioId === userId);
+    const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
     if (
       !projeto.isOwner(userId) &&
       (!userMember || !userMember.canManageMembers())
     ) {
       throw new ForbiddenException(
-        'Você não tem permissão para adicionar membros',
+        "Você não tem permissão para adicionar membros",
       );
     }
 
@@ -147,7 +147,7 @@ export class ProjetosService {
       where: { id: addMembroDto.usuarioId },
     });
     if (!usuario) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException("Usuário não encontrado");
     }
 
     // Verificar se o usuário já é membro
@@ -156,7 +156,7 @@ export class ProjetosService {
     });
 
     if (membroExistente) {
-      throw new BadRequestException('Usuário já é membro deste projeto');
+      throw new BadRequestException("Usuário já é membro deste projeto");
     }
 
     // Criar o membro
@@ -178,32 +178,33 @@ export class ProjetosService {
     const projeto = await this.findOne(projetoId, userId);
 
     // Verificar se o usuário pode gerenciar membros
-    const userMember = projeto.membros?.find(m => m.usuarioId === userId);
+    const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
     if (
       !projeto.isOwner(userId) &&
       (!userMember || !userMember.canManageMembers())
     ) {
       throw new ForbiddenException(
-        'Você não tem permissão para alterar membros',
+        "Você não tem permissão para alterar membros",
       );
     }
 
     const membro = await this.membroProjetoRepository.findOne({
       where: { id: membroId, projetoId },
-      relations: ['usuario'],
+      relations: ["usuario"],
     });
 
     if (!membro) {
-      throw new NotFoundException('Membro não encontrado');
+      throw new NotFoundException("Membro não encontrado");
     }
 
     // Não permitir alterar o próprio papel se for o único admin
     if (membro.usuarioId === userId && membro.papel === PapelMembro.ADMIN) {
       const adminCount =
-        projeto.membros?.filter(m => m.papel === PapelMembro.ADMIN).length || 0;
+        projeto.membros?.filter((m) => m.papel === PapelMembro.ADMIN).length ||
+        0;
       if (adminCount <= 1 && updateMembroDto.papel !== PapelMembro.ADMIN) {
         throw new BadRequestException(
-          'Deve haver pelo menos um administrador no projeto',
+          "Deve haver pelo menos um administrador no projeto",
         );
       }
     }
@@ -220,13 +221,13 @@ export class ProjetosService {
     const projeto = await this.findOne(projetoId, userId);
 
     // Verificar se o usuário pode gerenciar membros
-    const userMember = projeto.membros?.find(m => m.usuarioId === userId);
+    const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
     if (
       !projeto.isOwner(userId) &&
       (!userMember || !userMember.canManageMembers())
     ) {
       throw new ForbiddenException(
-        'Você não tem permissão para remover membros',
+        "Você não tem permissão para remover membros",
       );
     }
 
@@ -235,7 +236,7 @@ export class ProjetosService {
     });
 
     if (!membro) {
-      throw new NotFoundException('Membro não encontrado');
+      throw new NotFoundException("Membro não encontrado");
     }
 
     await this.membroProjetoRepository.remove(membro);
@@ -243,10 +244,10 @@ export class ProjetosService {
 
   private async createDefaultColumns(projetoId: number): Promise<void> {
     const defaultColumns = [
-      { nome: 'A Fazer', cor: '#6B7280', ordem: 1 },
-      { nome: 'Em Progresso', cor: '#3B82F6', ordem: 2 },
-      { nome: 'Em Revisão', cor: '#F59E0B', ordem: 3 },
-      { nome: 'Concluído', cor: '#10B981', ordem: 4 },
+      { nome: "A Fazer", cor: "#6B7280", ordem: 1 },
+      { nome: "Em Progresso", cor: "#3B82F6", ordem: 2 },
+      { nome: "Em Revisão", cor: "#F59E0B", ordem: 3 },
+      { nome: "Concluído", cor: "#10B981", ordem: 4 },
     ];
 
     for (const coluna of defaultColumns) {
@@ -271,8 +272,8 @@ export class ProjetosService {
 
     if (projeto.tarefas) {
       const hoje = new Date();
-      projeto.tarefas.forEach(tarefa => {
-        if (tarefa.coluna?.nome === 'Concluído') {
+      projeto.tarefas.forEach((tarefa) => {
+        if (tarefa.coluna?.nome === "Concluído") {
           stats.tarefasConcluidas++;
         } else {
           stats.tarefasEmAndamento++;

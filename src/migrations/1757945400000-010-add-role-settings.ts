@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AddRoleSettings1757945400000 implements MigrationInterface {
-  name = 'AddRoleSettings1757945400000';
+  name = "AddRoleSettings1757945400000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add jsonb column 'settings' to roles, default empty object
@@ -25,6 +25,6 @@ export class AddRoleSettings1757945400000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query('DROP INDEX IF EXISTS "IDX_ROLES_SETTINGS"');
-    await queryRunner.query('ALTER TABLE roles DROP COLUMN IF EXISTS settings');
+    await queryRunner.query("ALTER TABLE roles DROP COLUMN IF EXISTS settings");
   }
 }

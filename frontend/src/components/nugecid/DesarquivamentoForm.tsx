@@ -33,6 +33,8 @@ const desarquivamentoSchema = z.object({
   servidorResponsavel: z.string().min(1, 'Servidor responsável é obrigatório'),
   finalidadeDesarquivamento: z.string().min(1, 'Finalidade do desarquivamento é obrigatória'),
   solicitacaoProrrogacao: z.boolean().default(false),
+  solicitacaoProrrogacaoTexto: z.string().optional(),
+  dadosAdicionais: z.string().optional(),
   urgente: z.boolean().optional()
 })
 
@@ -79,6 +81,8 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       servidorResponsavel: initialData?.servidorResponsavel || '',
       finalidadeDesarquivamento: initialData?.finalidadeDesarquivamento || '',
       solicitacaoProrrogacao: initialData?.solicitacaoProrrogacao || false,
+      solicitacaoProrrogacaoTexto: initialData?.solicitacaoProrrogacaoTexto || '',
+      dadosAdicionais: initialData?.dadosAdicionais || '',
       urgente: initialData?.urgente || false
     }
   })
@@ -330,6 +334,30 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         {errors.finalidadeDesarquivamento && (
           <p className="text-sm text-red-600">{errors.finalidadeDesarquivamento.message}</p>
         )}
+      </div>
+
+      {/* Solicitação de Prorrogação - Texto */}
+      {watchedValues.solicitacaoProrrogacao && (
+        <div className="space-y-2">
+          <Label htmlFor="solicitacaoProrrogacaoTexto">Texto da Solicitação de Prorrogação</Label>
+          <Textarea
+            id="solicitacaoProrrogacaoTexto"
+            {...register('solicitacaoProrrogacaoTexto')}
+            placeholder="Descreva os detalhes da solicitação de prorrogação (ex: Prazo prorrogado em 18/06/25 para atendimento de perícia documentoscópica)"
+            rows={2}
+          />
+        </div>
+      )}
+
+      {/* Dados Adicionais */}
+      <div className="space-y-2">
+        <Label htmlFor="dadosAdicionais">Dados Adicionais</Label>
+        <Textarea
+          id="dadosAdicionais"
+          {...register('dadosAdicionais')}
+          placeholder="Informações complementares (ex: filiação, naturalidade, data de nascimento, etc.)"
+          rows={3}
+        />
       </div>
 
       {/* Checkboxes */}

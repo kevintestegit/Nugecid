@@ -5,13 +5,11 @@ import { Projeto, Coluna, Tarefa } from '../components/kanban';
 interface CreateProjetoDto {
   nome: string;
   descricao?: string;
-  cor?: string;
 }
 
 interface UpdateProjetoDto {
   nome?: string;
   descricao?: string;
-  cor?: string;
 }
 
 interface CreateColunaDto {

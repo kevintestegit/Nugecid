@@ -1,1 +1,5 @@
-export { Notificacao, TipoNotificacao, PrioridadeNotificacao } from './notificacao.entity';
+export {
+  Notificacao,
+  TipoNotificacao,
+  PrioridadeNotificacao,
+} from "./notificacao.entity";

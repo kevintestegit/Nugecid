@@ -1,16 +1,16 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AlterDesarquivamentosIdToInteger1756827500000
   implements MigrationInterface
 {
-  name = 'AlterDesarquivamentosIdToInteger1756827500000';
+  name = "AlterDesarquivamentosIdToInteger1756827500000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const tableCheck = await queryRunner.query(
       `SELECT to_regclass('public.desarquivamentos') AS exists`,
     );
     if (!tableCheck?.length || tableCheck[0].exists === null) {
-      console.log('Tabela desarquivamentos inexistente - nada a alterar.');
+      console.log("Tabela desarquivamentos inexistente - nada a alterar.");
       return;
     }
 
@@ -20,17 +20,17 @@ export class AlterDesarquivamentosIdToInteger1756827500000
     `);
     if (
       columnType?.length &&
-      ['integer', 'bigint'].includes(
-        (columnType[0].data_type || '').toLowerCase(),
+      ["integer", "bigint"].includes(
+        (columnType[0].data_type || "").toLowerCase(),
       )
     ) {
       console.log(
-        'Coluna desarquivamentos.id já é inteira - migração ignorada.',
+        "Coluna desarquivamentos.id já é inteira - migração ignorada.",
       );
       return;
     }
 
-    console.log('🔄 Iniciando migração: Alterando ID de UUID para INTEGER...');
+    console.log("🔄 Iniciando migração: Alterando ID de UUID para INTEGER...");
 
     // Verificar se existem dados na tabela
     const hasData = await queryRunner.query(
@@ -43,7 +43,7 @@ export class AlterDesarquivamentosIdToInteger1756827500000
     );
 
     if (recordCount > 0) {
-      console.log('⚠️  ATENÇÃO: Existem dados na tabela. Criando backup...');
+      console.log("⚠️  ATENÇÃO: Existem dados na tabela. Criando backup...");
 
       // Criar tabela de backup
       await queryRunner.query(`
@@ -51,7 +51,7 @@ export class AlterDesarquivamentosIdToInteger1756827500000
         SELECT * FROM desarquivamentos
       `);
 
-      console.log('✅ Backup criado: desarquivamentos_backup');
+      console.log("✅ Backup criado: desarquivamentos_backup");
     }
 
     // Remover foreign keys
@@ -93,7 +93,7 @@ export class AlterDesarquivamentosIdToInteger1756827500000
     );
 
     // Remover a tabela original
-    await queryRunner.query('DROP TABLE desarquivamentos');
+    await queryRunner.query("DROP TABLE desarquivamentos");
 
     // Criar nova tabela com ID integer
     await queryRunner.query(`
@@ -141,10 +141,10 @@ export class AlterDesarquivamentosIdToInteger1756827500000
         ORDER BY created_at ASC
       `);
 
-      console.log('✅ Dados migrados com sucesso');
+      console.log("✅ Dados migrados com sucesso");
 
       // Remover tabela de backup
-      await queryRunner.query('DROP TABLE desarquivamentos_backup');
+      await queryRunner.query("DROP TABLE desarquivamentos_backup");
     }
 
     // Recriar foreign keys
@@ -191,13 +191,13 @@ export class AlterDesarquivamentosIdToInteger1756827500000
       'CREATE INDEX "IDX_DESARQUIVAMENTOS_SETOR" ON "desarquivamentos" ("setor_demandante")',
     );
 
-    console.log('✅ Migração concluída: ID alterado de UUID para INTEGER');
-    console.log('🔢 Novos registros terão IDs numéricos sequenciais');
+    console.log("✅ Migração concluída: ID alterado de UUID para INTEGER");
+    console.log("🔢 Novos registros terão IDs numéricos sequenciais");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     console.log(
-      '⚠️  ATENÇÃO: Reverter esta migração pode causar perda de dados!',
+      "⚠️  ATENÇÃO: Reverter esta migração pode causar perda de dados!",
     );
 
     // Remover foreign keys
@@ -239,7 +239,7 @@ export class AlterDesarquivamentosIdToInteger1756827500000
     );
 
     // Remover tabela
-    await queryRunner.query('DROP TABLE desarquivamentos');
+    await queryRunner.query("DROP TABLE desarquivamentos");
 
     // Recriar tabela com UUID (estrutura original)
     await queryRunner.query(`
@@ -311,6 +311,6 @@ export class AlterDesarquivamentosIdToInteger1756827500000
       'CREATE INDEX "IDX_DESARQUIVAMENTOS_SETOR" ON "desarquivamentos" ("setor_demandante")',
     );
 
-    console.log('✅ Reversão concluída: ID alterado de INTEGER para UUID');
+    console.log("✅ Reversão concluída: ID alterado de INTEGER para UUID");
   }
 }

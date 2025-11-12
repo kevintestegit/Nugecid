@@ -1,25 +1,41 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useDesarquivamento } from '@/hooks/useDesarquivamentos'
+import { useDesarquivamento, useDownloadTermoPdf, useDownloadTermoDocx, useDesarquivamentoComments, useAddDesarquivamentoComment } from '@/hooks/useDesarquivamentos'
+import { useDesarquivamentosAnexos, useUploadDesarquivamentoAnexo, useDownloadDesarquivamentoAnexo, useDeleteDesarquivamentoAnexo, useViewDesarquivamentoAnexo, useUpdateDesarquivamentoAnexo } from '@/hooks/useDesarquivamentosAnexos'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { PageLoading } from '@/components/ui/Loading'
-import { 
-  ArrowLeft, 
-  Edit, 
-  FileText, 
-  User, 
-  Calendar, 
-  Clock, 
+import { Input } from '@/components/ui/Input'
+import { Label } from '@/components/ui/Label'
+import {
+  ArrowLeft,
+  Edit,
+  FileText,
+  User,
+  Calendar,
+  Clock,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Eye
+  Eye,
+  MessageCircle,
+  Send,
+  Loader2,
+  Upload,
+  Download,
+  Trash2,
+  Paperclip,
+  X
 } from 'lucide-react'
 import { getStatusLabel } from '@/utils/format'
 import { StatusDesarquivamento } from '@/types'
+import { formatDateTime } from '@/lib/utils'
+import { toast } from 'sonner'
+import { ImagePreviewModal } from '@/components/desarquivamentos/ImagePreviewModal'
+import { AnexosSection } from '@/components/desarquivamentos/AnexosSection'
+import { HistoricoTimeline } from '@/components/desarquivamentos/HistoricoTimeline'
 
 const DetalhesDesarquivamentoPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -30,7 +46,182 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   const desarquivamento = response?.data;
   const isIdValid = id ? !isNaN(parseInt(id, 10)) : false;
 
+  const downloadPdfMutation = useDownloadTermoPdf()
+  const downloadDocxMutation = useDownloadTermoDocx()
+
+  const { data: commentsResponse, isLoading: isLoadingComments } =
+    useDesarquivamentoComments(Number(id));
+  const comments = commentsResponse?.data ?? [];
+  const addCommentMutation = useAddDesarquivamentoComment(Number(id));
+  const [commentText, setCommentText] = useState('');
+
+  // Anexos - Separados por tipo
+  const { data: anexosDesarquivamento, isLoading: isLoadingAnexosDesarq } = 
+    useDesarquivamentosAnexos(Number(id), 'desarquivamento');
+  const { data: anexosRearquivamento, isLoading: isLoadingAnexosRearq } = 
+    useDesarquivamentosAnexos(Number(id), 'rearquivamento');
+  
+  const uploadAnexoMutation = useUploadDesarquivamentoAnexo();
+  const downloadAnexoMutation = useDownloadDesarquivamentoAnexo();
+  const deleteAnexoMutation = useDeleteDesarquivamentoAnexo();
+  const viewAnexoMutation = useViewDesarquivamentoAnexo();
+  const updateAnexoMutation = useUpdateDesarquivamentoAnexo();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewAnexo, setPreviewAnexo] = useState<any>(null);
+
   const canEdit = user?.role?.name === 'admin' || user?.role?.name === 'coordenador'
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    if (!previousOverflow || previousOverflow === 'hidden') {
+      document.body.style.overflow = 'auto'
+    }
+
+    return () => {
+      if (!previousOverflow) {
+        document.body.style.overflow = ''
+      } else {
+        document.body.style.overflow = previousOverflow
+      }
+    }
+  }, [])
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = commentText.trim();
+    if (!trimmed) {
+      toast.error('Digite um comentário antes de enviar.');
+      return;
+    }
+
+    try {
+      await addCommentMutation.mutateAsync(trimmed);
+      setCommentText('');
+      toast.success('Comentário adicionado com sucesso.');
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        'Não foi possível adicionar o comentário.';
+      toast.error(message);
+    }
+  };
+
+  const handleUploadDesarquivamento = async (file: File, descricao: string) => {
+    if (!id) return;
+    await uploadAnexoMutation.mutateAsync({
+      desarquivamentoId: Number(id),
+      file,
+      descricao: descricao.trim() || undefined,
+      tipoAnexo: 'desarquivamento'
+    });
+  };
+
+  const handleUploadRearquivamento = async (file: File, descricao: string) => {
+    if (!id) return;
+    await uploadAnexoMutation.mutateAsync({
+      desarquivamentoId: Number(id),
+      file,
+      descricao: descricao.trim() || undefined,
+      tipoAnexo: 'rearquivamento'
+    });
+  };
+
+  const handleDownloadTermo = (format: 'pdf' | 'docx') => {
+    if (!id || isNaN(Number(id))) {
+      toast.error('Identificador invalido para o termo.');
+      return;
+    }
+
+    if (desarquivamento?.status !== StatusDesarquivamento.DESARQUIVADO) {
+      toast.error('Somente solicitacoes com status DESARQUIVADO podem gerar termos.');
+      return;
+    }
+
+    const mutation = format === 'pdf' ? downloadPdfMutation : downloadDocxMutation;
+
+    mutation.mutate(Number(id), {
+      onSuccess: () => {
+        toast.success(
+          format === 'pdf'
+            ? 'Termo em PDF gerado com sucesso.'
+            : 'Termo em Word gerado com sucesso.'
+        );
+      },
+      onError: (error: any) => {
+        const message = error?.message || 'Nao foi possivel gerar o termo.';
+        toast.error(message);
+      },
+    });
+  };
+
+  const handleDownloadAnexo = async (anexoId: number) => {
+    if (!id) return;
+
+    const allAnexos = [...(anexosDesarquivamento ?? []), ...(anexosRearquivamento ?? [])];
+    const anexo = allAnexos.find(a => a.id === anexoId);
+
+    try {
+      const blob = await downloadAnexoMutation.mutateAsync({
+        desarquivamentoId: Number(id),
+        anexoId,
+      });
+
+      // Criar URL para download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = anexo?.nomeOriginal || 'anexo';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error('Erro ao baixar anexo.');
+    }
+  };
+
+  const handleDeleteAnexo = async (anexoId: number) => {
+    if (!id) return;
+    await deleteAnexoMutation.mutateAsync({
+      desarquivamentoId: Number(id),
+      anexoId,
+    });
+  };
+
+  const handleViewAnexo = async (anexo: any) => {
+    if (!id) return;
+
+    try {
+      const blob = await viewAnexoMutation.mutateAsync({
+        desarquivamentoId: Number(id),
+        anexoId: anexo.id,
+      });
+
+      // Criar URL temporária do blob
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setPreviewAnexo(anexo);
+    } catch (error: any) {
+      toast.error('Erro ao carregar visualização.');
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setPreviewAnexo(null);
+  };
+
+  const handleUpdateDescricao = async (anexoId: number, descricao: string) => {
+    if (!id) return;
+    await updateAnexoMutation.mutateAsync({
+      desarquivamentoId: Number(id),
+      anexoId,
+      descricao,
+    });
+  };
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -123,7 +314,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   }
 
   // Removido prazoVencimento pois não existe na entidade
-  const isPrazoVencido = false
+  const isPrazoVencido = false;
+
+  const canGerarTermo = desarquivamento?.status === StatusDesarquivamento.DESARQUIVADO;
 
   return (
     <div className="space-y-6">
@@ -141,7 +334,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Solicitação #{desarquivamento.numeroNicLaudoAuto}
+              Solicitação #{desarquivamento?.numeroSolicitacao || 'N/A'}
             </h1>
             <p className="text-gray-600 mt-1">
               Detalhes da solicitação de desarquivamento
@@ -160,17 +353,22 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const link = document.createElement('a')
-                  link.href = `/api/nugecid/${id}/termo`
-                  link.download = `termo-desarquivamento-${id}.pdf`
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                }}
+                onClick={() => handleDownloadTermo('pdf')}
+                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO podem gerar termos.' : undefined}
+                disabled={downloadPdfMutation.isPending || !canGerarTermo}
               >
                 <FileText className="h-4 w-4 mr-2" />
-                Imprimir Termo
+                {downloadPdfMutation.isPending ? 'Baixando...' : 'Termo PDF'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDownloadTermo('docx')}
+                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO podem gerar termos.' : undefined}
+                disabled={downloadDocxMutation.isPending || !canGerarTermo}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {downloadDocxMutation.isPending ? 'Baixando...' : 'Termo Word'}
               </Button>
             </>
           )}
@@ -250,12 +448,6 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Finalidade do Desarquivamento</p>
-              <p className="text-gray-900 whitespace-pre-wrap">
-                {desarquivamento.finalidadeDesarquivamento}
-              </p>
-            </div>
-            <div>
               <p className="text-sm text-gray-600">Setor Demandante</p>
               <p className="text-gray-900">
                 {desarquivamento.setorDemandante}
@@ -267,11 +459,11 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 {desarquivamento.servidorResponsavel}
               </p>
             </div>
-            {desarquivamento.solicitacaoProrrogacao && (
+            {desarquivamento.urgente && (
               <div>
-                <p className="text-sm text-gray-600">Solicitação de Prorrogação</p>
-                <Badge variant="secondary" className="mt-1">
-                  Sim
+                <p className="text-sm text-gray-600">Prioridade</p>
+                <Badge variant="destructive" className="mt-1">
+                  URGENTE
                 </Badge>
               </div>
             )}
@@ -321,6 +513,157 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         </Card>
       </div>
 
+      {/* Justificativa e Prazos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Justificativa e Prazos
+          </CardTitle>
+          <CardDescription>
+            Finalidade, justificativa e prazos da solicitação
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-600 font-medium mb-2">Finalidade do Desarquivamento *</p>
+            <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
+              {desarquivamento.finalidadeDesarquivamento}
+            </p>
+          </div>
+
+          {desarquivamento.justificativa && (
+            <div>
+              <p className="text-sm text-gray-600 font-medium mb-2">Justificativa</p>
+              <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
+                {desarquivamento.justificativa}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {desarquivamento.prazoDesarquivamento && (
+              <div>
+                <p className="text-sm text-gray-600 font-medium">Prazo de Desarquivamento</p>
+                <p className="text-gray-900 text-base">
+                  {formatDate(desarquivamento.prazoDesarquivamento)}
+                </p>
+              </div>
+            )}
+            
+            {desarquivamento.prazoVencimento && (
+              <div>
+                <p className="text-sm text-gray-600 font-medium">Prazo de Vencimento</p>
+                <p className={`text-base font-medium ${new Date(desarquivamento.prazoVencimento) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
+                  {formatDate(desarquivamento.prazoVencimento)}
+                  {new Date(desarquivamento.prazoVencimento) < new Date() && (
+                    <span className="ml-2 text-xs">(Vencido)</span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {desarquivamento.solicitacaoProrrogacao && (
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex items-center gap-2 mb-2">
+                <p className="text-sm text-gray-600 font-medium">Solicitação de Prorrogação</p>
+                <Badge variant="secondary">
+                  Sim
+                </Badge>
+              </div>
+              {desarquivamento.solicitacaoProrrogacaoTexto && (
+                <p className="text-sm text-gray-900 bg-amber-50 p-3 rounded-md border border-amber-200 whitespace-pre-wrap">
+                  {desarquivamento.solicitacaoProrrogacaoTexto}
+                </p>
+              )}
+            </div>
+          )}
+
+          {desarquivamento.dadosAdicionais && (
+            <div className="pt-2 border-t border-gray-200">
+              <p className="text-sm text-gray-600 font-medium mb-2">Dados Adicionais</p>
+              <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
+                {desarquivamento.dadosAdicionais}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Comentários */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            Comentários
+          </CardTitle>
+          <CardDescription>
+            Comentários sobre esta solicitação
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleSubmitComment} className="space-y-2">
+            <textarea
+              className="w-full min-h-[90px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="Escreva um comentário sobre esta solicitação..."
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              maxLength={2000}
+            />
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>
+                Registrado como{' '}
+                <strong>
+                  {user?.nome || user?.usuario || 'Usuário'}
+                </strong>
+              </span>
+              <button
+                type="submit"
+                disabled={addCommentMutation.isPending}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+              >
+                {addCommentMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Enviar Comentário
+              </button>
+            </div>
+          </form>
+
+          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+            {isLoadingComments ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              </div>
+            ) : comments.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Nenhum comentário registrado até o momento.
+              </p>
+            ) : (
+              comments.map(comment => (
+                <div
+                  key={comment.id}
+                  className="border border-gray-200 rounded-md px-3 py-2"
+                >
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span className="font-medium text-gray-700">
+                      {comment.authorName}
+                    </span>
+                    <span>{formatDateTime(comment.createdAt)}</span>
+                  </div>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                    {comment.comment}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Histórico de Alterações */}
       <Card>
         <CardHeader>
@@ -348,7 +691,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             {desarquivamento.updatedAt !== desarquivamento.createdAt && (
               <div className="flex items-start gap-3 pb-4 border-b last:border-b-0">
                 <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
@@ -391,8 +734,69 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Histórico de Ações */}
+      {desarquivamento?.id && (
+        <HistoricoTimeline desarquivamentoId={desarquivamento.id} />
+      )}
+
+      {/* Anexos - Divididos em Desarquivamento e Rearquivamento */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AnexosSection
+          title="Anexos de Desarquivamento"
+          description="Documentos relacionados ao desarquivamento"
+          anexos={anexosDesarquivamento ?? []}
+          isLoading={isLoadingAnexosDesarq}
+          canEdit={canEdit}
+          tipoAnexo="desarquivamento"
+          onUpload={handleUploadDesarquivamento}
+          onDownload={handleDownloadAnexo}
+          onDelete={handleDeleteAnexo}
+          onView={handleViewAnexo}
+          onUpdateDescricao={handleUpdateDescricao}
+          isUploading={uploadAnexoMutation.isPending}
+        />
+
+        <AnexosSection
+          title="Anexos de Rearquivamento"
+          description="Documentos relacionados ao rearquivamento"
+          anexos={anexosRearquivamento ?? []}
+          isLoading={isLoadingAnexosRearq}
+          canEdit={canEdit}
+          tipoAnexo="rearquivamento"
+          onUpload={handleUploadRearquivamento}
+          onDownload={handleDownloadAnexo}
+          onDelete={handleDeleteAnexo}
+          onView={handleViewAnexo}
+          onUpdateDescricao={handleUpdateDescricao}
+          isUploading={uploadAnexoMutation.isPending}
+        />
+      </div>
+
+      {/* Modal de Visualização */}
+      <ImagePreviewModal
+        anexo={previewAnexo}
+        previewUrl={previewUrl}
+        onClose={closePreview}
+        onUpdateDescricao={handleUpdateDescricao}
+        onDownload={anexoId => handleDownloadAnexo(Number(anexoId))}
+        canEdit={canEdit}
+        allImages={[...(anexosDesarquivamento ?? []), ...(anexosRearquivamento ?? [])]}
+      />
     </div>
   )
 }
 
 export default DetalhesDesarquivamentoPage
+
+
+
+
+
+
+
+
+
+
+
+

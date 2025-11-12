@@ -1,2 +1,2 @@
-export { User, UserProps } from './user';
-export { Role, RoleProps } from './role';
+export { User, UserProps } from "./user";
+export { Role, RoleProps } from "./role";

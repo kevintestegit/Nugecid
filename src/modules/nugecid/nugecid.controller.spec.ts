@@ -1,12 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from "@nestjs/testing";
 import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
   HttpStatus,
-} from '@nestjs/common';
-import { Response, Request } from 'express';
-import { NugecidController } from './nugecid.controller';
+} from "@nestjs/common";
+import { Response, Request } from "express";
+import { NugecidController } from "./nugecid.controller";
 import {
   CreateDesarquivamentoUseCase,
   FindAllDesarquivamentosUseCase,
@@ -17,19 +17,19 @@ import {
   GetDashboardStatsUseCase,
   ImportDesarquivamentoUseCase,
   ImportRegistrosUseCase,
-} from './application/use-cases';
-import { CreateDesarquivamentoDto } from './dto/create-desarquivamento.dto';
-import { UpdateDesarquivamentoDto } from './dto/update-desarquivamento.dto';
-import { QueryDesarquivamentoDto } from './dto/query-desarquivamento.dto';
-import { TipoDesarquivamentoEnum } from './domain/value-objects/tipo-desarquivamento.vo';
-import { StatusDesarquivamentoEnum } from './domain/value-objects/status-desarquivamento.vo';
-import { User } from '../users/entities/user.entity';
-import { Role } from '../users/entities/role.entity';
-import { ImportResultDto } from './dto/import-result.dto';
-import { RoleType } from '../users/enums/role-type.enum';
-import { TipoDesarquivamento } from './domain/value-objects/tipo-desarquivamento.vo';
+} from "./application/use-cases";
+import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
+import { UpdateDesarquivamentoDto } from "./dto/update-desarquivamento.dto";
+import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
+import { TipoDesarquivamentoEnum } from "./domain/value-objects/tipo-desarquivamento.vo";
+import { StatusDesarquivamentoEnum } from "./domain/value-objects/status-desarquivamento.vo";
+import { User } from "../users/entities/user.entity";
+import { Role } from "../users/entities/role.entity";
+import { ImportResultDto } from "./dto/import-result.dto";
+import { RoleType } from "../users/enums/role-type.enum";
+import { TipoDesarquivamento } from "./domain/value-objects/tipo-desarquivamento.vo";
 
-describe('NugecidController', () => {
+describe("NugecidController", () => {
   let controller: NugecidController;
   let createDesarquivamentoUseCase: CreateDesarquivamentoUseCase;
   let findAllDesarquivamentosUseCase: FindAllDesarquivamentosUseCase;
@@ -41,7 +41,7 @@ describe('NugecidController', () => {
   const mockAdminRole: Role = {
     id: 1,
     name: RoleType.ADMIN,
-    description: 'Administrator',
+    description: "Administrator",
     permissions: [],
     ativo: true,
     createdAt: new Date(),
@@ -55,7 +55,7 @@ describe('NugecidController', () => {
   const mockEditorRole: Role = {
     id: 2,
     name: RoleType.USUARIO,
-    description: 'User',
+    description: "User",
     permissions: [],
     ativo: true,
     createdAt: new Date(),
@@ -68,11 +68,11 @@ describe('NugecidController', () => {
 
   const mockAdminUser: User = {
     id: 1,
-    nome: 'Admin User',
-    usuario: 'admin',
+    nome: "Admin User",
+    usuario: "admin",
     role: mockAdminRole,
     roleId: 1,
-    senha: 'hashedpassword',
+    senha: "hashedpassword",
     ativo: true,
     ultimoLogin: new Date(),
     createdAt: new Date(),
@@ -82,25 +82,27 @@ describe('NugecidController', () => {
     bloqueadoAte: null,
     tokenReset: null,
     tokenResetExpira: null,
+    settings: {},
     auditorias: [],
-    validatePassword: jest.fn().mockResolvedValue(true),
     isAdmin: jest.fn().mockReturnValue(true),
+    isCoordenador: jest.fn().mockReturnValue(false),
     isEditor: jest.fn().mockReturnValue(false),
     canManageUser: jest.fn().mockReturnValue(true),
     canViewAllRecords: jest.fn().mockReturnValue(true),
     isBlocked: jest.fn().mockReturnValue(false),
-    toJSON: jest.fn(),
-    serialize: jest.fn(),
-    hashPassword: jest.fn(),
-  };
+    validatePassword: jest.fn().mockResolvedValue(true),
+    hashPassword: jest.fn().mockResolvedValue("hashedpassword"),
+    toJSON: jest.fn().mockReturnValue({}),
+    serialize: jest.fn().mockReturnValue({}),
+  } as any;
 
   const mockEditorUser: User = {
     id: 2,
-    nome: 'Editor User',
-    usuario: 'editor',
+    nome: "Editor User",
+    usuario: "editor",
     role: mockEditorRole,
     roleId: 2,
-    senha: 'hashedpassword',
+    senha: "hashedpassword",
     ativo: true,
     ultimoLogin: new Date(),
     createdAt: new Date(),
@@ -110,34 +112,36 @@ describe('NugecidController', () => {
     bloqueadoAte: null,
     tokenReset: null,
     tokenResetExpira: null,
+    settings: {},
     auditorias: [],
-    validatePassword: jest.fn().mockResolvedValue(true),
     isAdmin: jest.fn().mockReturnValue(false),
+    isCoordenador: jest.fn().mockReturnValue(false),
     isEditor: jest.fn().mockReturnValue(true),
-    canManageUser: jest.fn().mockReturnValue(true),
+    canManageUser: jest.fn().mockReturnValue(false),
     canViewAllRecords: jest.fn().mockReturnValue(false),
     isBlocked: jest.fn().mockReturnValue(false),
-    toJSON: jest.fn(),
-    serialize: jest.fn(),
-    hashPassword: jest.fn(),
-  };
+    validatePassword: jest.fn().mockResolvedValue(true),
+    hashPassword: jest.fn().mockResolvedValue("hashedpassword"),
+    toJSON: jest.fn().mockReturnValue({}),
+    serialize: jest.fn().mockReturnValue({}),
+  } as any;
 
   const mockDesarquivamento: any = {
     id: 1,
     tipoDesarquivamento: TipoDesarquivamentoEnum.FISICO,
-    status: 'SOLICITADO',
-    numeroNicLaudoAuto: 'DES202400001',
+    status: "SOLICITADO",
+    numeroNicLaudoAuto: "DES202400001",
     urgente: false,
     createdBy: mockEditorUser.id,
     createdAt: new Date(),
     updatedAt: new Date(),
-    nomeCompleto: 'João Silva',
-    numeroProcesso: '12345',
-    tipoDocumento: 'Laudo Pericial',
+    nomeCompleto: "João Silva",
+    numeroProcesso: "12345",
+    tipoDocumento: "Laudo Pericial",
     dataSolicitacao: new Date(),
-    setorDemandante: 'Setor Teste',
-    servidorResponsavel: 'Servidor Teste',
-    finalidadeDesarquivamento: 'Teste',
+    setorDemandante: "Setor Teste",
+    servidorResponsavel: "Servidor Teste",
+    finalidadeDesarquivamento: "Teste",
     solicitacaoProrrogacao: false,
   };
 
@@ -225,28 +229,28 @@ describe('NugecidController', () => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
+  describe("create", () => {
     const createDto: CreateDesarquivamentoDto = {
-      tipoDesarquivamento: 'FISICO',
+      tipoDesarquivamento: "FISICO",
       desarquivamentoFisicoDigital: TipoDesarquivamentoEnum.FISICO,
-      nomeCompleto: 'João Silva',
-      numeroNicLaudoAuto: 'NIC-12345',
-      numeroProcesso: '12345-PROC',
-      tipoDocumento: 'Laudo',
+      nomeCompleto: "João Silva",
+      numeroNicLaudoAuto: "NIC-12345",
+      numeroProcesso: "12345-PROC",
+      tipoDocumento: "Laudo",
       dataSolicitacao: new Date().toISOString(),
-      setorDemandante: 'Delegacia',
-      servidorResponsavel: 'Servidor Teste',
-      finalidadeDesarquivamento: 'Para processo',
+      setorDemandante: "Delegacia",
+      servidorResponsavel: "Servidor Teste",
+      finalidadeDesarquivamento: "Para processo",
       solicitacaoProrrogacao: false,
     };
 
-    it('should create a new desarquivamento successfully', async () => {
+    it("should create a new desarquivamento successfully", async () => {
       mockCreateDesarquivamentoUseCase.execute.mockResolvedValue(
         mockDesarquivamento,
       );
 
       const mockReq = {
-        headers: { accept: 'application/json' },
+        headers: { accept: "application/json" },
       } as any as Request;
       const mockRes = {
         status: jest.fn().mockReturnThis(),
@@ -264,22 +268,22 @@ describe('NugecidController', () => {
       expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
-        message: 'Desarquivamento criado com sucesso',
+        message: "Desarquivamento criado com sucesso",
         data: mockDesarquivamento,
       });
     });
   });
 
-  describe('findAll', () => {
+  describe("findAll", () => {
     const queryDto: QueryDesarquivamentoDto = { page: 1, limit: 10 };
 
-    it('should return a paginated list of desarquivamentos', async () => {
+    it("should return a paginated list of desarquivamentos", async () => {
       mockFindAllDesarquivamentosUseCase.execute.mockResolvedValue(
         mockPaginatedResult,
       );
 
       const mockReq = {
-        headers: { accept: 'application/json' },
+        headers: { accept: "application/json" },
       } as any as Request;
       const mockRes = {
         json: jest.fn(),
@@ -306,21 +310,21 @@ describe('NugecidController', () => {
     });
   });
 
-  describe('findOne', () => {
-    it('should return a single desarquivamento by ID', async () => {
+  describe("findOne", () => {
+    it("should return a single desarquivamento by ID", async () => {
       mockFindDesarquivamentoByIdUseCase.execute.mockResolvedValue(
         mockDesarquivamento,
       );
 
       const mockReq = {
-        headers: { accept: 'application/json' },
+        headers: { accept: "application/json" },
       } as any as Request;
       const mockRes = {
         json: jest.fn(),
         render: jest.fn(),
       } as any as Response;
 
-      await controller.findOne(1, mockEditorUser);
+      await controller.findOne(1, mockEditorUser, mockReq);
 
       expect(findDesarquivamentoByIdUseCase.execute).toHaveBeenCalledWith({
         id: 1,
@@ -334,19 +338,19 @@ describe('NugecidController', () => {
     });
   });
 
-  describe('update', () => {
+  describe("update", () => {
     const updateDto: UpdateDesarquivamentoDto = {
       status: StatusDesarquivamentoEnum.FINALIZADO,
     };
 
-    it('should update a desarquivamento successfully', async () => {
+    it("should update a desarquivamento successfully", async () => {
       const updatedDesarquivamento = { ...mockDesarquivamento, ...updateDto };
       mockUpdateDesarquivamentoUseCase.execute.mockResolvedValue(
         updatedDesarquivamento,
       );
 
       const mockReq = {
-        headers: { accept: 'application/json' },
+        headers: { accept: "application/json" },
       } as any as Request;
       const mockRes = {
         json: jest.fn(),
@@ -363,25 +367,25 @@ describe('NugecidController', () => {
       });
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
-        message: 'Desarquivamento atualizado com sucesso',
+        message: "Desarquivamento atualizado com sucesso",
         data: updatedDesarquivamento,
       });
     });
   });
 
-  describe('remove', () => {
-    it('should remove a desarquivamento successfully', async () => {
+  describe("remove", () => {
+    it("should remove a desarquivamento successfully", async () => {
       mockDeleteDesarquivamentoUseCase.execute.mockResolvedValue(undefined);
 
       const mockReq = {
-        headers: { accept: 'application/json' },
+        headers: { accept: "application/json" },
       } as any as Request;
       const mockRes = {
         json: jest.fn(),
         redirect: jest.fn(),
       } as any as Response;
 
-      await controller.remove('1', mockAdminUser);
+      await controller.remove("1", mockAdminUser);
 
       expect(deleteDesarquivamentoUseCase.execute).toHaveBeenCalledWith({
         id: 1,
@@ -391,14 +395,14 @@ describe('NugecidController', () => {
       });
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,
-        message: 'Desarquivamento removido com sucesso',
+        message: "Desarquivamento removido com sucesso",
       });
     });
   });
 
-  describe('importDesarquivamentos', () => {
+  describe("importDesarquivamentos", () => {
     const mockFile = {
-      buffer: Buffer.from('mock file content'),
+      buffer: Buffer.from("mock file content"),
     } as Express.Multer.File;
 
     const mockImportResult: ImportResultDto = {
@@ -406,12 +410,12 @@ describe('NugecidController', () => {
       successCount: 8,
       errorCount: 2,
       errors: [
-        { row: 5, details: 'Erro na linha 5' },
-        { row: 7, details: 'Erro na linha 7' },
+        { row: 5, details: "Erro na linha 5" },
+        { row: 7, details: "Erro na linha 7" },
       ],
     };
 
-    it('should import data from a file successfully', async () => {
+    it("should import data from a file successfully", async () => {
       mockImportDesarquivamentoUseCase.execute.mockResolvedValue(
         mockImportResult,
       );
@@ -440,7 +444,7 @@ describe('NugecidController', () => {
       );
     });
 
-    it('should throw BadRequestException if no file is provided', async () => {
+    it("should throw BadRequestException if no file is provided", async () => {
       const mockRes = {
         status: jest.fn().mockReturnThis(),
         json: jest.fn(),

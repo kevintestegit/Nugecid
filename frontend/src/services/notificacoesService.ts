@@ -1,8 +1,34 @@
 import { api } from './api';
 
+type ApiResponseEnvelope<T> = {
+  success: boolean
+  statusCode: number
+  timestamp: string
+  path: string
+  method: string
+  data: T
+  meta?: any
+}
+
+const unwrap = <T>(response: { data: any }): T => {
+  if (!response) return undefined as T
+
+  const payload = response.data?.data ?? response.data
+  return payload as T
+}
+
 export interface Notificacao {
   id: number;
-  tipo: 'solicitacao_pendente' | 'novo_processo';
+  tipo: 
+    | 'solicitacao_pendente' 
+    | 'novo_processo'
+    | 'mencao'
+    | 'tarefa_atribuida'
+    | 'tarefa_alterada'
+    | 'tarefa_comentada'
+    | 'prazo_proximo'
+    | 'tarefa_atrasada'
+    | 'projeto_atualizado';
   titulo: string;
   descricao: string;
   detalhes?: Record<string, any>;
@@ -11,6 +37,14 @@ export interface Notificacao {
   usuarioId: number;
   solicitacaoId?: number;
   processoId?: number;
+  tarefaId?: number;
+  projetoId?: number;
+  remetenteId?: number;
+  link?: string;
+  remetente?: {
+    id: number;
+    nome: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -55,10 +89,10 @@ export class NotificacoesService {
     tipo?: string;
     prioridade?: string;
   }): Promise<NotificacoesResponse> {
-    const response = await api.get<NotificacoesResponse>(this.baseUrl, {
+    const response = await api.get<ApiResponseEnvelope<NotificacoesResponse>>(this.baseUrl, {
       params,
     });
-    return response.data;
+    return unwrap<NotificacoesResponse>(response);
   }
 
   /**
@@ -66,8 +100,12 @@ export class NotificacoesService {
    */
   async buscarNaoLidas(): Promise<Notificacao[]> {
     try {
-      const response = await api.get<NotificacoesResponse>(`${this.baseUrl}/nao-lidas`);
-      return response.data.data;
+      const response = await api.get<ApiResponseEnvelope<NotificacoesResponse>>(`${this.baseUrl}/nao-lidas`);
+      const payload = unwrap<NotificacoesResponse>(response);
+      if (Array.isArray(payload?.data)) {
+        return payload.data;
+      }
+      return Array.isArray(payload as any) ? (payload as any) : [];
     } catch (err: any) {
       console.error('Erro detalhado ao buscar não lidas:', {
         status: err.response?.status,
@@ -75,7 +113,8 @@ export class NotificacoesService {
         message: err.message,
         url: `${this.baseUrl}/nao-lidas`
       });
-      throw err;
+      // Em caso de erro, retornar array vazio em vez de lançar erro
+      return [];
     }
   }
 
@@ -83,40 +122,40 @@ export class NotificacoesService {
    * Buscar uma notificação específica por ID
    */
   async buscarPorId(id: number): Promise<Notificacao> {
-    const response = await api.get<Notificacao>(`${this.baseUrl}/${id}`);
-    return response.data;
+    const response = await api.get<ApiResponseEnvelope<Notificacao>>(`${this.baseUrl}/${id}`);
+    return unwrap<Notificacao>(response);
   }
 
   /**
    * Criar uma nova notificação
    */
   async criar(data: CreateNotificacaoDto): Promise<Notificacao> {
-    const response = await api.post<Notificacao>(this.baseUrl, data);
-    return response.data;
+    const response = await api.post<ApiResponseEnvelope<Notificacao>>(this.baseUrl, data);
+    return unwrap<Notificacao>(response);
   }
 
   /**
    * Marcar notificação como lida
    */
   async marcarComoLida(id: number): Promise<Notificacao> {
-    const response = await api.patch<Notificacao>(`${this.baseUrl}/${id}/marcar-lida`);
-    return response.data;
+    const response = await api.patch<ApiResponseEnvelope<Notificacao>>(`${this.baseUrl}/${id}/marcar-lida`);
+    return unwrap<Notificacao>(response);
   }
 
   /**
    * Marcar notificação como não lida
    */
   async marcarComoNaoLida(id: number): Promise<Notificacao> {
-    const response = await api.patch<Notificacao>(`${this.baseUrl}/${id}/marcar-nao-lida`);
-    return response.data;
+    const response = await api.patch<ApiResponseEnvelope<Notificacao>>(`${this.baseUrl}/${id}/marcar-nao-lida`);
+    return unwrap<Notificacao>(response);
   }
 
   /**
    * Marcar todas as notificações como lidas
    */
   async marcarTodasComoLidas(): Promise<{ affected: number }> {
-    const response = await api.patch<{ affected: number }>(`${this.baseUrl}/marcar-todas-lidas`);
-    return response.data;
+    const response = await api.patch<ApiResponseEnvelope<{ affected: number }>>(`${this.baseUrl}/marcar-todas-lidas`);
+    return unwrap<{ affected: number }>(response);
   }
 
   /**
@@ -131,8 +170,8 @@ export class NotificacoesService {
    */
   async buscarEstatisticas(): Promise<EstatisticasNotificacoes> {
     try {
-      const response = await api.get<EstatisticasNotificacoes>(`${this.baseUrl}/estatisticas`);
-      return response.data;
+      const response = await api.get<ApiResponseEnvelope<EstatisticasNotificacoes>>(`${this.baseUrl}/estatisticas`);
+      return unwrap<EstatisticasNotificacoes>(response);
     } catch (err: any) {
       console.error('Erro detalhado ao buscar estatísticas:', {
         status: err.response?.status,
@@ -140,7 +179,14 @@ export class NotificacoesService {
         message: err.message,
         url: `${this.baseUrl}/estatisticas`
       });
-      throw err;
+      // Em caso de erro, retornar estatísticas vazias
+      return {
+        total: 0,
+        naoLidas: 0,
+        lidas: 0,
+        porTipo: {},
+        porPrioridade: {}
+      };
     }
   }
 
@@ -148,10 +194,30 @@ export class NotificacoesService {
    * Verificar solicitações pendentes manualmente
    */
   async verificarSolicitacoesPendentes(): Promise<{ message: string; notificacoesCriadas: number }> {
-    const response = await api.post<{ message: string; notificacoesCriadas: number }>(
+    const response = await api.post<ApiResponseEnvelope<{ message: string; notificacoesCriadas: number }>>(
       `${this.baseUrl}/verificar-pendentes`
     );
-    return response.data;
+    return unwrap<{ message: string; notificacoesCriadas: number }>(response);
+  }
+
+  /**
+   * Verificar tarefas com prazo próximo
+   */
+  async verificarPrazos(): Promise<{ notificacoesCriadas: number }> {
+    const response = await api.post<ApiResponseEnvelope<{ notificacoesCriadas: number }>>(
+      `${this.baseUrl}/verificar-prazos`
+    );
+    return unwrap<{ notificacoesCriadas: number }>(response);
+  }
+
+  /**
+   * Verificar tarefas atrasadas
+   */
+  async verificarAtrasadas(): Promise<{ notificacoesCriadas: number }> {
+    const response = await api.post<ApiResponseEnvelope<{ notificacoesCriadas: number }>>(
+      `${this.baseUrl}/verificar-atrasadas`
+    );
+    return unwrap<{ notificacoesCriadas: number }>(response);
   }
 
   /**
@@ -161,10 +227,10 @@ export class NotificacoesService {
     page?: number;
     limit?: number;
   }): Promise<NotificacoesResponse> {
-    const response = await api.get<NotificacoesResponse>(`${this.baseUrl}/tipo/${tipo}`, {
+    const response = await api.get<ApiResponseEnvelope<NotificacoesResponse>>(`${this.baseUrl}/tipo/${tipo}`, {
       params,
     });
-    return response.data;
+    return unwrap<NotificacoesResponse>(response);
   }
 
   /**
