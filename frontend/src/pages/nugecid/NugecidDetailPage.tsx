@@ -129,13 +129,13 @@ const NugecidDetailPage: React.FC<NugecidDetailPageProps> = ({ className }) => {
   }
 
   const isOverdue = (prazoAtendimento?: string, status?: string) => {
-    if (!prazoAtendimento || status === 'CONCLUIDO' || status === 'CANCELADO') {
+    if (!prazoAtendimento || status === 'FINALIZADO' || status === 'NAO_COLETADO' || status === 'NAO_LOCALIZADO') {
       return false
     }
     return new Date(prazoAtendimento) < new Date()
   }
 
-  const canEdit = !['CONCLUIDO', 'CANCELADO', 'ARQUIVADO'].includes(desarquivamento.status)
+  const canEdit = !['FINALIZADO', 'NAO_COLETADO', 'NAO_LOCALIZADO'].includes(desarquivamento.status)
 
   return (
     <div className={cn('container mx-auto px-4 py-6 max-w-6xl', className)}>
@@ -396,15 +396,15 @@ const NugecidDetailPage: React.FC<NugecidDetailPageProps> = ({ className }) => {
               {/* StatusBadge temporariamente substituído */}
               <div className="text-center">
                 <Badge 
-                  variant={desarquivamento.status === 'CONCLUIDO' ? 'default' : 
-                          desarquivamento.status === 'PENDENTE' ? 'secondary' : 
-                          desarquivamento.status === 'CANCELADO' ? 'destructive' : 'outline'}
+                  variant={desarquivamento.status === 'FINALIZADO' ? 'default' : 
+                          desarquivamento.status === 'SOLICITADO' ? 'secondary' : 
+                          desarquivamento.status === 'NAO_COLETADO' || desarquivamento.status === 'NAO_LOCALIZADO' ? 'destructive' : 'outline'}
                   className="px-3 py-1 text-sm"
                 >
-                  {desarquivamento.status === 'CONCLUIDO' && <CheckCircle className="w-3 h-3 mr-1" />}
-                  {desarquivamento.status === 'CANCELADO' && <XCircle className="w-3 h-3 mr-1" />}
-                  {desarquivamento.status === 'PENDENTE' && <Clock className="w-3 h-3 mr-1" />}
-                  {desarquivamento.status === 'ARQUIVADO' && <Archive className="w-3 h-3 mr-1" />}
+                  {desarquivamento.status === 'FINALIZADO' && <CheckCircle className="w-3 h-3 mr-1" />}
+                  {(desarquivamento.status === 'NAO_COLETADO' || desarquivamento.status === 'NAO_LOCALIZADO') && <XCircle className="w-3 h-3 mr-1" />}
+                  {desarquivamento.status === 'SOLICITADO' && <Clock className="w-3 h-3 mr-1" />}
+                  {desarquivamento.status === 'DESARQUIVADO' && <Archive className="w-3 h-3 mr-1" />}
                   {desarquivamento.status}
                 </Badge>
               </div>

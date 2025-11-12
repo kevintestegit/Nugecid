@@ -116,16 +116,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const savedUser = localStorage.getItem('user')
       
       if (accessToken && refreshToken && savedUser) {
-        updateUser(JSON.parse(savedUser))
-        
+        const localUser = JSON.parse(savedUser)
+        console.log('📦 Usuário do localStorage:', { id: localUser.id, nome: localUser.nome, avatarUrl: localUser.avatarUrl })
+        updateUser(localUser)
+
         // Schedule token refresh
         scheduleTokenRefresh()
-        
+
         // Verificar se o token ainda é válido
         try {
+          console.log('🌐 Buscando dados atualizados do backend...')
           const response = await apiService.getCurrentUser()
           if (response.success && response.data) {
+            console.log('✅ Dados recebidos do backend:', { id: response.data.id, nome: response.data.nome, avatarUrl: response.data.avatarUrl })
             updateUser(response.data)
+          } else {
+            console.warn('⚠️ Backend não retornou dados válidos')
           }
         } catch (error: any) {
           console.log('🔍 Erro ao verificar usuário atual:', error)
@@ -284,11 +290,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useOptionalAuth = (): AuthContextType | null => {
+export function useOptionalAuth(): AuthContextType | null {
   return useContext(AuthContext) ?? null
 }
 
-export const useAuth = (): AuthContextType => {
+export function useAuth(): AuthContextType {
   const context = useOptionalAuth()
   if (context === null) {
     throw new Error('useAuth deve ser usado dentro de um AuthProvider')

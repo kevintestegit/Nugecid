@@ -1,18 +1,18 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { User } from '../../domain/entities/user';
-import { UserId } from '../../domain/value-objects/user-id';
-import { Usuario } from '../../domain/value-objects/usuario';
-import { Password } from '../../domain/value-objects/password';
-import { RoleId } from '../../domain/value-objects/role-id';
-import { IUserRepository } from '../../domain/repositories/user.repository.interface';
-import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
-import { UpdateUserDto } from '../dto/update-user.dto';
+import { Injectable, Inject } from "@nestjs/common";
+import { User } from "../../domain/entities/user";
+import { UserId } from "../../domain/value-objects/user-id";
+import { Usuario } from "../../domain/value-objects/usuario";
+import { Password } from "../../domain/value-objects/password";
+import { RoleId } from "../../domain/value-objects/role-id";
+import { IUserRepository } from "../../domain/repositories/user.repository.interface";
+import { IRoleRepository } from "../../domain/repositories/role.repository.interface";
+import { UpdateUserDto } from "../dto/update-user.dto";
 
 @Injectable()
 export class UpdateUserUseCase {
   constructor(
-    @Inject('IUserRepository') private readonly userRepository: IUserRepository,
-    @Inject('IRoleRepository') private readonly roleRepository: IRoleRepository,
+    @Inject("IUserRepository") private readonly userRepository: IUserRepository,
+    @Inject("IRoleRepository") private readonly roleRepository: IRoleRepository,
   ) {}
 
   async execute(id: number, dto: UpdateUserDto): Promise<User> {
@@ -20,7 +20,7 @@ export class UpdateUserUseCase {
     const user = await this.userRepository.findById(userId);
 
     if (!user) {
-      throw new Error('Usuário não encontrado');
+      throw new Error("Usuário não encontrado");
     }
 
     // Atualizar nome se fornecido
@@ -36,7 +36,7 @@ export class UpdateUserUseCase {
       if (!user.usuario.equals(newUsuario)) {
         const usuarioExists = await this.userRepository.exists(newUsuario);
         if (usuarioExists) {
-          throw new Error('Usuário já está em uso');
+          throw new Error("Usuário já está em uso");
         }
         user.updateUsuario(newUsuario);
       }
@@ -51,7 +51,7 @@ export class UpdateUserUseCase {
     if (dto.role !== undefined) {
       const role = await this.roleRepository.findByName(dto.role);
       if (!role) {
-        throw new Error('Role não encontrada');
+        throw new Error("Role não encontrada");
       }
       const roleId = role.id;
       user.updateRole(roleId, role);
@@ -64,6 +64,18 @@ export class UpdateUserUseCase {
       } else {
         user.deactivate();
       }
+    }
+
+    if (dto.avatarUrl !== undefined) {
+      user.updateAvatarUrl(dto.avatarUrl);
+    }
+
+    if (dto.matricula !== undefined) {
+      const normalizedMatricula =
+        dto.matricula && dto.matricula.trim().length > 0
+          ? dto.matricula.trim()
+          : null;
+      user.updateMatricula(normalizedMatricula);
     }
 
     return this.userRepository.update(user);

@@ -3,7 +3,7 @@ export class RoleId {
 
   constructor(value: number) {
     if (!value || value <= 0) {
-      throw new Error('ID da role deve ser um número positivo');
+      throw new Error("ID da role deve ser um número positivo");
     }
 
     this._value = value;

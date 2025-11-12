@@ -1,11 +1,11 @@
 export enum StatusDesarquivamentoEnum {
-  FINALIZADO = 'FINALIZADO',
-  DESARQUIVADO = 'DESARQUIVADO',
-  NAO_COLETADO = 'NAO_COLETADO',
-  SOLICITADO = 'SOLICITADO',
-  REARQUIVAMENTO_SOLICITADO = 'REARQUIVAMENTO_SOLICITADO',
-  RETIRADO_PELO_SETOR = 'RETIRADO_PELO_SETOR',
-  NAO_LOCALIZADO = 'NAO_LOCALIZADO',
+  FINALIZADO = "FINALIZADO",
+  DESARQUIVADO = "DESARQUIVADO",
+  NAO_COLETADO = "NAO_COLETADO",
+  SOLICITADO = "SOLICITADO",
+  REARQUIVAMENTO_SOLICITADO = "REARQUIVAMENTO_SOLICITADO",
+  RETIRADO_PELO_SETOR = "RETIRADO_PELO_SETOR",
+  NAO_LOCALIZADO = "NAO_LOCALIZADO",
 }
 
 export class StatusDesarquivamento {
@@ -160,21 +160,21 @@ export class StatusDesarquivamento {
   getColor(): string {
     switch (this._value) {
       case StatusDesarquivamentoEnum.SOLICITADO:
-        return '#8b5cf6'; // roxo
+        return "#8b5cf6"; // roxo
       case StatusDesarquivamentoEnum.DESARQUIVADO:
-        return '#3b82f6'; // azul
+        return "#3b82f6"; // azul
       case StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR:
-        return '#06b6d4'; // ciano
+        return "#06b6d4"; // ciano
       case StatusDesarquivamentoEnum.FINALIZADO:
-        return '#10b981'; // verde
+        return "#10b981"; // verde
       case StatusDesarquivamentoEnum.NAO_COLETADO:
-        return '#f59e0b'; // amarelo
+        return "#f59e0b"; // amarelo
       case StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO:
-        return '#6b7280'; // cinza
+        return "#6b7280"; // cinza
       case StatusDesarquivamentoEnum.NAO_LOCALIZADO:
-        return '#ef4444'; // vermelho
+        return "#ef4444"; // vermelho
       default:
-        return '#6b7280'; // cinza
+        return "#6b7280"; // cinza
     }
   }
 
@@ -182,21 +182,21 @@ export class StatusDesarquivamento {
   getDescription(): string {
     switch (this._value) {
       case StatusDesarquivamentoEnum.SOLICITADO:
-        return 'Aguardando desarquivamento';
+        return "Aguardando desarquivamento";
       case StatusDesarquivamentoEnum.DESARQUIVADO:
-        return 'Desarquivado e disponível';
+        return "Desarquivado e disponível";
       case StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR:
-        return 'Retirado pelo setor solicitante';
+        return "Retirado pelo setor solicitante";
       case StatusDesarquivamentoEnum.FINALIZADO:
-        return 'Processo finalizado';
+        return "Processo finalizado";
       case StatusDesarquivamentoEnum.NAO_COLETADO:
-        return 'Não coletado pelo setor';
+        return "Não coletado pelo setor";
       case StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO:
-        return 'Rearquivamento solicitado';
+        return "Rearquivamento solicitado";
       case StatusDesarquivamentoEnum.NAO_LOCALIZADO:
-        return 'Documento não localizado';
+        return "Documento não localizado";
       default:
-        return 'Status desconhecido';
+        return "Status desconhecido";
     }
   }
 }

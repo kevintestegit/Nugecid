@@ -8,7 +8,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  closestCenter,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { KanbanColumn, Coluna } from './KanbanColumn';
@@ -35,7 +35,7 @@ interface KanbanBoardProps {
   colunas: Coluna[];
   tarefas: Tarefa[];
   onMoveTask?: (tarefaId: number, sourceColunaId: number, targetColunaId: number, newOrder: number) => void;
-  onReorderTasks?: (colunaId: number, tarefaIds: number[]) => void;
+  onReorderTasks?: (colunaId: number, tarefaIds: number[], movedTaskId?: number) => void;
   onAddColumn?: () => void;
   onEditColumn?: (coluna: Coluna) => void;
   onDeleteColumn?: (colunaId: number) => void;
@@ -107,42 +107,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
+    
     if (!over) return;
-
+    
     const activeId = active.id;
     const overId = over.id;
-
+    
     if (activeId === overId) return;
-
+    
+    // Permitir que o @dnd-kit detecte quando estamos sobre outra coluna
+    // Isso habilita a animação visual de movimento entre colunas
     const isActiveTask = active.data.current?.type === 'tarefa';
-    const isOverTask = over.data.current?.type === 'tarefa';
     const isOverColumn = over.data.current?.type === 'coluna';
-
-    if (!isActiveTask) return;
-
-    // Dropping task over another task
-    if (isActiveTask && isOverTask) {
-      const activeTask = active.data.current.tarefa as Tarefa;
-      const overTask = over.data.current.tarefa as Tarefa;
-
-      if (activeTask.coluna_id !== overTask.coluna_id) {
-        // Move to different column
-        const overColumnTasks = tarefasPorColuna[overTask.coluna_id];
-        const overIndex = overColumnTasks.findIndex(t => t.id === overTask.id);
-        
-        onMoveTask?.(activeTask.id, activeTask.coluna_id, overTask.coluna_id, overIndex);
-      }
-    }
-
-    // Dropping task over column
+    
     if (isActiveTask && isOverColumn) {
-      const activeTask = active.data.current.tarefa as Tarefa;
-      const overColumn = over.data.current.coluna as Coluna;
-
-      if (activeTask.coluna_id !== overColumn.id) {
-        const overColumnTasks = tarefasPorColuna[overColumn.id];
-        onMoveTask?.(activeTask.id, activeTask.coluna_id, overColumn.id, overColumnTasks.length);
-      }
+      // Apenas para permitir a animação, não fazemos nada aqui
+      return;
     }
   };
 
@@ -150,30 +130,85 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const { active, over } = event;
     setActiveId(null);
 
-    if (!over) return;
+    console.log('🎯 handleDragEnd:', { 
+      activeId: active.id, 
+      overId: over?.id,
+      activeType: active.data.current?.type,
+      overType: over?.data.current?.type,
+      activeData: active.data.current,
+      overData: over?.data.current
+    })
+
+    if (!over) {
+      console.log('❌ Sem destino (over é null)')
+      return;
+    }
 
     const activeId = active.id;
     const overId = over.id;
 
-    if (activeId === overId) return;
+    if (activeId === overId) {
+      console.log('❌ Mesma origem e destino')
+      return;
+    }
 
     const isActiveTask = active.data.current?.type === 'tarefa';
     const isOverTask = over.data.current?.type === 'tarefa';
+    const isOverColumn = over.data.current?.type === 'coluna';
 
+    console.log('📋 Tipos detectados:', { isActiveTask, isOverTask, isOverColumn })
+
+    // PRIORIDADE 1: Mover para coluna vazia (soltou diretamente na coluna)
+    if (isActiveTask && isOverColumn) {
+      const activeTask = active.data.current.tarefa as Tarefa;
+      const overColumn = over.data.current.coluna as Coluna;
+      
+      console.log('🔀 Movendo para coluna:', {
+        taskId: activeTask.id,
+        taskTitle: activeTask.titulo,
+        from: activeTask.coluna_id,
+        to: overColumn.id,
+        columnName: overColumn.nome
+      })
+      
+      const overColumnTasks = tarefasPorColuna[overColumn.id] || [];
+      onMoveTask?.(activeTask.id, activeTask.coluna_id, overColumn.id, overColumnTasks.length);
+      return;
+    }
+
+    // PRIORIDADE 2: Mover/reordenar entre tarefas
     if (isActiveTask && isOverTask) {
       const activeTask = active.data.current.tarefa as Tarefa;
       const overTask = over.data.current.tarefa as Tarefa;
 
+      console.log('📦 Interação entre tarefas:', {
+        activeTaskId: activeTask.id,
+        activeTaskTitle: activeTask.titulo,
+        activeColumn: activeTask.coluna_id,
+        overTaskId: overTask.id,
+        overTaskTitle: overTask.titulo,
+        overColumn: overTask.coluna_id
+      })
+
       if (activeTask.coluna_id === overTask.coluna_id) {
-        // Reorder within same column
+        // Reordenar na mesma coluna
+        console.log('🔃 Reordenando na mesma coluna')
         const columnTasks = tarefasPorColuna[activeTask.coluna_id];
         const oldIndex = columnTasks.findIndex(t => t.id === activeTask.id);
         const newIndex = columnTasks.findIndex(t => t.id === overTask.id);
         
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex);
-        onReorderTasks?.(activeTask.coluna_id, reorderedTasks.map(t => t.id));
+        onReorderTasks?.(activeTask.coluna_id, reorderedTasks.map(t => t.id), activeTask.id);
+      } else {
+        // Mover para coluna diferente
+        console.log('🔄 Movendo entre colunas diferentes')
+        const overColumnTasks = tarefasPorColuna[overTask.coluna_id];
+        const overIndex = overColumnTasks.findIndex(t => t.id === overTask.id);
+        onMoveTask?.(activeTask.id, activeTask.coluna_id, overTask.coluna_id, overIndex);
       }
     }
+    
+    console.log('⚠️ Nenhuma ação executada - tipos não reconhecidos')
   };
 
   const activeTarefa = activeId ? tarefas.find(t => t.id === activeId) : null;
@@ -270,7 +305,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <div className="flex-1 overflow-x-auto">
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}

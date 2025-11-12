@@ -45,11 +45,14 @@ export const useNotificacoes = () => {
     try {
       setLoading(true);
       const data = await notificacoesService.buscarNaoLidas();
-      setNaoLidas(data);
+      // Garantir que data sempre seja um array
+      setNaoLidas(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
       setError('Erro ao carregar notificações não lidas');
       console.error('Erro ao buscar notificações não lidas:', err);
+      // Em caso de erro, definir como array vazio
+      setNaoLidas([]);
     } finally {
       setLoading(false);
     }
@@ -64,6 +67,14 @@ export const useNotificacoes = () => {
     } catch (err) {
       setError('Erro ao carregar estatísticas');
       console.error('Erro ao buscar estatísticas:', err);
+      // Em caso de erro, definir estatísticas vazias
+      setEstatisticas({
+        total: 0,
+        naoLidas: 0,
+        lidas: 0,
+        porTipo: {},
+        porPrioridade: {}
+      });
     }
   }, []);
 

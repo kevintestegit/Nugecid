@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import type { AxiosError } from 'axios'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -13,15 +14,27 @@ import { Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
 const loginSchema = z.object({
-  usuario: z
-    .string()
-    .min(1, 'Usuário é obrigatório'),
-  senha: z
-    .string()
-    .min(1, 'Senha é obrigatória'),
+  usuario: z.string().min(1, 'Usuário é obrigatório'),
+  senha: z.string().min(1, 'Senha é obrigatória'),
 })
 
 type LoginFormData = z.infer<typeof loginSchema>
+
+interface FieldErrorProps {
+  id: string
+  message?: string
+}
+
+const FieldError: React.FC<FieldErrorProps> = ({ id, message }) => {
+  if (!message) return null
+
+  return (
+    <div id={id} className="flex items-center gap-2 text-sm text-red-600">
+      <AlertCircle className="h-4 w-4" />
+      {message}
+    </div>
+  )
+}
 
 const LoginPage: React.FC = () => {
   const { login } = useAuth()
@@ -30,7 +43,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const from = location.state?.from?.pathname || '/'
+  const from = (location.state as any)?.from?.pathname || '/'
 
   const {
     register,
@@ -46,7 +59,8 @@ const LoginPage: React.FC = () => {
       await login(data)
       toast.success('Login realizado com sucesso!')
       navigate(from, { replace: true })
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as AxiosError<{ message?: string }>
       const message = error.response?.data?.message || 'Usuário ou senha inválidos.'
       toast.error(message)
     } finally {
@@ -62,34 +76,35 @@ const LoginPage: React.FC = () => {
             NUGECID
           </h1>
           <p className="text-gray-600">
-            Sistema de Gerenciamento de Controle de Desarquivamentos - ITEP
+            Sistema de Gerenciamento de Controle de Desarquivamentos - Polícia Científica do Rio Grande do Norte
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Fazer Login</CardTitle>
+            <CardTitle>{isLoading ? 'Entrando...' : 'Fazer Login'}</CardTitle>
             <CardDescription>
-              Entre com suas credenciais para acessar o sistema
+              {isLoading
+                ? 'Validando suas credenciais...'
+                : 'Entre com suas credenciais para acessar o sistema'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="usuario">Usuário</Label>
                 <Input
                   id="usuario"
                   type="text"
                   placeholder="Seu usuário"
+                  autoComplete="username"
+                  disabled={isLoading}
+                  aria-invalid={!!errors.usuario}
+                  aria-describedby={errors.usuario ? 'usuario-error' : undefined}
                   {...register('usuario')}
                   className={errors.usuario ? 'border-red-500' : ''}
                 />
-                {errors.usuario && (
-                  <div className="flex items-center gap-2 text-sm text-red-600">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.usuario.message}
-                  </div>
-                )}
+                <FieldError id="usuario-error" message={errors.usuario?.message} />
               </div>
 
               <div className="space-y-2">
@@ -99,34 +114,32 @@ const LoginPage: React.FC = () => {
                     id="senha"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Sua senha"
+                    autoComplete="current-password"
+                    disabled={isLoading}
+                    aria-invalid={!!errors.senha}
+                    aria-describedby={errors.senha ? 'senha-error' : undefined}
                     {...register('senha')}
-                    className={errors.senha ? 'border-red-500 pr-10' : 'pr-10'}
+                    className={`${errors.senha ? 'border-red-500 ' : ''}pr-10`}
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => setShowPassword(prev => !prev)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-500" />
+                      <EyeOff className="w-4 h-4" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-500" />
+                      <Eye className="w-4 h-4" />
                     )}
-                  </Button>
+                  </button>
                 </div>
-                {errors.senha && (
-                  <div className="flex items-center gap-2 text-sm text-red-600">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.senha.message}
-                  </div>
-                )}
+                <FieldError id="senha-error" message={errors.senha?.message} />
               </div>
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full hover:text-primary-700 data-[state=pressed]:text-primary-900"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -144,7 +157,7 @@ const LoginPage: React.FC = () => {
 
         <div className="text-center text-sm text-gray-600">
           <p>Problemas para acessar?</p>
-          <p>Entre em contato com alguém ai</p>
+          <p>Não consigo te ajudar.</p>
         </div>
       </div>
     </div>

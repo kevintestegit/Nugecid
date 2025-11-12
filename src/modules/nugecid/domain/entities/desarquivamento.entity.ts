@@ -2,10 +2,12 @@ import {
   DesarquivamentoId,
   StatusDesarquivamento,
   StatusDesarquivamentoEnum,
-} from '../value-objects';
+} from "../value-objects";
+import { TipoDesarquivamentoEnum } from "../enums/tipo-desarquivamento.enum";
 
 export interface DesarquivamentoDomainProps {
   id?: DesarquivamentoId;
+  numeroSolicitacao?: number;
   tipoDesarquivamento: string;
   status: StatusDesarquivamento;
   nomeCompleto: string;
@@ -30,13 +32,14 @@ export interface DesarquivamentoDomainProps {
 export class DesarquivamentoDomain {
   private constructor(
     private readonly _id: DesarquivamentoId | undefined,
-    private readonly _tipoDesarquivamento: string,
+    private readonly _numeroSolicitacao: number | undefined,
+    private _tipoDesarquivamento: string,
     private _status: StatusDesarquivamento,
     private readonly _nomeCompleto: string,
     private readonly _numeroNicLaudoAuto: string,
     private readonly _numeroProcesso: string,
     private readonly _tipoDocumento: string,
-    private readonly _dataSolicitacao: Date,
+    private _dataSolicitacao: Date,
     private _dataDesarquivamentoSAG: Date | undefined,
     private _dataDevolucaoSetor: Date | undefined,
     private readonly _setorDemandante: string,
@@ -55,12 +58,13 @@ export class DesarquivamentoDomain {
 
   // Factory method para criar nova instÃ¢ncia
   static create(
-    props: Omit<DesarquivamentoDomainProps, 'id' | 'createdAt' | 'updatedAt'>,
+    props: Omit<DesarquivamentoDomainProps, "id" | "createdAt" | "updatedAt">,
   ): DesarquivamentoDomain {
     const now = new Date();
 
     return new DesarquivamentoDomain(
       undefined, // ID serÃ¡ gerado pelo repositÃ³rio
+      props.numeroSolicitacao,
       props.tipoDesarquivamento,
       props.status || StatusDesarquivamento.createSolicitado(),
       props.nomeCompleto,
@@ -87,6 +91,7 @@ export class DesarquivamentoDomain {
   static reconstruct(props: DesarquivamentoDomainProps): DesarquivamentoDomain {
     return new DesarquivamentoDomain(
       props.id,
+      props.numeroSolicitacao,
       props.tipoDesarquivamento,
       props.status,
       props.nomeCompleto,
@@ -114,8 +119,16 @@ export class DesarquivamentoDomain {
     return this._id;
   }
 
+  get numeroSolicitacao(): number | undefined {
+    return this._numeroSolicitacao;
+  }
+
   get tipoDesarquivamento(): string {
     return this._tipoDesarquivamento;
+  }
+
+  set tipoDesarquivamento(value: string) {
+    this._tipoDesarquivamento = value;
   }
 
   get status(): StatusDesarquivamento {
@@ -193,48 +206,44 @@ export class DesarquivamentoDomain {
   // MÃ©todos de negÃ³cio
   private validate(): void {
     if (!this._nomeCompleto || this._nomeCompleto.trim().length === 0) {
-      throw new Error('Nome completo Ã© obrigatÃ³rio');
+      throw new Error("Nome completo Ã© obrigatÃ³rio");
     }
 
     if (this._nomeCompleto.length > 255) {
-      throw new Error('Nome completo deve ter no mÃ¡ximo 255 caracteres');
+      throw new Error("Nome completo deve ter no mÃ¡ximo 255 caracteres");
     }
 
     if (
       !this._numeroNicLaudoAuto ||
       this._numeroNicLaudoAuto.trim().length === 0
     ) {
-      throw new Error('NÃºmero NIC/Laudo/Auto Ã© obrigatÃ³rio');
+      throw new Error("NÃºmero NIC/Laudo/Auto Ã© obrigatÃ³rio");
     }
 
-    if (!this._numeroProcesso || this._numeroProcesso.trim().length === 0) {
-      throw new Error('NÃºmero do processo Ã© obrigatÃ³rio');
-    }
+    // numeroProcesso agora é OPCIONAL - removida validação
 
     if (!this._tipoDocumento || this._tipoDocumento.trim().length === 0) {
-      throw new Error('Tipo do documento Ã© obrigatÃ³rio');
+      throw new Error("Tipo do documento Ã© obrigatÃ³rio");
     }
 
-    if (!this._setorDemandante || this._setorDemandante.trim().length === 0) {
-      throw new Error('Setor demandante Ã© obrigatÃ³rio');
-    }
+    // setorDemandante agora é OPCIONAL - removida validação
 
     if (
       !this._servidorResponsavel ||
       this._servidorResponsavel.trim().length === 0
     ) {
-      throw new Error('Servidor responsÃ¡vel Ã© obrigatÃ³rio');
+      throw new Error("Servidor responsÃ¡vel Ã© obrigatÃ³rio");
     }
 
     if (
       !this._finalidadeDesarquivamento ||
       this._finalidadeDesarquivamento.trim().length === 0
     ) {
-      throw new Error('Finalidade do desarquivamento Ã© obrigatÃ³ria');
+      throw new Error("Finalidade do desarquivamento Ã© obrigatÃ³ria");
     }
 
     if (this._criadoPorId <= 0) {
-      throw new Error('ID do usuÃ¡rio criador deve ser vÃ¡lido');
+      throw new Error("ID do usuÃ¡rio criador deve ser vÃ¡lido");
     }
 
     if (
@@ -242,13 +251,13 @@ export class DesarquivamentoDomain {
       this._responsavelId !== null &&
       this._responsavelId < 0
     ) {
-      throw new Error('ID do responsÃ¡vel deve ser vÃ¡lido');
+      throw new Error("ID do responsÃ¡vel deve ser vÃ¡lido");
     }
   }
 
   // Verifica se pode ser acessado por um usuÃ¡rio
   canBeAccessedBy(userId: number, userRoles: string[]): boolean {
-    const upperCaseUserRoles = userRoles.map(role => role.toUpperCase());
+    const upperCaseUserRoles = userRoles.map((role) => role.toUpperCase());
     // Criador sempre pode acessar
     if (this._criadoPorId === userId) {
       return true;
@@ -260,14 +269,14 @@ export class DesarquivamentoDomain {
     }
 
     // Administradores podem acessar tudo
-    if (upperCaseUserRoles.includes('ADMIN')) {
+    if (upperCaseUserRoles.includes("ADMIN")) {
       return true;
     }
 
     // UsuÃ¡rios com role especÃ­fica podem acessar
     if (
-      upperCaseUserRoles.includes('NUGECID_VIEWER') ||
-      upperCaseUserRoles.includes('NUGECID_OPERATOR')
+      upperCaseUserRoles.includes("NUGECID_VIEWER") ||
+      upperCaseUserRoles.includes("NUGECID_OPERATOR")
     ) {
       return true;
     }
@@ -278,11 +287,11 @@ export class DesarquivamentoDomain {
   // Verifica se pode ser editado por um usuÃ¡rio
   canBeEditedBy(userId: number, userRoles: string[]): boolean {
     // Normaliza roles vindas do controller (ex.: 'admin', 'coordenador', 'usuario')
-    const upperCaseUserRoles = (userRoles || []).map(role =>
-      (role || '').toUpperCase(),
+    const upperCaseUserRoles = (userRoles || []).map((role) =>
+      (role || "").toUpperCase(),
     );
     // Administradores sempre podem editar (override), independentemente do status
-    if (upperCaseUserRoles.includes('ADMIN')) {
+    if (upperCaseUserRoles.includes("ADMIN")) {
       return true;
     }
     // NÃ£o pode editar se estiver concluÃ­do (exceto ADMIN - jÃ¡ tratado acima)
@@ -302,9 +311,9 @@ export class DesarquivamentoDomain {
 
     // Operadores/coordenadores podem editar
     if (
-      upperCaseUserRoles.includes('NUGECID_OPERATOR') ||
-      upperCaseUserRoles.includes('COORDENADOR') ||
-      upperCaseUserRoles.includes('OPERADOR')
+      upperCaseUserRoles.includes("NUGECID_OPERATOR") ||
+      upperCaseUserRoles.includes("COORDENADOR") ||
+      upperCaseUserRoles.includes("OPERADOR")
     ) {
       return true;
     }
@@ -314,14 +323,11 @@ export class DesarquivamentoDomain {
 
   // Verifica se pode ser excluÃ­do por um usuÃ¡rio (regras especÃ­ficas para exclusÃ£o)
   canBeDeletedBy(userId: number, userRoles: string[]): boolean {
-    const upperCaseUserRoles = userRoles.map(role => role.toUpperCase());
+    const upperCaseUserRoles = userRoles.map((role) => role.toUpperCase());
 
-    // Administradores podem excluir qualquer coisa (exceto em andamento)
-    if (upperCaseUserRoles.includes('ADMIN')) {
-      // NÃ£o permitir exclusÃ£o de registros em andamento, mesmo para admin
-      if (this._status.isInProgress()) {
-        return false;
-      }
+    // Administradores podem excluir qualquer coisa SEM RESTRIÇÕES
+    // Necessário para manutenção, importações e correções
+    if (upperCaseUserRoles.includes("ADMIN")) {
       return true;
     }
 
@@ -417,7 +423,7 @@ export class DesarquivamentoDomain {
   // Atribui responsÃ¡vel
   assignResponsible(responsavelId: number): void {
     if (responsavelId < 0) {
-      throw new Error('ID do responsÃ¡vel deve ser vÃ¡lido');
+      throw new Error("ID do responsÃ¡vel deve ser vÃ¡lido");
     }
 
     this._responsavelId = responsavelId;
@@ -436,8 +442,20 @@ export class DesarquivamentoDomain {
   }
 
   // Define data de devoluÃ§Ã£o ao setor
-  setDataDevolucaoSetor(data: Date): void {
-    this._dataDevolucaoSetor = data;
+  setDataDevolucaoSetor(data: Date | null): void {
+    this._dataDevolucaoSetor = data === null ? undefined : data;
+    this._updatedAt = new Date();
+  }
+
+  // Remove a data de devolução ao setor
+  clearDataDevolucaoSetor(): void {
+    this._dataDevolucaoSetor = undefined;
+    this._updatedAt = new Date();
+  }
+
+  // Define data de solicitação
+  setDataSolicitacao(data: Date): void {
+    this._dataSolicitacao = data;
     this._updatedAt = new Date();
   }
 
@@ -445,7 +463,7 @@ export class DesarquivamentoDomain {
   complete(): void {
     if (!this._status.canBeCompleted()) {
       throw new Error(
-        'Desarquivamento nÃ£o pode ser concluÃ­do no status atual',
+        "Desarquivamento nÃ£o pode ser concluÃ­do no status atual",
       );
     }
 
@@ -460,13 +478,13 @@ export class DesarquivamentoDomain {
   cancel(motivo?: string): void {
     if (!this._status.canBeCancelled()) {
       throw new Error(
-        'Desarquivamento nÃ£o pode ser cancelado no status atual',
+        "Desarquivamento nÃ£o pode ser cancelado no status atual",
       );
     }
 
     // Cancel functionality not available in new status structure
     throw new Error(
-      'Cancelamento nÃ£o estÃ¡ disponÃ­vel na nova estrutura de status',
+      "Cancelamento nÃ£o estÃ¡ disponÃ­vel na nova estrutura de status",
     );
     this._updatedAt = new Date();
   }
@@ -475,7 +493,7 @@ export class DesarquivamentoDomain {
   delete(): void {
     if (this._status.isInProgress()) {
       throw new Error(
-        'NÃ£o Ã© possÃ­vel excluir desarquivamento em andamento',
+        "NÃ£o Ã© possÃ­vel excluir desarquivamento em andamento",
       );
     }
 

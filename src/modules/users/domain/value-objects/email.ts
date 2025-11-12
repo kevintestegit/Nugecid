@@ -3,11 +3,11 @@ export class Email {
 
   constructor(value: string) {
     if (!value) {
-      throw new Error('Email não pode estar vazio');
+      throw new Error("Email não pode estar vazio");
     }
 
     if (!this.isValidEmail(value)) {
-      throw new Error('Email inválido');
+      throw new Error("Email inválido");
     }
 
     this._value = value.toLowerCase().trim();

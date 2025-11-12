@@ -13,98 +13,98 @@ import {
   Ip,
   Headers,
   UnauthorizedException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-} from '@nestjs/swagger';
+} from "@nestjs/swagger";
 import {
   Request as ExpressRequest,
   Response as ExpressResponse,
-} from 'express';
+} from "express";
 
-import { AuthService, LoginResponse } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { LocalAuthGuard } from './guards/local-auth.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { SessionAuthGuard } from './guards/session-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { IsPublic } from '../../common/decorators/is-public.decorator';
-import { Public } from '../../common/decorators/public.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
+import { AuthService, LoginResponse } from "./auth.service";
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
+import { LocalAuthGuard } from "./guards/local-auth.guard";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { SessionAuthGuard } from "./guards/session-auth.guard";
+import { RolesGuard } from "./guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { IsPublic } from "../../common/decorators/is-public.decorator";
+import { Public } from "../../common/decorators/public.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { User } from "../users/entities/user.entity";
 
-@ApiTags('Autenticação')
-@Controller('auth')
+@ApiTags("Autenticação")
+@Controller("auth")
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
   constructor(private readonly authService: AuthService) {}
 
-  @Get('login')
+  @Get("login")
   @IsPublic()
-  @ApiOperation({ summary: 'Renderiza página de login' })
-  @Render('login')
+  @ApiOperation({ summary: "Renderiza página de login" })
+  @Render("login")
   loginPage(@Request() req: ExpressRequest) {
     // Se já estiver logado, redireciona para página principal
     if (req.user) {
-      return { redirect: '/' };
+      return { redirect: "/" };
     }
 
     return {
-      title: 'Login - SGC ITEP',
+      title: "Login - SGC ITEP",
       error: req.query.error || null,
       message: req.query.message || null,
     };
   }
 
-  @Post('login')
+  @Post("login")
   @IsPublic()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Realiza login do usuário' })
+  @ApiOperation({ summary: "Realiza login do usuário" })
   @ApiResponse({
     status: 200,
-    description: 'Login realizado com sucesso',
+    description: "Login realizado com sucesso",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         user: {
-          type: 'object',
+          type: "object",
           properties: {
-            id: { type: 'number' },
-            nome: { type: 'string' },
-            usuario: { type: 'string' },
-            role: { type: 'object' },
+            id: { type: "number" },
+            nome: { type: "string" },
+            usuario: { type: "string" },
+            role: { type: "object" },
           },
         },
-        accessToken: { type: 'string' },
+        accessToken: { type: "string" },
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
+  @ApiResponse({ status: 401, description: "Credenciais inválidas" })
   async login(
     @Body() loginDto: LoginDto,
     @Request() req: ExpressRequest,
     @Response() res: ExpressResponse,
     @Ip() ipAddress: string,
-    @Headers('user-agent') userAgent: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     try {
       const result = await this.authService.login(
         loginDto,
         ipAddress,
-        userAgent || 'Unknown',
+        userAgent || "Unknown",
       );
 
       // Define o cookie com o token de acesso
-      res.cookie('access_token', result.accessToken, {
+      res.cookie("access_token", result.accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 3600000, // 1 hora
       });
 
@@ -112,7 +112,7 @@ export class AuthController {
       req.session.user = result.user;
 
       // Se for requisição AJAX/API, retorna JSON
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.json({
           success: true,
           data: result,
@@ -120,11 +120,11 @@ export class AuthController {
       }
 
       // Se for requisição web, redireciona
-      return res.redirect('/');
+      return res.redirect("/");
     } catch (error) {
       this.logger.error(`Erro no login: ${error.message}`);
 
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(401).json({ message: error.message });
       }
 
@@ -134,15 +134,15 @@ export class AuthController {
     }
   }
 
-  @Post('register')
+  @Post("register")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles("admin")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Registra novo usuário (apenas admins)' })
-  @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado' })
+  @ApiOperation({ summary: "Registra novo usuário (apenas admins)" })
+  @ApiResponse({ status: 201, description: "Usuário criado com sucesso" })
+  @ApiResponse({ status: 400, description: "Dados inválidos" })
+  @ApiResponse({ status: 401, description: "Não autorizado" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async register(
     @Body() registerDto: RegisterDto,
     @CurrentUser() currentUser: User,
@@ -150,61 +150,61 @@ export class AuthController {
     return this.authService.register(registerDto, currentUser);
   }
 
-  @Post('logout')
+  @Post("logout")
   @UseGuards(SessionAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Realiza logout do usuário' })
-  @ApiResponse({ status: 200, description: 'Logout realizado com sucesso' })
+  @ApiOperation({ summary: "Realiza logout do usuário" })
+  @ApiResponse({ status: 200, description: "Logout realizado com sucesso" })
   async logout(
     @Request() req: ExpressRequest,
     @Response() res: ExpressResponse,
     @Ip() ipAddress: string,
-    @Headers('user-agent') userAgent: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     try {
       if (req.session.user) {
         await this.authService.logout(
           req.session.user.id,
           ipAddress,
-          userAgent || 'Unknown',
+          userAgent || "Unknown",
         );
       }
 
       // Destroi a sessão
-      req.session.destroy(err => {
+      req.session.destroy((err) => {
         if (err) {
           this.logger.error(`Erro ao destruir sessão: ${err.message}`);
         }
       });
 
       // Se for requisição AJAX/API, retorna JSON
-      if (req.headers.accept?.includes('application/json')) {
-        return res.json({ message: 'Logout realizado com sucesso' });
+      if (req.headers.accept?.includes("application/json")) {
+        return res.json({ message: "Logout realizado com sucesso" });
       }
 
       // Se for requisição web, redireciona
-      return res.redirect('/auth/login?message=Logout realizado com sucesso');
+      return res.redirect("/auth/login?message=Logout realizado com sucesso");
     } catch (error) {
       this.logger.error(`Erro no logout: ${error.message}`);
 
-      if (req.headers.accept?.includes('application/json')) {
-        return res.status(500).json({ message: 'Erro interno do servidor' });
+      if (req.headers.accept?.includes("application/json")) {
+        return res.status(500).json({ message: "Erro interno do servidor" });
       }
 
-      return res.redirect('/auth/login?error=Erro ao realizar logout');
+      return res.redirect("/auth/login?error=Erro ao realizar logout");
     }
   }
 
-  @Get('profile')
+  @Get("profile")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Obtém perfil do usuário logado' })
-  @ApiResponse({ status: 200, description: 'Perfil do usuário' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiOperation({ summary: "Obtém perfil do usuário logado" })
+  @ApiResponse({ status: 200, description: "Perfil do usuário" })
+  @ApiResponse({ status: 401, description: "Não autorizado" })
   async getProfile(@CurrentUser() currentUser: User) {
     try {
       this.logger.debug(`[AuthController] Endpoint /auth/profile chamado`);
       this.logger.debug(
-        `[AuthController] CurrentUser recebido: ${JSON.stringify(currentUser ? { id: currentUser.id, usuario: currentUser.usuario } : 'null')}`,
+        `[AuthController] CurrentUser recebido: ${JSON.stringify(currentUser ? { id: currentUser.id, usuario: currentUser.usuario } : "null")}`,
       );
 
       if (!currentUser) {
@@ -212,7 +212,7 @@ export class AuthController {
           `[AuthController] CurrentUser é null/undefined no endpoint /auth/profile`,
         );
         throw new UnauthorizedException(
-          'Usuário não encontrado no contexto da requisição',
+          "Usuário não encontrado no contexto da requisição",
         );
       }
 
@@ -220,7 +220,7 @@ export class AuthController {
         this.logger.error(
           `[AuthController] CurrentUser não possui ID: ${JSON.stringify(currentUser)}`,
         );
-        throw new UnauthorizedException('ID do usuário não encontrado');
+        throw new UnauthorizedException("ID do usuário não encontrado");
       }
 
       this.logger.debug(
@@ -231,13 +231,14 @@ export class AuthController {
       const user = await this.authService.findUserById(currentUser.id);
 
       this.logger.debug(
-        `[AuthController] Usuário encontrado: ${JSON.stringify({ id: user.id, usuario: user.usuario, role: user.role?.name })}`,
+        `[AuthController] Usuário encontrado: ${JSON.stringify({ id: user.id, usuario: user.usuario, role: user.role?.name, avatarUrl: user.avatarUrl })}`,
       );
 
       const response = {
         id: user.id,
         nome: user.nome,
         usuario: user.usuario,
+        avatarUrl: user.avatarUrl,
         settings: user.settings || {},
         role: user.role
           ? {
@@ -253,7 +254,7 @@ export class AuthController {
       };
 
       this.logger.debug(
-        `[AuthController] Retornando perfil do usuário: ${user.usuario}`,
+        `[AuthController] Retornando perfil com avatarUrl: ${response.avatarUrl || 'null'}`,
       );
       return response;
     } catch (error) {
@@ -269,11 +270,11 @@ export class AuthController {
     }
   }
 
-  @Get('check')
+  @Get("check")
   @UseGuards(SessionAuthGuard)
-  @ApiOperation({ summary: 'Verifica se usuário está autenticado' })
-  @ApiResponse({ status: 200, description: 'Usuário autenticado' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiOperation({ summary: "Verifica se usuário está autenticado" })
+  @ApiResponse({ status: 200, description: "Usuário autenticado" })
+  @ApiResponse({ status: 401, description: "Não autorizado" })
   async checkAuth(@CurrentUser() user: User) {
     return {
       authenticated: true,
@@ -286,42 +287,42 @@ export class AuthController {
     };
   }
 
-  @Post('/api/v2/auth/login')
+  @Post("/api/v2/auth/login")
   @IsPublic()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Login API v2 - Retorna JWT com expiração de 50 minutos',
+    summary: "Login API v2 - Retorna JWT com expiração de 50 minutos",
   })
   @ApiResponse({
     status: 200,
-    description: 'Login realizado com sucesso',
+    description: "Login realizado com sucesso",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         user: {
-          type: 'object',
+          type: "object",
           properties: {
-            userId: { type: 'number' },
-            usuario: { type: 'string' },
-            role: { type: 'string' },
+            userId: { type: "number" },
+            usuario: { type: "string" },
+            role: { type: "string" },
           },
         },
-        accessToken: { type: 'string' },
-        expiresIn: { type: 'string' },
+        accessToken: { type: "string" },
+        expiresIn: { type: "string" },
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
+  @ApiResponse({ status: 401, description: "Credenciais inválidas" })
   async loginV2(
     @Body() loginDto: LoginDto,
     @Ip() ipAddress: string,
-    @Headers('user-agent') userAgent: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     try {
       const result = await this.authService.loginV2(
         loginDto,
         ipAddress,
-        userAgent || 'Unknown',
+        userAgent || "Unknown",
       );
 
       this.logger.log(
@@ -334,24 +335,24 @@ export class AuthController {
     }
   }
 
-  @Post('refresh')
+  @Post("refresh")
   @IsPublic()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Renovar token JWT usando refresh token' })
+  @ApiOperation({ summary: "Renovar token JWT usando refresh token" })
   @ApiResponse({
     status: 200,
-    description: 'Token renovado com sucesso',
+    description: "Token renovado com sucesso",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        accessToken: { type: 'string' },
-        expiresIn: { type: 'string' },
+        accessToken: { type: "string" },
+        expiresIn: { type: "string" },
       },
     },
   })
   @ApiResponse({
     status: 401,
-    description: 'Refresh token inválido ou expirado',
+    description: "Refresh token inválido ou expirado",
   })
   async refreshToken(
     @Body() body: { refreshToken: string },
@@ -359,13 +360,13 @@ export class AuthController {
   ) {
     try {
       const result = await this.authService.refreshToken(body.refreshToken);
-      this.logger.log('Token renovado com sucesso');
+      this.logger.log("Token renovado com sucesso");
 
       // Atualiza o cookie httpOnly com o novo access token
-      res.cookie('access_token', result.accessToken, {
+      res.cookie("access_token", result.accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         maxAge: 50 * 60 * 1000, // 50 minutos
       });
 
@@ -376,57 +377,66 @@ export class AuthController {
     }
   }
 
-  @Get('online-users')
+  @Get("online-users")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Obtém lista de usuários online' })
+  @ApiOperation({ summary: "Obtém lista de usuários online" })
   @ApiResponse({
     status: 200,
-    description: 'Lista de usuários online',
+    description: "Lista de usuários online",
     schema: {
-      type: 'array',
+      type: "array",
       items: {
-        type: 'object',
+        type: "object",
         properties: {
-          id: { type: 'number' },
-          nome: { type: 'string' },
-          usuario: { type: 'string' },
-          role: { type: 'string' },
-          lastActivity: { type: 'string', format: 'date-time' },
+          id: { type: "number" },
+          nome: { type: "string" },
+          usuario: { type: "string" },
+          role: { type: "string" },
+          lastActivity: { type: "string", format: "date-time" },
         },
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 401, description: "Não autorizado" })
   async getOnlineUsers() {
     try {
       const onlineUsers = await this.authService.getOnlineUsers();
-      this.logger.debug(`[ONLINE-USERS] Retornando ${onlineUsers.length} usuários online`);
+      this.logger.debug(
+        `[ONLINE-USERS] Retornando ${onlineUsers.length} usuários online`,
+      );
       return onlineUsers;
     } catch (error) {
-      this.logger.error(`[ONLINE-USERS] Erro ao obter usuários online: ${error.message}`, error.stack);
+      this.logger.error(
+        `[ONLINE-USERS] Erro ao obter usuários online: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
-  @Get('online-users/debug')
+  @Get("online-users/debug")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Debug - Informações detalhadas sobre usuários online' })
+  @ApiOperation({
+    summary: "Debug - Informações detalhadas sobre usuários online",
+  })
   @ApiResponse({
     status: 200,
-    description: 'Informações de debug sobre usuários online',
+    description: "Informações de debug sobre usuários online",
   })
   async getOnlineUsersDebug() {
     try {
       const onlineUsers = await this.authService.getOnlineUsers();
       const debugInfo = {
         totalUsers: onlineUsers.length,
-        users: onlineUsers.map(u => ({
+        users: onlineUsers.map((u) => ({
           id: u.id,
           nome: u.nome,
           usuario: u.usuario,
           role: u.role,
           lastActivity: u.lastActivity,
-          minutesSinceActivity: Math.floor((Date.now() - u.lastActivity.getTime()) / (1000 * 60))
+          minutesSinceActivity: Math.floor(
+            (Date.now() - u.lastActivity.getTime()) / (1000 * 60),
+          ),
         })),
         serverTime: new Date().toISOString(),
         mapSize: (this.authService as any).onlineUsers?.size || 0,

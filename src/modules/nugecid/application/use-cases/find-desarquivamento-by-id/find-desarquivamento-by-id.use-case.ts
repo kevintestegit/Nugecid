@@ -1,10 +1,10 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from "@nestjs/common";
 import {
   DesarquivamentoDomain,
   DesarquivamentoId,
   IDesarquivamentoRepository,
-} from '../../../domain';
-import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from '../../../domain/nugecid.constants';
+} from "../../../domain";
+import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
 
 export interface FindDesarquivamentoByIdRequest {
   id: number;
@@ -14,6 +14,7 @@ export interface FindDesarquivamentoByIdRequest {
 
 export interface FindDesarquivamentoByIdResponse {
   id: number;
+  numeroSolicitacao: number;
   codigoBarras: string;
   tipoDesarquivamento: string;
   tipoSolicitacao: string; // For compatibility
@@ -80,7 +81,7 @@ export class FindDesarquivamentoByIdUseCase {
     if (request.userId && request.userRoles) {
       if (!desarquivamento.canBeAccessedBy(request.userId, request.userRoles)) {
         throw new Error(
-          'Acesso negado: você não tem permissão para visualizar este desarquivamento',
+          "Acesso negado: você não tem permissão para visualizar este desarquivamento",
         );
       }
     }
@@ -96,17 +97,17 @@ export class FindDesarquivamentoByIdUseCase {
   private validateRequest(request: FindDesarquivamentoByIdRequest): void {
     // Validar ID
     if (!request.id || request.id <= 0 || !Number.isInteger(request.id)) {
-      throw new Error('ID deve ser um número inteiro positivo');
+      throw new Error("ID deve ser um número inteiro positivo");
     }
 
     // Validar IDs de usuário se fornecidos
     if (request.userId !== undefined && request.userId <= 0) {
-      throw new Error('ID do usuário deve ser positivo');
+      throw new Error("ID do usuário deve ser positivo");
     }
 
     // Validar roles se fornecidas
     if (request.userRoles !== undefined && !Array.isArray(request.userRoles)) {
-      throw new Error('Roles do usuário devem ser um array');
+      throw new Error("Roles do usuário devem ser um array");
     }
   }
 
@@ -134,6 +135,7 @@ export class FindDesarquivamentoByIdUseCase {
 
     return {
       id: desarquivamento.id?.value || 0,
+      numeroSolicitacao: desarquivamento.numeroSolicitacao || 0,
       codigoBarras: desarquivamento.numeroNicLaudoAuto, // Using numeroNicLaudoAuto as unique identifier
       tipoDesarquivamento: desarquivamento.tipoDesarquivamento,
       tipoSolicitacao: desarquivamento.tipoDesarquivamento, // For compatibility

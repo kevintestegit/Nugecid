@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -7,15 +7,16 @@ import { Badge } from '@/components/ui/Badge'
 import { 
   Filter, 
   X, 
-  Calendar,
   RefreshCw,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
+import { DateRangeInput, DateRange } from '@/components/ui/DateRangeInput'
 import { cn } from '@/utils/cn'
 import { StatusDesarquivamento, TipoSolicitacao } from '@/types'
 import { getStatusLabel, getTipoLabel } from '@/utils/format'
+import { format, parseISO, isValid } from 'date-fns'
 
 interface FilterState {
   search: string
@@ -45,10 +46,13 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   const [isExpanded, setIsExpanded] = useState(false)
 
   const statusOptions: { value: StatusDesarquivamento; label: string }[] = [
-    { value: StatusDesarquivamento.PENDENTE, label: 'Pendente' },
-    { value: StatusDesarquivamento.EM_ANDAMENTO, label: 'Em Andamento' },
-    { value: StatusDesarquivamento.CONCLUIDO, label: 'Concluído' },
-    { value: StatusDesarquivamento.CANCELADO, label: 'Cancelado' },
+    { value: StatusDesarquivamento.SOLICITADO, label: 'Solicitado' },
+    { value: StatusDesarquivamento.DESARQUIVADO, label: 'Desarquivado' },
+    { value: StatusDesarquivamento.RETIRADO_PELO_SETOR, label: 'Retirado pelo Setor' },
+    { value: StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO, label: 'Rearquivamento Solicitado' },
+    { value: StatusDesarquivamento.FINALIZADO, label: 'Finalizado' },
+    { value: StatusDesarquivamento.NAO_COLETADO, label: 'Não Coletado' },
+    { value: StatusDesarquivamento.NAO_LOCALIZADO, label: 'Não Localizado' },
   ]
 
   const tipoOptions: { value: TipoSolicitacao; label: string }[] = [
@@ -62,6 +66,30 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     onFiltersChange({
       ...filters,
       [key]: value
+    })
+  }
+
+  const parseFilterDate = (value: string): Date | null => {
+    if (!value) return null
+    const parsed = parseISO(value)
+    return isValid(parsed) ? parsed : null
+  }
+
+  const formatFilterDateLabel = (value: string) => {
+    const date = parseFilterDate(value)
+    return date ? format(date, 'dd/MM/yyyy') : ''
+  }
+
+  const dateRangeValue = useMemo<DateRange>(() => ({
+    startDate: parseFilterDate(filters.dataInicio),
+    endDate: parseFilterDate(filters.dataFim)
+  }), [filters.dataInicio, filters.dataFim])
+
+  const handleDateRangeChange = (range: DateRange) => {
+    onFiltersChange({
+      ...filters,
+      dataInicio: range.startDate ? format(range.startDate, 'yyyy-MM-dd') : '',
+      dataFim: range.endDate ? format(range.endDate, 'yyyy-MM-dd') : ''
     })
   }
 
@@ -201,31 +229,11 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dataInicio">Data Início</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="dataInicio"
-                    type="date"
-                    value={filters.dataInicio}
-                    onChange={(e) => handleFilterChange('dataInicio', e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dataFim">Data Fim</Label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="dataFim"
-                    type="date"
-                    value={filters.dataFim}
-                    onChange={(e) => handleFilterChange('dataFim', e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+                <Label>Periodo da solicitacao</Label>
+                <DateRangeInput
+                  value={dateRangeValue}
+                  onChange={handleDateRangeChange}
+                />
               </div>
             </div>
           </div>
@@ -260,6 +268,15 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   <X 
                     className="h-3 w-3 cursor-pointer" 
                     onClick={() => handleFilterChange('tipo', '')}
+                  />
+                </Badge>
+              )}
+              {(filters.dataInicio || filters.dataFim) && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  Periodo: {filters.dataInicio ? formatFilterDateLabel(filters.dataInicio) : 'Inicio livre'} - {filters.dataFim ? formatFilterDateLabel(filters.dataFim) : 'Sem fim'}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => handleDateRangeChange({ startDate: null, endDate: null })}
                   />
                 </Badge>
               )}

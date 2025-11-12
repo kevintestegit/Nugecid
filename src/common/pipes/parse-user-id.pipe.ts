@@ -3,7 +3,7 @@ import {
   Injectable,
   ArgumentMetadata,
   BadRequestException,
-} from '@nestjs/common';
+} from "@nestjs/common";
 
 /**
  * Pipe customizado para validar IDs de usuários
@@ -19,7 +19,7 @@ export class ParseUserIdPipe implements PipeTransform<string, number> {
     if (uuidRegex.test(value)) {
       throw new BadRequestException(
         `ID de usuário inválido. Recebido UUID '${value}', mas esperado um número inteiro. ` +
-          'Verifique se você não está confundindo IDs de usuários (numéricos) com IDs de desarquivamentos (UUIDs).',
+          "Verifique se você não está confundindo IDs de usuários (numéricos) com IDs de desarquivamentos (UUIDs).",
       );
     }
 

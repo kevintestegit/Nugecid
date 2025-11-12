@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 
-import { Auditoria } from '../audit/entities/auditoria.entity';
-import { DesarquivamentoTypeOrmEntity } from './infrastructure/entities/desarquivamento.typeorm-entity';
+import { Auditoria } from "../audit/entities/auditoria.entity";
+import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 
 @Injectable()
 export class NugecidAuditService {
@@ -34,9 +34,9 @@ export class NugecidAuditService {
         userId,
         resourceId: resourceId || data?.desarquivamentoId || 0,
         metadata: {
-          environment: process.env.NODE_ENV || 'development',
-          version: process.env.npm_package_version || '1.0.0',
-          service: 'nugecid-service',
+          environment: process.env.NODE_ENV || "development",
+          version: process.env.npm_package_version || "1.0.0",
+          service: "nugecid-service",
         },
       };
 
@@ -46,8 +46,8 @@ export class NugecidAuditService {
         resource as any,
         resourceId || data?.desarquivamentoId || 0,
         enrichedData,
-        ipAddress || 'system',
-        userAgent || 'nugecid-service',
+        ipAddress || "system",
+        userAgent || "nugecid-service",
       );
 
       const audit = this.auditoriaRepository.create(auditData);
@@ -67,7 +67,7 @@ export class NugecidAuditService {
 
   async saveDesarquivamentoAudit(
     userId: number,
-    action: 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'VIEW',
+    action: "CREATE" | "UPDATE" | "DELETE" | "RESTORE" | "VIEW",
     desarquivamento: Partial<DesarquivamentoTypeOrmEntity>,
     changes?: any,
     ipAddress?: string,
@@ -89,7 +89,7 @@ export class NugecidAuditService {
     await this.saveAudit(
       userId,
       action,
-      'DESARQUIVAMENTO',
+      "DESARQUIVAMENTO",
       details,
       auditData,
       desarquivamento.id,
@@ -103,19 +103,19 @@ export class NugecidAuditService {
     desarquivamento: Partial<DesarquivamentoTypeOrmEntity>,
     changes?: any,
   ): string {
-    const baseInfo = `${desarquivamento.numeroNicLaudoAuto || 'N/A'} - ${desarquivamento.nomeCompleto || 'N/A'}`;
+    const baseInfo = `${desarquivamento.numeroNicLaudoAuto || "N/A"} - ${desarquivamento.nomeCompleto || "N/A"}`;
 
     switch (action) {
-      case 'CREATE':
+      case "CREATE":
         return `Novo desarquivamento criado: ${baseInfo} (Tipo: ${desarquivamento.tipoDesarquivamento}, Status: ${desarquivamento.status})`;
-      case 'UPDATE':
-        const changedFields = changes ? Object.keys(changes).join(', ') : 'N/A';
+      case "UPDATE":
+        const changedFields = changes ? Object.keys(changes).join(", ") : "N/A";
         return `Desarquivamento atualizado: ${baseInfo} (Campos alterados: ${changedFields})`;
-      case 'DELETE':
+      case "DELETE":
         return `Desarquivamento removido: ${baseInfo}`;
-      case 'RESTORE':
+      case "RESTORE":
         return `Desarquivamento restaurado: ${baseInfo}`;
-      case 'VIEW':
+      case "VIEW":
         return `Desarquivamento visualizado: ${baseInfo}`;
       default:
         return `Ação ${action} executada em desarquivamento: ${baseInfo}`;
@@ -123,6 +123,52 @@ export class NugecidAuditService {
   }
 
   private extractPreviousValues(changes: any): any {
-    return null;
+    if (!changes || typeof changes !== 'object') {
+      return null;
+    }
+
+    const previousValues: any = {};
+
+    // Extrai os valores "from" de cada mudança
+    for (const [key, value] of Object.entries(changes)) {
+      if (value && typeof value === 'object' && 'from' in value) {
+        previousValues[key] = value.from;
+      }
+    }
+
+    return Object.keys(previousValues).length > 0 ? previousValues : null;
+  }
+
+  /**
+   * Busca auditorias por entidade e ID
+   */
+  async findByEntity(
+    entityName: string,
+    entityId: number,
+  ): Promise<Auditoria[]> {
+    try {
+      const auditorias = await this.auditoriaRepository.find({
+        where: {
+          entityName,
+          entityId,
+        },
+        relations: ["user"],
+        order: {
+          timestamp: "DESC",
+        },
+      });
+
+      this.logger.debug(
+        `Encontradas ${auditorias.length} auditorias para ${entityName} #${entityId}`,
+      );
+
+      return auditorias;
+    } catch (error) {
+      this.logger.error(
+        `Erro ao buscar auditorias: ${error.message}`,
+        error.stack,
+      );
+      return [];
+    }
   }
 }

@@ -1,1 +1,1 @@
-export { ProjetosController } from './projetos.controller';
+export { ProjetosController } from "./projetos.controller";

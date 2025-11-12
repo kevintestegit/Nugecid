@@ -3,10 +3,10 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-import { Response } from 'express';
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { map } from "rxjs/operators";
+import { Response } from "express";
 
 /**
  * Interceptor para transformar respostas da API
@@ -20,7 +20,7 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
     const request = ctx.getRequest();
 
     return next.handle().pipe(
-      map(data => {
+      map((data) => {
         // Se a resposta já foi enviada (ex: redirect, file download), não transformar
         if (response.headersSent) {
           return data;
@@ -32,7 +32,7 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
         }
 
         // Se o data já tem a estrutura esperada, retornar como está
-        if (data && typeof data === 'object' && 'success' in data) {
+        if (data && typeof data === "object" && "success" in data) {
           return data;
         }
 
@@ -42,8 +42,8 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
         }
 
         // Verificar se é uma resposta HTML (view rendering)
-        const contentType = response.getHeader('content-type');
-        if (contentType && contentType.toString().includes('text/html')) {
+        const contentType = response.getHeader("content-type");
+        if (contentType && contentType.toString().includes("text/html")) {
           return data;
         }
 
@@ -60,12 +60,12 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
         // Adicionar metadados de paginação se existirem
         if (
           data &&
-          typeof data === 'object' &&
-          'data' in data &&
-          'meta' in data
+          typeof data === "object" &&
+          "data" in data &&
+          "meta" in data
         ) {
           transformedResponse.data = data.data;
-          transformedResponse['meta'] = data.meta;
+          transformedResponse["meta"] = data.meta;
         }
 
         return transformedResponse;

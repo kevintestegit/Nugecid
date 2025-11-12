@@ -6,48 +6,48 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   JoinColumn,
-} from 'typeorm';
+} from "typeorm";
 
-import { User } from '../../users/entities/user.entity';
-import { Checklist } from './checklist.entity';
+import { User } from "../../users/entities/user.entity";
+import { Checklist } from "./checklist.entity";
 
-@Entity('itens_checklist')
+@Entity("itens_checklist")
 export class ItemChecklist {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'checklist_id', nullable: false })
+  @Column({ name: "checklist_id", nullable: false })
   checklistId: number;
 
-  @ManyToOne(() => Checklist, checklist => checklist.itens, {
-    onDelete: 'CASCADE',
+  @ManyToOne(() => Checklist, (checklist) => checklist.itens, {
+    onDelete: "CASCADE",
   })
-  @JoinColumn({ name: 'checklist_id' })
+  @JoinColumn({ name: "checklist_id" })
   checklist: Checklist;
 
   @Column({ length: 500, nullable: false })
   texto: string;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: "boolean", default: false })
   concluido: boolean;
 
-  @Column({ type: 'integer', nullable: false })
+  @Column({ type: "integer", nullable: false })
   ordem: number;
 
-  @Column({ name: 'concluido_por_id', nullable: true })
+  @Column({ name: "concluido_por_id", nullable: true })
   concluidoPorId: number;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'concluido_por_id' })
+  @JoinColumn({ name: "concluido_por_id" })
   concluidoPor: User;
 
-  @Column({ name: 'concluido_em', type: 'timestamp', nullable: true })
+  @Column({ name: "concluido_em", type: "timestamp", nullable: true })
   concluidoEm: Date;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 
   // Métodos
@@ -89,11 +89,11 @@ export class ItemChecklist {
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'agora';
+    if (diffMins < 1) return "agora";
     if (diffMins < 60) return `${diffMins}m atrás`;
     if (diffHours < 24) return `${diffHours}h atrás`;
     if (diffDays < 7) return `${diffDays}d atrás`;
 
-    return this.concluidoEm.toLocaleDateString('pt-BR');
+    return this.concluidoEm.toLocaleDateString("pt-BR");
   }
 }

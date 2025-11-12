@@ -1,41 +1,43 @@
-# Stage 1 - Install dependencies once
-FROM node:18-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
-
-# Stage 2 - Build application (backend + frontend)
+# Build stage
 FROM node:18-alpine AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
-COPY . .
-RUN npm run build
-RUN cd frontend && npm run build
 
-# Stage 3 - Production image
-FROM node:18-alpine AS runner
-RUN apk add --no-cache dumb-init
-RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
 WORKDIR /app
 
+# Copy package files
 COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-RUN npm prune --omit=dev
 
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/frontend/dist ./frontend/dist
-RUN mkdir -p uploads && chown nestjs:nodejs uploads
+# Install all dependencies (including dev) for build
+RUN npm ci && npm cache clean --force
 
-USER nestjs
-ENV NODE_ENV=production
-ENV PORT=3000
+# Copy source code
+COPY . .
 
+# Build the application
+RUN npm run build:backend
+
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install PostgreSQL client for backups
+RUN apk add --no-cache postgresql-client
+
+# Copy package files
+COPY package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy built application from builder
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+
+# Create necessary directories
+RUN mkdir -p /app/uploads /app/backups
+
+# Expose port
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://127.0.0.1:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
-
-CMD ["dumb-init", "node", "dist/src/main.js"]
+# Start application
+CMD ["node", "dist/src/main.js"]

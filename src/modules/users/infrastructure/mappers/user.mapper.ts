@@ -1,11 +1,11 @@
-import { User as DomainUser } from '../../domain/entities/user';
-import { Role as DomainRole } from '../../domain/entities/role';
-import { UserId } from '../../domain/value-objects/user-id';
-import { Usuario } from '../../domain/value-objects/usuario';
-import { Password } from '../../domain/value-objects/password';
-import { RoleId } from '../../domain/value-objects/role-id';
-import { User as UserEntity } from '../../entities/user.entity';
-import { Role as RoleEntity } from '../../entities/role.entity';
+import { User as DomainUser } from "../../domain/entities/user";
+import { Role as DomainRole } from "../../domain/entities/role";
+import { UserId } from "../../domain/value-objects/user-id";
+import { Usuario } from "../../domain/value-objects/usuario";
+import { Password } from "../../domain/value-objects/password";
+import { RoleId } from "../../domain/value-objects/role-id";
+import { User as UserEntity } from "../../entities/user.entity";
+import { Role as RoleEntity } from "../../entities/role.entity";
 
 export class UserMapper {
   static toDomain(entity: UserEntity): DomainUser {
@@ -38,7 +38,9 @@ export class UserMapper {
       password,
       roleId,
       role,
+      matricula: entity.matricula,
       settings: entity.settings,
+      avatarUrl: entity.avatarUrl,
       ativo: entity.ativo,
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
@@ -57,11 +59,13 @@ export class UserMapper {
     entity.usuario = domain.usuario.value;
     entity.senha = domain.password.hashedValue;
     entity.roleId = domain.roleId.value;
+    entity.matricula = domain.matricula ?? null;
     entity.ativo = domain.ativo;
     entity.createdAt = domain.createdAt;
     entity.updatedAt = domain.updatedAt;
     entity.deletedAt = domain.deletedAt;
     entity.settings = domain.settings;
+    entity.avatarUrl = domain.avatarUrl ?? null;
 
     if (domain.role) {
       const roleEntity = new RoleEntity();
@@ -78,10 +82,10 @@ export class UserMapper {
   }
 
   static toDomainArray(entities: UserEntity[]): DomainUser[] {
-    return entities.map(entity => this.toDomain(entity));
+    return entities.map((entity) => this.toDomain(entity));
   }
 
   static toEntityArray(domains: DomainUser[]): UserEntity[] {
-    return domains.map(domain => this.toEntity(domain));
+    return domains.map((domain) => this.toEntity(domain));
   }
 }

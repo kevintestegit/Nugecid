@@ -1,12 +1,13 @@
 // src/modules/registros/registros.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { validate } from 'class-validator';
-import * as XLSX from 'xlsx';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { validate } from "class-validator";
+import * as XLSX from "xlsx";
 
-import { Registro } from './entities/registro.entity';
-import { ImportRegistroDto } from './dto/import-registro.dto';
+import { Registro } from "./entities/registro.entity";
+import { ImportRegistroDto } from "./dto/import-registro.dto";
+import { NotificacoesService } from "../notificacoes/services";
 
 @Injectable()
 export class RegistrosService {
@@ -15,11 +16,12 @@ export class RegistrosService {
   constructor(
     @InjectRepository(Registro)
     private readonly registroRepository: Repository<Registro>,
+    private readonly notificacoesService: NotificacoesService,
   ) {}
 
-  async importFromXlsx(file: Express.Multer.File) {
+  async importFromXlsx(file: Express.Multer.File, userId?: number) {
     const workbook = XLSX.read(file.buffer, {
-      type: 'buffer',
+      type: "buffer",
       cellDates: true,
     });
     const sheetName = workbook.SheetNames[0];
@@ -29,18 +31,19 @@ export class RegistrosService {
     const totalRows = data.length;
     let successCount = 0;
     const errors = [];
+    const novosRegistros: Registro[] = [];
 
     for (let i = 0; i < totalRows; i++) {
       const row = data[i];
       const registroDto = new ImportRegistroDto();
 
       // Mapeamento cuidadoso dos campos, especialmente a data
-      registroDto.numero_processo = row['numero_processo'];
-      registroDto.delegacia_origem = row['delegacia_origem'];
-      registroDto.nome_vitima = row['nome_vitima'];
-      registroDto.data_fato = new Date(row['data_fato']);
-      registroDto.investigador_responsavel = row['investigador_responsavel'];
-      registroDto.idade_vitima = row['idade_vitima'];
+      registroDto.numero_processo = row["numero_processo"];
+      registroDto.delegacia_origem = row["delegacia_origem"];
+      registroDto.nome_vitima = row["nome_vitima"];
+      registroDto.data_fato = new Date(row["data_fato"]);
+      registroDto.investigador_responsavel = row["investigador_responsavel"];
+      registroDto.idade_vitima = row["idade_vitima"];
 
       const validationErrors = await validate(registroDto);
 
@@ -48,7 +51,7 @@ export class RegistrosService {
         errors.push({
           row: i + 2, // +2 para corresponder à linha da planilha (cabeçalho + 1-based index)
           data: row,
-          errors: validationErrors.map(err => ({
+          errors: validationErrors.map((err) => ({
             property: err.property,
             constraints: err.constraints,
           })),
@@ -56,7 +59,8 @@ export class RegistrosService {
       } else {
         try {
           const newRegistro = this.registroRepository.create(registroDto);
-          await this.registroRepository.save(newRegistro);
+          const savedRegistro = await this.registroRepository.save(newRegistro);
+          novosRegistros.push(savedRegistro);
           successCount++;
         } catch (dbError) {
           this.logger.error(
@@ -68,9 +72,9 @@ export class RegistrosService {
             data: row,
             errors: [
               {
-                property: 'database',
+                property: "database",
                 constraints: {
-                  save: 'Falha ao inserir o registro no banco de dados.',
+                  save: "Falha ao inserir o registro no banco de dados.",
                 },
               },
             ],
@@ -85,6 +89,17 @@ export class RegistrosService {
       );
     }
 
+    if (novosRegistros.length > 0) {
+      await this.notificacoesService.notificarNovoRegistro(
+        userId ?? null,
+        novosRegistros[0]?.id,
+        {
+          totalImportado: novosRegistros.length,
+          numeroProcesso: novosRegistros[0]?.numero_processo,
+          delegacia: novosRegistros[0]?.delegacia_origem,
+        },
+      );
+    }
     return {
       totalRows,
       successCount,

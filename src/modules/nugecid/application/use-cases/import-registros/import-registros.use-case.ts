@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { validate } from 'class-validator';
-import * as XLSX from 'xlsx';
+import { Injectable, Logger } from "@nestjs/common";
+import { validate } from "class-validator";
+import * as XLSX from "xlsx";
 import {
   ImportRegistroDto,
   TipoDesarquivamento,
   StatusDesarquivamento,
-} from '../../../dto/import-registro.dto';
+} from "../../../dto/import-registro.dto";
 
 export interface ImportRegistrosRequest {
   file: Express.Multer.File;
@@ -46,7 +46,7 @@ export class ImportRegistrosUseCase {
 
     // Processar planilha
     const workbook = XLSX.read(request.file.buffer, {
-      type: 'buffer',
+      type: "buffer",
       cellDates: true,
     });
     const sheetName = workbook.SheetNames[0];
@@ -75,7 +75,7 @@ export class ImportRegistrosUseCase {
           errors.push({
             row: rowNumber,
             data: row,
-            errors: validationErrors.map(err => ({
+            errors: validationErrors.map((err) => ({
               property: err.property,
               constraints: err.constraints || {},
             })),
@@ -92,9 +92,9 @@ export class ImportRegistrosUseCase {
           data: row,
           errors: [
             {
-              property: 'processing',
+              property: "processing",
               constraints: {
-                error: error.message || 'Erro desconhecido ao processar linha',
+                error: error.message || "Erro desconhecido ao processar linha",
               },
             },
           ],
@@ -129,25 +129,25 @@ export class ImportRegistrosUseCase {
 
   private async validateFile(file: Express.Multer.File): Promise<void> {
     if (!file) {
-      throw new Error('Arquivo não fornecido');
+      throw new Error("Arquivo não fornecido");
     }
 
     const allowedMimeTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel', // .xls
-      'text/csv', // .csv
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "application/vnd.ms-excel", // .xls
+      "text/csv", // .csv
     ];
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new Error(
-        'Formato de arquivo não suportado. Use .xlsx, .xls ou .csv',
+        "Formato de arquivo não suportado. Use .xlsx, .xls ou .csv",
       );
     }
 
     // Validar tamanho do arquivo (máximo 10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (file.size > maxSize) {
-      throw new Error('Arquivo muito grande. Tamanho máximo permitido: 10MB');
+      throw new Error("Arquivo muito grande. Tamanho máximo permitido: 10MB");
     }
   }
 
@@ -156,42 +156,42 @@ export class ImportRegistrosUseCase {
 
     // Mapear campos obrigatórios
     dto.desarquivamentoTipo = this.mapTipoDesarquivamento(
-      row['DESARQUIVAMENTO FÍSICO/DIGITAL'] || row['desarquivamentoTipo'],
+      row["DESARQUIVAMENTO FÍSICO/DIGITAL"] || row["desarquivamentoTipo"],
     );
-    dto.status = this.mapStatusDesarquivamento(row['Status'] || row['status']);
+    dto.status = this.mapStatusDesarquivamento(row["Status"] || row["status"]);
     dto.nomeCompleto = this.sanitizeString(
-      row['Nome Completo'] || row['nomeCompleto'],
+      row["Nome Completo"] || row["nomeCompleto"],
     );
     dto.numDocumento = this.sanitizeString(
-      row['Nº DO NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA'] || row['numDocumento'],
+      row["Nº DO NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA"] || row["numDocumento"],
     );
     dto.dataSolicitacao = this.formatDate(
-      row['Data de solicitação'] || row['dataSolicitacao'],
+      row["Data de solicitação"] || row["dataSolicitacao"],
     );
 
     // Mapear campos opcionais
     dto.numProcesso = this.sanitizeString(
-      row['Nº do Processo'] || row['numProcesso'],
+      row["Nº do Processo"] || row["numProcesso"],
     );
     dto.tipoDocumento = this.sanitizeString(
-      row['Tipo do Documento'] || row['tipoDocumento'],
+      row["Tipo do Documento"] || row["tipoDocumento"],
     );
     dto.dataDesarquivamento = this.formatDate(
-      row['Data do desarquivamento - SAG'] || row['dataDesarquivamento'],
+      row["Data do desarquivamento - SAG"] || row["dataDesarquivamento"],
     );
     dto.dataDevolucao = this.formatDate(
-      row['Data da devolução pelo setor'] || row['dataDevolucao'],
+      row["Data da devolução pelo setor"] || row["dataDevolucao"],
     );
     dto.setorDemandante = this.sanitizeString(
-      row['Setor Demandante'] || row['setorDemandante'],
+      row["Setor Demandante"] || row["setorDemandante"],
     );
     dto.servidorResponsavel = this.sanitizeString(
-      row['Servidor Responsável'] || row['servidorResponsavel'],
+      row["Servidor Responsável"] || row["servidorResponsavel"],
     );
     dto.finalidade = this.sanitizeString(
-      row['Finalidade'] || row['finalidade'],
+      row["Finalidade"] || row["finalidade"],
     );
-    dto.prorrogacao = this.mapBoolean(row['Prorrogação'] || row['prorrogacao']);
+    dto.prorrogacao = this.mapBoolean(row["Prorrogação"] || row["prorrogacao"]);
 
     return dto;
   }
@@ -202,13 +202,13 @@ export class ImportRegistrosUseCase {
     const normalizedValue = String(value).trim();
 
     switch (normalizedValue.toLowerCase()) {
-      case 'físico':
-      case 'fisico':
+      case "físico":
+      case "fisico":
         return TipoDesarquivamento.FISICO;
-      case 'digital':
+      case "digital":
         return TipoDesarquivamento.DIGITAL;
-      case 'não localizado':
-      case 'nao localizado':
+      case "não localizado":
+      case "nao localizado":
         return TipoDesarquivamento.NAO_LOCALIZADO;
       default:
         throw new Error(`Tipo de desarquivamento inválido: ${normalizedValue}`);
@@ -221,21 +221,21 @@ export class ImportRegistrosUseCase {
     const normalizedValue = String(value).trim();
 
     switch (normalizedValue.toLowerCase()) {
-      case 'finalizado':
+      case "finalizado":
         return StatusDesarquivamento.FINALIZADO;
-      case 'desarquivado':
+      case "desarquivado":
         return StatusDesarquivamento.DESARQUIVADO;
-      case 'não coletado':
-      case 'nao coletado':
+      case "não coletado":
+      case "nao coletado":
         return StatusDesarquivamento.NAO_COLETADO;
-      case 'solicitado':
+      case "solicitado":
         return StatusDesarquivamento.SOLICITADO;
-      case 'rearquivamento solicitado':
+      case "rearquivamento solicitado":
         return StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO;
-      case 'retirado pelo setor':
+      case "retirado pelo setor":
         return StatusDesarquivamento.RETIRADO_PELO_SETOR;
-      case 'não localizado':
-      case 'nao localizado':
+      case "não localizado":
+      case "nao localizado":
         return StatusDesarquivamento.NAO_LOCALIZADO;
       default:
         throw new Error(
@@ -257,20 +257,20 @@ export class ImportRegistrosUseCase {
 
       if (value instanceof Date) {
         date = value;
-      } else if (typeof value === 'string') {
+      } else if (typeof value === "string") {
         date = new Date(value);
-      } else if (typeof value === 'number') {
+      } else if (typeof value === "number") {
         // Excel serial date
         date = new Date((value - 25569) * 86400 * 1000);
       } else {
-        throw new Error('Formato de data não reconhecido');
+        throw new Error("Formato de data não reconhecido");
       }
 
       if (isNaN(date.getTime())) {
-        throw new Error('Data inválida');
+        throw new Error("Data inválida");
       }
 
-      return date.toISOString().split('T')[0]; // YYYY-MM-DD
+      return date.toISOString().split("T")[0]; // YYYY-MM-DD
     } catch (error) {
       throw new Error(`Erro ao formatar data: ${error.message}`);
     }
@@ -279,10 +279,10 @@ export class ImportRegistrosUseCase {
   private mapBoolean(value: any): boolean {
     if (value === undefined || value === null) return false;
 
-    if (typeof value === 'boolean') return value;
+    if (typeof value === "boolean") return value;
 
     const normalizedValue = String(value).toLowerCase().trim();
-    return ['sim', 'yes', 'true', '1', 'verdadeiro'].includes(normalizedValue);
+    return ["sim", "yes", "true", "1", "verdadeiro"].includes(normalizedValue);
   }
 
   private async saveRegistro(
@@ -296,7 +296,7 @@ export class ImportRegistrosUseCase {
     );
 
     // Simular delay de salvamento
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
   private generateSummaryMessage(
@@ -326,10 +326,10 @@ export class ImportRegistrosUseCase {
     if (errors > 0) {
       details.push(`Registros com erro: ${errors}`);
       details.push(
-        'Verifique os detalhes dos erros abaixo para corrigir os dados e tentar novamente.',
+        "Verifique os detalhes dos erros abaixo para corrigir os dados e tentar novamente.",
       );
     }
 
-    return details.join('\n');
+    return details.join("\n");
   }
 }

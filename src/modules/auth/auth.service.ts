@@ -3,17 +3,17 @@ import {
   UnauthorizedException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import * as bcrypt from 'bcryptjs';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import * as bcrypt from "bcryptjs";
 
-import { User } from '../users/entities/user.entity';
-import { Role } from '../users/entities/role.entity';
-import { Auditoria, AuditAction } from '../audit/entities/auditoria.entity';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+import { User } from "../users/entities/user.entity";
+import { Role } from "../users/entities/role.entity";
+import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
+import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
 
 export interface JwtPayload {
   sub: number;
@@ -24,7 +24,7 @@ export interface JwtPayload {
 }
 
 export interface LoginResponse {
-  user: Omit<User, 'senha'>;
+  user: Omit<User, "senha">;
   accessToken: string;
   refreshToken: string;
   expiresIn: string;
@@ -67,15 +67,15 @@ export class AuthService {
       // Se o input contém @, tenta buscar por usuários que tenham email como nome de usuário
       let user = await this.userRepository.findOne({
         where: { usuario: usuario },
-        relations: ['role'],
+        relations: ["role"],
       });
 
       // Se não encontrou e o input parece ser um email, tenta buscar pelo nome base
-      if (!user && usuario.includes('@')) {
-        const baseUsername = usuario.split('@')[0];
+      if (!user && usuario.includes("@")) {
+        const baseUsername = usuario.split("@")[0];
         user = await this.userRepository.findOne({
           where: { usuario: baseUsername },
-          relations: ['role'],
+          relations: ["role"],
         });
         this.logger.debug(
           `[AuthService] Tentativa de busca alternativa com nome base: "${baseUsername}"`,
@@ -101,7 +101,7 @@ export class AuthService {
         this.logger.warn(
           `[AuthService] Tentativa de login com usuário inativo: "${usuario}"`,
         );
-        throw new UnauthorizedException('Usuário inativo');
+        throw new UnauthorizedException("Usuário inativo");
       }
 
       if (user.isBlocked()) {
@@ -152,26 +152,26 @@ export class AuthService {
     const user = await this.validateUser(loginDto.usuario, loginDto.senha);
 
     if (!user) {
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException("Credenciais inválidas");
     }
 
     const payload: JwtPayload = {
       sub: user.id,
       usuario: user.usuario,
-      role: user.role?.name || 'user',
+      role: user.role?.name || "user",
     };
 
     // Força expiração de 50 minutos
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '50m' });
+    const accessToken = this.jwtService.sign(payload, { expiresIn: "50m" });
 
     // Gera refresh token com expiração maior
     const refreshPayload = {
       sub: user.id,
       usuario: user.usuario,
-      type: 'refresh',
+      type: "refresh",
     };
     const refreshToken = this.jwtService.sign(refreshPayload, {
-      expiresIn: '7d',
+      expiresIn: "7d",
     });
 
     // Salva auditoria de login bem-sucedido
@@ -186,7 +186,7 @@ export class AuthService {
       user: this.sanitizeUser(user),
       accessToken,
       refreshToken,
-      expiresIn: '50m',
+      expiresIn: "50m",
     };
   }
 
@@ -207,19 +207,19 @@ export class AuthService {
         ipAddress,
         userAgent,
         false,
-        'Credenciais inválidas',
+        "Credenciais inválidas",
       );
-      throw new UnauthorizedException('Credenciais inválidas');
+      throw new UnauthorizedException("Credenciais inválidas");
     }
 
     const payload: JwtPayload = {
       sub: user.id,
       usuario: user.usuario,
-      role: user.role?.name || 'user',
+      role: user.role?.name || "user",
     };
 
     // Força expiração de 50 minutos para API v2
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '50m' });
+    const accessToken = this.jwtService.sign(payload, { expiresIn: "50m" });
 
     // Salva auditoria de login bem-sucedido
     await this.saveLoginAudit(user.id, ipAddress, userAgent, true);
@@ -233,10 +233,10 @@ export class AuthService {
       user: {
         userId: user.id,
         usuario: user.usuario,
-        role: user.role?.name || 'user',
+        role: user.role?.name || "user",
       },
       accessToken,
-      expiresIn: '50m',
+      expiresIn: "50m",
     };
   }
 
@@ -250,38 +250,38 @@ export class AuthService {
       // Verifica se o refresh token é válido
       const decoded = this.jwtService.verify(refreshToken) as any;
 
-      if (decoded.type !== 'refresh') {
-        throw new UnauthorizedException('Invalid refresh token type');
+      if (decoded.type !== "refresh") {
+        throw new UnauthorizedException("Invalid refresh token type");
       }
 
       // Busca o usuário
       const user = await this.userRepository.findOne({
         where: { id: decoded.sub },
-        relations: ['role'],
+        relations: ["role"],
       });
 
       if (!user || !user.ativo) {
-        throw new UnauthorizedException('Usuário não encontrado ou inativo');
+        throw new UnauthorizedException("Usuário não encontrado ou inativo");
       }
 
       // Gera novo access token
       const payload: JwtPayload = {
         sub: user.id,
         usuario: user.usuario,
-        role: user.role?.name || 'user',
+        role: user.role?.name || "user",
       };
 
-      const accessToken = this.jwtService.sign(payload, { expiresIn: '50m' });
+      const accessToken = this.jwtService.sign(payload, { expiresIn: "50m" });
 
       this.logger.log(`Token renovado para usuário: ${user.usuario}`);
 
       return {
         accessToken,
-        expiresIn: '50m',
+        expiresIn: "50m",
       };
     } catch (error) {
       this.logger.warn(`Falha ao renovar token: ${error.message}`);
-      throw new UnauthorizedException('Token de refresh inválido ou expirado');
+      throw new UnauthorizedException("Token de refresh inválido ou expirado");
     }
   }
 
@@ -291,7 +291,7 @@ export class AuthService {
   async validateJwtPayload(payload: JwtPayload): Promise<User | null> {
     const user = await this.userRepository.findOne({
       where: { id: payload.sub },
-      relations: ['role'], // Garante que a role seja carregada
+      relations: ["role"], // Garante que a role seja carregada
     });
 
     if (user && user.ativo) {
@@ -304,7 +304,7 @@ export class AuthService {
   async register(registerDto: RegisterDto, currentUser: User): Promise<User> {
     if (!currentUser.isAdmin()) {
       throw new UnauthorizedException(
-        'Apenas administradores podem criar usuários',
+        "Apenas administradores podem criar usuários",
       );
     }
 
@@ -313,7 +313,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Usuário já está em uso');
+      throw new BadRequestException("Usuário já está em uso");
     }
 
     const role = await this.roleRepository.findOne({
@@ -321,7 +321,7 @@ export class AuthService {
     });
 
     if (!role) {
-      throw new BadRequestException('Role inválida');
+      throw new BadRequestException("Role inválida");
     }
 
     const user = this.userRepository.create({
@@ -359,26 +359,27 @@ export class AuthService {
    */
   async findUserById(id: number): Promise<User> {
     const user = await this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role')
-      .where('user.id = :id', { id })
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.role", "role")
+      .where("user.id = :id", { id })
       .select([
-        'user.id',
-        'user.nome',
-        'user.usuario',
-        'user.ultimoLogin',
-        'user.createdAt',
-        'user.settings',
-        'role.id',
-        'role.name',
-        'role.description',
-        'role.permissions',
+        "user.id",
+        "user.nome",
+        "user.usuario",
+        "user.avatarUrl",
+        "user.ultimoLogin",
+        "user.createdAt",
+        "user.settings",
+        "role.id",
+        "role.name",
+        "role.description",
+        "role.permissions",
       ])
-      .addSelect('role.settings')
+      .addSelect("role.settings")
       .getOne();
 
     if (!user) {
-      throw new UnauthorizedException('Usuário não encontrado');
+      throw new UnauthorizedException("Usuário não encontrado");
     }
 
     return user;
@@ -465,30 +466,38 @@ export class AuthService {
    * Obtém lista de usuários online
    */
   async getOnlineUsers(): Promise<
-    { id: number; nome: string; usuario: string; role: string; lastActivity: Date }[]
+    {
+      id: number;
+      nome: string;
+      usuario: string;
+      role: string;
+      lastActivity: Date;
+    }[]
   > {
     // Limpa usuários inativos antes de retornar
     await this.cleanupInactiveUsers();
 
     const onlineUserIds = Array.from(this.onlineUsers.keys());
     if (onlineUserIds.length === 0) {
-      this.logger.debug('Nenhum usuário online encontrado');
+      this.logger.debug("Nenhum usuário online encontrado");
       return [];
     }
 
-    this.logger.debug(`Encontrados ${onlineUserIds.length} usuários online: ${onlineUserIds.join(', ')}`);
+    this.logger.debug(
+      `Encontrados ${onlineUserIds.length} usuários online: ${onlineUserIds.join(", ")}`,
+    );
 
     const users = await this.userRepository.find({
       where: { id: In(onlineUserIds) },
-      relations: ['role'],
-      select: ['id', 'nome', 'usuario'],
+      relations: ["role"],
+      select: ["id", "nome", "usuario"],
     });
 
-    const result = users.map(user => ({
+    const result = users.map((user) => ({
       id: user.id,
       nome: user.nome,
       usuario: user.usuario,
-      role: user.role?.name || 'user',
+      role: user.role?.name || "user",
       lastActivity: this.onlineUsers.get(user.id)?.lastActivity || new Date(),
     }));
 
@@ -522,10 +531,12 @@ export class AuthService {
     }
 
     if (inactiveUsers.length > 0) {
-      inactiveUsers.forEach(userId => {
+      inactiveUsers.forEach((userId) => {
         this.onlineUsers.delete(userId);
       });
-      this.logger.log(`Removidos ${inactiveUsers.length} usuários inativos: ${inactiveUsers.join(', ')}`);
+      this.logger.log(
+        `Removidos ${inactiveUsers.length} usuários inativos: ${inactiveUsers.join(", ")}`,
+      );
     }
   }
 

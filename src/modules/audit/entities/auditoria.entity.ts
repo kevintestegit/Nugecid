@@ -5,40 +5,40 @@ import {
   ManyToOne,
   CreateDateColumn,
   JoinColumn,
-} from 'typeorm';
+} from "typeorm";
 
-import { User } from '../../users/entities/user.entity';
+import { User } from "../../users/entities/user.entity";
 
 export enum AuditAction {
-  CREATE = 'CREATE',
-  UPDATE = 'UPDATE',
-  DELETE = 'DELETE',
-  LOGIN = 'LOGIN',
-  LOGOUT = 'LOGOUT',
-  EXPORT = 'EXPORT',
-  IMPORT = 'IMPORT',
-  VIEW = 'VIEW',
+  CREATE = "CREATE",
+  UPDATE = "UPDATE",
+  DELETE = "DELETE",
+  LOGIN = "LOGIN",
+  LOGOUT = "LOGOUT",
+  EXPORT = "EXPORT",
+  IMPORT = "IMPORT",
+  VIEW = "VIEW",
 }
 
-@Entity('auditorias')
+@Entity("auditorias")
 export class Auditoria {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'user_id', nullable: false })
+  @Column({ name: "user_id", nullable: false })
   userId: number;
 
-  @Column({ type: 'varchar', enum: AuditAction, nullable: false })
+  @Column({ type: "varchar", enum: AuditAction, nullable: false })
   action: AuditAction;
 
-  @Column({ name: 'entity_name', length: 100, nullable: false })
+  @Column({ name: "entity_name", length: 100, nullable: false })
   entityName: string;
 
-  @Column({ name: 'entity_id', nullable: true })
+  @Column({ name: "entity_id", nullable: true })
   entityId: number;
 
   @Column({
-    type: 'text',
+    type: "text",
     nullable: true,
     transformer: {
       to: (value: any) => (value ? JSON.stringify(value) : null),
@@ -47,20 +47,20 @@ export class Auditoria {
   })
   details: any;
 
-  @Column({ name: 'ip_address', length: 45, nullable: true })
+  @Column({ name: "ip_address", length: 45, nullable: true })
   ipAddress: string;
 
-  @Column({ name: 'user_agent', type: 'text', nullable: true })
+  @Column({ name: "user_agent", type: "text", nullable: true })
   userAgent: string;
 
-  @Column({ type: 'boolean', default: true })
+  @Column({ type: "boolean", default: true })
   success: boolean;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   error: string;
 
   @Column({
-    type: 'text',
+    type: "text",
     nullable: true,
     transformer: {
       to: (value: any) => (value ? JSON.stringify(value) : null),
@@ -69,12 +69,12 @@ export class Auditoria {
   })
   response: any;
 
-  @CreateDateColumn({ name: 'timestamp' })
+  @CreateDateColumn({ name: "timestamp" })
   timestamp: Date;
 
   // Relacionamentos
-  @ManyToOne(() => User, user => user.auditorias, { eager: true })
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, (user) => user.auditorias, { eager: true })
+  @JoinColumn({ name: "user_id" })
   user: User;
 
   // Métodos
@@ -88,7 +88,7 @@ export class Auditoria {
     return {
       userId,
       action: AuditAction.LOGIN,
-      entityName: 'auth',
+      entityName: "auth",
       ipAddress,
       userAgent,
       success,
@@ -108,7 +108,7 @@ export class Auditoria {
     return {
       userId,
       action: AuditAction.LOGOUT,
-      entityName: 'auth',
+      entityName: "auth",
       ipAddress,
       userAgent,
       success: true,
@@ -142,25 +142,25 @@ export class Auditoria {
 
   getActionLabel(): string {
     const labels = {
-      [AuditAction.CREATE]: 'Criação',
-      [AuditAction.UPDATE]: 'Atualização',
-      [AuditAction.DELETE]: 'Exclusão',
-      [AuditAction.LOGIN]: 'Login',
-      [AuditAction.LOGOUT]: 'Logout',
-      [AuditAction.EXPORT]: 'Exportação',
-      [AuditAction.IMPORT]: 'Importação',
-      [AuditAction.VIEW]: 'Visualização',
+      [AuditAction.CREATE]: "Criação",
+      [AuditAction.UPDATE]: "Atualização",
+      [AuditAction.DELETE]: "Exclusão",
+      [AuditAction.LOGIN]: "Login",
+      [AuditAction.LOGOUT]: "Logout",
+      [AuditAction.EXPORT]: "Exportação",
+      [AuditAction.IMPORT]: "Importação",
+      [AuditAction.VIEW]: "Visualização",
     };
-    return labels[this.action] || 'Desconhecido';
+    return labels[this.action] || "Desconhecido";
   }
 
   getResourceLabel(): string {
     const labels = {
-      auth: 'Autenticação',
-      users: 'Usuários',
-      nugecid: 'Desarquivamentos',
-      dashboard: 'Dashboard',
-      files: 'Arquivos',
+      auth: "Autenticação",
+      users: "Usuários",
+      nugecid: "Desarquivamentos",
+      dashboard: "Dashboard",
+      files: "Arquivos",
     };
     return labels[this.entityName] || this.entityName;
   }

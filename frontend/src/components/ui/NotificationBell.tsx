@@ -94,6 +94,13 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       locale: ptBR
     });
 
+    const extraInfo = [
+      notificacao.detalhes?.nome_completo && `Nome: ${notificacao.detalhes?.nome_completo}`,
+      notificacao.detalhes?.numero_processo && `Processo: ${notificacao.detalhes?.numero_processo}`,
+      notificacao.detalhes?.tipo_documento && `Documento: ${notificacao.detalhes?.tipo_documento}`,
+      notificacao.detalhes?.acao_requerida && `Ação: ${notificacao.detalhes?.acao_requerida}`,
+    ].filter(Boolean)
+
     return (
       <div
         key={notificacao.id}
@@ -116,6 +123,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                 {notificacao.descricao}
               </p>
+              {extraInfo.length > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {extraInfo.map(info => (
+                    <li key={info} className="text-[11px] text-gray-500">
+                      {info}
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="flex items-center justify-between mt-2">
                 <span className="text-xs text-gray-500">{timeAgo}</span>
                 {!notificacao.lida && (

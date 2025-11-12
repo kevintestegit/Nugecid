@@ -74,9 +74,70 @@ npm run start:debug
 ```
 
 O sistema estará disponível em:
-- **Aplicação**: http://localhost:3000
+- **Frontend (Vite)**: http://localhost:3001
+- **API**: http://localhost:3000
 - **API Docs**: http://localhost:3000/api/docs
 - **Health Check**: http://localhost:3000/api/health
+
+## 🐳 Deploy com Docker Compose
+
+O projeto inclui um fluxo padronizado para subir toda a stack em qualquer máquina com Docker:
+
+- `./scripts/install.sh`: instala Docker e Docker Compose plugin em distribuições baseadas em Ubuntu (ex.: Zorin OS).
+- `./scripts/run.sh`: garante `.env`, baixa imagens necessárias e sobe app, banco (`db`) e Adminer (`adminer`).
+- `./scripts/stop.sh`: derruba os serviços em execução.
+
+Backups e restauros são feitos via `./scripts/backup_db.sh` e `./scripts/restore_db.sh backups/sgc_YYYYMMDD_HHMMSS.dump`. Os arquivos `.dump` ficam em `backups/`, compartilhada com o container do Postgres via volume. Uploads persistem em um volume nomeado (`app_uploads`); para migrar entre máquinas:
+
+```bash
+# exportar uploads
+docker run --rm -v sgc_app_uploads:/from -v "$(pwd)"/backups:/to alpine \
+  sh -c "cd /from && tar -czf /to/uploads.tgz ."
+
+# importar uploads
+docker run --rm -v sgc_app_uploads:/to -v "$(pwd)"/backups:/from alpine \
+  sh -c "cd /to && tar -xzf /from/uploads.tgz"
+```
+
+Portas padrão (sobreponha no `.env` conforme necessário):
+- App: `HOST_HTTP_PORT` → 3000 (mapeia para `APP_PORT`)
+- Banco: `HOST_DB_PORT` → 5432
+- Adminer: `HOST_ADMINER_PORT` → 8081
+
+Após o primeiro `run.sh`, revise o `.env` e ajuste segredos/senhas antes de colocar em produção.
+
+## 👤 Preferências do Usuário
+
+- Cada usuário pode definir foto de perfil; o backend salva o avatar em `/uploads/avatars` e expõe as rotas `POST /users/me/avatar` e `DELETE /users/me/avatar`.
+- Preferências pessoais (tema, exibição de e-mail/telefone, salvamento automático, visualização compacta e itens por página) ficam persistidas em `usuarios.settings` (JSONB).
+- O frontend lê essas preferências durante o login e aplica automaticamente o tema escolhido, mantendo comportamento consistente em novos acessos.
+- Execute a migration `1762105000000-AddAvatarUrlToUsuarios` para adicionar a coluna `avatar_url` antes de aplicar as novas funcionalidades em produção.
+
+## 🔒 Sistema de Backup
+
+O SGC-ITEP possui um sistema automatizado de backup para proteção dos dados. Ver documentação completa em [`docs/BACKUP.md`](docs/BACKUP.md).
+
+### Backups Automáticos
+
+- **Backup Completo**: Diariamente às 2h da manhã
+- **Backup de Desarquivamentos**: A cada 6 horas (0h, 6h, 12h, 18h)
+- **Retenção**: 30 dias (limpeza automática)
+
+### Uso Rápido
+
+```bash
+# Via CLI
+./scripts/backup-cli.sh full              # Backup completo
+./scripts/backup-cli.sh desarq            # Backup de desarquivamentos
+./scripts/backup-cli.sh list              # Listar backups
+./scripts/backup-cli.sh restore <arquivo> # Restaurar backup
+
+# Via API
+curl -X POST http://localhost:3000/backup/full \
+  -H "Authorization: Bearer $SGC_TOKEN"
+```
+
+Os backups são salvos em `./backups/` e podem ser restaurados a qualquer momento.
 
 ## 📚 Documentação da API
 
@@ -104,6 +165,13 @@ O sistema estará disponível em:
 - `POST /api/nugecid/import` - Importar planilha Excel
 - `GET /api/nugecid/export` - Exportar para Excel
 - `GET /api/nugecid/barcode/:codigo` - Buscar por código de barras
+
+#### Backup
+- `POST /api/backup/full` - Criar backup completo (admin)
+- `POST /api/backup/desarquivamentos` - Backup de desarquivamentos (admin, coordenador)
+- `GET /api/backup/list` - Listar backups disponíveis
+- `POST /api/backup/restore/:filename` - Restaurar backup (admin)
+- `POST /api/backup/clean` - Remover backups antigos (admin)
 
 ### Autenticação
 
@@ -245,7 +313,7 @@ Este projeto é propriedade do Instituto Técnico-Científico de Perícia (ITEP/
 
 ---
 
-**Desenvolvido para o ITEP/RN**
+**Desenvolvido para a PCI/RN**
 
 ## Execução (atualizado)
 

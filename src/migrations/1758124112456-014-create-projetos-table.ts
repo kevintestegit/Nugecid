@@ -1,7 +1,7 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateProjetosTable1758124112456 implements MigrationInterface {
-  name = '014CreateProjetosTable1758124112456';
+  name = "014CreateProjetosTable1758124112456";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -126,18 +126,27 @@ export class CreateProjetosTable1758124112456 implements MigrationInterface {
       `ALTER TABLE "desarquivamentos" ADD "desarquivamento_fisico_digital" "public"."desarquivamentos_desarquivamento_fisico_digital_enum" NOT NULL`,
     );
     await queryRunner.query(
-      `ALTER TABLE "roles" DROP CONSTRAINT "roles_name_key"`,
+      `ALTER TABLE "roles" DROP CONSTRAINT IF EXISTS "roles_name_key"`,
     );
-    await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN "name"`);
+
+    // Ajuste seguro para reduzir o tamanho da coluna sem perder dados
     await queryRunner.query(
-      `ALTER TABLE "roles" ADD "name" character varying(50) NOT NULL`,
+      `ALTER TABLE "roles" RENAME COLUMN "name" TO "name_old"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "roles" ADD "name" character varying(50)`,
+    );
+    await queryRunner.query(`UPDATE "roles" SET "name" = LEFT("name_old", 50)`);
+    await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN "name_old"`);
+    await queryRunner.query(
+      `ALTER TABLE "roles" ALTER COLUMN "name" SET NOT NULL`,
     );
     await queryRunner.query(
       `ALTER TABLE "roles" ADD CONSTRAINT "UQ_648e3f5447f725579d7d4ffdfb7" UNIQUE ("name")`,
     );
-    await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN "description"`);
+
     await queryRunner.query(
-      `ALTER TABLE "roles" ADD "description" character varying(255)`,
+      `ALTER TABLE "roles" ALTER COLUMN "description" TYPE character varying(255) USING LEFT("description", 255)`,
     );
     await queryRunner.query(
       `ALTER TABLE "roles" ALTER COLUMN "settings" DROP NOT NULL`,
@@ -145,15 +154,20 @@ export class CreateProjetosTable1758124112456 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "roles" ALTER COLUMN "settings" SET DEFAULT '{}'::jsonb`,
     );
-    await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN "permissions"`);
-    await queryRunner.query(`ALTER TABLE "roles" ADD "permissions" text`);
-    await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN "created_at"`);
     await queryRunner.query(
-      `ALTER TABLE "roles" ADD "created_at" TIMESTAMP NOT NULL DEFAULT now()`,
+      `ALTER TABLE "roles" ALTER COLUMN "permissions" TYPE text USING "permissions"::text`,
     );
-    await queryRunner.query(`ALTER TABLE "roles" DROP COLUMN "updated_at"`);
     await queryRunner.query(
-      `ALTER TABLE "roles" ADD "updated_at" TIMESTAMP NOT NULL DEFAULT now()`,
+      `ALTER TABLE "roles" ALTER COLUMN "created_at" TYPE TIMESTAMP`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "roles" ALTER COLUMN "created_at" SET DEFAULT now()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "roles" ALTER COLUMN "updated_at" TYPE TIMESTAMP`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "roles" ALTER COLUMN "updated_at" SET DEFAULT now()`,
     );
     await queryRunner.query(
       `ALTER TABLE "auditorias" DROP CONSTRAINT "auditorias_pkey"`,

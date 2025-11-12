@@ -17,7 +17,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/Select'
-import { DateRangePicker, DateRange } from '@/components/ui/DateRangePicker'
+import { DateRangeInput, DateRange } from '@/components/ui/DateRangeInput'
 
 import {
   Table,
@@ -40,7 +40,8 @@ import {
   User,
   AlertCircle,
   Filter,
-  X
+  X,
+  Download
 } from 'lucide-react'
 import { SearchInput } from '@/components/ui/SearchInput'
 import { StatusDesarquivamento, TipoSolicitacao, TipoDesarquivamento, CreateDesarquivamentoDto, Desarquivamento } from '@/types'
@@ -88,25 +89,38 @@ const DesarquivamentosPage: React.FC = () => {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: StatusDesarquivamento }) => {
-      return apiService.updateDesarquivamento(id, { status } as any)
+      console.log('[DesarquivamentosPage] Atualizando status:', { id, status })
+      const payload = { status }
+      console.log('[DesarquivamentosPage] Payload enviado:', JSON.stringify(payload))
+      return apiService.updateDesarquivamento(id, payload)
     },
     onSuccess: () => {
       setEditingStatusId(null)
-      // Invalida lista para refletir novo status
+      toast.success('Status atualizado com sucesso')
       queryClient.invalidateQueries({ queryKey: ['desarquivamentos'] })
     },
-    onError: () => {
+    onError: (error: any) => {
       setEditingStatusId(null)
+      console.error('[DesarquivamentosPage] Erro ao atualizar status:', error)
+      const message = error?.response?.data?.message || error?.message || 'Erro ao atualizar status'
+      toast.error(`Erro ao atualizar status: ${message}`)
     }
   })
 
   // Query parameters
   const queryParams = useMemo(() => {
-    const toYMD = (d?: Date | null) => {
+    const toYMD = (d?: Date | null, isEndDate = false) => {
       if (!d) return undefined
-      const yyyy = d.getFullYear()
-      const mm = String(d.getMonth() + 1).padStart(2, '0')
-      const dd = String(d.getDate()).padStart(2, '0')
+
+      // Se for data final, adiciona 1 dia para incluir o dia completo
+      const dateToFormat = isEndDate ? new Date(d) : d
+      if (isEndDate) {
+        dateToFormat.setDate(dateToFormat.getDate() + 1)
+      }
+
+      const yyyy = dateToFormat.getFullYear()
+      const mm = String(dateToFormat.getMonth() + 1).padStart(2, '0')
+      const dd = String(dateToFormat.getDate()).padStart(2, '0')
       return `${yyyy}-${mm}-${dd}`
     }
 
@@ -120,8 +134,8 @@ const DesarquivamentosPage: React.FC = () => {
         tipoDesarquivamentoFilter !== 'all'
           ? (tipoDesarquivamentoFilter as TipoDesarquivamento)
           : undefined,
-      startDate: toYMD(dateRange.startDate),
-      endDate: toYMD(dateRange.endDate),
+      startDate: toYMD(dateRange.startDate, false),
+      endDate: toYMD(dateRange.endDate, true),
     }
   }, [currentPage, pageSize, searchTerm, statusFilter, tipoFilter, tipoDesarquivamentoFilter, dateRange])
 
@@ -241,6 +255,41 @@ const DesarquivamentosPage: React.FC = () => {
     setDeleteConfirm({ isOpen: false, item: null })
   }
 
+  const handleExportPlanilha = async () => {
+    try {
+      toast.info('Gerando planilha...', { duration: 2000 })
+      
+      // Aplicar os mesmos filtros ativos na exportação
+      const exportParams: any = {}
+      
+      if (searchTerm) exportParams.search = searchTerm
+      if (statusFilter !== 'all') exportParams.status = statusFilter
+      if (tipoFilter !== 'all') exportParams.tipo = tipoFilter
+      if (tipoDesarquivamentoFilter !== 'all') exportParams.tipoDesarquivamento = tipoDesarquivamentoFilter
+      if (dateRange.startDate) exportParams.dataInicio = dateRange.startDate
+      if (dateRange.endDate) exportParams.dataFim = dateRange.endDate
+      
+      const blob = await apiService.exportDesarquivamentos(exportParams)
+      
+      // Criar link para download
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `desarquivamentos_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast.success('Planilha exportada com sucesso!')
+    } catch (error: any) {
+      console.error('Erro ao exportar planilha:', error)
+      toast.error('Erro ao exportar planilha', {
+        description: error?.message || 'Tente novamente mais tarde'
+      })
+    }
+  }
+
   const handleSearch = (value: string) => {
     setSearchTerm(value)
     setCurrentPage(1) // Reset to first page when searching
@@ -325,14 +374,24 @@ const DesarquivamentosPage: React.FC = () => {
           )}
           {canEdit && (
             <>
-              <Button onClick={() => setIsImportModalOpen(true)} 
-                variant="outline" 
-                size="sm"
-                disabled={isImporting}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Importar Planilha
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Planilha
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsImportModalOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar Planilha
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPlanilha}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar Planilha
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button asChild size="sm" className="hover:scale-100">
                 <Link to="/desarquivamentos/novo">
                   <Plus className="h-4 w-4 mr-2" />
@@ -401,11 +460,9 @@ const DesarquivamentosPage: React.FC = () => {
             </div>
             <div className="space-y-2">
               <label htmlFor="dateRange" className="text-sm font-medium">Período</label>
-              <DateRangePicker
+              <DateRangeInput
                 value={dateRange}
                 onChange={handleDateRangeChange}
-                placeholder="Selecionar período de datas"
-                className="w-full"
               />
             </div>
             <div className="space-y-2">
@@ -437,7 +494,9 @@ const DesarquivamentosPage: React.FC = () => {
         <CardHeader>
           <CardTitle>Solicitações</CardTitle>
           <CardDescription>
-            {data?.meta?.total ? `${data.meta.total} solicitação(ões) encontrada(s)` : 'Nenhuma solicitação encontrada'}
+            {data?.meta?.total
+              ? `${data.meta.total} ${data.meta.total === 1 ? 'solicitação encontrada' : 'solicitações encontradas'}`
+              : 'Nenhuma solicitação encontrada'}
           </CardDescription>
         </CardHeader>
         <CardContent>

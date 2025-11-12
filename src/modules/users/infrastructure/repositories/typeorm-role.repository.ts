@@ -1,14 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Role as DomainRole } from '../../domain/entities/role';
-import { RoleId } from '../../domain/value-objects/role-id';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Role as DomainRole } from "../../domain/entities/role";
+import { RoleId } from "../../domain/value-objects/role-id";
 import {
   IRoleRepository,
   RoleFilters,
-} from '../../domain/repositories/role.repository.interface';
-import { Role as RoleEntity } from '../../entities/role.entity';
-import { RoleMapper } from '../mappers/role.mapper';
+} from "../../domain/repositories/role.repository.interface";
+import { Role as RoleEntity } from "../../entities/role.entity";
+import { RoleMapper } from "../mappers/role.mapper";
 
 @Injectable()
 export class TypeOrmRoleRepository implements IRoleRepository {
@@ -40,17 +40,17 @@ export class TypeOrmRoleRepository implements IRoleRepository {
   }
 
   async findAll(filters?: RoleFilters): Promise<DomainRole[]> {
-    const queryBuilder = this.roleRepository.createQueryBuilder('role');
+    const queryBuilder = this.roleRepository.createQueryBuilder("role");
 
     if (filters) {
       if (filters.nome) {
-        queryBuilder.andWhere('role.name ILIKE :nome', {
+        queryBuilder.andWhere("role.name ILIKE :nome", {
           nome: `%${filters.nome}%`,
         });
       }
 
       if (filters.permissao) {
-        queryBuilder.andWhere(':permissao = ANY(role.permissions)', {
+        queryBuilder.andWhere(":permissao = ANY(role.permissions)", {
           permissao: filters.permissao,
         });
       }
@@ -79,8 +79,8 @@ export class TypeOrmRoleRepository implements IRoleRepository {
 
   async findByPermission(permission: string): Promise<DomainRole[]> {
     const entities = await this.roleRepository
-      .createQueryBuilder('role')
-      .where(':permission = ANY(role.permissions)', { permission })
+      .createQueryBuilder("role")
+      .where(":permission = ANY(role.permissions)", { permission })
       .getMany();
 
     return RoleMapper.toDomainArray(entities);

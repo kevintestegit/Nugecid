@@ -1,16 +1,16 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateTarefasTables1758124300000 implements MigrationInterface {
-  name = '015CreateTarefasTables1758124300000';
+  name = "015CreateTarefasTables1758124300000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Verificar se as tabelas já existem
-    const projetosExists = await queryRunner.hasTable('projetos');
-    const colunasExists = await queryRunner.hasTable('colunas');
-    const tarefasExists = await queryRunner.hasTable('tarefas');
-    const comentariosExists = await queryRunner.hasTable('comentarios');
-    const historicoExists = await queryRunner.hasTable('historico_tarefas');
-    const membrosExists = await queryRunner.hasTable('membros_projeto');
+    const projetosExists = await queryRunner.hasTable("projetos");
+    const colunasExists = await queryRunner.hasTable("colunas");
+    const tarefasExists = await queryRunner.hasTable("tarefas");
+    const comentariosExists = await queryRunner.hasTable("comentarios");
+    const historicoExists = await queryRunner.hasTable("historico_tarefas");
+    const membrosExists = await queryRunner.hasTable("membros_projeto");
 
     // Criar tabela projetos se não existir
     if (!projetosExists) {
@@ -29,9 +29,15 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       `);
 
       // Índices para projetos
-      await queryRunner.query(`CREATE INDEX idx_projetos_criador ON projetos(criador_id);`);
-      await queryRunner.query(`CREATE INDEX idx_projetos_ativo ON projetos(ativo);`);
-      await queryRunner.query(`CREATE INDEX idx_projetos_data_criacao ON projetos(data_criacao);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_projetos_criador ON projetos(criador_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_projetos_ativo ON projetos(ativo);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_projetos_data_criacao ON projetos(data_criacao);`,
+      );
     }
 
     // Criar tabela membros_projeto se não existir
@@ -51,9 +57,15 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       `);
 
       // Índices para membros_projeto
-      await queryRunner.query(`CREATE INDEX idx_membros_projeto_projeto ON membros_projeto(projeto_id);`);
-      await queryRunner.query(`CREATE INDEX idx_membros_projeto_usuario ON membros_projeto(usuario_id);`);
-      await queryRunner.query(`CREATE INDEX idx_membros_projeto_papel ON membros_projeto(papel);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_membros_projeto_projeto ON membros_projeto(projeto_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_membros_projeto_usuario ON membros_projeto(usuario_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_membros_projeto_papel ON membros_projeto(papel);`,
+      );
     }
 
     // Criar tabela colunas se não existir
@@ -72,8 +84,12 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       `);
 
       // Índices para colunas
-      await queryRunner.query(`CREATE INDEX idx_colunas_projeto ON colunas(projeto_id);`);
-      await queryRunner.query(`CREATE INDEX idx_colunas_ordem ON colunas(projeto_id, ordem);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_colunas_projeto ON colunas(projeto_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_colunas_ordem ON colunas(projeto_id, ordem);`,
+      );
     }
 
     // Criar tabela tarefas se não existir
@@ -102,14 +118,30 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       `);
 
       // Índices para tarefas
-      await queryRunner.query(`CREATE INDEX idx_tarefas_projeto ON tarefas(projeto_id);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_coluna ON tarefas(coluna_id);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_responsavel ON tarefas(responsavel_id);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_criador ON tarefas(criador_id);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_prioridade ON tarefas(prioridade);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_prazo ON tarefas(prazo);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_ordem ON tarefas(coluna_id, ordem);`);
-      await queryRunner.query(`CREATE INDEX idx_tarefas_tags ON tarefas USING GIN(tags);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_projeto ON tarefas(projeto_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_coluna ON tarefas(coluna_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_responsavel ON tarefas(responsavel_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_criador ON tarefas(criador_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_prioridade ON tarefas(prioridade);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_prazo ON tarefas(prazo);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_ordem ON tarefas(coluna_id, ordem);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_tarefas_tags ON tarefas USING GIN(tags);`,
+      );
     }
 
     // Criar tabela comentarios se não existir
@@ -128,9 +160,15 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       `);
 
       // Índices para comentários
-      await queryRunner.query(`CREATE INDEX idx_comentarios_tarefa ON comentarios(tarefa_id);`);
-      await queryRunner.query(`CREATE INDEX idx_comentarios_autor ON comentarios(autor_id);`);
-      await queryRunner.query(`CREATE INDEX idx_comentarios_data ON comentarios(data_criacao);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_comentarios_tarefa ON comentarios(tarefa_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_comentarios_autor ON comentarios(autor_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_comentarios_data ON comentarios(data_criacao);`,
+      );
     }
 
     // Criar tabela historico_tarefas se não existir
@@ -151,10 +189,18 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       `);
 
       // Índices para histórico_tarefas
-      await queryRunner.query(`CREATE INDEX idx_historico_tarefa ON historico_tarefas(tarefa_id);`);
-      await queryRunner.query(`CREATE INDEX idx_historico_usuario ON historico_tarefas(usuario_id);`);
-      await queryRunner.query(`CREATE INDEX idx_historico_data ON historico_tarefas(data_acao);`);
-      await queryRunner.query(`CREATE INDEX idx_historico_acao ON historico_tarefas(acao);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_historico_tarefa ON historico_tarefas(tarefa_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_historico_usuario ON historico_tarefas(usuario_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_historico_data ON historico_tarefas(data_acao);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_historico_acao ON historico_tarefas(acao);`,
+      );
     }
 
     // Criar função para atualizar data_atualizacao
@@ -170,17 +216,17 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
 
     // Aplicar triggers nas tabelas se não existirem
     const triggers = [
-      { table: 'projetos', trigger: 'update_projetos_updated_at' },
-      { table: 'colunas', trigger: 'update_colunas_updated_at' },
-      { table: 'tarefas', trigger: 'update_tarefas_updated_at' },
-      { table: 'comentarios', trigger: 'update_comentarios_updated_at' }
+      { table: "projetos", trigger: "update_projetos_updated_at" },
+      { table: "colunas", trigger: "update_colunas_updated_at" },
+      { table: "tarefas", trigger: "update_tarefas_updated_at" },
+      { table: "comentarios", trigger: "update_comentarios_updated_at" },
     ];
 
     for (const { table, trigger } of triggers) {
       const triggerExists = await queryRunner.query(`
         SELECT 1 FROM pg_trigger WHERE tgname = '${trigger}'
       `);
-      
+
       if (!triggerExists.length) {
         await queryRunner.query(`
           CREATE TRIGGER ${trigger} BEFORE UPDATE ON ${table}
@@ -206,15 +252,27 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remover triggers
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_comentarios_updated_at ON comentarios;`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_tarefas_updated_at ON tarefas;`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_colunas_updated_at ON colunas;`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_projetos_updated_at ON projetos;`);
-    
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_comentarios_updated_at ON comentarios;`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_tarefas_updated_at ON tarefas;`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_colunas_updated_at ON colunas;`,
+    );
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_projetos_updated_at ON projetos;`,
+    );
+
     // Remover função
-    await queryRunner.query(`DROP FUNCTION IF EXISTS update_updated_at_column();`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS criar_colunas_padrao(INTEGER);`);
-    
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS update_updated_at_column();`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS criar_colunas_padrao(INTEGER);`,
+    );
+
     // Remover tabelas na ordem correta (devido às foreign keys)
     await queryRunner.query(`DROP TABLE IF EXISTS historico_tarefas;`);
     await queryRunner.query(`DROP TABLE IF EXISTS comentarios;`);

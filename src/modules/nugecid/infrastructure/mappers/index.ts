@@ -1,1 +1,1 @@
-export { DesarquivamentoMapper } from './desarquivamento.mapper';
+export { DesarquivamentoMapper } from "./desarquivamento.mapper";

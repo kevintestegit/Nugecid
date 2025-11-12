@@ -3,7 +3,7 @@ export class DesarquivamentoId {
 
   constructor(value: number) {
     if (!value || value <= 0) {
-      throw new Error('DesarquivamentoId deve ser um número positivo');
+      throw new Error("DesarquivamentoId deve ser um número positivo");
     }
     this._value = value;
   }

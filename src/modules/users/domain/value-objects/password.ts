@@ -1,4 +1,4 @@
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from "bcryptjs";
 
 export class Password {
   private readonly _hashedValue: string;
@@ -9,11 +9,11 @@ export class Password {
 
   static async create(plainPassword: string): Promise<Password> {
     if (!plainPassword) {
-      throw new Error('Senha não pode estar vazia');
+      throw new Error("Senha não pode estar vazia");
     }
 
     if (plainPassword.length < 6) {
-      throw new Error('Senha deve ter pelo menos 6 caracteres');
+      throw new Error("Senha deve ter pelo menos 6 caracteres");
     }
 
     const saltRounds = 10;
@@ -23,7 +23,7 @@ export class Password {
 
   static fromHash(hashedValue: string): Password {
     if (!hashedValue) {
-      throw new Error('Hash da senha não pode estar vazio');
+      throw new Error("Hash da senha não pode estar vazio");
     }
     return new Password(hashedValue);
   }

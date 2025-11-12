@@ -8,6 +8,7 @@ import {
 import { apiService } from '@/services/api'
 import {
   CreateDesarquivamentoDto,
+  UpdateDesarquivamentoDto,
   Desarquivamento,
   PaginatedResponse,
 } from '@/types'
@@ -111,7 +112,7 @@ export const useCreateDesarquivamento = () => {
 export const useUpdateDesarquivamento = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CreateDesarquivamentoDto }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateDesarquivamentoDto }) =>
       apiService.updateDesarquivamento(Number(id), data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [DESARQUIVAMENTOS_QUERY_KEY, variables.id] })
@@ -341,3 +342,98 @@ export const useDashboardStats = () => {
     staleTime: 1000 * 60 * 2, // 2 minutos
   })
 }
+
+/**
+ * Hook para fazer download do termo de entrega em PDF.
+ */
+export const useDownloadTermoPdf = () => {
+  return useMutation({
+    mutationFn: async (id: number) => {
+      try {
+        const blob = await apiService.getTermoDeEntregaPdf(id);
+
+        // Cria URL para download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `termo_de_entrega_${id}.pdf`;
+
+        // Dispara o download
+        document.body.appendChild(link);
+        link.click();
+
+        // Limpa o URL e remove o link
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        return blob;
+      } catch (error: any) {
+        throw new Error(await extractTermoErrorMessage(error));
+      }
+    },
+  })
+}
+
+/**
+ * Hook para fazer download do termo de entrega em Word (DOCX).
+ */
+export const useDownloadTermoDocx = () => {
+  return useMutation({
+    mutationFn: async (id: number) => {
+      try {
+        const blob = await apiService.getTermoDeEntregaDocx(id);
+
+        // Cria URL para download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `termo_de_entrega_${id}.docx`;
+
+        // Dispara o download
+        document.body.appendChild(link);
+        link.click();
+
+        // Limpa o URL e remove o link
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        return blob;
+      } catch (error: any) {
+        throw new Error(await extractTermoErrorMessage(error));
+      }
+    },
+  })
+}
+
+const extractTermoErrorMessage = async (error: any): Promise<string> => {
+  const fallback = 'Não foi possível gerar o termo.';
+
+  if (error?.response?.data) {
+    const data = error.response.data;
+
+    if (data instanceof Blob) {
+      try {
+        const text = await data.text();
+        try {
+          const json = JSON.parse(text);
+          return json?.message || fallback;
+        } catch {
+          return text || fallback;
+        }
+      } catch {
+        return fallback;
+      }
+    }
+
+    if (typeof data === 'object' && data.message) {
+      return data.message;
+    }
+  }
+
+  if (typeof error?.message === 'string') {
+    return error.message;
+  }
+
+  return fallback;
+};
+

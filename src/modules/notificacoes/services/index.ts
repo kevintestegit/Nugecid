@@ -1,2 +1,2 @@
-export * from './notificacoes.service';
-export * from './notificacoes-scheduler.service';
+export * from "./notificacoes.service";
+export * from "./notificacoes-scheduler.service";

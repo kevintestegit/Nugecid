@@ -1,11 +1,13 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateNotificacoesTable1758235300000 implements MigrationInterface {
-  name = '016CreateNotificacoesTable1758235300000';
+export class CreateNotificacoesTable1758235300000
+  implements MigrationInterface
+{
+  name = "016CreateNotificacoesTable1758235300000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Verificar se a tabela já existe
-    const notificacoesExists = await queryRunner.hasTable('notificacoes');
+    const notificacoesExists = await queryRunner.hasTable("notificacoes");
 
     if (!notificacoesExists) {
       // Criar enum para tipo de notificação
@@ -52,20 +54,36 @@ export class CreateNotificacoesTable1758235300000 implements MigrationInterface 
       `);
 
       // Índices para performance
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_usuario ON notificacoes(usuario_id);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_tipo ON notificacoes(tipo);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_lida ON notificacoes(lida);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_prioridade ON notificacoes(prioridade);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_created_at ON notificacoes(created_at);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_deleted_at ON notificacoes(deleted_at);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_usuario_lida ON notificacoes(usuario_id, lida);`);
-      await queryRunner.query(`CREATE INDEX idx_notificacoes_tipo_created ON notificacoes(tipo, created_at);`);
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_usuario ON notificacoes(usuario_id);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_tipo ON notificacoes(tipo);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_lida ON notificacoes(lida);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_prioridade ON notificacoes(prioridade);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_created_at ON notificacoes(created_at);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_deleted_at ON notificacoes(deleted_at);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_usuario_lida ON notificacoes(usuario_id, lida);`,
+      );
+      await queryRunner.query(
+        `CREATE INDEX idx_notificacoes_tipo_created ON notificacoes(tipo, created_at);`,
+      );
 
       // Trigger para atualizar updated_at
       const triggerExists = await queryRunner.query(`
         SELECT 1 FROM pg_trigger WHERE tgname = 'update_notificacoes_updated_at'
       `);
-      
+
       if (!triggerExists.length) {
         await queryRunner.query(`
           CREATE TRIGGER update_notificacoes_updated_at 
@@ -189,19 +207,29 @@ export class CreateNotificacoesTable1758235300000 implements MigrationInterface 
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remover view
-    await queryRunner.query(`DROP VIEW IF EXISTS vw_notificacoes_estatisticas;`);
-    
+    await queryRunner.query(
+      `DROP VIEW IF EXISTS vw_notificacoes_estatisticas;`,
+    );
+
     // Remover funções
-    await queryRunner.query(`DROP FUNCTION IF EXISTS verificar_solicitacoes_pendentes();`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS criar_notificacao_solicitacao_pendente(INTEGER, INTEGER, INTEGER);`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS criar_notificacao_novo_processo(INTEGER, INTEGER, VARCHAR);`);
-    
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS verificar_solicitacoes_pendentes();`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS criar_notificacao_solicitacao_pendente(INTEGER, INTEGER, INTEGER);`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS criar_notificacao_novo_processo(INTEGER, INTEGER, VARCHAR);`,
+    );
+
     // Remover trigger
-    await queryRunner.query(`DROP TRIGGER IF EXISTS update_notificacoes_updated_at ON notificacoes;`);
-    
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS update_notificacoes_updated_at ON notificacoes;`,
+    );
+
     // Remover tabela
     await queryRunner.query(`DROP TABLE IF EXISTS notificacoes;`);
-    
+
     // Remover enums
     await queryRunner.query(`DROP TYPE IF EXISTS notificacao_tipo_enum;`);
     await queryRunner.query(`DROP TYPE IF EXISTS notificacao_prioridade_enum;`);

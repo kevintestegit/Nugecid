@@ -3,7 +3,9 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
-import NotificationBell from '@/components/NotificationBell'
+import NotificationBell from '@/components/ui/NotificationBell'
+import { GlobalSearch } from '@/components/layout/GlobalSearch'
+import { NugecidLogo } from '@/components/ui/NugecidLogo'
 import {
   Home,
   FileText,
@@ -12,8 +14,8 @@ import {
   LogOut,
   Menu,
   X,
-  Archive,
   BarChart,
+  Shield,
   CheckSquare,
   FolderOpen,
   Kanban,
@@ -37,6 +39,23 @@ const Layout: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed))
   }, [sidebarCollapsed])
+
+  useEffect(() => {
+    const html = document.documentElement
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = html.style.overflow
+
+    document.body.style.overflow = 'auto'
+    document.body.style.removeProperty('position')
+    html.style.overflowY = 'auto'
+    document.body.removeAttribute('data-scroll-locked')
+    html.removeAttribute('data-scroll-locked')
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      html.style.overflow = previousHtmlOverflow
+    }
+  }, [location.pathname])
 
   const userInitial = user?.nome?.charAt(0)?.toUpperCase() ?? '?'
   const userAvatar = user?.avatarUrl
@@ -67,6 +86,12 @@ const Layout: React.FC = () => {
       href: '/desarquivamentos',
       icon: FileText,
       current: location.pathname.startsWith('/desarquivamentos')
+    },
+    {
+      name: 'Custódia de Vestígios',
+      href: '/custodia',
+      icon: Shield,
+      current: location.pathname.startsWith('/custodia')
     },
     {
       name: 'Relatórios',
@@ -123,9 +148,8 @@ const Layout: React.FC = () => {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-card border-r border-border shadow-lg animate-slide-in-left">
           <div className="flex h-16 items-center justify-between px-4">
-            <Link to="/" className="flex items-center gap-2">
-              <Archive className='h-8 w-auto' />
-              <h1 className='text-xl font-bold text-foreground'>NUGECID</h1>
+            <Link to="/" className="flex items-center">
+              <NugecidLogo showText={true} className="h-10 w-auto" />
             </Link>
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
               <X className="h-6 w-6" />
@@ -152,6 +176,26 @@ const Layout: React.FC = () => {
               )
             })}
           </nav>
+          
+          {/* Beta Warning Banner - Mobile */}
+          <div className="mx-4 mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+            <div className="flex items-start gap-2">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  Versão Beta
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1 leading-relaxed">
+                  Algumas funcionalidades podem não funcionar corretamente.
+                </p>
+              </div>
+            </div>
+          </div>
+          
           <div className="border-t border-border/80 p-4 space-y-3">
             <div className="flex items-center gap-3">
               {userAvatar ? (
@@ -195,18 +239,30 @@ const Layout: React.FC = () => {
       {/* Desktop sidebar */}
       <div
         className={cn(
-          "hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col transition-all duration-500 ease-in-out relative z-30",
+          "hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col lg:z-30",
           sidebarCollapsed ? "lg:w-16" : "lg:w-64"
         )}
+        style={{
+          transition: 'width 0.5s ease-in-out',
+          willChange: 'width',
+          transform: 'translateZ(0)', // Force hardware acceleration
+          backfaceVisibility: 'hidden', // Prevent flickering
+          perspective: 1000 // Improve 3D context
+        }}
       >
-        <div className="relative flex flex-col flex-grow border-r border-border bg-card shadow-lg">
+        <div className="flex flex-col h-full border-r border-border bg-card shadow-lg">
           {/* Toggle Button - Minimalist Design */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className={cn(
-              "group absolute top-20 z-40 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-300 ease-in-out hover:h-7 hover:w-7 hover:bg-card hover:text-foreground hover:shadow-md hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95",
-              sidebarCollapsed ? "-right-3" : "-right-3"
+              "absolute top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-300 ease-in-out hover:h-7 hover:w-7 hover:bg-card hover:text-foreground hover:shadow-md hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95",
+              "-right-3"
             )}
+            style={{
+              transform: 'translateZ(0)', // Force hardware acceleration
+              willChange: 'transform',
+              position: 'absolute'
+            }}
             title={sidebarCollapsed ? "Expandir sidebar" : "Recolher sidebar"}
           >
             <div className="relative flex items-center justify-center">
@@ -227,15 +283,14 @@ const Layout: React.FC = () => {
           </button>
 
           <div className="flex h-16 flex-shrink-0 items-center border-b border-border/80 px-4">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-                <Archive className="h-5 w-5" />
-              </div>
-              {!sidebarCollapsed && (
-                <span className="text-xl font-semibold text-foreground">
-                  NUGECID
-                </span>
-              )}
+            <Link to="/" className="flex items-center justify-center w-full">
+              <NugecidLogo
+                showText={!sidebarCollapsed}
+                className={cn(
+                  "transition-all duration-300",
+                  sidebarCollapsed ? "h-12 w-12" : "h-12 w-auto"
+                )}
+              />
             </Link>
           </div>
           
@@ -266,6 +321,28 @@ const Layout: React.FC = () => {
               )
             })}
           </nav>
+
+          {/* Beta Warning Banner */}
+          <div className={cn(
+            "mx-4 mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 transition-all duration-300",
+            sidebarCollapsed ? "hidden" : "block"
+          )}>
+            <div className="flex items-start gap-2">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  Versão Beta
+                </p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1 leading-relaxed">
+                  Algumas funcionalidades podem não funcionar corretamente.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div className="border-t border-border/80 p-4">
             <div
@@ -343,9 +420,14 @@ const Layout: React.FC = () => {
 
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1" />
+            
             <div className="flex items-center gap-x-4 lg:gap-x-6">
+              {/* Campo de busca global */}
+              <GlobalSearch />
+              
               {/* Notifications - Novo componente integrado */}
               <NotificationBell />
+              
               <div className="hidden sm:block">
                 <span className="text-sm font-medium text-foreground">
                   Bem-vindo, <span className="font-semibold">{user?.nome}</span>

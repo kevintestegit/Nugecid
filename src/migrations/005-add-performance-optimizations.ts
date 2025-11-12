@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
+import { MigrationInterface, QueryRunner, TableIndex } from "typeorm";
 
 export class AddPerformanceOptimizations1700000005000
   implements MigrationInterface
 {
-  name = 'AddPerformanceOptimizations1700000005000';
+  name = "AddPerformanceOptimizations1700000005000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Habilitar extensão uuid-ossp se não estiver habilitada
@@ -108,27 +108,27 @@ export class AddPerformanceOptimizations1700000005000
     `);
 
     // Estatísticas iniciais para o otimizador de consultas
-    await queryRunner.query('ANALYZE roles;');
-    await queryRunner.query('ANALYZE usuarios;');
-    await queryRunner.query('ANALYZE auditorias;');
-    await queryRunner.query('ANALYZE desarquivamentos;');
+    await queryRunner.query("ANALYZE roles;");
+    await queryRunner.query("ANALYZE usuarios;");
+    await queryRunner.query("ANALYZE auditorias;");
+    await queryRunner.query("ANALYZE desarquivamentos;");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Remover triggers
     await queryRunner.query(
-      'DROP TRIGGER IF EXISTS update_roles_updated_at ON roles;',
+      "DROP TRIGGER IF EXISTS update_roles_updated_at ON roles;",
     );
     await queryRunner.query(
-      'DROP TRIGGER IF EXISTS update_usuarios_updated_at ON usuarios;',
+      "DROP TRIGGER IF EXISTS update_usuarios_updated_at ON usuarios;",
     );
     await queryRunner.query(
-      'DROP TRIGGER IF EXISTS update_desarquivamentos_updated_at ON desarquivamentos;',
+      "DROP TRIGGER IF EXISTS update_desarquivamentos_updated_at ON desarquivamentos;",
     );
 
     // Remover função
     await queryRunner.query(
-      'DROP FUNCTION IF EXISTS update_updated_at_column();',
+      "DROP FUNCTION IF EXISTS update_updated_at_column();",
     );
 
     // Os índices serão removidos automaticamente quando as tabelas forem dropadas

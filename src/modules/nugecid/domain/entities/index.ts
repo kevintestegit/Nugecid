@@ -1,1 +1,1 @@
-export * from './desarquivamento.entity';
+export * from "./desarquivamento.entity";

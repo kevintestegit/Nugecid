@@ -3,4 +3,5 @@ export interface CreateUserDto {
   usuario: string;
   senha: string;
   role: string;
+  matricula?: string | null;
 }

@@ -1,1 +1,1 @@
-export * from './desarquivamento.repository.interface';
+export * from "./desarquivamento.repository.interface";

@@ -12,19 +12,40 @@ function log(message) {
   console.log(message);
 }
 
-async function checkDockerInstalled() {
-  try {
-    await execAsync('docker --version');
-    return true;
-  } catch {
-    log('Erro: Docker não instalado ou fora do PATH.');
-    return false;
+async function findDockerCommand() {
+  const possiblePaths = [
+    'docker',
+    '/usr/bin/docker',
+    '/usr/local/bin/docker',
+    '/snap/bin/docker',
+    '/home/linuxbrew/.linuxbrew/bin/docker',
+  ];
+  
+  for (const path of possiblePaths) {
+    try {
+      await execAsync(`${path} --version`);
+      return path;
+    } catch {
+      continue;
+    }
   }
+  return null;
+}
+
+async function checkDockerInstalled() {
+  const dockerCmd = await findDockerCommand();
+  if (dockerCmd) {
+    global.DOCKER_CMD = dockerCmd;
+    return true;
+  }
+  log('Erro: Docker não instalado ou fora do PATH.');
+  return false;
 }
 
 async function checkDockerRunning() {
   try {
-    await execAsync('docker info');
+    const cmd = global.DOCKER_CMD || 'docker';
+    await execAsync(`${cmd} info`);
     return true;
   } catch {
     log('Erro: Docker não está rodando.');
@@ -34,7 +55,9 @@ async function checkDockerRunning() {
 
 async function checkContainersRunning() {
   try {
-    const { stdout } = await execAsync('docker-compose ps --services --filter "status=running"');
+    const cmd = global.DOCKER_CMD || 'docker';
+    const composeCmd = `${cmd} compose`;
+    const { stdout } = await execAsync(`${composeCmd} ps --services --filter "status=running"`);
     const runningServices = stdout.trim().split('\n').filter(Boolean);
     const requiredServices = ['postgres', 'redis', 'pgadmin'];
     const missingServices = requiredServices.filter(s => !runningServices.includes(s));
@@ -52,7 +75,9 @@ async function checkContainersRunning() {
 
 async function checkPostgresConnection() {
   try {
-    const { stdout } = await execAsync('docker-compose exec -T postgres pg_isready -U postgres -d sgc_itep');
+    const cmd = global.DOCKER_CMD || 'docker';
+    const composeCmd = `${cmd} compose`;
+    const { stdout } = await execAsync(`${composeCmd} exec -T postgres pg_isready -U postgres -d sgc_itep`);
     return stdout.includes('accepting connections');
   } catch {
     return false;
@@ -61,7 +86,9 @@ async function checkPostgresConnection() {
 
 async function checkRedisConnection() {
   try {
-    const { stdout } = await execAsync('docker-compose exec -T redis redis-cli ping');
+    const cmd = global.DOCKER_CMD || 'docker';
+    const composeCmd = `${cmd} compose`;
+    const { stdout } = await execAsync(`${composeCmd} exec -T redis redis-cli ping`);
     return stdout.trim() === 'PONG';
   } catch {
     return false;
@@ -78,7 +105,9 @@ async function checkDockerServices() {
   if (!containersOK) {
     log('Subindo serviços Docker necessários...');
     try {
-      await execAsync('docker-compose up -d');
+      const cmd = global.DOCKER_CMD || 'docker';
+      const composeCmd = `${cmd} compose`;
+      await execAsync(`${composeCmd} up -d`);
     } catch (e) {
       log('Falha ao subir serviços Docker.');
       process.exit(1);
@@ -109,4 +138,5 @@ module.exports = {
   checkContainersRunning,
   checkPostgresConnection,
   checkRedisConnection,
+  findDockerCommand,
 };

@@ -1,46 +1,79 @@
 services:
-  postgres:
-    image: postgres:15-alpine
-    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${DOCKER_DB_NAME:-sgc_itep}
-      POSTGRES_USER: ${DOCKER_DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DOCKER_DB_PASSWORD:-@Sanfona1}
-    ports:
-      - "${DOCKER_DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DOCKER_DB_USERNAME:-postgres} -d ${DOCKER_DB_NAME:-sgc_itep}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  sgc-itep-app:
-    build: .
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sgc-backend
+    env_file: .env
     environment:
       NODE_ENV: production
-      PORT: 3000
-      DATABASE_HOST: ${DOCKER_DB_HOST:-postgres}
+      PORT: ${APP_PORT:-3000}
+      DATABASE_HOST: db
       DATABASE_PORT: 5432
-      DATABASE_USERNAME: ${DOCKER_DB_USERNAME:-postgres}
-      DATABASE_PASSWORD: ${DOCKER_DB_PASSWORD:-@Sanfona1}
-      DATABASE_NAME: ${DOCKER_DB_NAME:-sgc_itep}
+      DATABASE_USERNAME: ${POSTGRES_USER:-sgc}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-sgc_password}
+      DATABASE_NAME: ${POSTGRES_DB:-sgc}
+    ports:
+      - "${HOST_BACKEND_PORT:-8080}:${APP_PORT:-3000}"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - app_uploads:/app/uploads
+      - ./backups:/app/backups
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      test: ["CMD", "node", "-e", "const port = process.env.PORT || 3000; require('http').get('http://127.0.0.1:' + port + '/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: sgc-frontend
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:${HOST_BACKEND_PORT:-8080}
+    ports:
+      - "${HOST_FRONTEND_PORT:-3001}:3001"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    env_file: .env
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "${HOST_DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    ports:
+      - "${HOST_ADMINER_PORT:-8081}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
-  postgres_data:
+  pgdata:
+  app_uploads:
+  frontend_node_modules:

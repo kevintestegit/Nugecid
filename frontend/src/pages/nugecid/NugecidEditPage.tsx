@@ -125,7 +125,7 @@ const NugecidEditPage: React.FC<NugecidEditPageProps> = ({ className }) => {
   }
 
   // Check if can edit
-  const canEdit = !['CONCLUIDO', 'CANCELADO', 'ARQUIVADO'].includes(desarquivamento.status)
+  const canEdit = !['FINALIZADO', 'NAO_COLETADO', 'NAO_LOCALIZADO'].includes(desarquivamento.status)
   
   if (!canEdit) {
     return (

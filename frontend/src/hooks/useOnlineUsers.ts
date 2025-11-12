@@ -6,6 +6,7 @@ export interface OnlineUser {
   nome: string;
   usuario: string;
   role: string;
+  lastActivity: string;
 }
 
 export const QUERY_KEYS = {

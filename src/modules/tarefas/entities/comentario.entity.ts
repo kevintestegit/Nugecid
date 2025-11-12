@@ -7,45 +7,45 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
   JoinColumn,
-} from 'typeorm';
+} from "typeorm";
 
-import { User } from '../../users/entities/user.entity';
-import { Tarefa } from './tarefa.entity';
+import { User } from "../../users/entities/user.entity";
+import { Tarefa } from "./tarefa.entity";
 
-@Entity('comentarios')
+@Entity("comentarios")
 export class Comentario {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'tarefa_id', nullable: false })
+  @Column({ name: "tarefa_id", nullable: false })
   tarefaId: number;
 
-  @ManyToOne(() => Tarefa, tarefa => tarefa.comentarios, {
-    onDelete: 'CASCADE',
+  @ManyToOne(() => Tarefa, (tarefa) => tarefa.comentarios, {
+    onDelete: "CASCADE",
   })
-  @JoinColumn({ name: 'tarefa_id' })
+  @JoinColumn({ name: "tarefa_id" })
   tarefa: Tarefa;
 
-  @Column({ name: 'autor_id', nullable: false })
+  @Column({ name: "autor_id", nullable: false })
   autorId: number;
 
   @ManyToOne(() => User, { eager: true })
-  @JoinColumn({ name: 'autor_id' })
+  @JoinColumn({ name: "autor_id" })
   autor: User;
 
-  @Column({ type: 'text', nullable: false })
+  @Column({ type: "text", nullable: false })
   conteudo: string;
 
-  @Column({ type: 'boolean', default: false })
+  @Column({ type: "boolean", default: false })
   editado: boolean;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "data_criacao" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "data_atualizacao" })
   updatedAt: Date;
 
-  @DeleteDateColumn({ name: 'deleted_at' })
+  @DeleteDateColumn({ name: "deleted_at" })
   deletedAt: Date;
 
   // Métodos
@@ -72,11 +72,11 @@ export class Comentario {
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'agora';
+    if (diffMins < 1) return "agora";
     if (diffMins < 60) return `${diffMins}m atrás`;
     if (diffHours < 24) return `${diffHours}h atrás`;
     if (diffDays < 7) return `${diffDays}d atrás`;
 
-    return this.createdAt.toLocaleDateString('pt-BR');
+    return this.createdAt.toLocaleDateString("pt-BR");
   }
 }

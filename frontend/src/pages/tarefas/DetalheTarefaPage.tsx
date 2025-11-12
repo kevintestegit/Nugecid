@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner'
 import TarefaForm from '@/components/tarefas/TarefaForm'
 import { useTarefas } from '@/hooks/useTarefas'
+import { useUsers } from '@/hooks/useUsers'
 import { Tarefa, StatusTarefa, PrioridadeTarefa, UpdateTarefaDto } from '@/types'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -37,6 +38,8 @@ const DetalheTarefaPage: React.FC = () => {
     getHistoricoTarefa,
     loading 
   } = useTarefas()
+  const { data: usersResponse, isLoading: loadingUsers } = useUsers({ page: 1, limit: 1000 })
+  const usuarios = usersResponse?.data ?? []
   
   const [tarefa, setTarefa] = useState<Tarefa | null>(null)
   const [historico, setHistorico] = useState<any[]>([])
@@ -254,9 +257,10 @@ const DetalheTarefaPage: React.FC = () => {
                   tarefa={tarefa}
                   onSubmit={handleUpdate}
                   onCancel={() => setIsEditing(false)}
-                  loading={loading}
+                  loading={loading || loadingUsers}
                   submitLabel="Salvar Alterações"
                   cancelLabel="Cancelar"
+                  usuarios={usuarios}
                 />
               </CardContent>
             </Card>
@@ -343,16 +347,16 @@ const DetalheTarefaPage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
-                <Badge className={`flex items-center gap-1 ${getStatusColor(tarefa.status)}`}>
-                  {getStatusIcon(tarefa.status)}
-                  {tarefa.status.replace('_', ' ').toUpperCase()}
+                <Badge className={`flex items-center gap-1 ${tarefa.status ? getStatusColor(tarefa.status) : ''}`}>
+                  {tarefa.status ? getStatusIcon(tarefa.status) : null}
+                  {tarefa.status ? tarefa.status.replace('_', ' ').toUpperCase() : 'STATUS INDEFINIDO'}
                 </Badge>
               </div>
               
               <div className="flex items-center gap-2">
                 <Flag className="h-4 w-4 text-gray-500" />
-                <Badge className={getPrioridadeColor(tarefa.prioridade)}>
-                  {tarefa.prioridade.toUpperCase()}
+                <Badge className={tarefa.prioridade ? getPrioridadeColor(tarefa.prioridade) : ''}>
+                  {tarefa.prioridade ? tarefa.prioridade.toUpperCase() : 'PRIORIDADE INDEFINIDA'}
                 </Badge>
               </div>
             </CardContent>

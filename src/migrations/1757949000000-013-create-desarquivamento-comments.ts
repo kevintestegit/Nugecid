@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class CreateDesarquivamentoComments1757949000000
   implements MigrationInterface
 {
-  name = 'CreateDesarquivamentoComments1757949000000';
+  name = "CreateDesarquivamentoComments1757949000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
@@ -34,6 +34,6 @@ export class CreateDesarquivamentoComments1757949000000
     await queryRunner.query(
       'DROP INDEX IF EXISTS "IDX_DESARQ_COMMENTS_DESARQ"',
     );
-    await queryRunner.query('DROP TABLE IF EXISTS desarquivamento_comments');
+    await queryRunner.query("DROP TABLE IF EXISTS desarquivamento_comments");
   }
 }

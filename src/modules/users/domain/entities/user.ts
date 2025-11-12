@@ -1,11 +1,16 @@
-import { UserId } from '../value-objects/user-id';
-import { Usuario } from '../value-objects/usuario';
-import { Password } from '../value-objects/password';
-import { Role } from './role';
-import { RoleId } from '../value-objects/role-id';
+import { UserId } from "../value-objects/user-id";
+import { Usuario } from "../value-objects/usuario";
+import { Password } from "../value-objects/password";
+import { Role } from "./role";
+import { RoleId } from "../value-objects/role-id";
 
 export interface UserSettings {
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
+  showEmail?: boolean;
+  showPhone?: boolean;
+  autoSave?: boolean;
+  compactView?: boolean;
+  itemsPerPage?: number;
   [key: string]: unknown;
 }
 
@@ -16,7 +21,9 @@ export interface UserProps {
   password: Password;
   roleId: RoleId;
   role?: Role;
+  matricula?: string | null;
   settings?: UserSettings;
+  avatarUrl?: string | null;
   ativo?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -30,7 +37,9 @@ export class User {
   private _password: Password;
   private _roleId: RoleId;
   private _role?: Role;
+  private _matricula?: string | null;
   private _settings?: UserSettings;
+  private _avatarUrl?: string | null;
   private _ativo: boolean;
   private _createdAt: Date;
   private _updatedAt: Date;
@@ -45,7 +54,9 @@ export class User {
     this._password = props.password;
     this._roleId = props.roleId;
     this._role = props.role;
+    this._matricula = props.matricula ?? null;
     this._settings = props.settings;
+    this._avatarUrl = props.avatarUrl;
     this._ativo = props.ativo ?? true;
     this._createdAt = props.createdAt || new Date();
     this._updatedAt = props.updatedAt || new Date();
@@ -54,23 +65,23 @@ export class User {
 
   private validateProps(props: UserProps): void {
     if (!props.nome || props.nome.trim().length === 0) {
-      throw new Error('Nome do usuário é obrigatório');
+      throw new Error("Nome do usuário é obrigatório");
     }
 
     if (props.nome.trim().length < 2) {
-      throw new Error('Nome deve ter pelo menos 2 caracteres');
+      throw new Error("Nome deve ter pelo menos 2 caracteres");
     }
 
     if (!props.usuario) {
-      throw new Error('Usuário é obrigatório');
+      throw new Error("Usuário é obrigatório");
     }
 
     if (!props.password) {
-      throw new Error('Senha é obrigatória');
+      throw new Error("Senha é obrigatória");
     }
 
     if (!props.roleId) {
-      throw new Error('Role é obrigatória');
+      throw new Error("Role é obrigatória");
     }
   }
 
@@ -98,8 +109,16 @@ export class User {
     return this._role;
   }
 
+  get matricula(): string | null | undefined {
+    return this._matricula;
+  }
+
   get settings(): UserSettings | undefined {
     return this._settings;
+  }
+
+  get avatarUrl(): string | null | undefined {
+    return this._avatarUrl;
   }
 
   get ativo(): boolean {
@@ -124,11 +143,11 @@ export class User {
 
   updateNome(nome: string): void {
     if (!nome || nome.trim().length === 0) {
-      throw new Error('Nome não pode estar vazio');
+      throw new Error("Nome não pode estar vazio");
     }
 
     if (nome.trim().length < 2) {
-      throw new Error('Nome deve ter pelo menos 2 caracteres');
+      throw new Error("Nome deve ter pelo menos 2 caracteres");
     }
 
     this._nome = nome.trim();
@@ -151,8 +170,22 @@ export class User {
     this._updatedAt = new Date();
   }
 
+  updateMatricula(matricula?: string | null): void {
+    if (matricula && matricula.trim().length === 0) {
+      this._matricula = null;
+    } else {
+      this._matricula = matricula ? matricula.trim() : null;
+    }
+    this._updatedAt = new Date();
+  }
+
   updateSettings(settings: UserSettings | undefined): void {
     this._settings = settings;
+    this._updatedAt = new Date();
+  }
+
+  updateAvatarUrl(avatarUrl: string | null | undefined): void {
+    this._avatarUrl = avatarUrl;
     this._updatedAt = new Date();
   }
 

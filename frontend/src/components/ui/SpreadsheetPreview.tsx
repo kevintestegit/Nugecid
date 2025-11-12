@@ -64,8 +64,8 @@ export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({
                     </td>
                   )}
                   {headers.map((header, colIndex) => (
-                    <td 
-                      key={`cell-${rowIndex}-${colIndex}`} 
+                    <td
+                      key={`cell-${rowIndex}-${colIndex}-${header}`}
                       className="px-4 py-3 text-gray-900 dark:text-gray-100 max-w-[200px] truncate"
                       title={String(row[header])}
                     >

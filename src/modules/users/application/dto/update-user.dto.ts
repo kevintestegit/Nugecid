@@ -3,5 +3,7 @@ export interface UpdateUserDto {
   usuario?: string;
   senha?: string;
   role?: string;
+  matricula?: string | null;
   ativo?: boolean;
+  avatarUrl?: string | null;
 }

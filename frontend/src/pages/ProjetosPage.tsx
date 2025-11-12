@@ -7,6 +7,9 @@ import { Badge } from '../components/ui/Badge';
 import { Loading } from '../components/ui/Loading';
 import { Alert } from '../components/ui/Alert';
 import { Input } from '../components/ui/Input';
+import { Label } from '../components/ui/Label';
+import { Textarea } from '../components/ui/Textarea';
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/AlertDialog';
 import { 
   Plus, 
   Calendar, 
@@ -16,7 +19,8 @@ import {
   Trash2,
   Archive,
   Star,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { kanbanService } from '../services/kanbanService';
@@ -44,6 +48,11 @@ interface ProjetosPageState {
   filterStatus: 'todos' | 'ativos' | 'arquivados' | 'favoritos';
 }
 
+interface ProjectFormValues {
+  nome: string;
+  descricao?: string;
+}
+
 const ProjetosPage: React.FC = () => {
   const navigate = useNavigate();
   const { checkPermission } = useAuth();
@@ -59,6 +68,9 @@ const ProjetosPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Projeto | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [isUpdatingProject, setIsUpdatingProject] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   // Carregar projetos
   const loadProjetos = async () => {
@@ -66,10 +78,10 @@ const ProjetosPage: React.FC = () => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       const response = await kanbanService.getProjetos();
-      
+
       setState(prev => ({
         ...prev,
-        projetos: response.data || [],
+        projetos: Array.isArray(response) ? response : (response as any)?.data || [],
         loading: false
       }));
     } catch (error: any) {
@@ -85,6 +97,20 @@ const ProjetosPage: React.FC = () => {
   useEffect(() => {
     loadProjetos();
   }, []);
+
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openMenuId !== null) {
+        setOpenMenuId(null);
+      }
+    };
+
+    if (openMenuId !== null) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openMenuId]);
 
   // Filtrar projetos
   const filteredProjetos = state.projetos.filter(projeto => {
@@ -125,6 +151,54 @@ const ProjetosPage: React.FC = () => {
     setShowEditModal(true);
   };
 
+  const handleCreateProjectSubmit = async (values: ProjectFormValues) => {
+    setIsCreatingProject(true);
+    try {
+      const payload = {
+        nome: values.nome.trim(),
+        descricao: values.descricao?.trim() || undefined,
+      };
+      await kanbanService.createProjeto(payload);
+      toast.success('Projeto criado com sucesso');
+      setShowCreateModal(false);
+      await loadProjetos();
+    } catch (error: any) {
+      console.error('Erro ao criar projeto:', error);
+      const message = error?.response?.data?.message || error?.message || 'Erro ao criar projeto';
+      toast.error(message);
+    } finally {
+      setIsCreatingProject(false);
+    }
+  };
+
+  const handleUpdateProjectSubmit = async (values: ProjectFormValues) => {
+    if (!selectedProject) {
+      return;
+    }
+    setIsUpdatingProject(true);
+    try {
+      const payload = {
+        nome: values.nome.trim(),
+        descricao: values.descricao?.trim() || undefined,
+      };
+      await kanbanService.updateProjeto(selectedProject.id, payload);
+      toast.success('Projeto atualizado com sucesso');
+      setShowEditModal(false);
+      setSelectedProject(null);
+      await loadProjetos();
+    } catch (error: any) {
+      console.error('Erro ao atualizar projeto:', error);
+      const message = error?.response?.data?.message || error?.message || 'Erro ao atualizar projeto';
+      toast.error(message);
+    } finally {
+      setIsUpdatingProject(false);
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setSelectedProject(null);
+  };
   const handleDeleteProject = async (projeto: Projeto) => {
     if (!checkPermission('delete', 'projetos')) {
       toast.error('Você não tem permissão para excluir projetos');
@@ -335,35 +409,57 @@ const ProjetosPage: React.FC = () => {
                       <Star className="w-4 h-4" fill={projeto.favorito ? 'currentColor' : 'none'} />
                     </Button>
                     
-                    <div className="relative group">
-                      <Button variant="ghost" size="sm" className="p-1">
+                    <div className="relative">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="p-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === projeto.id ? null : projeto.id);
+                        }}
+                      >
                         <MoreVertical className="w-4 h-4" />
                       </Button>
-                      
-                      {/* Menu dropdown - implementar posteriormente */}
-                      <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-10 hidden group-hover:block">
-                        <button
-                          onClick={() => handleEditProject(projeto)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                        >
-                          <Edit className="w-4 h-4" />
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleArchiveProject(projeto)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                        >
-                          <Archive className="w-4 h-4" />
-                          {projeto.ativo ? 'Arquivar' : 'Desarquivar'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteProject(projeto)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Excluir
-                        </button>
-                      </div>
+
+                      {/* Menu dropdown */}
+                      {openMenuId === projeto.id && (
+                        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50 min-w-[160px]">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              handleEditProject(projeto);
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          >
+                            <Edit className="w-4 h-4" />
+                            Editar
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              handleArchiveProject(projeto);
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                          >
+                            <Archive className="w-4 h-4" />
+                            {projeto.ativo ? 'Arquivar' : 'Desarquivar'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                              handleDeleteProject(projeto);
+                            }}
+                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Excluir
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -425,11 +521,117 @@ const ProjetosPage: React.FC = () => {
         </div>
       )}
 
+      <ProjectModal
+        open={showCreateModal}
+        title="Novo projeto"
+        description="Defina o nome e descrição do novo projeto."
+        submitLabel="Criar projeto"
+        loading={isCreatingProject}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateProjectSubmit}
+      />
+      <ProjectModal
+        open={showEditModal && !!selectedProject}
+        title="Editar projeto"
+        description="Atualize as informações do projeto selecionado."
+        submitLabel="Salvar alterações"
+        loading={isUpdatingProject}
+        initialData={selectedProject ? { nome: selectedProject.nome, descricao: selectedProject.descricao ?? '' } : undefined}
+        onClose={handleCloseEditModal}
+        onSubmit={handleUpdateProjectSubmit}
+      />
       {/* Modais - serão implementados posteriormente */}
       {/* CreateProjectModal */}
       {/* EditProjectModal */}
     </div>
   );
 };
+
+function ProjectModal({
+  open,
+  title,
+  description,
+  submitLabel,
+  loading,
+  initialData,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  submitLabel: string;
+  loading?: boolean;
+  initialData?: ProjectFormValues;
+  onClose: () => void;
+  onSubmit: (values: ProjectFormValues) => void;
+}) {
+  const defaultValues: ProjectFormValues = { nome: '', descricao: '' };
+  const [formValues, setFormValues] = React.useState<ProjectFormValues>(defaultValues);
+
+  React.useEffect(() => {
+    if (open) {
+      setFormValues({
+        nome: initialData?.nome ?? '',
+        descricao: initialData?.descricao ?? '',
+      });
+    }
+  }, [open, initialData]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formValues.nome.trim()) {
+      return;
+    }
+    onSubmit({
+      nome: formValues.nome.trim(),
+      descricao: formValues.descricao?.trim() || '',
+    });
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="project-name">Nome *</Label>
+            <Input
+              id="project-name"
+              value={formValues.nome}
+              onChange={(event) => setFormValues(prev => ({ ...prev, nome: event.target.value }))}
+              placeholder="Ex.: Projeto Kanban"
+              disabled={loading}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="project-description">Descrição</Label>
+            <Textarea
+              id="project-description"
+              value={formValues.descricao}
+              onChange={(event) => setFormValues(prev => ({ ...prev, descricao: event.target.value }))}
+              placeholder="Detalhes ou objetivos do projeto"
+              disabled={loading}
+              rows={4}
+            />
+          </div>
+          <AlertDialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading || !formValues.nome.trim()}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {submitLabel}
+            </Button>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 export default ProjetosPage;

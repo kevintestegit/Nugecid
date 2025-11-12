@@ -1,10 +1,10 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
-import { 
-  ApiResponse, 
-  PaginatedResponse, 
-  Desarquivamento, 
-  CreateDesarquivamentoDto, 
-  UpdateDesarquivamentoDto, 
+import {
+  ApiResponse,
+  PaginatedResponse,
+  Desarquivamento,
+  CreateDesarquivamentoDto,
+  UpdateDesarquivamentoDto,
   QueryDesarquivamentoDto,
   LoginDto,
   LoginResponse,
@@ -17,7 +17,9 @@ import {
   CreateUserDto,
   UpdateUserDto,
   DeleteResponse,
-  DesarquivamentoComment
+  DesarquivamentoComment,
+  SearchParams,
+  SearchResponse
 } from '@/types'
 
 export class ApiService {
@@ -188,18 +190,49 @@ export class ApiService {
     return response.data
   }
 
+  // Term reports
+  async getTermoDeEntregaPdf(id: number): Promise<Blob> {
+    const response: AxiosResponse<Blob> = await this.api.get(`/nugecid/${id}/termo`, {
+      responseType: 'blob',
+      headers: { Accept: 'application/pdf' },
+    })
+    return response.data
+  }
+
+  async getTermoDeEntregaDocx(id: number): Promise<Blob> {
+    const response: AxiosResponse<Blob> = await this.api.get(`/nugecid/${id}/termo-docx`, {
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      },
+    })
+    return response.data
+  }
+
   async addDesarquivamentoComment(id: number, comment: string): Promise<ApiResponse<DesarquivamentoComment>> {
     const response: AxiosResponse<ApiResponse<DesarquivamentoComment>> = await this.api.post(`/nugecid/${id}/comments`, { comment })
     return response.data
   }
 
   async createDesarquivamento(data: CreateDesarquivamentoDto): Promise<ApiResponse<Desarquivamento>> {
-    const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.post('/nugecid', data)
+    // Importar normalização dinamicamente para evitar circular dependency
+    const { normalizeDesarquivamentoData } = await import('@/utils/normalization')
+    const normalizedData = normalizeDesarquivamentoData(data)
+    const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.post('/nugecid', normalizedData)
     return response.data
   }
 
   async updateDesarquivamento(id: number, data: UpdateDesarquivamentoDto): Promise<ApiResponse<Desarquivamento>> {
-    const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.patch(`/nugecid/${id}`, data)
+    console.log('[ApiService] updateDesarquivamento - Dados originais:', JSON.stringify(data))
+    
+    // Importar normalização dinamicamente
+    const { normalizeDesarquivamentoData } = await import('@/utils/normalization')
+    const normalizedData = normalizeDesarquivamentoData(data)
+    
+    console.log('[ApiService] updateDesarquivamento - Dados normalizados:', JSON.stringify(normalizedData))
+    console.log('[ApiService] updateDesarquivamento - URL:', `/nugecid/${id}`)
+    
+    const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.patch(`/nugecid/${id}`, normalizedData)
     return response.data
   }
 
@@ -357,6 +390,30 @@ export class ApiService {
     return response.data
   }
 
+  async uploadMyAvatar(file: File): Promise<ApiResponse<{ avatarUrl: string }>> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response: AxiosResponse<ApiResponse<{ avatarUrl: string }>> = await this.api.post(
+      '/users/me/avatar',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    )
+
+    return response.data
+  }
+
+  async deleteMyAvatar(): Promise<ApiResponse<{ avatarUrl?: string | null }>> {
+    const response: AxiosResponse<ApiResponse<{ avatarUrl?: string | null }>> = await this.api.delete(
+      '/users/me/avatar',
+    )
+    return response.data
+  }
+
   // Lixeira endpoints
   async getDesarquivamentosLixeira(params?: QueryDesarquivamentoDto): Promise<PaginatedResponse<Desarquivamento>> {
     try {
@@ -398,6 +455,113 @@ export class ApiService {
     } catch (error: any) {
       console.error('[ApiService] deleteDesarquivamentoPermanente error:', error?.response?.status, error?.response?.data || error?.message)
       throw error;
+    }
+  }
+
+  // Anexos de Desarquivamentos
+  async getDesarquivamentosAnexos(desarquivamentoId: number, tipoAnexo?: 'desarquivamento' | 'rearquivamento'): Promise<ApiResponse<any[]>> {
+    try {
+      const params = tipoAnexo ? { tipo: tipoAnexo } : {};
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(`/nugecid/${desarquivamentoId}/anexos`, { params });
+      return response.data;
+    } catch (error: any) {
+      console.error('[ApiService] getDesarquivamentosAnexos error:', error?.response?.status, error?.response?.data || error?.message);
+      throw error;
+    }
+  }
+
+  async uploadDesarquivamentoAnexo(desarquivamentoId: number, file: File, descricao?: string, tipoAnexo?: 'desarquivamento' | 'rearquivamento'): Promise<ApiResponse<any>> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (descricao) {
+        formData.append('descricao', descricao);
+      }
+      if (tipoAnexo) {
+        formData.append('tipoAnexo', tipoAnexo);
+      }
+
+      const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
+        `/nugecid/${desarquivamentoId}/anexos/upload`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('[ApiService] uploadDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      throw error;
+    }
+  }
+
+  async updateDesarquivamentoAnexo(desarquivamentoId: number, anexoId: number, descricao: string): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.api.patch(
+        `/nugecid/${desarquivamentoId}/anexos/${anexoId}`,
+        { descricao }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('[ApiService] updateDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      throw error;
+    }
+  }
+
+  async downloadDesarquivamentoAnexo(desarquivamentoId: number, anexoId: number): Promise<Blob> {
+    try {
+      const response: AxiosResponse<Blob> = await this.api.get(
+        `/nugecid/${desarquivamentoId}/anexos/${anexoId}/download`,
+        {
+          responseType: 'blob',
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('[ApiService] downloadDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      throw error;
+    }
+  }
+
+  async viewDesarquivamentoAnexo(desarquivamentoId: number, anexoId: number): Promise<Blob> {
+    try {
+      const response: AxiosResponse<Blob> = await this.api.get(
+        `/nugecid/${desarquivamentoId}/anexos/${anexoId}/view`,
+        {
+          responseType: 'blob',
+        }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('[ApiService] viewDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      throw error;
+    }
+  }
+
+  async deleteDesarquivamentoAnexo(desarquivamentoId: number, anexoId: number): Promise<void> {
+    try {
+      await this.api.delete(`/nugecid/${desarquivamentoId}/anexos/${anexoId}`);
+    } catch (error: any) {
+      console.error('[ApiService] deleteDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      throw error;
+    }
+  }
+
+  // Global Search endpoints
+  async search(params: SearchParams): Promise<SearchResponse> {
+    try {
+      const response: AxiosResponse<SearchResponse> = await this.api.get('/search', { params })
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] search error:', error?.message || error)
+      return {
+        results: [],
+        total: 0,
+        query: params.query,
+        typesCounts: {}
+      }
     }
   }
 }

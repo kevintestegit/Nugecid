@@ -1,6 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Projeto } from './projeto.entity';
-import { Coluna } from './coluna.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from "typeorm";
+import { Projeto } from "./projeto.entity";
+import { Coluna } from "./coluna.entity";
 
 @Entity()
 export class Tarefa {
@@ -10,18 +10,18 @@ export class Tarefa {
   @Column()
   titulo: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   descricao: string;
 
   @Column({ default: 0 })
   ordem: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   prazo: Date;
 
-  @ManyToOne(() => Projeto, projeto => projeto.tarefas)
+  @ManyToOne(() => Projeto, (projeto) => projeto.tarefas)
   projeto: Projeto;
 
-  @ManyToOne(() => Coluna, coluna => coluna.tarefas)
+  @ManyToOne(() => Coluna, (coluna) => coluna.tarefas)
   coluna: Coluna;
 }

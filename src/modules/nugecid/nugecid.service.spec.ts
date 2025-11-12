@@ -1,30 +1,30 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Test, TestingModule } from "@nestjs/testing";
+import { getRepositoryToken } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-} from '@nestjs/common';
-import * as fs from 'fs';
-import * as XLSX from 'xlsx';
+} from "@nestjs/common";
+import * as fs from "fs";
+import * as XLSX from "xlsx";
 
-import { NugecidService } from './nugecid.service';
-import { TipoDesarquivamentoEnum } from './domain/value-objects/tipo-desarquivamento.vo';
-import { TipoDesarquivamento } from './domain/value-objects/tipo-desarquivamento.vo';
-import { StatusDesarquivamentoEnum } from './domain/value-objects/status-desarquivamento.vo';
-import { DesarquivamentoTypeOrmEntity } from './infrastructure/entities/desarquivamento.typeorm-entity';
-import { User } from '../users/entities/user.entity';
-import { Auditoria } from '../audit/entities/auditoria.entity';
-import { CreateDesarquivamentoDto } from './dto/create-desarquivamento.dto';
-import { UpdateDesarquivamentoDto } from './dto/update-desarquivamento.dto';
-import { QueryDesarquivamentoDto } from './dto/query-desarquivamento.dto';
+import { NugecidService } from "./nugecid.service";
+import { TipoDesarquivamentoEnum } from "./domain/value-objects/tipo-desarquivamento.vo";
+import { TipoDesarquivamento } from "./domain/value-objects/tipo-desarquivamento.vo";
+import { StatusDesarquivamentoEnum } from "./domain/value-objects/status-desarquivamento.vo";
+import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
+import { User } from "../users/entities/user.entity";
+import { Auditoria } from "../audit/entities/auditoria.entity";
+import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
+import { UpdateDesarquivamentoDto } from "./dto/update-desarquivamento.dto";
+import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
 
 // Mock do fs
-jest.mock('fs');
-jest.mock('xlsx');
+jest.mock("fs");
+jest.mock("xlsx");
 
-describe('NugecidService', () => {
+describe("NugecidService", () => {
   let service: NugecidService;
   let desarquivamentoRepository: Repository<DesarquivamentoTypeOrmEntity>;
   let userRepository: Repository<User>;
@@ -33,9 +33,9 @@ describe('NugecidService', () => {
   // Mock data
   const mockAdminUser = {
     id: 1,
-    nome: 'Admin User',
-    usuario: 'admin',
-    role: { id: 1, name: 'admin' },
+    nome: "Admin User",
+    usuario: "admin",
+    role: { id: 1, name: "admin" },
     isAdmin: () => true,
     isEditor: () => false,
     canViewAllRecords: () => true,
@@ -43,9 +43,9 @@ describe('NugecidService', () => {
 
   const mockEditorUser = {
     id: 2,
-    nome: 'Editor User',
-    usuario: 'editor',
-    role: { id: 2, name: 'editor' },
+    nome: "Editor User",
+    usuario: "editor",
+    role: { id: 2, name: "editor" },
     isAdmin: () => false,
     isEditor: () => true,
     canViewAllRecords: () => false,
@@ -53,16 +53,16 @@ describe('NugecidService', () => {
 
   const mockDesarquivamento = {
     id: 1,
-    numeroNicLaudoAuto: 'SGC20250001',
+    numeroNicLaudoAuto: "SGC20250001",
     tipoDesarquivamento: TipoDesarquivamentoEnum.FISICO,
-    nomeCompleto: 'João Silva',
-    numeroProcesso: '2024001',
-    status: 'SOLICITADO',
-    tipoDocumento: 'Laudo',
+    nomeCompleto: "João Silva",
+    numeroProcesso: "2024001",
+    status: "SOLICITADO",
+    tipoDocumento: "Laudo",
     dataSolicitacao: new Date(),
-    setorDemandante: 'Delegacia',
-    servidorResponsavel: 'Servidor Teste',
-    finalidadeDesarquivamento: 'Processo judicial',
+    setorDemandante: "Delegacia",
+    servidorResponsavel: "Servidor Teste",
+    finalidadeDesarquivamento: "Processo judicial",
     solicitacaoProrrogacao: false,
     urgente: false,
     criadoPorId: mockEditorUser.id,
@@ -133,23 +133,23 @@ describe('NugecidService', () => {
     jest.clearAllMocks();
   });
 
-  describe('create', () => {
+  describe("create", () => {
     const createDto: CreateDesarquivamentoDto = {
       tipoDesarquivamento: TipoDesarquivamentoEnum.FISICO,
       desarquivamentoFisicoDigital: TipoDesarquivamentoEnum.FISICO,
-      nomeCompleto: 'João Silva',
-      numeroNicLaudoAuto: 'NIC-2024001',
-      numeroProcesso: '2024001-PROC',
-      tipoDocumento: 'Laudo',
+      nomeCompleto: "João Silva",
+      numeroNicLaudoAuto: "NIC-2024001",
+      numeroProcesso: "2024001-PROC",
+      tipoDocumento: "Laudo",
       dataSolicitacao: new Date().toISOString(),
-      setorDemandante: 'Delegacia',
-      servidorResponsavel: 'Servidor Teste',
-      finalidadeDesarquivamento: 'Processo judicial',
+      setorDemandante: "Delegacia",
+      servidorResponsavel: "Servidor Teste",
+      finalidadeDesarquivamento: "Processo judicial",
       solicitacaoProrrogacao: false,
       urgente: false,
     };
 
-    it('deve criar um desarquivamento com sucesso', async () => {
+    it("deve criar um desarquivamento com sucesso", async () => {
       const savedDesarquivamento = { ...mockDesarquivamento, ...createDto };
       mockDesarquivamentoRepository.create.mockReturnValue(
         savedDesarquivamento,
@@ -168,13 +168,13 @@ describe('NugecidService', () => {
       expect(mockDesarquivamentoRepository.create).toHaveBeenCalledWith({
         ...createDto,
         criadoPor: mockEditorUser,
-        status: 'SOLICITADO',
+        status: "SOLICITADO",
       });
       expect(mockDesarquivamentoRepository.save).toHaveBeenCalled();
       expect(result).toEqual(savedDesarquivamento);
     });
 
-    it('deve registrar auditoria ao criar', async () => {
+    it("deve registrar auditoria ao criar", async () => {
       const savedDesarquivamento = { ...mockDesarquivamento, ...createDto };
       mockDesarquivamentoRepository.create.mockReturnValue(
         savedDesarquivamento,
@@ -194,13 +194,13 @@ describe('NugecidService', () => {
     });
   });
 
-  describe('findAll', () => {
+  describe("findAll", () => {
     const queryDto: QueryDesarquivamentoDto = {
       page: 1,
       limit: 10,
     };
 
-    it('admin deve ver todos os registros', async () => {
+    it("admin deve ver todos os registros", async () => {
       const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -219,14 +219,14 @@ describe('NugecidService', () => {
       const result = await service.findAll(queryDto);
 
       expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
-        'desarquivamento.createdById = :userId',
+        "desarquivamento.createdById = :userId",
         expect.any(Object),
       );
       expect(result.desarquivamentos).toHaveLength(1);
       expect(result.total).toBe(1);
     });
 
-    it('deve retornar todos os registros sem filtro de usuário', async () => {
+    it("deve retornar todos os registros sem filtro de usuário", async () => {
       const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -245,14 +245,14 @@ describe('NugecidService', () => {
       const result = await service.findAll(queryDto);
 
       expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
-        'desarquivamento.createdById = :userId',
+        "desarquivamento.createdById = :userId",
         expect.any(Object),
       );
       expect(result.desarquivamentos).toHaveLength(1);
     });
 
-    it('deve aplicar filtros de busca', async () => {
-      const queryWithSearch = { ...queryDto, search: 'João' };
+    it("deve aplicar filtros de busca", async () => {
+      const queryWithSearch = { ...queryDto, search: "João" };
       const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -269,14 +269,14 @@ describe('NugecidService', () => {
       await service.findAll(queryWithSearch);
 
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining('nomeSolicitante'),
-        expect.objectContaining({ search: '%João%' }),
+        expect.stringContaining("nomeSolicitante"),
+        expect.objectContaining({ search: "%João%" }),
       );
     });
   });
 
-  describe('findOne', () => {
-    it('deve retornar desarquivamento encontrado', async () => {
+  describe("findOne", () => {
+    it("deve retornar desarquivamento encontrado", async () => {
       const mockDesarquivamentoFound = {
         ...mockDesarquivamento,
         canBeAccessedBy: jest.fn().mockReturnValue(true),
@@ -290,17 +290,17 @@ describe('NugecidService', () => {
       expect(result).toEqual(mockDesarquivamentoFound);
       expect(mockDesarquivamentoRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: ['usuario', 'responsavel'],
+        relations: ["usuario", "responsavel"],
       });
     });
 
-    it('deve lançar NotFoundException se registro não existe', async () => {
+    it("deve lançar NotFoundException se registro não existe", async () => {
       mockDesarquivamentoRepository.findOne.mockResolvedValue(null);
 
       await expect(service.findOne(999)).rejects.toThrow(NotFoundException);
     });
 
-    it('deve retornar desarquivamento mesmo sem verificar acesso', async () => {
+    it("deve retornar desarquivamento mesmo sem verificar acesso", async () => {
       const mockDesarquivamentoWithoutAccess = {
         ...mockDesarquivamento,
         canBeAccessedBy: jest.fn().mockReturnValue(false),
@@ -314,12 +314,12 @@ describe('NugecidService', () => {
     });
   });
 
-  describe('update', () => {
+  describe("update", () => {
     const updateDto: UpdateDesarquivamentoDto = {
       status: StatusDesarquivamentoEnum.FINALIZADO,
     };
 
-    it('deve atualizar desarquivamento se usuário pode editar', async () => {
+    it("deve atualizar desarquivamento se usuário pode editar", async () => {
       const mockDesarquivamentoToUpdate = {
         ...mockDesarquivamento,
         canBeEditedBy: jest.fn().mockReturnValue(true),
@@ -343,7 +343,7 @@ describe('NugecidService', () => {
       expect(result.status).toBe(StatusDesarquivamentoEnum.FINALIZADO);
     });
 
-    it('deve lançar ForbiddenException se usuário não pode editar', async () => {
+    it("deve lançar ForbiddenException se usuário não pode editar", async () => {
       const mockDesarquivamentoNoEdit = {
         ...mockDesarquivamento,
         canBeEditedBy: jest.fn().mockReturnValue(false),
@@ -358,8 +358,8 @@ describe('NugecidService', () => {
     });
   });
 
-  describe('remove', () => {
-    it('deve fazer soft delete se usuário pode deletar', async () => {
+  describe("remove", () => {
+    it("deve fazer soft delete se usuário pode deletar", async () => {
       const mockDesarquivamentoToDelete = {
         ...mockDesarquivamento,
         canBeDeletedBy: jest.fn().mockReturnValue(true),
@@ -381,7 +381,7 @@ describe('NugecidService', () => {
       expect(mockDesarquivamentoRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
-    it('deve lançar ForbiddenException se usuário não pode deletar', async () => {
+    it("deve lançar ForbiddenException se usuário não pode deletar", async () => {
       const mockDesarquivamentoNoDelete = {
         ...mockDesarquivamento,
         canBeDeletedBy: jest.fn().mockReturnValue(false),
@@ -396,29 +396,29 @@ describe('NugecidService', () => {
     });
   });
 
-  describe('findByBarcode', () => {
-    it('deve encontrar desarquivamento por código de barras', async () => {
+  describe("findByBarcode", () => {
+    it("deve encontrar desarquivamento por código de barras", async () => {
       const mockDesarquivamentoWithBarcode = {
         ...mockDesarquivamento,
-        codigoBarras: 'DES202400001',
+        codigoBarras: "DES202400001",
         canBeAccessedBy: jest.fn().mockReturnValue(true),
       };
       mockDesarquivamentoRepository.findOne.mockResolvedValue(
         mockDesarquivamentoWithBarcode,
       );
 
-      const result = await service.findByBarcode('DES202400001');
+      const result = await service.findByBarcode("DES202400001");
 
       expect(result).toEqual(mockDesarquivamentoWithBarcode);
       expect(mockDesarquivamentoRepository.findOne).toHaveBeenCalledWith({
-        where: { codigoBarras: 'DES202400001' },
-        relations: ['usuario', 'responsavel'],
+        where: { codigoBarras: "DES202400001" },
+        relations: ["usuario", "responsavel"],
       });
     });
   });
 
-  describe('getDashboardStats', () => {
-    it('deve retornar estatísticas do dashboard', async () => {
+  describe("getDashboardStats", () => {
+    it("deve retornar estatísticas do dashboard", async () => {
       // Mock do QueryBuilder
       const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),

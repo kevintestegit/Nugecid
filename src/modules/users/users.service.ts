@@ -15,18 +15,18 @@ import {
   Render,
   Request,
   Response,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
-} from '@nestjs/swagger';
+} from "@nestjs/swagger";
 import {
   Request as ExpressRequest,
   Response as ExpressResponse,
-} from 'express';
+} from "express";
 
 // Use Cases
 import {
@@ -38,27 +38,27 @@ import {
   RestoreUserUseCase,
   GetUserStatisticsUseCase,
   GetRolesUseCase,
-} from './application/use-cases';
+} from "./application/use-cases";
 
 // DTOs
-import { CreateUserDto } from './application/dto/create-user.dto';
-import { UpdateUserDto } from './application/dto/update-user.dto';
-import { QueryUsersDto } from './application/dto/query-users.dto';
+import { CreateUserDto } from "./application/dto/create-user.dto";
+import { UpdateUserDto } from "./application/dto/update-user.dto";
+import { QueryUsersDto } from "./application/dto/query-users.dto";
 
 // Guards and Decorators
-import { SessionAuthGuard } from '../auth/guards/session-auth.guard';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from './entities/user.entity';
+import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { User } from "./entities/user.entity";
 
 // Mappers
-import { UserMapper } from './infrastructure/mappers/user.mapper';
-import { RoleMapper } from './infrastructure/mappers/role.mapper';
+import { UserMapper } from "./infrastructure/mappers/user.mapper";
+import { RoleMapper } from "./infrastructure/mappers/role.mapper";
 
-@ApiTags('Usuários')
-@Controller('users')
+@ApiTags("Usuários")
+@Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(
@@ -73,24 +73,24 @@ export class UsersController {
   ) {}
 
   @Get()
-  @Roles('admin')
+  @Roles("admin")
   // Ensure API responses are not cached by browsers/proxies
   // This prevents browsers from returning 304 Not Modified for the users list
   // which was causing the frontend to mis-handle the response.
   // Using no-store and no-cache guarantees fresh data.
   @Header(
-    'Cache-Control',
-    'no-store, no-cache, must-revalidate, proxy-revalidate',
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
   )
-  @ApiOperation({ summary: 'Lista todos os usuários' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'role', required: false, type: String })
-  @ApiQuery({ name: 'ativo', required: false, type: Boolean })
+  @ApiOperation({ summary: "Lista todos os usuários" })
+  @ApiQuery({ name: "page", required: false, type: Number })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  @ApiQuery({ name: "search", required: false, type: String })
+  @ApiQuery({ name: "role", required: false, type: String })
+  @ApiQuery({ name: "ativo", required: false, type: Boolean })
   @ApiResponse({
     status: 200,
-    description: 'Lista de usuários retornada com sucesso.',
+    description: "Lista de usuários retornada com sucesso.",
   })
   async findAll(@Query() query: QueryUsersDto) {
     const result = await this.getUsersUseCase.execute(query as any);
@@ -117,7 +117,7 @@ export class UsersController {
     const users = result as any[];
     return {
       success: true,
-      data: users.map(user => UserMapper.toEntity(user)),
+      data: users.map((user) => UserMapper.toEntity(user)),
       meta: {
         total: users.length,
         page: 1,
@@ -129,25 +129,25 @@ export class UsersController {
     };
   }
 
-  @Get('api')
-  @Roles('admin', 'coordenador')
+  @Get("api")
+  @Roles("admin", "coordenador")
   @Header(
-    'Cache-Control',
-    'no-store, no-cache, must-revalidate, proxy-revalidate',
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
   )
-  @ApiOperation({ summary: 'Lista usuários com paginação e filtros' })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'roleId', required: false, type: Number })
-  @ApiQuery({ name: 'ativo', required: false, type: Boolean })
+  @ApiOperation({ summary: "Lista usuários com paginação e filtros" })
+  @ApiQuery({ name: "page", required: false, type: Number })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  @ApiQuery({ name: "search", required: false, type: String })
+  @ApiQuery({ name: "roleId", required: false, type: Number })
+  @ApiQuery({ name: "ativo", required: false, type: Boolean })
   @ApiQuery({
-    name: 'sortBy',
+    name: "sortBy",
     required: false,
-    enum: ['nome', 'usuario', 'criadoEm', 'ultimoLogin'],
+    enum: ["nome", "usuario", "criadoEm", "ultimoLogin"],
   })
-  @ApiQuery({ name: 'sortOrder', required: false, enum: ['ASC', 'DESC'] })
-  @ApiResponse({ status: 200, description: 'Lista de usuários' })
+  @ApiQuery({ name: "sortOrder", required: false, enum: ["ASC", "DESC"] })
+  @ApiResponse({ status: 200, description: "Lista de usuários" })
   async findAllApi(@Query() query: QueryUsersDto) {
     const result = await this.getUsersUseCase.execute(query as any);
 
@@ -173,7 +173,7 @@ export class UsersController {
     const users = result as any[];
     return {
       success: true,
-      data: users.map(user => UserMapper.toEntity(user)),
+      data: users.map((user) => UserMapper.toEntity(user)),
       meta: {
         total: users.length,
         page: 1,
@@ -185,26 +185,26 @@ export class UsersController {
     };
   }
 
-  @Get('novo')
+  @Get("novo")
   @UseGuards(RolesGuard)
-  @Roles('admin')
-  @Render('usuarios/novo')
-  @ApiOperation({ summary: 'Renderiza página de criação de usuário' })
+  @Roles("admin")
+  @Render("usuarios/novo")
+  @ApiOperation({ summary: "Renderiza página de criação de usuário" })
   async createPage() {
     const roles = await this.getRolesUseCase.execute();
     return {
-      title: 'Novo Usuário - SGC ITEP',
-      roles: roles.map(role => RoleMapper.toEntity(role)),
+      title: "Novo Usuário - SGC ITEP",
+      roles: roles.map((role) => RoleMapper.toEntity(role)),
     };
   }
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles('admin')
-  @ApiOperation({ summary: 'Cria novo usuário' })
-  @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  @ApiResponse({ status: 403, description: 'Acesso negado' })
+  @Roles("admin")
+  @ApiOperation({ summary: "Cria novo usuário" })
+  @ApiResponse({ status: 201, description: "Usuário criado com sucesso" })
+  @ApiResponse({ status: 400, description: "Dados inválidos" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   async create(
     @Body() createUserDto: CreateUserDto,
     @CurrentUser() currentUser: User,
@@ -216,14 +216,14 @@ export class UsersController {
       const userEntity = UserMapper.toEntity(user);
 
       // Se for requisição AJAX/API, retorna JSON
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(201).json(userEntity);
       }
 
       // Se for requisição web, redireciona
-      return res.redirect('/users?message=Usuário criado com sucesso');
+      return res.redirect("/users?message=Usuário criado com sucesso");
     } catch (error) {
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
@@ -233,36 +233,36 @@ export class UsersController {
     }
   }
 
-  @Get('stats')
+  @Get("stats")
   @UseGuards(RolesGuard)
-  @Roles('admin')
-  @ApiOperation({ summary: 'Obtém estatísticas dos usuários' })
-  @ApiResponse({ status: 200, description: 'Estatísticas dos usuários' })
+  @Roles("admin")
+  @ApiOperation({ summary: "Obtém estatísticas dos usuários" })
+  @ApiResponse({ status: 200, description: "Estatísticas dos usuários" })
   async getStats() {
     return this.getUserStatisticsUseCase.execute();
   }
 
-  @Get('roles')
-  @ApiOperation({ summary: 'Lista todas as roles disponíveis' })
-  @ApiResponse({ status: 200, description: 'Lista de roles' })
+  @Get("roles")
+  @ApiOperation({ summary: "Lista todas as roles disponíveis" })
+  @ApiResponse({ status: 200, description: "Lista de roles" })
   async findAllRoles() {
     const roles = await this.getRolesUseCase.execute();
-    return roles.map(role => RoleMapper.toEntity(role));
+    return roles.map((role) => RoleMapper.toEntity(role));
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Busca usuário por ID' })
-  @ApiResponse({ status: 200, description: 'Dados do usuário' })
-  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  @Get(":id")
+  @ApiOperation({ summary: "Busca usuário por ID" })
+  @ApiResponse({ status: 200, description: "Dados do usuário" })
+  @ApiResponse({ status: 404, description: "Usuário não encontrado" })
   async findOne(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @Request() req: ExpressRequest,
   ) {
     const user = await this.getUserByIdUseCase.execute(id);
     const userEntity = UserMapper.toEntity(user);
 
     // Se for requisição AJAX/API, retorna JSON
-    if (req.headers.accept?.includes('application/json')) {
+    if (req.headers.accept?.includes("application/json")) {
       return userEntity;
     }
 
@@ -273,10 +273,10 @@ export class UsersController {
     };
   }
 
-  @Get(':id/detalhe')
-  @Render('usuarios/detalhe')
-  @ApiOperation({ summary: 'Renderiza página de detalhes do usuário' })
-  async detailPage(@Param('id', ParseIntPipe) id: number) {
+  @Get(":id/detalhe")
+  @Render("usuarios/detalhe")
+  @ApiOperation({ summary: "Renderiza página de detalhes do usuário" })
+  async detailPage(@Param("id", ParseIntPipe) id: number) {
     const user = await this.getUserByIdUseCase.execute(id);
     const userEntity = UserMapper.toEntity(user);
     return {
@@ -285,31 +285,31 @@ export class UsersController {
     };
   }
 
-  @Get(':id/editar')
+  @Get(":id/editar")
   @UseGuards(RolesGuard)
-  @Roles('admin')
-  @Render('usuarios/editar')
-  @ApiOperation({ summary: 'Renderiza página de edição do usuário' })
-  async editPage(@Param('id', ParseIntPipe) id: number) {
+  @Roles("admin")
+  @Render("usuarios/editar")
+  @ApiOperation({ summary: "Renderiza página de edição do usuário" })
+  async editPage(@Param("id", ParseIntPipe) id: number) {
     const user = await this.getUserByIdUseCase.execute(id);
     const roles = await this.getRolesUseCase.execute();
     const userEntity = UserMapper.toEntity(user);
     return {
       title: `Editar ${userEntity.nome} - SGC ITEP`,
       user: userEntity,
-      roles: roles.map(role => RoleMapper.toEntity(role)),
+      roles: roles.map((role) => RoleMapper.toEntity(role)),
     };
   }
 
-  @Patch(':id')
-  @Roles('admin')
-  @ApiOperation({ summary: 'Atualiza usuário' })
-  @ApiResponse({ status: 200, description: 'Usuário atualizado com sucesso' })
-  @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  @ApiResponse({ status: 403, description: 'Acesso negado' })
-  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  @Patch(":id")
+  @Roles("admin")
+  @ApiOperation({ summary: "Atualiza usuário" })
+  @ApiResponse({ status: 200, description: "Usuário atualizado com sucesso" })
+  @ApiResponse({ status: 400, description: "Dados inválidos" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  @ApiResponse({ status: 404, description: "Usuário não encontrado" })
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser() currentUser: User,
     @Request() req: ExpressRequest,
@@ -320,7 +320,7 @@ export class UsersController {
       const userEntity = UserMapper.toEntity(user);
 
       // Se for requisição AJAX/API, retorna JSON
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.json(userEntity);
       }
 
@@ -329,7 +329,7 @@ export class UsersController {
         `/users/${id}?message=Usuário atualizado com sucesso`,
       );
     } catch (error) {
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
@@ -339,16 +339,16 @@ export class UsersController {
     }
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles("admin")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Remove usuário (soft delete)' })
-  @ApiResponse({ status: 204, description: 'Usuário removido com sucesso' })
-  @ApiResponse({ status: 403, description: 'Acesso negado' })
-  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  @ApiOperation({ summary: "Remove usuário (soft delete)" })
+  @ApiResponse({ status: 204, description: "Usuário removido com sucesso" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  @ApiResponse({ status: 404, description: "Usuário não encontrado" })
   async remove(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @CurrentUser() currentUser: User,
     @Request() req: ExpressRequest,
     @Response() res: ExpressResponse,
@@ -357,14 +357,14 @@ export class UsersController {
       await this.deleteUserUseCase.execute(id);
 
       // Se for requisição AJAX/API, retorna status 204
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(204).send();
       }
 
       // Se for requisição web, redireciona
-      return res.redirect('/users?message=Usuário removido com sucesso');
+      return res.redirect("/users?message=Usuário removido com sucesso");
     } catch (error) {
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
@@ -372,15 +372,15 @@ export class UsersController {
     }
   }
 
-  @Patch(':id/reativar')
+  @Patch(":id/reativar")
   @UseGuards(RolesGuard)
-  @Roles('admin')
-  @ApiOperation({ summary: 'Reativa usuário' })
-  @ApiResponse({ status: 200, description: 'Usuário reativado com sucesso' })
-  @ApiResponse({ status: 403, description: 'Acesso negado' })
-  @ApiResponse({ status: 404, description: 'Usuário não encontrado' })
+  @Roles("admin")
+  @ApiOperation({ summary: "Reativa usuário" })
+  @ApiResponse({ status: 200, description: "Usuário reativado com sucesso" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  @ApiResponse({ status: 404, description: "Usuário não encontrado" })
   async reactivate(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @CurrentUser() currentUser: User,
     @Request() req: ExpressRequest,
     @Response() res: ExpressResponse,
@@ -390,14 +390,14 @@ export class UsersController {
       const userEntity = UserMapper.toEntity(user);
 
       // Se for requisição AJAX/API, retorna JSON
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.json(userEntity);
       }
 
       // Se for requisição web, redireciona
       return res.redirect(`/users/${id}?message=Usuário reativado com sucesso`);
     } catch (error) {
-      if (req.headers.accept?.includes('application/json')) {
+      if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
@@ -405,14 +405,14 @@ export class UsersController {
     }
   }
 
-  @Get('perfil/meu')
-  @Render('usuarios/perfil')
-  @ApiOperation({ summary: 'Renderiza página do perfil do usuário logado' })
+  @Get("perfil/meu")
+  @Render("usuarios/perfil")
+  @ApiOperation({ summary: "Renderiza página do perfil do usuário logado" })
   async profilePage(@CurrentUser() currentUser: User) {
     const user = await this.getUserByIdUseCase.execute(currentUser.id);
     const userEntity = UserMapper.toEntity(user);
     return {
-      title: 'Meu Perfil - SGC ITEP',
+      title: "Meu Perfil - SGC ITEP",
       user: userEntity,
       isOwnProfile: true,
     };

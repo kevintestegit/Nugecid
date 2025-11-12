@@ -1,16 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User as DomainUser } from '../../domain/entities/user';
-import { UserId } from '../../domain/value-objects/user-id';
-import { Usuario } from '../../domain/value-objects/usuario';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { User as DomainUser } from "../../domain/entities/user";
+import { UserId } from "../../domain/value-objects/user-id";
+import { Usuario } from "../../domain/value-objects/usuario";
 import {
   IUserRepository,
   UserFilters,
   UserStatistics,
-} from '../../domain/repositories/user.repository.interface';
-import { User as UserEntity } from '../../entities/user.entity';
-import { UserMapper } from '../mappers/user.mapper';
+} from "../../domain/repositories/user.repository.interface";
+import { User as UserEntity } from "../../entities/user.entity";
+import { UserMapper } from "../mappers/user.mapper";
 
 @Injectable()
 export class TypeOrmUserRepository implements IUserRepository {
@@ -28,7 +28,7 @@ export class TypeOrmUserRepository implements IUserRepository {
   async findById(id: UserId): Promise<DomainUser | null> {
     const entity = await this.userRepository.findOne({
       where: { id: id.value },
-      relations: ['role'],
+      relations: ["role"],
     });
 
     return entity ? UserMapper.toDomain(entity) : null;
@@ -37,7 +37,7 @@ export class TypeOrmUserRepository implements IUserRepository {
   async findByUsuario(usuario: Usuario): Promise<DomainUser | null> {
     const entity = await this.userRepository.findOne({
       where: { usuario: usuario.value },
-      relations: ['role'],
+      relations: ["role"],
     });
 
     return entity ? UserMapper.toDomain(entity) : null;
@@ -45,38 +45,41 @@ export class TypeOrmUserRepository implements IUserRepository {
 
   async findAll(filters?: UserFilters): Promise<DomainUser[]> {
     const queryBuilder = this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role');
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.role", "role");
 
     if (filters) {
       if (filters.nome) {
-        queryBuilder.andWhere('user.nome ILIKE :nome', {
+        queryBuilder.andWhere("user.nome ILIKE :nome", {
           nome: `%${filters.nome}%`,
         });
       }
 
       if (filters.usuario) {
-        queryBuilder.andWhere('user.usuario ILIKE :usuario', {
+        queryBuilder.andWhere("user.usuario ILIKE :usuario", {
           usuario: `%${filters.usuario}%`,
         });
       }
 
       if (filters.ativo !== undefined) {
-        queryBuilder.andWhere('user.ativo = :ativo', { ativo: filters.ativo });
+        queryBuilder.andWhere("user.ativo = :ativo", { ativo: filters.ativo });
       }
 
       if (filters.roleId) {
-        queryBuilder.andWhere('user.roleId = :roleId', {
+        queryBuilder.andWhere("user.roleId = :roleId", {
           roleId: filters.roleId,
         });
       }
 
+      // Usuários inativos podem incluir soft-deleted apenas se includeDeleted for true
       if (!filters.includeDeleted) {
-        queryBuilder.andWhere('user.deletedAt IS NULL');
+        queryBuilder.andWhere("user.deletedAt IS NULL");
       }
     } else {
-      queryBuilder.andWhere('user.deletedAt IS NULL');
+      queryBuilder.andWhere("user.deletedAt IS NULL");
     }
+
+    // Debug: Log da query gerada para verificar se está correta
 
     const entities = await queryBuilder.getMany();
     return UserMapper.toDomainArray(entities);
@@ -92,38 +95,44 @@ export class TypeOrmUserRepository implements IUserRepository {
     totalPages: number;
   }> {
     const queryBuilder = this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role');
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.role", "role");
 
     if (filters) {
       if (filters.nome) {
-        queryBuilder.andWhere('user.nome ILIKE :nome', {
+        queryBuilder.andWhere("user.nome ILIKE :nome", {
           nome: `%${filters.nome}%`,
         });
       }
 
       if (filters.usuario) {
-        queryBuilder.andWhere('user.usuario ILIKE :usuario', {
+        queryBuilder.andWhere("user.usuario ILIKE :usuario", {
           usuario: `%${filters.usuario}%`,
         });
       }
 
       if (filters.ativo !== undefined) {
-        queryBuilder.andWhere('user.ativo = :ativo', { ativo: filters.ativo });
+        queryBuilder.andWhere("user.ativo = :ativo", { ativo: filters.ativo });
       }
 
       if (filters.roleId) {
-        queryBuilder.andWhere('user.roleId = :roleId', {
+        queryBuilder.andWhere("user.roleId = :roleId", {
           roleId: filters.roleId,
         });
       }
 
+      // Usuários inativos podem incluir soft-deleted apenas se includeDeleted for true
       if (!filters.includeDeleted) {
-        queryBuilder.andWhere('user.deletedAt IS NULL');
+        queryBuilder.andWhere("user.deletedAt IS NULL");
       }
     } else {
-      queryBuilder.andWhere('user.deletedAt IS NULL');
+      queryBuilder.andWhere("user.deletedAt IS NULL");
     }
+
+    // Debug: Log da query gerada para verificar se está correta
+      "🔍 [DEBUG] Query SQL gerada (paginação):",
+      queryBuilder.getSql(),
+    );
 
     const total = await queryBuilder.getCount();
     const entities = await queryBuilder
@@ -169,9 +178,9 @@ export class TypeOrmUserRepository implements IUserRepository {
       where: { ativo: false },
     });
     const deletados = await this.userRepository
-      .createQueryBuilder('user')
+      .createQueryBuilder("user")
       .withDeleted()
-      .where('user.deletedAt IS NOT NULL')
+      .where("user.deletedAt IS NOT NULL")
       .getCount();
 
     return { total, ativos, inativos, deletados };

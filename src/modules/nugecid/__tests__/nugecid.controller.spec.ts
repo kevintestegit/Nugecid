@@ -1,5 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { NugecidController } from '../nugecid.controller';
+import { Test, TestingModule } from "@nestjs/testing";
+import { NugecidController } from "../nugecid.controller";
 import {
   CreateDesarquivamentoUseCase,
   FindAllDesarquivamentosUseCase,
@@ -11,14 +11,14 @@ import {
   GetDashboardStatsUseCase,
   ImportDesarquivamentoUseCase,
   ImportRegistrosUseCase,
-} from '../application/use-cases';
-import { NugecidImportService } from '../nugecid-import.service';
-import { NugecidStatsService } from '../nugecid-stats.service';
-import { NugecidPdfService } from '../nugecid-pdf.service';
-import { NugecidExportService } from '../nugecid-export.service';
-import { NugecidAuditService } from '../nugecid-audit.service';
+} from "../application/use-cases";
+import { NugecidImportService } from "../nugecid-import.service";
+import { NugecidStatsService } from "../nugecid-stats.service";
+import { NugecidPdfService } from "../nugecid-pdf.service";
+import { NugecidExportService } from "../nugecid-export.service";
+import { NugecidAuditService } from "../nugecid-audit.service";
 
-describe('NugecidController', () => {
+describe("NugecidController", () => {
   let controller: NugecidController;
 
   beforeEach(async () => {
@@ -46,7 +46,7 @@ describe('NugecidController', () => {
     controller = module.get<NugecidController>(NugecidController);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(controller).toBeDefined();
   });
 });

@@ -3,11 +3,11 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Coluna, Projeto } from '../entities';
-import { CreateColunaDto, UpdateColunaDto } from '../dto';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Coluna, Projeto } from "../entities";
+import { CreateColunaDto, UpdateColunaDto } from "../dto";
 
 @Injectable()
 export class ColunasService {
@@ -25,16 +25,16 @@ export class ColunasService {
     // Verificar se o projeto existe e se o usuário tem acesso
     const projeto = await this.projetoRepository.findOne({
       where: { id: createColunaDto.projetoId },
-      relations: ['membros'],
+      relations: ["membros"],
     });
 
     if (!projeto) {
-      throw new NotFoundException('Projeto não encontrado');
+      throw new NotFoundException("Projeto não encontrado");
     }
 
     if (!projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para criar colunas neste projeto',
+        "Você não tem permissão para criar colunas neste projeto",
       );
     }
 
@@ -42,7 +42,7 @@ export class ColunasService {
     if (!createColunaDto.ordem) {
       const lastColuna = await this.colunaRepository.findOne({
         where: { projetoId: createColunaDto.projetoId },
-        order: { ordem: 'DESC' },
+        order: { ordem: "DESC" },
       });
       createColunaDto.ordem = lastColuna ? lastColuna.ordem + 1 : 1;
     } else {
@@ -50,7 +50,7 @@ export class ColunasService {
       await this.reorderColumns(
         createColunaDto.projetoId,
         createColunaDto.ordem,
-        'insert',
+        "insert",
       );
     }
 
@@ -62,23 +62,23 @@ export class ColunasService {
     // Verificar se o projeto existe e se o usuário tem acesso
     const projeto = await this.projetoRepository.findOne({
       where: { id: projetoId },
-      relations: ['membros'],
+      relations: ["membros"],
     });
 
     if (!projeto) {
-      throw new NotFoundException('Projeto não encontrado');
+      throw new NotFoundException("Projeto não encontrado");
     }
 
     if (!projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar este projeto',
+        "Você não tem permissão para acessar este projeto",
       );
     }
 
     return this.colunaRepository.find({
       where: { projetoId },
-      relations: ['tarefas', 'tarefas.responsavel'],
-      order: { ordem: 'ASC' },
+      relations: ["tarefas", "tarefas.responsavel"],
+      order: { ordem: "ASC" },
     });
   }
 
@@ -86,20 +86,20 @@ export class ColunasService {
     const coluna = await this.colunaRepository.findOne({
       where: { id },
       relations: [
-        'projeto',
-        'projeto.membros',
-        'tarefas',
-        'tarefas.responsavel',
+        "projeto",
+        "projeto.membros",
+        "tarefas",
+        "tarefas.responsavel",
       ],
     });
 
     if (!coluna) {
-      throw new NotFoundException('Coluna não encontrada');
+      throw new NotFoundException("Coluna não encontrada");
     }
 
     if (!coluna.projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para acessar esta coluna',
+        "Você não tem permissão para acessar esta coluna",
       );
     }
 
@@ -115,7 +115,7 @@ export class ColunasService {
 
     if (!coluna.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para editar esta coluna',
+        "Você não tem permissão para editar esta coluna",
       );
     }
 
@@ -124,7 +124,7 @@ export class ColunasService {
       await this.reorderColumns(
         coluna.projetoId,
         updateColunaDto.ordem,
-        'update',
+        "update",
         coluna.ordem,
       );
     }
@@ -138,19 +138,19 @@ export class ColunasService {
 
     if (!coluna.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para deletar esta coluna',
+        "Você não tem permissão para deletar esta coluna",
       );
     }
 
     // Verificar se a coluna tem tarefas
     if (coluna.tarefas && coluna.tarefas.length > 0) {
       throw new BadRequestException(
-        'Não é possível deletar uma coluna que contém tarefas',
+        "Não é possível deletar uma coluna que contém tarefas",
       );
     }
 
     // Reordenar colunas após remoção
-    await this.reorderColumns(coluna.projetoId, coluna.ordem, 'delete');
+    await this.reorderColumns(coluna.projetoId, coluna.ordem, "delete");
 
     await this.colunaRepository.remove(coluna);
   }
@@ -158,16 +158,16 @@ export class ColunasService {
   async reorderColumns(
     projetoId: number,
     targetOrder: number,
-    operation: 'insert' | 'update' | 'delete',
+    operation: "insert" | "update" | "delete",
     currentOrder?: number,
   ): Promise<void> {
     const colunas = await this.colunaRepository.find({
       where: { projetoId },
-      order: { ordem: 'ASC' },
+      order: { ordem: "ASC" },
     });
 
     switch (operation) {
-      case 'insert':
+      case "insert":
         // Incrementar ordem das colunas que estão na posição target ou depois
         for (const coluna of colunas) {
           if (coluna.ordem >= targetOrder) {
@@ -177,7 +177,7 @@ export class ColunasService {
         }
         break;
 
-      case 'update':
+      case "update":
         if (!currentOrder) return;
 
         if (targetOrder > currentOrder) {
@@ -199,7 +199,7 @@ export class ColunasService {
         }
         break;
 
-      case 'delete':
+      case "delete":
         // Decrementar ordem das colunas que estão depois da deletada
         for (const coluna of colunas) {
           if (coluna.ordem > targetOrder) {
@@ -220,7 +220,7 @@ export class ColunasService {
 
     if (!coluna.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        'Você não tem permissão para reordenar colunas neste projeto',
+        "Você não tem permissão para reordenar colunas neste projeto",
       );
     }
 
@@ -239,7 +239,7 @@ export class ColunasService {
     await this.reorderColumns(
       coluna.projetoId,
       newOrder,
-      'update',
+      "update",
       coluna.ordem,
     );
 
@@ -263,7 +263,7 @@ export class ColunasService {
 
     if (coluna.tarefas) {
       const hoje = new Date();
-      coluna.tarefas.forEach(tarefa => {
+      coluna.tarefas.forEach((tarefa) => {
         if (tarefa.prazo && new Date(tarefa.prazo) < hoje) {
           stats.tarefasAtrasadas++;
         }

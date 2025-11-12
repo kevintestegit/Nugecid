@@ -1,5 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Input } from './Input';
+import React, { useMemo } from 'react';
+import { DateRange as DayPickerRange } from 'react-day-picker';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { CalendarIcon, X } from 'lucide-react';
+import { Button } from './Button';
+import { Popover, PopoverContent, PopoverTrigger } from './Popover';
+import { Calendar } from './Calendar';
+import { cn } from '@/utils/cn';
 
 export interface DateRange {
   startDate: Date | null;
@@ -9,73 +16,99 @@ export interface DateRange {
 interface DateRangePickerProps {
   value: DateRange;
   onChange: (dateRange: DateRange) => void;
-  placeholder?: string; // This is not used anymore, but I'll keep it to avoid breaking changes in parent
+  placeholder?: string;
   className?: string;
 }
 
-export function DateRangePicker({ value, onChange, className = "" }: DateRangePickerProps) {
-  const formatDate = (date: Date | null): string => {
-    if (!date) return '';
-    // Make sure to get UTC date parts to avoid timezone issues
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const year = date.getUTCFullYear();
-    return `${day}/${month}/${year}`;
-  };
+const formatDisplayDate = (date: Date | null) =>
+  date ? format(date, 'dd/MM/yyyy', { locale: ptBR }) : '';
 
-  const [startStr, setStartStr] = useState(formatDate(value.startDate));
-  const [endStr, setEndStr] = useState(formatDate(value.endDate));
-
-  useEffect(() => {
-    setStartStr(formatDate(value.startDate));
-  }, [value.startDate]);
-
-  useEffect(() => {
-    setEndStr(formatDate(value.endDate));
-  }, [value.endDate]);
-
-  const parseDate = (str: string): Date | null => {
-    const parts = str.split('/');
-    if (parts.length === 3) {
-      const [day, month, year] = parts.map(p => parseInt(p, 10));
-      if (!isNaN(day) && !isNaN(month) && !isNaN(year) && year > 1000) {
-        // Create date in UTC
-        const date = new Date(Date.UTC(year, month - 1, day));
-        if (!isNaN(date.getTime())) {
-          return date;
-        }
-      }
+export function DateRangePicker({
+  value,
+  onChange,
+  placeholder = 'Selecionar periodo',
+  className = '',
+}: DateRangePickerProps) {
+  const selectedRange = useMemo<DayPickerRange | undefined>(() => {
+    if (value.startDate || value.endDate) {
+      return {
+        from: value.startDate ?? undefined,
+        to: value.endDate ?? undefined,
+      };
     }
-    return null;
+    return undefined;
+  }, [value.startDate, value.endDate]);
+
+  const label = useMemo(() => {
+    if (value.startDate && value.endDate) {
+      return `${formatDisplayDate(value.startDate)} - ${formatDisplayDate(value.endDate)}`;
+    }
+    if (value.startDate) {
+      return `A partir de ${formatDisplayDate(value.startDate)}`;
+    }
+    if (value.endDate) {
+      return `Ate ${formatDisplayDate(value.endDate)}`;
+    }
+    return placeholder;
+  }, [value.startDate, value.endDate, placeholder]);
+
+  const handleSelect = (range?: DayPickerRange) => {
+    onChange({
+      startDate: range?.from ?? null,
+      endDate: range?.to ?? null,
+    });
   };
 
-  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const str = e.target.value;
-    setStartStr(str);
-    const date = parseDate(str);
-    onChange({ ...value, startDate: date });
-  };
-  
-  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const str = e.target.value;
-    setEndStr(str);
-    const date = parseDate(str);
-    onChange({ ...value, endDate: date });
+  const handleClear = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    onChange({ startDate: null, endDate: null });
   };
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <Input
-        value={startStr}
-        onChange={handleStartChange}
-        placeholder="dd/mm/aaaa"
-      />
-      <span className="text-muted-foreground">-</span>
-      <Input
-        value={endStr}
-        onChange={handleEndChange}
-        placeholder="dd/mm/aaaa"
-      />
+    <div className={cn('flex w-full', className)}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              'w-full justify-start text-left font-normal',
+              !value.startDate && !value.endDate && 'text-muted-foreground',
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {label}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 max-w-[240px]" align="start" side="bottom">
+          <Calendar
+            mode="range"
+            numberOfMonths={1}
+            selected={selectedRange}
+            onSelect={handleSelect}
+            defaultMonth={selectedRange?.from ?? new Date()}
+            initialFocus
+          />
+          <div className="flex items-center justify-between border-t px-2 py-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClear}
+              disabled={!value.startDate && !value.endDate}
+              className="text-muted-foreground hover:text-foreground h-6 px-2 text-[0.7rem]"
+            >
+              <X className="mr-0.5 h-3 w-3" />
+              Limpar
+            </Button>
+            {(value.startDate || value.endDate) && (
+              <span className="text-[0.65rem] text-muted-foreground">
+                {value.startDate ? formatDisplayDate(value.startDate) : 'Inicio indefinido'}
+                {' - '}
+                {value.endDate ? formatDisplayDate(value.endDate) : 'Sem data final'}
+              </span>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

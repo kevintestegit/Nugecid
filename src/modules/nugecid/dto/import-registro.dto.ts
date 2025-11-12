@@ -5,33 +5,33 @@ import {
   IsOptional,
   IsEnum,
   IsBoolean,
-} from 'class-validator';
-import { Transform } from 'class-transformer';
+} from "class-validator";
+import { Transform } from "class-transformer";
 
 // Enums normalizados (sem acentos) apenas para validação do import
 export enum TipoDesarquivamento {
-  FISICO = 'FISICO',
-  DIGITAL = 'DIGITAL',
-  NAO_LOCALIZADO = 'NAO_LOCALIZADO',
+  FISICO = "FISICO",
+  DIGITAL = "DIGITAL",
+  NAO_LOCALIZADO = "NAO_LOCALIZADO",
 }
 
 export enum StatusDesarquivamento {
-  FINALIZADO = 'FINALIZADO',
-  DESARQUIVADO = 'DESARQUIVADO',
-  NAO_COLETADO = 'NAO_COLETADO',
-  SOLICITADO = 'SOLICITADO',
-  REARQUIVAMENTO_SOLICITADO = 'REARQUIVAMENTO_SOLICITADO',
-  RETIRADO_PELO_SETOR = 'RETIRADO_PELO_SETOR',
-  NAO_LOCALIZADO = 'NAO_LOCALIZADO',
+  FINALIZADO = "FINALIZADO",
+  DESARQUIVADO = "DESARQUIVADO",
+  NAO_COLETADO = "NAO_COLETADO",
+  SOLICITADO = "SOLICITADO",
+  REARQUIVAMENTO_SOLICITADO = "REARQUIVAMENTO_SOLICITADO",
+  RETIRADO_PELO_SETOR = "RETIRADO_PELO_SETOR",
+  NAO_LOCALIZADO = "NAO_LOCALIZADO",
 }
 
 export class ImportRegistroDto {
   // Normalizador auxiliar
   private static norm(v: any): string {
-    return (v ?? '')
+    return (v ?? "")
       .toString()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase()
       .trim();
   }

@@ -1,5 +1,5 @@
-import { Role } from '../entities/role';
-import { RoleId } from '../value-objects/role-id';
+import { Role } from "../entities/role";
+import { RoleId } from "../value-objects/role-id";
 
 export interface RoleFilters {
   nome?: string;

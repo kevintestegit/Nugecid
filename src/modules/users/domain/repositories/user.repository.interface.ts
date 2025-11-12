@@ -1,6 +1,6 @@
-import { User } from '../entities/user';
-import { UserId } from '../value-objects/user-id';
-import { Usuario } from '../value-objects/usuario';
+import { User } from "../entities/user";
+import { UserId } from "../value-objects/user-id";
+import { Usuario } from "../value-objects/usuario";
 
 export interface UserFilters {
   nome?: string;

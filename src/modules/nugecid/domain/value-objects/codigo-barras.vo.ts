@@ -3,14 +3,14 @@ export class CodigoBarras {
   private static readonly PATTERN = /^DES\d{10}$/; // Formato: DES + 10 dígitos
 
   constructor(value: string) {
-    if (!value || typeof value !== 'string') {
-      throw new Error('Código de barras deve ser uma string válida');
+    if (!value || typeof value !== "string") {
+      throw new Error("Código de barras deve ser uma string válida");
     }
 
     const trimmedValue = value.trim();
     if (!CodigoBarras.PATTERN.test(trimmedValue)) {
       throw new Error(
-        'Código de barras deve seguir o formato DES + 10 dígitos (ex: DES2024010001)',
+        "Código de barras deve seguir o formato DES + 10 dígitos (ex: DES2024010001)",
       );
     }
 
@@ -35,9 +35,9 @@ export class CodigoBarras {
 
   static generateNew(): CodigoBarras {
     const year = String(new Date().getFullYear()).slice(-2); // Últimos 2 dígitos do ano
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    const day = String(new Date().getDate()).padStart(2, '0');
-    const random = String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+    const month = String(new Date().getMonth() + 1).padStart(2, "0");
+    const day = String(new Date().getDate()).padStart(2, "0");
+    const random = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
 
     const codigo = `DES${year}${month}${day}${random}`; // Total: DES + 10 dígitos
     return new CodigoBarras(codigo);

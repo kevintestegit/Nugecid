@@ -1,10 +1,10 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger } from "@nestjs/common";
 import {
   DesarquivamentoDomain,
   DesarquivamentoId,
   IDesarquivamentoRepository,
-} from '../../../domain';
-import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from '../../../domain/nugecid.constants';
+} from "../../../domain";
+import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
 
 export interface DeleteDesarquivamentoRequest {
   id: number;
@@ -82,7 +82,7 @@ export class DeleteDesarquivamentoUseCase {
       `[DELETE_USE_CASE] 📊 RESULTADO DA BUSCA: ${
         desarquivamento
           ? `ENCONTRADO - ID: ${desarquivamento.id?.value}`
-          : 'NÃO ENCONTRADO'
+          : "NÃO ENCONTRADO"
       }`,
     );
 
@@ -106,13 +106,13 @@ export class DeleteDesarquivamentoUseCase {
     this.logger.log(`[DELETE_USE_CASE] ✅ Desarquivamento encontrado:`);
     this.logger.log(`[DELETE_USE_CASE]   - ID: ${desarquivamento.id?.value}`);
     this.logger.log(
-      `[DELETE_USE_CASE]   - NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || 'N/A'}`,
+      `[DELETE_USE_CASE]   - NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
     );
     this.logger.log(
       `[DELETE_USE_CASE]   - Status: ${desarquivamento.status?.value}`,
     );
     this.logger.log(
-      `[DELETE_USE_CASE]   - Já excluído: ${desarquivamento.isDeleted() ? 'SIM' : 'NÃO'}`,
+      `[DELETE_USE_CASE]   - Já excluído: ${desarquivamento.isDeleted() ? "SIM" : "NÃO"}`,
     );
 
     // Verificar se já foi excluído (para soft delete)
@@ -122,7 +122,7 @@ export class DeleteDesarquivamentoUseCase {
       );
       return {
         success: true,
-        message: 'Desarquivamento já estava excluído',
+        message: "Desarquivamento já estava excluído",
         deletedAt: desarquivamento.deletedAt,
       };
     }
@@ -156,16 +156,16 @@ export class DeleteDesarquivamentoUseCase {
   private validateRequest(request: DeleteDesarquivamentoRequest): void {
     // Validar ID
     if (!request.id || request.id <= 0 || !Number.isInteger(request.id)) {
-      throw new Error('ID deve ser um número inteiro positivo');
+      throw new Error("ID deve ser um número inteiro positivo");
     }
 
     // Validar usuário
     if (!request.userId || request.userId <= 0) {
-      throw new Error('ID do usuário é obrigatório');
+      throw new Error("ID do usuário é obrigatório");
     }
 
     if (!request.userRoles || !Array.isArray(request.userRoles)) {
-      throw new Error('Roles do usuário são obrigatórias');
+      throw new Error("Roles do usuário são obrigatórias");
     }
   }
 
@@ -175,12 +175,12 @@ export class DeleteDesarquivamentoUseCase {
     userRoles: string[],
     permanent?: boolean,
   ): void {
-    const upperCaseUserRoles = userRoles.map(role => role.toUpperCase());
+    const upperCaseUserRoles = userRoles.map((role) => role.toUpperCase());
 
     this.logger.log(`[DELETE_USE_CASE] 🔐 VERIFICANDO PERMISSÕES:`);
     this.logger.log(`[DELETE_USE_CASE] 🔐 Usuário ID: ${userId}`);
     this.logger.log(
-      `[DELETE_USE_CASE] 🔐 Roles: [${upperCaseUserRoles.join(', ')}]`,
+      `[DELETE_USE_CASE] 🔐 Roles: [${upperCaseUserRoles.join(", ")}]`,
     );
     this.logger.log(
       `[DELETE_USE_CASE] 🔐 Desarquivamento ID: ${desarquivamento.id?.value}`,
@@ -189,19 +189,19 @@ export class DeleteDesarquivamentoUseCase {
       `[DELETE_USE_CASE] 🔐 Criado por: ${desarquivamento.criadoPorId}`,
     );
     this.logger.log(
-      `[DELETE_USE_CASE] 🔐 Responsável: ${desarquivamento.responsavelId || 'N/A'}`,
+      `[DELETE_USE_CASE] 🔐 Responsável: ${desarquivamento.responsavelId || "N/A"}`,
     );
     this.logger.log(
       `[DELETE_USE_CASE] 🔐 Status: ${desarquivamento.status?.value}`,
     );
     this.logger.log(
-      `[DELETE_USE_CASE] 🔐 Exclusão permanente: ${permanent ? 'SIM' : 'NÃO'}`,
+      `[DELETE_USE_CASE] 🔐 Exclusão permanente: ${permanent ? "SIM" : "NÃO"}`,
     );
 
     // Verificar se pode ser excluído (usando método específico)
     const canDelete = desarquivamento.canBeDeletedBy(userId, userRoles);
     this.logger.log(
-      `[DELETE_USE_CASE] 🔐 Pode excluir? ${canDelete ? 'SIM' : 'NÃO'}`,
+      `[DELETE_USE_CASE] 🔐 Pode excluir? ${canDelete ? "SIM" : "NÃO"}`,
     );
 
     if (!canDelete) {
@@ -210,7 +210,7 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] ❌ - Usuário ${userId} não tem permissão para excluir`,
       );
       this.logger.error(
-        `[DELETE_USE_CASE] ❌ - Roles: [${upperCaseUserRoles.join(', ')}]`,
+        `[DELETE_USE_CASE] ❌ - Roles: [${upperCaseUserRoles.join(", ")}]`,
       );
       this.logger.error(
         `[DELETE_USE_CASE] ❌ - Criador: ${desarquivamento.criadoPorId}`,
@@ -219,31 +219,19 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] ❌ - Status: ${desarquivamento.status?.value}`,
       );
       throw new Error(
-        'Acesso negado: você não tem permissão para excluir este desarquivamento',
+        "Acesso negado: você não tem permissão para excluir este desarquivamento",
       );
     }
 
     // Hard delete só para administradores
-    if (permanent && !upperCaseUserRoles.includes('ADMIN')) {
+    if (permanent && !upperCaseUserRoles.includes("ADMIN")) {
       throw new Error(
-        'Acesso negado: apenas administradores podem realizar exclusão permanente',
+        "Acesso negado: apenas administradores podem realizar exclusão permanente",
       );
     }
 
-    // Não permitir exclusão de registros em andamento (verificar novamente para segurança)
-    if (desarquivamento.status.isInProgress()) {
-      throw new Error('Não é possível excluir desarquivamento em andamento');
-    }
-
-    // Verificar regras de negócio específicas
-    if (desarquivamento.status.value === 'FINALIZADO') {
-      // Apenas admins podem excluir registros concluídos
-      if (!upperCaseUserRoles.includes('ADMIN')) {
-        throw new Error(
-          'Apenas administradores podem excluir desarquivamentos concluídos',
-        );
-      }
-    }
+    // Administradores têm permissão total, usuários normais seguem as regras do domínio
+    // As validações de negócio já foram feitas no método canBeDeletedBy() acima
 
     this.logger.log(
       `[DELETE_USE_CASE] ✅ PERMISSÕES APROVADAS - Usuário pode excluir`,
@@ -281,7 +269,7 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] ✅ ID excluído: ${desarquivamento.id?.value}`,
       );
       this.logger.log(
-        `[DELETE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || 'N/A'}`,
+        `[DELETE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
       );
       this.logger.log(`[DELETE_USE_CASE] ✅ Usuário: ${userId}`);
       this.logger.log(
@@ -298,7 +286,7 @@ export class DeleteDesarquivamentoUseCase {
 
       return {
         success: true,
-        message: 'Desarquivamento excluído com sucesso',
+        message: "Desarquivamento excluído com sucesso",
         deletedAt: endTime,
       };
     } catch (error) {
@@ -347,7 +335,7 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] ✅ ID excluído permanentemente: ${desarquivamento.id?.value}`,
       );
       this.logger.log(
-        `[DELETE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || 'N/A'}`,
+        `[DELETE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
       );
       this.logger.log(
         `[DELETE_USE_CASE] ✅ Timestamp final: ${endTime.toISOString()}`,
@@ -363,7 +351,7 @@ export class DeleteDesarquivamentoUseCase {
 
       return {
         success: true,
-        message: 'Desarquivamento excluído permanentemente',
+        message: "Desarquivamento excluído permanentemente",
         deletedAt: endTime,
       };
     } catch (error) {
@@ -404,7 +392,7 @@ export class RestoreDesarquivamentoUseCase {
     this.logger.log(`[RESTORE_USE_CASE] 📋 ID: ${request.id}`);
     this.logger.log(`[RESTORE_USE_CASE] 👤 Usuário: ${request.userId}`);
     this.logger.log(
-      `[RESTORE_USE_CASE] 🔑 Roles: ${request.userRoles.join(', ')}`,
+      `[RESTORE_USE_CASE] 🔑 Roles: ${request.userRoles.join(", ")}`,
     );
     this.logger.log(
       `[RESTORE_USE_CASE] 🕐 Timestamp: ${startTime.toISOString()}`,
@@ -414,21 +402,21 @@ export class RestoreDesarquivamentoUseCase {
     this.logger.log(`[RESTORE_USE_CASE] ✅ Validando entrada...`);
     if (!request.id || request.id <= 0) {
       this.logger.error(`[RESTORE_USE_CASE] ❌ ID inválido: ${request.id}`);
-      throw new Error('ID deve ser um número inteiro positivo');
+      throw new Error("ID deve ser um número inteiro positivo");
     }
 
     if (!request.userId || request.userId <= 0) {
       this.logger.error(
         `[RESTORE_USE_CASE] ❌ ID do usuário inválido: ${request.userId}`,
       );
-      throw new Error('ID do usuário é obrigatório');
+      throw new Error("ID do usuário é obrigatório");
     }
 
     if (!request.userRoles || !Array.isArray(request.userRoles)) {
       this.logger.error(
         `[RESTORE_USE_CASE] ❌ Roles inválidas: ${request.userRoles}`,
       );
-      throw new Error('Roles do usuário são obrigatórias');
+      throw new Error("Roles do usuário são obrigatórias");
     }
     this.logger.log(`[RESTORE_USE_CASE] ✅ Entrada validada com sucesso`);
 
@@ -449,7 +437,7 @@ export class RestoreDesarquivamentoUseCase {
       throw new Error(`Desarquivamento com ID ${request.id} não encontrado`);
     }
     this.logger.log(
-      `[RESTORE_USE_CASE] ✅ Desarquivamento encontrado: ${desarquivamento.numeroNicLaudoAuto || 'N/A'}`,
+      `[RESTORE_USE_CASE] ✅ Desarquivamento encontrado: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
     );
 
     // Verificar se está excluído
@@ -458,13 +446,13 @@ export class RestoreDesarquivamentoUseCase {
       this.logger.error(
         `[RESTORE_USE_CASE] ❌ Desarquivamento não está excluído: ID ${request.id}`,
       );
-      throw new Error('Desarquivamento não está excluído');
+      throw new Error("Desarquivamento não está excluído");
     }
     this.logger.log(
       `[RESTORE_USE_CASE] ✅ Desarquivamento está excluído e pode ser restaurado`,
     );
 
-    const upperCaseUserRoles = request.userRoles.map(role =>
+    const upperCaseUserRoles = request.userRoles.map((role) =>
       role.toUpperCase(),
     );
     // Verificar permissões (apenas admins e operadores podem restaurar)
@@ -472,14 +460,14 @@ export class RestoreDesarquivamentoUseCase {
       `[RESTORE_USE_CASE] 🔐 Verificando permissões de restauração...`,
     );
     if (
-      !upperCaseUserRoles.includes('ADMIN') &&
-      !upperCaseUserRoles.includes('NUGECID_OPERATOR')
+      !upperCaseUserRoles.includes("ADMIN") &&
+      !upperCaseUserRoles.includes("NUGECID_OPERATOR")
     ) {
       this.logger.error(
-        `[RESTORE_USE_CASE] ❌ Permissão negada para usuário ${request.userId} com roles: ${request.userRoles.join(', ')}`,
+        `[RESTORE_USE_CASE] ❌ Permissão negada para usuário ${request.userId} com roles: ${request.userRoles.join(", ")}`,
       );
       throw new Error(
-        'Acesso negado: você não tem permissão para restaurar desarquivamentos',
+        "Acesso negado: você não tem permissão para restaurar desarquivamentos",
       );
     }
     this.logger.log(`[RESTORE_USE_CASE] ✅ Permissões verificadas com sucesso`);
@@ -490,7 +478,7 @@ export class RestoreDesarquivamentoUseCase {
       );
       this.logger.log(`[RESTORE_USE_CASE] 📋 ID: ${request.id}`);
       this.logger.log(
-        `[RESTORE_USE_CASE] 🏷️ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || 'N/A'}`,
+        `[RESTORE_USE_CASE] 🏷️ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
       );
 
       // Restaurar registro usando o método restore do repositório TypeORM
@@ -504,7 +492,7 @@ export class RestoreDesarquivamentoUseCase {
       );
       this.logger.log(`[RESTORE_USE_CASE] ✅ ID restaurado: ${request.id}`);
       this.logger.log(
-        `[RESTORE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || 'N/A'}`,
+        `[RESTORE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
       );
       this.logger.log(`[RESTORE_USE_CASE] ✅ Usuário: ${request.userId}`);
       this.logger.log(
@@ -521,7 +509,7 @@ export class RestoreDesarquivamentoUseCase {
 
       return {
         success: true,
-        message: 'Desarquivamento restaurado com sucesso',
+        message: "Desarquivamento restaurado com sucesso",
       };
     } catch (error) {
       this.logger.error(

@@ -3,14 +3,14 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { Request } from 'express';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+} from "@nestjs/common";
+import { Observable } from "rxjs";
+import { tap } from "rxjs/operators";
+import { Request } from "express";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 
-import { Auditoria } from '../../modules/audit/entities/auditoria.entity';
+import { Auditoria } from "../../modules/audit/entities/auditoria.entity";
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
@@ -26,9 +26,9 @@ export class AuditInterceptor implements NestInterceptor {
 
     // Só audita operações importantes (POST, PUT, DELETE)
     const shouldAudit =
-      ['POST', 'PUT', 'DELETE'].includes(method) &&
-      !url.includes('/auth/') &&
-      !url.includes('/health');
+      ["POST", "PUT", "DELETE"].includes(method) &&
+      !url.includes("/auth/") &&
+      !url.includes("/health");
 
     if (!shouldAudit || !user) {
       return next.handle();
@@ -45,14 +45,14 @@ export class AuditInterceptor implements NestInterceptor {
         params,
         query,
         ip,
-        userAgent: request.get('User-Agent'),
+        userAgent: request.get("User-Agent"),
       },
       timestamp: new Date(),
     };
 
     return next.handle().pipe(
       tap({
-        next: response => {
+        next: (response) => {
           // Sucesso - salva auditoria
           this.saveAudit({
             ...auditData,
@@ -60,12 +60,12 @@ export class AuditInterceptor implements NestInterceptor {
             response: this.sanitizeResponse(response),
           });
         },
-        error: error => {
+        error: (error) => {
           // Erro - salva auditoria com erro
           this.saveAudit({
             ...auditData,
             success: false,
-            error: error.message || 'Erro desconhecido',
+            error: error.message || "Erro desconhecido",
           });
         },
       }),
@@ -77,27 +77,27 @@ export class AuditInterceptor implements NestInterceptor {
       const audit = this.auditoriaRepository.create(auditData);
       await this.auditoriaRepository.save(audit);
     } catch (error) {
-      console.error('Erro ao salvar auditoria:', error);
+      console.error("Erro ao salvar auditoria:", error);
     }
   }
 
   private getActionFromMethod(method: string): string {
     const actions = {
-      POST: 'CREATE',
-      PUT: 'UPDATE',
-      PATCH: 'UPDATE',
-      DELETE: 'DELETE',
+      POST: "CREATE",
+      PUT: "UPDATE",
+      PATCH: "UPDATE",
+      DELETE: "DELETE",
     };
-    return actions[method] || 'UNKNOWN';
+    return actions[method] || "UNKNOWN";
   }
 
   private getResourceFromUrl(url: string): string {
     // Extrai o recurso da URL (ex: /api/nugecid/123 -> nugecid)
-    const parts = url.split('/').filter(Boolean);
-    if (parts.length >= 2 && parts[0] === 'api') {
+    const parts = url.split("/").filter(Boolean);
+    if (parts.length >= 2 && parts[0] === "api") {
       return parts[1];
     }
-    return parts[0] || 'unknown';
+    return parts[0] || "unknown";
   }
 
   private sanitizeBody(body: any): any {
@@ -105,11 +105,11 @@ export class AuditInterceptor implements NestInterceptor {
 
     // Remove campos sensíveis
     const sanitized = { ...body };
-    const sensitiveFields = ['password', 'senha', 'token', 'secret'];
+    const sensitiveFields = ["password", "senha", "token", "secret"];
 
-    sensitiveFields.forEach(field => {
+    sensitiveFields.forEach((field) => {
       if (sanitized[field]) {
-        sanitized[field] = '[REDACTED]';
+        sanitized[field] = "[REDACTED]";
       }
     });
 
@@ -122,7 +122,7 @@ export class AuditInterceptor implements NestInterceptor {
     // Limita o tamanho da resposta para não sobrecarregar o banco
     const responseStr = JSON.stringify(response);
     if (responseStr.length > 1000) {
-      return { message: 'Response too large to store' };
+      return { message: "Response too large to store" };
     }
 
     return response;

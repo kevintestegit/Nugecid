@@ -21,8 +21,8 @@ import {
   NotFoundException,
   InternalServerErrorException,
   ForbiddenException,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -32,8 +32,8 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
-} from '@nestjs/swagger';
-import { Response, Request } from 'express';
+} from "@nestjs/swagger";
+import { Response, Request } from "express";
 
 // Use Cases
 import {
@@ -43,31 +43,33 @@ import {
   UpdateDesarquivamentoUseCase,
   DeleteDesarquivamentoUseCase,
   RestoreDesarquivamentoUseCase,
-} from './application/use-cases';
+} from "./application/use-cases";
 
 // DTOs
-import { CreateDesarquivamentoDto } from './dto/create-desarquivamento.dto';
-import { UpdateDesarquivamentoDto } from './dto/update-desarquivamento.dto';
-import { QueryDesarquivamentoDto } from './dto/query-desarquivamento.dto';
-import { CreateDesarquivamentoCommentDto } from './dto/create-comment.dto';
+import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
+import { UpdateDesarquivamentoDto } from "./dto/update-desarquivamento.dto";
+import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
+import { CreateDesarquivamentoCommentDto } from "./dto/create-comment.dto";
 
 // New Services
-import { NugecidImportService } from './nugecid-import.service';
-import { NugecidStatsService } from './nugecid-stats.service';
-import { NugecidPdfService } from './nugecid-pdf.service';
-import { NugecidExportService } from './nugecid-export.service';
-import { NugecidService } from './nugecid.service';
+import { NugecidImportService } from "./nugecid-import.service";
+import { NugecidStatsService } from "./nugecid-stats.service";
+import { NugecidPdfService } from "./nugecid-pdf.service";
+import { NugecidExportService } from "./nugecid-export.service";
+import { NugecidDocxService } from "./nugecid-docx.service";
+import { NugecidService } from "./nugecid.service";
+import { NugecidAuditService } from "./nugecid-audit.service";
 
 // Guards and Decorators
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
-import { RoleType } from '../users/enums/role-type.enum';
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { User } from "../users/entities/user.entity";
+import { RoleType } from "../users/enums/role-type.enum";
 
-@ApiTags('NUGECID - Desarquivamentos')
-@Controller('nugecid')
+@ApiTags("NUGECID - Desarquivamentos")
+@Controller("nugecid")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class NugecidController {
   private readonly logger = new Logger(NugecidController.name);
@@ -83,14 +85,16 @@ export class NugecidController {
     private readonly nugecidStatsService: NugecidStatsService,
     private readonly nugecidPdfService: NugecidPdfService,
     private readonly nugecidExportService: NugecidExportService,
+    private readonly nugecidDocxService: NugecidDocxService,
     private readonly nugecidService: NugecidService,
+    private readonly nugecidAuditService: NugecidAuditService,
   ) {}
 
   @Post()
-  @ApiOperation({ summary: 'Criar nova solicitação de desarquivamento' })
+  @ApiOperation({ summary: "Criar nova solicitação de desarquivamento" })
   @ApiResponse({
     status: 201,
-    description: 'Desarquivamento criado com sucesso',
+    description: "Desarquivamento criado com sucesso",
   })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
@@ -107,29 +111,29 @@ export class NugecidController {
 
     return res.status(HttpStatus.CREATED).json({
       success: true,
-      message: 'Desarquivamento criado com sucesso',
+      message: "Desarquivamento criado com sucesso",
       data: result,
     });
   }
 
-  @Post('import')
-  @ApiOperation({ summary: 'Importar desarquivamentos de planilha Excel' })
-  @ApiConsumes('multipart/form-data')
+  @Post("import")
+  @ApiOperation({ summary: "Importar desarquivamentos de planilha Excel" })
+  @ApiConsumes("multipart/form-data")
   @ApiBody({
-    description: 'Arquivo Excel com desarquivamentos',
+    description: "Arquivo Excel com desarquivamentos",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         file: {
-          type: 'string',
-          format: 'binary',
+          type: "string",
+          format: "binary",
         },
       },
     },
   })
   @Roles(RoleType.ADMIN)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor("file"))
   async importDesarquivamentos(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() currentUser: User,
@@ -137,13 +141,13 @@ export class NugecidController {
   ) {
     if (!file) {
       throw new BadRequestException(
-        'Arquivo não enviado. Por favor, envie um arquivo Excel.',
+        "Arquivo não enviado. Por favor, envie um arquivo Excel.",
       );
     }
 
     if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException(
-        'O arquivo enviado está vazio. Verifique se o arquivo Excel tem dados.',
+        "O arquivo enviado está vazio. Verifique se o arquivo Excel tem dados.",
       );
     }
 
@@ -156,34 +160,119 @@ export class NugecidController {
       currentUser,
     );
 
+    // Se TODOS os registros falharam, retornar erro HTTP 400
+    if (result.errorCount > 0 && result.successCount === 0) {
+      // Pegar os primeiros 10 erros para mostrar ao usuário
+      const primeirosErros = result.errors.slice(0, 10);
+      const mensagensErro = primeirosErros.map(
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+      );
+
+      const mensagemResumo = result.errors.length > 10
+        ? `\n\n... e mais ${result.errors.length - 10} erros.`
+        : '';
+
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: `Falha na importação: todos os ${result.totalRows} registros contêm erros de validação.`,
+        error: {
+          type: 'VALIDATION_ERROR',
+          totalErrors: result.errorCount,
+          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join('\n')}${mensagemResumo}`,
+          errors: result.errors, // Todos os erros detalhados
+        },
+        data: {
+          totalRows: result.totalRows,
+          successCount: 0,
+          errorCount: result.errorCount,
+        },
+      });
+    }
+
+    // Se há erros parciais, retornar aviso mas com sucesso
+    if (result.errorCount > 0) {
+      const primeirosErros = result.errors.slice(0, 5);
+      const mensagensErro = primeirosErros.map(
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+      );
+
+      return res.status(HttpStatus.OK).json({
+        success: true,
+        message: `Importação parcial: ${result.successCount} de ${result.totalRows} registros importados. ${result.errorCount} registros com erros.`,
+        warning: {
+          type: 'PARTIAL_IMPORT',
+          errorsFound: result.errorCount,
+          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join('\n')}`,
+          errors: result.errors,
+        },
+        data: result,
+      });
+    }
+
+    // Sucesso total
     return res.status(HttpStatus.OK).json({
       success: true,
-      message: `Importação concluída: ${result.successCount} de ${result.totalRows} registros importados com sucesso.`,
+      message: `Importação concluída com sucesso: ${result.successCount} registros importados.`,
       data: result,
     });
   }
 
+  @Get("export")
+  @ApiOperation({ summary: "Exportar desarquivamentos para planilha Excel" })
+  @ApiQuery({ type: QueryDesarquivamentoDto })
+  @Roles(RoleType.ADMIN, RoleType.USUARIO)
+  @ApiBearerAuth()
+  @Header(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  )
+  @Header("Content-Disposition", "attachment; filename=desarquivamentos.xlsx")
+  async exportDesarquivamentos(
+    @Query() queryDto: QueryDesarquivamentoDto,
+    @CurrentUser() currentUser: User,
+    @Res() res: Response,
+  ) {
+    this.logger.log(
+      `[${new Date().toISOString()}] 📤 Exportando desarquivamentos - Usuário: ${currentUser.usuario}`,
+    );
+
+    const buffer = await this.nugecidExportService.exportToExcel(
+      queryDto,
+      currentUser,
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=desarquivamentos_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+    res.send(buffer);
+  }
+
   // Alias de compatibilidade: alguns clientes chamam /api/nugecid/import-desarquivamentos
-  @Post('import-desarquivamentos')
+  @Post("import-desarquivamentos")
   @ApiOperation({
-    summary: 'Importar desarquivamentos (alias compatível com rotas legadas)',
+    summary: "Importar desarquivamentos (alias compatível com rotas legadas)",
   })
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes("multipart/form-data")
   @ApiBody({
-    description: 'Arquivo Excel com desarquivamentos',
+    description: "Arquivo Excel com desarquivamentos",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         file: {
-          type: 'string',
-          format: 'binary',
+          type: "string",
+          format: "binary",
         },
       },
     },
   })
   @Roles(RoleType.ADMIN)
   @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor("file"))
   async importDesarquivamentosAlias(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() currentUser: User,
@@ -191,13 +280,13 @@ export class NugecidController {
   ) {
     if (!file) {
       throw new BadRequestException(
-        'Arquivo nǜo enviado. Por favor, envie um arquivo Excel.',
+        "Arquivo não enviado. Por favor, envie um arquivo Excel.",
       );
     }
 
     if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException(
-        'O arquivo enviado estǭ vazio. Verifique se o arquivo Excel tem dados.',
+        "O arquivo enviado está vazio. Verifique se o arquivo Excel tem dados.",
       );
     }
 
@@ -210,32 +299,82 @@ export class NugecidController {
       currentUser,
     );
 
+    // Se TODOS os registros falharam, retornar erro HTTP 400
+    if (result.errorCount > 0 && result.successCount === 0) {
+      // Pegar os primeiros 10 erros para mostrar ao usuário
+      const primeirosErros = result.errors.slice(0, 10);
+      const mensagensErro = primeirosErros.map(
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+      );
+
+      const mensagemResumo = result.errors.length > 10
+        ? `\n\n... e mais ${result.errors.length - 10} erros.`
+        : '';
+
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        success: false,
+        message: `Falha na importação: todos os ${result.totalRows} registros contêm erros de validação.`,
+        error: {
+          type: 'VALIDATION_ERROR',
+          totalErrors: result.errorCount,
+          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join('\n')}${mensagemResumo}`,
+          errors: result.errors, // Todos os erros detalhados
+        },
+        data: {
+          totalRows: result.totalRows,
+          successCount: 0,
+          errorCount: result.errorCount,
+        },
+      });
+    }
+
+    // Se há erros parciais, retornar aviso mas com sucesso
+    if (result.errorCount > 0) {
+      const primeirosErros = result.errors.slice(0, 5);
+      const mensagensErro = primeirosErros.map(
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+      );
+
+      return res.status(HttpStatus.OK).json({
+        success: true,
+        message: `Importação parcial: ${result.successCount} de ${result.totalRows} registros importados. ${result.errorCount} registros com erros.`,
+        warning: {
+          type: 'PARTIAL_IMPORT',
+          errorsFound: result.errorCount,
+          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join('\n')}`,
+          errors: result.errors,
+        },
+        data: result,
+      });
+    }
+
+    // Sucesso total
     return res.status(HttpStatus.OK).json({
       success: true,
-      message: `Importa��ǜo conclu��da: ${result.successCount} de ${result.totalRows} registros importados com sucesso.`,
+      message: `Importação concluída com sucesso: ${result.successCount} registros importados.`,
       data: result,
     });
   }
 
-  @Post('import-registros')
-  @ApiOperation({ summary: 'Importar registros de um arquivo .xlsx ou .csv' })
-  @ApiConsumes('multipart/form-data')
+  @Post("import-registros")
+  @ApiOperation({ summary: "Importar registros de um arquivo .xlsx ou .csv" })
+  @ApiConsumes("multipart/form-data")
   @ApiBody({
     description:
-      'Arquivo (.xlsx ou .csv) contendo os registros para importação',
+      "Arquivo (.xlsx ou .csv) contendo os registros para importação",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         file: {
-          type: 'string',
-          format: 'binary',
+          type: "string",
+          format: "binary",
         },
       },
     },
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor("file"))
   @HttpCode(HttpStatus.CREATED)
   async importRegistros(
     @UploadedFile() file: Express.Multer.File,
@@ -243,13 +382,13 @@ export class NugecidController {
   ) {
     if (!file) {
       throw new BadRequestException(
-        'Nenhum arquivo enviado. Por favor, anexe um arquivo .xlsx ou .csv.',
+        "Nenhum arquivo enviado. Por favor, anexe um arquivo .xlsx ou .csv.",
       );
     }
 
     if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException(
-        'O arquivo enviado está vazio. Verifique se o arquivo Excel tem dados.',
+        "O arquivo enviado está vazio. Verifique se o arquivo Excel tem dados.",
       );
     }
 
@@ -269,41 +408,81 @@ export class NugecidController {
     };
   }
 
-  @Get(':id/termo')
-  @ApiOperation({ summary: 'Gerar termo de entrega de desarquivamento em PDF' })
+  @Get(":id/termo")
+  @ApiOperation({ summary: "Gerar termo de entrega de desarquivamento em PDF" })
   @ApiParam({
-    name: 'id',
-    description: 'ID do desarquivamento',
-    type: 'number',
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "number",
   })
   @ApiBearerAuth()
-  @Header('Content-Type', 'application/pdf')
-  @Header('Content-Disposition', 'attachment; filename=termo_de_entrega.pdf')
+  @Header("Content-Type", "application/pdf")
+  @Header("Content-Disposition", "attachment; filename=termo_de_entrega.pdf")
   async getTermoDeEntrega(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @Res() res: Response,
     @CurrentUser() currentUser: User,
   ) {
     const desarquivamento = await this.findDesarquivamentoByIdUseCase.execute({
       id,
       userId: currentUser.id,
-      userRoles: [currentUser.role?.name || 'USER'],
+      userRoles: [currentUser.role?.name || "USER"],
     });
     const buffer = await this.nugecidPdfService.generatePdf(
       desarquivamento as any,
     );
 
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
-      'Content-Disposition',
+      "Content-Disposition",
       `attachment; filename=termo_de_entrega_${id}.pdf`,
+    );
+    res.send(buffer);
+  }
+
+  @Get(":id/termo-docx")
+  @ApiOperation({
+    summary: "Gerar termo de entrega de desarquivamento em Word (DOCX)",
+  })
+  @ApiParam({
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "number",
+  })
+  @ApiBearerAuth()
+  @Header(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  )
+  @Header("Content-Disposition", "attachment; filename=termo_de_entrega.docx")
+  async getTermoDeEntregaDocx(
+    @Param("id", ParseIntPipe) id: number,
+    @Res() res: Response,
+    @CurrentUser() currentUser: User,
+  ) {
+    const desarquivamento = await this.findDesarquivamentoByIdUseCase.execute({
+      id,
+      userId: currentUser.id,
+      userRoles: [currentUser.role?.name || "USER"],
+    });
+    const buffer = await this.nugecidDocxService.generateTermoDocx(
+      desarquivamento as any,
+    );
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=termo_de_entrega_${id}.docx`,
     );
     res.send(buffer);
   }
 
   @Get()
   @Roles(RoleType.ADMIN, RoleType.USUARIO)
-  @ApiOperation({ summary: 'Listar desarquivamentos com filtros e paginação' })
+  @ApiOperation({ summary: "Listar desarquivamentos com filtros e paginação" })
   @ApiQuery({ type: QueryDesarquivamentoDto })
   @ApiBearerAuth()
   async findAll(
@@ -344,7 +523,7 @@ export class NugecidController {
       sortOrder: (queryDto as any).sortOrder,
       filters,
       userId: currentUser.id,
-      userRoles: [currentUser.role?.name || 'USER'],
+      userRoles: [currentUser.role?.name || "USER"],
     });
 
     return {
@@ -359,9 +538,9 @@ export class NugecidController {
     };
   }
 
-  @Get('lixeira')
+  @Get("lixeira")
   @Roles(RoleType.ADMIN, RoleType.USUARIO)
-  @ApiOperation({ summary: 'Listar desarquivamentos excluídos (lixeira)' })
+  @ApiOperation({ summary: "Listar desarquivamentos excluídos (lixeira)" })
   @ApiQuery({ type: QueryDesarquivamentoDto })
   @ApiBearerAuth()
   async findDeleted(
@@ -416,11 +595,11 @@ export class NugecidController {
       sortOrder: (queryDto as any).sortOrder,
       filters,
       userId: currentUser.id,
-      userRoles: [currentUser.role?.name || 'USER'],
+      userRoles: [currentUser.role?.name || "USER"],
     });
 
     // Filtra apenas os itens que foram excluídos (têm deletedAt)
-    const deletedItems = result.data.filter(item => item.deletedAt);
+    const deletedItems = result.data.filter((item) => item.deletedAt);
 
     this.logger.log(
       `[${timestamp}] 📊 Encontrados ${deletedItems.length} itens na lixeira`,
@@ -438,11 +617,11 @@ export class NugecidController {
     };
   }
 
-  @Patch('lixeira/:id/restaurar')
+  @Patch("lixeira/:id/restaurar")
   @Roles(RoleType.ADMIN, RoleType.USUARIO)
-  @ApiOperation({ summary: 'Restaurar desarquivamento da lixeira' })
+  @ApiOperation({ summary: "Restaurar desarquivamento da lixeira" })
   @ApiBearerAuth()
-  async restore(@Param('id') id: string, @CurrentUser() currentUser: User) {
+  async restore(@Param("id") id: string, @CurrentUser() currentUser: User) {
     const timestamp = new Date().toISOString();
     this.logger.log(
       `[${timestamp}] 🔄 Iniciando restauração - ID: ${id}, Usuário: ${currentUser.usuario}`,
@@ -452,7 +631,7 @@ export class NugecidController {
       const result = await this.restoreDesarquivamentoUseCase.execute({
         id: Number(id),
         userId: currentUser.id,
-        userRoles: [currentUser.role?.name || 'USER'],
+        userRoles: [currentUser.role?.name || "USER"],
       });
 
       this.logger.log(
@@ -461,7 +640,7 @@ export class NugecidController {
 
       return {
         success: true,
-        message: 'Desarquivamento restaurado com sucesso',
+        message: "Desarquivamento restaurado com sucesso",
         data: result,
         restoredAt: timestamp,
         restoredBy: currentUser.usuario,
@@ -475,8 +654,8 @@ export class NugecidController {
     }
   }
 
-  @Get('dashboard')
-  @ApiOperation({ summary: 'Obter estatísticas do dashboard' })
+  @Get("dashboard")
+  @ApiOperation({ summary: "Obter estatísticas do dashboard" })
   @Roles(RoleType.ADMIN, RoleType.USUARIO)
   @ApiBearerAuth()
   async getDashboard() {
@@ -488,16 +667,16 @@ export class NugecidController {
     };
   }
 
-  @Delete('lixeira/:id/permanente')
+  @Delete("lixeira/:id/permanente")
   @Roles(RoleType.ADMIN)
   @ApiOperation({
     summary:
-      'Excluir permanentemente desarquivamento da lixeira (IRREVERSÍVEL)',
+      "Excluir permanentemente desarquivamento da lixeira (IRREVERSÍVEL)",
   })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async hardDelete(
-    @Param('id') idParam: string,
+    @Param("id") idParam: string,
     @CurrentUser() currentUser: User,
   ) {
     const timestamp = new Date().toISOString();
@@ -511,13 +690,13 @@ export class NugecidController {
       const cleanId = idParam.trim();
       if (!/^\d+$/.test(cleanId)) {
         throw new BadRequestException(
-          'ID inválido. Deve ser um número inteiro.',
+          "ID inválido. Deve ser um número inteiro.",
         );
       }
       id = parseInt(cleanId, 10);
     } catch (error) {
       throw new BadRequestException(
-        'ID inválido. Deve ser um número inteiro positivo.',
+        "ID inválido. Deve ser um número inteiro positivo.",
       );
     }
 
@@ -525,13 +704,13 @@ export class NugecidController {
       const result = await this.deleteDesarquivamentoUseCase.execute({
         id,
         userId: currentUser.id,
-        userRoles: [currentUser.role?.name || 'USER'],
+        userRoles: [currentUser.role?.name || "USER"],
         permanent: true,
       });
 
       return {
         success: true,
-        message: 'Desarquivamento excluído permanentemente',
+        message: "Desarquivamento excluído permanentemente",
         data: result,
       };
     } catch (error) {
@@ -540,13 +719,13 @@ export class NugecidController {
         error.stack,
       );
       throw new BadRequestException(
-        error.message || 'Erro ao excluir permanentemente',
+        error.message || "Erro ao excluir permanentemente",
       );
     }
   }
 
-  @Get('export')
-  @ApiOperation({ summary: 'Exportar desarquivamentos para Excel' })
+  @Get("export")
+  @ApiOperation({ summary: "Exportar desarquivamentos para Excel" })
   @ApiQuery({ type: QueryDesarquivamentoDto })
   @Roles(RoleType.ADMIN)
   @ApiBearerAuth()
@@ -559,33 +738,52 @@ export class NugecidController {
       queryDto,
       currentUser,
     );
-    const fileName = `desarquivamentos_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `desarquivamentos_${new Date().toISOString().split("T")[0]}.xlsx`;
 
     res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.send(buffer);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Obter desarquivamento por ID' })
+  @Get(":id/historico")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Buscar histórico de ações de um desarquivamento",
+    description:
+      "Retorna todas as ações (criação, atualização, exclusão, etc.) realizadas em um desarquivamento específico",
+  })
   @ApiParam({
-    name: 'id',
-    description: 'ID do desarquivamento',
-    type: 'integer',
+    name: "id",
+    type: "number",
+    description: "ID do desarquivamento",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Histórico retornado com sucesso",
+  })
+  async getHistorico(@Param("id", ParseIntPipe) id: number) {
+    return this.nugecidService.getHistorico(id);
+  }
+
+  @Get(":id/related")
+  @ApiOperation({
+    summary: "Buscar registros relacionados pelo mesmo número de processo",
+  })
+  @ApiParam({
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "integer",
   })
   @ApiBearerAuth()
-  async findOne(
-    @Param('id', ParseIntPipe) id: number,
+  async findRelatedByProcess(
+    @Param("id", ParseIntPipe) id: number,
     @CurrentUser() currentUser: User,
   ) {
-    const result = await this.findDesarquivamentoByIdUseCase.execute({
-      id,
-      userId: currentUser.id,
-      userRoles: [currentUser.role?.name || 'USER'],
-    });
+    const result = await this.nugecidService.findRelatedByProcess(id);
 
     return {
       success: true,
@@ -593,15 +791,77 @@ export class NugecidController {
     };
   }
 
-  @Get('barcode/:codigo')
-  @ApiOperation({ summary: 'Obter desarquivamento por código de barras' })
+  @Get(":id/comments")
+  @ApiOperation({ summary: "Lista comentários do desarquivamento" })
+  @ApiResponse({
+    status: 200,
+    description: "Comentários retornados com sucesso",
+  })
+  async listComments(@Param("id", ParseIntPipe) id: number) {
+    const comments = await this.nugecidService.listComments(id);
+    return {
+      success: true,
+      data: comments.map((comment) => ({
+        id: comment.id,
+        comment: comment.comment,
+        authorName: comment.authorName,
+        userId: comment.userId,
+        createdAt: comment.createdAt,
+        user: comment.user
+          ? {
+              id: comment.user.id,
+              nome: comment.user.nome,
+              usuario: comment.user.usuario,
+            }
+          : null,
+      })),
+    };
+  }
+
+  @Get(":id")
+  @ApiOperation({ summary: "Obter desarquivamento por ID" })
   @ApiParam({
-    name: 'codigo',
-    description: 'Código de barras do desarquivamento',
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "integer",
+  })
+  @ApiBearerAuth()
+  async findOne(
+    @Param("id", ParseIntPipe) id: number,
+    @CurrentUser() currentUser: User,
+    @Req() request: any,
+  ) {
+    const result = await this.findDesarquivamentoByIdUseCase.execute({
+      id,
+      userId: currentUser.id,
+      userRoles: [currentUser.role?.name || "USER"],
+    });
+
+    // Auditoria de visualização
+    await this.nugecidAuditService.saveDesarquivamentoAudit(
+      currentUser.id,
+      "VIEW",
+      result,
+      null,
+      request.ip,
+      request.get('user-agent'),
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Get("barcode/:codigo")
+  @ApiOperation({ summary: "Obter desarquivamento por código de barras" })
+  @ApiParam({
+    name: "codigo",
+    description: "Código de barras do desarquivamento",
   })
   @ApiBearerAuth()
   async findByBarcode(
-    @Param('codigo') codigo: string,
+    @Param("codigo") codigo: string,
     @CurrentUser() currentUser: User,
   ) {
     const result = await this.findAllDesarquivamentosUseCase.execute({
@@ -609,11 +869,11 @@ export class NugecidController {
       limit: 1,
       page: 1,
       userId: currentUser.id,
-      userRoles: [currentUser.role?.name || 'USER'],
+      userRoles: [currentUser.role?.name || "USER"],
     });
 
     if (result.data.length === 0) {
-      throw new NotFoundException('Desarquivamento não encontrado');
+      throw new NotFoundException("Desarquivamento não encontrado");
     }
 
     return {
@@ -622,63 +882,71 @@ export class NugecidController {
     };
   }
 
-  @Patch(':id')
-  @ApiOperation({ summary: 'Atualizar desarquivamento' })
+  @Patch(":id")
+  @ApiOperation({ summary: "Atualizar desarquivamento" })
   @ApiParam({
-    name: 'id',
-    description: 'ID do desarquivamento',
-    type: 'integer',
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "integer",
   })
   @ApiBearerAuth()
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @Body() updateDesarquivamentoDto: UpdateDesarquivamentoDto,
     @CurrentUser() currentUser: User,
   ) {
     try {
+      // Log para debug
+      console.log('[Controller] updateDesarquivamentoDto recebido:', {
+        dataDevolucaoSetor: updateDesarquivamentoDto.dataDevolucaoSetor,
+        hasProp: 'dataDevolucaoSetor' in updateDesarquivamentoDto,
+      });
+
       const result = await this.updateDesarquivamentoUseCase.execute({
         id,
         ...updateDesarquivamentoDto,
+        // Garante que dataDevolucaoSetor seja passada explicitamente mesmo se for null/undefined
+        dataDevolucaoSetor: updateDesarquivamentoDto.dataDevolucaoSetor,
         userId: currentUser.id,
-        userRoles: [currentUser.role?.name || 'USER'],
+        userRoles: [currentUser.role?.name || "USER"],
       });
 
       return {
         success: true,
-        message: 'Desarquivamento atualizado com sucesso',
+        message: "Desarquivamento atualizado com sucesso",
         data: result,
       };
     } catch (error) {
       // Normaliza erros conhecidos para não retornar 500 indevidamente
-      const msg = (error?.message || '').toString();
-      if (msg.includes('Acesso negado')) {
+      const msg = (error?.message || "").toString();
+      if (msg.includes("Acesso negado")) {
         throw new ForbiddenException(
-          'Você não tem permissão para editar este desarquivamento',
+          "Você não tem permissão para editar este desarquivamento",
         );
       }
-      if (msg.includes('não encontrado') || msg.includes('no encontrado')) {
-        throw new NotFoundException('Desarquivamento não encontrado');
+      if (msg.includes("não encontrado") || msg.includes("no encontrado")) {
+        throw new NotFoundException("Desarquivamento não encontrado");
       }
       if (
-        msg.toLowerCase().includes('status inv') ||
-        msg.toLowerCase().includes('id deve ser')
+        msg.toLowerCase().includes("status inv") ||
+        msg.toLowerCase().includes("id deve ser")
       ) {
         throw new BadRequestException(msg);
       }
-      throw new BadRequestException(msg || 'Erro ao atualizar desarquivamento');
+      throw new BadRequestException(msg || "Erro ao atualizar desarquivamento");
     }
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Remover desarquivamento' })
+  @Delete(":id")
+  @ApiOperation({ summary: "Remover desarquivamento" })
   @ApiParam({
-    name: 'id',
-    description: 'ID do desarquivamento',
-    type: 'integer',
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "integer",
   })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  async remove(@Param('id') idParam: string, @CurrentUser() currentUser: User) {
+  async remove(@Param("id") idParam: string, @CurrentUser() currentUser: User) {
     const timestamp = new Date().toISOString();
     this.logger.log(
       `[${timestamp}] [NugecidController] EXCLUSÃO INICIADA - ID param: '${idParam}', Usuário: ${currentUser?.id} (${currentUser?.usuario}), Tipo: SOFT DELETE`,
@@ -747,7 +1015,7 @@ export class NugecidController {
       const result = await this.deleteDesarquivamentoUseCase.execute({
         id,
         userId: currentUser.id,
-        userRoles: [currentUser.role?.name || 'USER'],
+        userRoles: [currentUser.role?.name || "USER"],
         permanent: false,
       });
 
@@ -758,12 +1026,12 @@ export class NugecidController {
 
       return {
         success: true,
-        message: 'Desarquivamento removido com sucesso',
+        message: "Desarquivamento removido com sucesso",
         data: {
           id,
           deletedAt: completedTimestamp,
           deletedBy: currentUser.id,
-          type: 'soft_delete',
+          type: "soft_delete",
         },
       };
     } catch (error) {
@@ -773,70 +1041,43 @@ export class NugecidController {
       );
 
       // Melhorar mensagens de erro para o usuário
-      if (error.message.includes('Acesso negado')) {
+      if (error.message.includes("Acesso negado")) {
         throw new ForbiddenException(
-          'Você não tem permissão para excluir este desarquivamento',
+          "Você não tem permissão para excluir este desarquivamento",
         );
       }
 
       if (
-        error.message.includes('ID') &&
-        error.message.includes('não encontrado')
+        error.message.includes("ID") &&
+        error.message.includes("não encontrado")
       ) {
-        throw new NotFoundException('Desarquivamento não encontrado');
+        throw new NotFoundException("Desarquivamento não encontrado");
       }
 
-      if (error.message.includes('em andamento')) {
+      if (error.message.includes("em andamento")) {
         throw new BadRequestException(
-          'Não é possível excluir desarquivamento em andamento',
+          "Não é possível excluir desarquivamento em andamento",
         );
       }
 
-      if (error.message.includes('concluídos')) {
+      if (error.message.includes("concluídos")) {
         throw new ForbiddenException(
-          'Apenas administradores podem excluir desarquivamentos concluídos',
+          "Apenas administradores podem excluir desarquivamentos concluídos",
         );
       }
 
       // Erro genérico
       throw new BadRequestException(
-        error.message || 'Erro ao excluir desarquivamento',
+        error.message || "Erro ao excluir desarquivamento",
       );
     }
   }
 
-  @Get(':id/comments')
-  @ApiOperation({ summary: 'Lista comentários do desarquivamento' })
-  @ApiResponse({
-    status: 200,
-    description: 'Comentários retornados com sucesso',
-  })
-  async listComments(@Param('id', ParseIntPipe) id: number) {
-    const comments = await this.nugecidService.listComments(id);
-    return {
-      success: true,
-      data: comments.map(comment => ({
-        id: comment.id,
-        comment: comment.comment,
-        authorName: comment.authorName,
-        userId: comment.userId,
-        createdAt: comment.createdAt,
-        user: comment.user
-          ? {
-              id: comment.user.id,
-              nome: comment.user.nome,
-              usuario: comment.user.usuario,
-            }
-          : null,
-      })),
-    };
-  }
-
-  @Post(':id/comments')
-  @ApiOperation({ summary: 'Adiciona um comentário ao desarquivamento' })
-  @ApiResponse({ status: 201, description: 'Comentário criado com sucesso' })
+  @Post(":id/comments")
+  @ApiOperation({ summary: "Adiciona um comentário ao desarquivamento" })
+  @ApiResponse({ status: 201, description: "Comentário criado com sucesso" })
   async addComment(
-    @Param('id', ParseIntPipe) id: number,
+    @Param("id", ParseIntPipe) id: number,
     @Body() body: CreateDesarquivamentoCommentDto,
     @CurrentUser() currentUser: User,
   ) {

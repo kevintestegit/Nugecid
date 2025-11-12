@@ -1,20 +1,20 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { Strategy } from 'passport-custom';
-import { Request } from 'express';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy } from "passport-custom";
+import { Request } from "express";
 
-import { AuthService } from '../auth.service';
-import { User } from '../../users/entities/user.entity';
+import { AuthService } from "../auth.service";
+import { User } from "../../users/entities/user.entity";
 
 @Injectable()
-export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
+export class SessionStrategy extends PassportStrategy(Strategy, "session") {
   constructor(private authService: AuthService) {
     super();
   }
 
   async validate(req: Request): Promise<User> {
     if (!req.session || !req.session.user) {
-      throw new UnauthorizedException('Sessão inválida ou expirada');
+      throw new UnauthorizedException("Sessão inválida ou expirada");
     }
 
     try {
@@ -22,18 +22,18 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       const user = await this.authService.findUserById(req.session.user.id);
 
       if (!user.ativo) {
-        throw new UnauthorizedException('Usuário inativo');
+        throw new UnauthorizedException("Usuário inativo");
       }
 
       if (user.isBlocked()) {
-        throw new UnauthorizedException('Usuário bloqueado');
+        throw new UnauthorizedException("Usuário bloqueado");
       }
 
       return user;
     } catch (error) {
       // Remove sessão inválida
       req.session.destroy(() => {});
-      throw new UnauthorizedException('Sessão inválida');
+      throw new UnauthorizedException("Sessão inválida");
     }
   }
 }

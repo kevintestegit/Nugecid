@@ -1,7 +1,7 @@
-import { User } from '../../src/modules/users/entities/user.entity';
-import { Role } from '../../src/modules/users/entities/role.entity';
-import { RoleFactory } from './role.factory';
-import { DeepPartial } from 'typeorm';
+import { User } from "../../src/modules/users/entities/user.entity";
+import { Role } from "../../src/modules/users/entities/role.entity";
+import { RoleFactory } from "./role.factory";
+import { DeepPartial } from "typeorm";
 
 export class UserFactory {
   static build(data: DeepPartial<User> = {}): DeepPartial<User> {
@@ -9,9 +9,9 @@ export class UserFactory {
 
     return {
       id: 1,
-      nome: 'Test User',
-      usuario: 'testuser',
-      senha: 'password123',
+      nome: "Test User",
+      usuario: "testuser",
+      senha: "password123",
       role: role,
       ativo: true,
       ...data,
