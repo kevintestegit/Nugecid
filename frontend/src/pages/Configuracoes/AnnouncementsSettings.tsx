@@ -22,6 +22,8 @@ import {
   Loader2,
   Save,
   X,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { toast } from 'sonner';
@@ -60,6 +62,8 @@ export const AnnouncementsSettings: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -103,6 +107,7 @@ export const AnnouncementsSettings: React.FC = () => {
         active: announcement.active,
         targetRoles: announcement.targetRoles || [],
       });
+      setImagePreview(announcement.imageUrl || null);
     } else {
       setEditingId(null);
       const now = new Date();
@@ -119,6 +124,7 @@ export const AnnouncementsSettings: React.FC = () => {
         active: true,
         targetRoles: [],
       });
+      setImagePreview(null);
     }
     setShowModal(true);
   };
@@ -126,6 +132,58 @@ export const AnnouncementsSettings: React.FC = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingId(null);
+    setImagePreview(null);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Tipo de arquivo não permitido. Use JPEG, PNG, GIF ou WebP.');
+      return;
+    }
+
+    // Validar tamanho (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Tamanho máximo: 5MB');
+      return;
+    }
+
+    try {
+      setUploading(true);
+
+      // Criar preview local
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload para o servidor
+      const formDataUpload = new FormData();
+      formDataUpload.append('image', file);
+
+      const response = await apiService.uploadAnnouncementImage(formDataUpload);
+
+      if (response.success && response.data?.url) {
+        setFormData({ ...formData, imageUrl: response.data.url });
+        toast.success('Imagem enviada com sucesso!');
+      }
+    } catch (error: any) {
+      console.error('Erro ao fazer upload da imagem:', error);
+      toast.error(error.response?.data?.message || 'Erro ao fazer upload da imagem');
+      setImagePreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setFormData({ ...formData, imageUrl: '' });
+    setImagePreview(null);
   };
 
   const handleSave = async () => {
@@ -346,14 +404,65 @@ export const AnnouncementsSettings: React.FC = () => {
               />
             </div>
 
-            <div>
-              <Label htmlFor="imageUrl">URL da Imagem (opcional)</Label>
-              <Input
-                id="imageUrl"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="/uploads/announcements/image.jpg"
-              />
+            {/* Upload de Imagem */}
+            <div className="space-y-3">
+              <Label htmlFor="image">Imagem (opcional)</Label>
+
+              {imagePreview ? (
+                <div className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute top-6 right-6 p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                    title="Remover imagem"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
+                  <input
+                    type="file"
+                    id="image"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="image"
+                    className="cursor-pointer flex flex-col items-center gap-3"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Enviando imagem...
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                          <Upload className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Clique para fazer upload
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            JPEG, PNG, GIF ou WebP (máx. 5MB)
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
 
             <div>

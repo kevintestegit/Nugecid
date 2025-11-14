@@ -77,6 +77,17 @@ export class ApiService {
           return Promise.reject(error)
         }
 
+        // IMPORTANTE: Não tentar renovar token se a requisição original já é de refresh
+        // Isso evita loop infinito quando o refresh token está inválido/expirado
+        if (originalRequest.url === '/auth/refresh') {
+          console.warn('🔄 Falha no refresh token - redirecionando para login')
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('refreshToken')
+          localStorage.removeItem('user')
+          window.location.href = '/login'
+          return Promise.reject(error)
+        }
+
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
 
@@ -761,6 +772,21 @@ export class ApiService {
 
   async getAnnouncementStats(id: number): Promise<ApiResponse<any>> {
     const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/announcements/${id}/stats`)
+    return response.data
+  }
+
+  async uploadAnnouncementImage(formData: FormData): Promise<ApiResponse<{
+    filename: string
+    originalName: string
+    size: number
+    mimetype: string
+    url: string
+  }>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/announcements/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   }
 }
