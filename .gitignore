@@ -37,3 +37,5 @@ uploads/
 *.local
 .pnpm-store/
 node_modules
+/backups/*.sql
+/backups/*.tar.gz

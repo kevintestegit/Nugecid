@@ -35,7 +35,7 @@ import { PastasModule } from "./modules/pastas/pastas.module";
 import { PlanilhasModule } from "./modules/planilhas/planilhas.module";
 import { BackupModule } from "./modules/backup/backup.module";
 import { SecurityModule } from "./modules/security/security.module";
-import { WebscrapingModule } from "./modules/webscraping/webscraping.module";
+// import { WebscrapingModule } from "./modules/webscraping/webscraping.module";  // TEMPORARIAMENTE DESABILITADO
 import { AnnouncementsModule } from "./modules/announcements/announcements.module";
 
 // Guards
@@ -176,7 +176,7 @@ import { Projeto } from "./modules/projetos/entities/projeto.entity";
     PlanilhasModule,
     BackupModule,
     SecurityModule,
-    WebscrapingModule,
+    // WebscrapingModule,  // TEMPORARIAMENTE DESABILITADO
     AnnouncementsModule,
   ],
   controllers: [AppController],

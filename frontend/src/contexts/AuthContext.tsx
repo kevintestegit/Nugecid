@@ -96,9 +96,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Para outros erros (token inválido, expirado, etc.), fazer logout
-      console.log('🚪 Fazendo logout devido a erro de autenticação')
+      // IMPORTANTE: Não tentar novamente, deixar o interceptor lidar com isso
+      console.log('🚪 Token de refresh inválido ou expirado - limpando sessão')
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
+      localStorage.removeItem('user')
       updateUser(null)
 
       // Clear refresh timer

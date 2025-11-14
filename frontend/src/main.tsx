@@ -37,7 +37,18 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <ThemeProvider>
             <BrowserRouter>
               <App />
-              <Toaster position="top-right" richColors />
+              <Toaster 
+                position="top-right" 
+                richColors 
+                toastOptions={{
+                  classNames: {
+                    toast: 'toast-custom',
+                    title: 'toast-title',
+                    description: 'toast-description',
+                    icon: 'toast-icon',
+                  },
+                }}
+              />
             </BrowserRouter>
           </ThemeProvider>
         </AuthProvider>
