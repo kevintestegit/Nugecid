@@ -12,7 +12,15 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   ApiTags,
   ApiOperation,
@@ -100,6 +108,72 @@ export class AnnouncementsController {
       success: true,
       data: announcements,
       total: announcements.length,
+    };
+  }
+
+  @Post('upload-image')
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const uploadPath = path.join(process.cwd(), 'uploads', 'announcements');
+          if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+          }
+          cb(null, uploadPath);
+        },
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `announcement-${uniqueSuffix}${ext}`);
+        },
+      }),
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+      fileFilter: (req, file, cb) => {
+        const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (allowedMimes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(
+            new BadRequestException(
+              'Tipo de arquivo não permitido. Use JPEG, PNG, GIF ou WebP.',
+            ),
+            false,
+          );
+        }
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload de imagem para aviso (Admin)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Imagem enviada com sucesso',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Arquivo inválido',
+  })
+  async uploadImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Nenhum arquivo enviado');
+    }
+
+    const imageUrl = `/uploads/announcements/${file.filename}`;
+
+    return {
+      success: true,
+      data: {
+        filename: file.filename,
+        originalName: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+        url: imageUrl,
+      },
+      message: 'Imagem enviada com sucesso',
     };
   }
 
