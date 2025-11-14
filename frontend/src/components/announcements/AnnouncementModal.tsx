@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, AlertCircle, AlertTriangle, Info, Megaphone } from 'lucide-react';
 import { apiService } from '@/services/api';
 
@@ -47,9 +48,18 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
     loadAnnouncements();
+  }, []);
+
+  // Bloquear scroll da página quando o modal estiver aberto
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, []);
 
   const loadAnnouncements = async () => {
@@ -73,13 +83,17 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
     const currentAnnouncement = announcements[currentIndex];
 
     try {
-      await apiService.markAnnouncementAsViewed(currentAnnouncement.id);
+      // Só marca como visualizado se marcou "Não mostrar novamente"
+      if (dontShowAgain) {
+        await apiService.markAnnouncementAsViewed(currentAnnouncement.id);
+      }
     } catch (error) {
       console.error('Erro ao marcar aviso como visualizado:', error);
     }
 
     if (currentIndex < announcements.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      setDontShowAgain(false); // Reset para o próximo anúncio
     } else {
       onClose();
     }
@@ -93,8 +107,8 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
   const config = priorityConfig[currentAnnouncement.priority];
   const Icon = config.icon;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl mx-4 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         {/* Header com gradiente */}
         <div className={`bg-gradient-to-r ${config.bgColor} p-6 text-white relative`}>
@@ -146,15 +160,38 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
 
         {/* Footer */}
         <div className="p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          {/* Checkbox "Não mostrar novamente" */}
+          <div className="mb-4 flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <input
+              type="checkbox"
+              id="dontShowAgain"
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+            />
+            <label
+              htmlFor="dontShowAgain"
+              className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none"
+            >
+              Não mostrar este aviso novamente
+            </label>
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {announcements.length > 1 ? (
                 <span>
-                  Pressione "Entendi" para ver o próximo aviso
+                  {dontShowAgain 
+                    ? 'Este aviso não será exibido novamente' 
+                    : 'Pressione "Entendi" para ver o próximo aviso'
+                  }
                 </span>
               ) : (
                 <span>
-                  Pressione "Entendi" para continuar
+                  {dontShowAgain 
+                    ? 'Este aviso não será exibido novamente' 
+                    : 'Pressione "Entendi" para continuar'
+                  }
                 </span>
               )}
             </div>
@@ -187,4 +224,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
       </div>
     </div>
   );
+
+  // Renderizar usando Portal para garantir que o modal fique acima de tudo
+  return createPortal(modalContent, document.body);
 };
