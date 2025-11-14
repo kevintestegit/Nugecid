@@ -39,11 +39,6 @@ export class RolesGuard implements CanActivate {
     }
 
     const user = request.user;
-      id: user?.id,
-      nome: user?.nome,
-      role: user?.role,
-      roleId: user?.roleId,
-    });
 
     if (!user) {
       throw new ForbiddenException("Usuário não autenticado");
@@ -53,19 +48,11 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException("Usuário sem role definida");
     }
 
-      id: user.role.id,
-      name: user.role.name,
-      nameType: typeof user.role.name,
-      nameLength: user.role.name?.length,
-    });
-
     // Verificar se o usuário tem uma das roles necessárias
     const userRoleName = user.role.name?.toLowerCase()?.trim();
 
     const hasRole = requiredRoles.some((role) => {
       const normalizedRequiredRole = role?.toLowerCase()?.trim();
-        `🔍 [RolesGuard] Comparing '${userRoleName}' === '${normalizedRequiredRole}'`,
-      );
       return userRoleName === normalizedRequiredRole;
     });
 

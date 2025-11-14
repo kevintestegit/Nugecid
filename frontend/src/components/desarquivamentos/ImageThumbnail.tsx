@@ -2,17 +2,21 @@ import React, { useEffect, useState } from 'react'
 import { apiService } from '@/services/api'
 
 interface ImageThumbnailProps {
-  desarquivamentoId: number
+  desarquivamentoId: number | null
+  numeroProcesso?: string | null
   anexoId: number
   nomeOriginal: string
   tipoMime: string
+  previewUrl?: string
 }
 
 export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
   desarquivamentoId,
+  numeroProcesso,
   anexoId,
   nomeOriginal,
   tipoMime,
+  previewUrl,
 }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,11 +30,36 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
         setLoading(true)
         setError(false)
 
-        // Busca a imagem via API
-        const blob = await apiService.viewDesarquivamentoAnexo(
-          desarquivamentoId,
-          anexoId
-        )
+        let blob: Blob
+        
+        // Se tem previewUrl, usar ela (vem do backend com a URL correta)
+        if (previewUrl) {
+          const response = await fetch(previewUrl, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            },
+          })
+          if (!response.ok) throw new Error('Erro ao carregar imagem')
+          blob = await response.blob()
+        } else if (desarquivamentoId) {
+          // Anexo de solicitação
+          blob = await apiService.viewDesarquivamentoAnexo(
+            desarquivamentoId,
+            anexoId
+          )
+        } else if (numeroProcesso) {
+          // Anexo de processo - usar rota de processo
+          const encodedProcesso = encodeURIComponent(numeroProcesso)
+          const response = await fetch(`/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/view`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            },
+          })
+          if (!response.ok) throw new Error('Erro ao carregar imagem')
+          blob = await response.blob()
+        } else {
+          throw new Error('Nem desarquivamentoId nem numeroProcesso fornecidos')
+        }
 
         // Cria URL temporária
         objectUrl = URL.createObjectURL(blob)
@@ -56,7 +85,7 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [desarquivamentoId, anexoId, tipoMime])
+  }, [desarquivamentoId, numeroProcesso, anexoId, tipoMime, previewUrl])
 
   // Mostrar ícone enquanto carrega
   if (loading) {

@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, X, Trash2, Loader2 } from 'lucide-react'
 import { useDeleteUser, useUser } from '@/hooks/useUsers'
 
@@ -30,13 +31,33 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ userId, onClose, onSu
     }
   }
 
-  return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        {/* Header */}
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !deleteUserMutation.isPending) {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [deleteUserMutation.isPending, onClose])
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
+  const modalContent = (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+        onClick={handleBackdropClick}
+      />
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 pointer-events-auto">
+          {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
@@ -109,8 +130,8 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ userId, onClose, onSu
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+          {/* Footer */}
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
           <button
             onClick={onClose}
             disabled={deleteUserMutation.isPending}
@@ -136,9 +157,12 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ userId, onClose, onSu
             )}
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
 export default DeleteUserModal

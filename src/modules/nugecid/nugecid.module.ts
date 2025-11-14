@@ -5,7 +5,7 @@ import * as multer from "multer";
 
 // Controller
 import { NugecidController } from "./nugecid.controller";
-import { AnexosController } from "./controllers/anexos.controller";
+import { AnexosController, AnexosProcessoController } from "./controllers/anexos.controller";
 
 // Modules
 import { AuthModule } from "../auth/auth.module";
@@ -101,7 +101,7 @@ import { NugecidService } from "./nugecid.service";
     }),
     NotificacoesModule,
   ],
-  controllers: [NugecidController, AnexosController],
+  controllers: [NugecidController, AnexosController, AnexosProcessoController],
   providers: [
     // Use Cases
     CreateDesarquivamentoUseCase,

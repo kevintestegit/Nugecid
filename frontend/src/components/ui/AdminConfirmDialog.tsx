@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -36,7 +37,14 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (!isOpen) return null
+  const handleClose = useCallback(() => {
+    if (!isLoading) {
+      setCredentials({ usuario: '', senha: '' })
+      setError(null)
+      setShowPassword(false)
+      onClose()
+    }
+  }, [isLoading, onClose])
 
   const getVariantStyles = () => {
     switch (variant) {
@@ -66,17 +74,8 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
   const styles = getVariantStyles()
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isLoading) {
+    if (e.target === e.currentTarget) {
       handleClose()
-    }
-  }
-
-  const handleClose = () => {
-    if (!isLoading) {
-      setCredentials({ usuario: '', senha: '' })
-      setError(null)
-      setShowPassword(false)
-      onClose()
     }
   }
 
@@ -144,12 +143,36 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
     }
   }
 
-  return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={handleBackdropClick}
-    >
-      <Card className="w-full max-w-md mx-auto">
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (!isOpen) return
+      if (event.key === 'Escape') {
+        handleClose()
+      }
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [handleClose, isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  const modalContent = (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+        onClick={handleBackdropClick}
+      />
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+        <Card className="relative w-full max-w-md mx-4 pointer-events-auto">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
@@ -256,9 +279,12 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
             </Button>
           </div>
         </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
 export { AdminConfirmDialog }

@@ -84,7 +84,11 @@ export class NugecidAnexosService implements OnModuleInit {
     user: User,
     descricao?: string,
     tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
+    anexarAoProcesso: boolean = false,
   ): Promise<any> {
+    // DEBUG: Log para verificar o valor recebido
+    this.logger.log(`[DEBUG] uploadAnexo - desarquivamentoId: ${desarquivamentoId}, tipoAnexo: ${tipoAnexo}, anexarAoProcesso: ${anexarAoProcesso} (type: ${typeof anexarAoProcesso})`);
+    
     // Verificar se o desarquivamento existe
     const desarquivamento = await this.desarquivamentoRepository.findOne({
       where: { id: desarquivamentoId },
@@ -112,7 +116,8 @@ export class NugecidAnexosService implements OnModuleInit {
 
     // Criar registro no banco
     const anexo = this.anexoRepository.create({
-      desarquivamentoId,
+      desarquivamentoId: anexarAoProcesso ? null : desarquivamentoId,
+      numeroProcesso: anexarAoProcesso ? desarquivamento.numeroProcesso : null,
       usuarioId: user.id,
       nomeOriginal: file.originalname,
       nomeArquivo: uniqueFileName,
@@ -125,8 +130,9 @@ export class NugecidAnexosService implements OnModuleInit {
 
     const savedAnexo = await this.anexoRepository.save(anexo);
 
+    const tipoVinculo = anexarAoProcesso ? "processo" : "solicitação";
     this.logger.log(
-      `Anexo criado: ${savedAnexo.nomeOriginal} para desarquivamento ${desarquivamentoId} por ${user.usuario}`,
+      `Anexo criado: ${savedAnexo.nomeOriginal} para ${tipoVinculo} ${anexarAoProcesso ? desarquivamento.numeroProcesso : desarquivamentoId} por ${user.usuario}`,
     );
 
     return this.mapAnexoResponse(savedAnexo);
@@ -136,6 +142,7 @@ export class NugecidAnexosService implements OnModuleInit {
     const base = {
       id: anexo.id,
       desarquivamentoId: anexo.desarquivamentoId,
+      numeroProcesso: anexo.numeroProcesso,
       usuarioId: anexo.usuarioId,
       nomeOriginal: anexo.nomeOriginal,
       nomeArquivo: anexo.nomeArquivo,
@@ -144,19 +151,22 @@ export class NugecidAnexosService implements OnModuleInit {
       tamanhoBytes: anexo.tamanhoBytes,
       descricao: anexo.descricao,
       tipoAnexo: anexo.tipoAnexo,
+      tipoVinculo: anexo.getTipoVinculo(),
       createdAt: anexo.createdAt,
       usuario: anexo.usuario,
     };
 
     // Usar a rota da API para visualização, que já tem controle de acesso
+    const routeBase = anexo.desarquivamentoId
+      ? `/api/nugecid/${anexo.desarquivamentoId}/anexos/${anexo.id}`
+      : `/api/nugecid/processo/${encodeURIComponent(anexo.numeroProcesso)}/anexos/${anexo.id}`;
+
     const previewUrl =
-      anexo.isImage() || anexo.isPdf()
-        ? `/api/nugecid/${anexo.desarquivamentoId}/anexos/${anexo.id}/view`
-        : undefined;
+      anexo.isImage() || anexo.isPdf() ? `${routeBase}/view` : undefined;
 
     return {
       ...base,
-      url: `/api/nugecid/${anexo.desarquivamentoId}/anexos/${anexo.id}/download`,
+      url: `${routeBase}/download`,
       previewUrl,
     };
   }
@@ -165,7 +175,49 @@ export class NugecidAnexosService implements OnModuleInit {
     desarquivamentoId: number,
     tipoAnexo?: "desarquivamento" | "rearquivamento",
   ): Promise<any[]> {
-    const where: any = { desarquivamentoId };
+    // Buscar o desarquivamento para pegar o numeroProcesso
+    const desarquivamento = await this.desarquivamentoRepository.findOne({
+      where: { id: desarquivamentoId },
+    });
+
+    if (!desarquivamento) {
+      throw new NotFoundException("Desarquivamento não encontrado");
+    }
+
+    const where: any[] = [];
+
+    // Anexos da solicitação específica
+    const whereSolicitacao: any = { desarquivamentoId };
+    if (tipoAnexo) {
+      whereSolicitacao.tipoAnexo = tipoAnexo;
+    }
+    where.push(whereSolicitacao);
+
+    // Anexos do processo (se houver numeroProcesso)
+    if (desarquivamento.numeroProcesso) {
+      const whereProcesso: any = { numeroProcesso: desarquivamento.numeroProcesso };
+      if (tipoAnexo) {
+        whereProcesso.tipoAnexo = tipoAnexo;
+      }
+      where.push(whereProcesso);
+    }
+
+    const anexos = await this.anexoRepository.find({
+      where,
+      order: { createdAt: "DESC" },
+    });
+
+    return anexos.map((anexo) => this.mapAnexoResponse(anexo));
+  }
+
+  /**
+   * Busca anexos de um processo (todas as solicitações)
+   */
+  async findAnexosByProcesso(
+    numeroProcesso: string,
+    tipoAnexo?: "desarquivamento" | "rearquivamento",
+  ): Promise<any[]> {
+    const where: any = { numeroProcesso };
     if (tipoAnexo) {
       where.tipoAnexo = tipoAnexo;
     }

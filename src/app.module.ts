@@ -34,6 +34,9 @@ import { NotificacoesModule } from "./modules/notificacoes/notificacoes.module";
 import { PastasModule } from "./modules/pastas/pastas.module";
 import { PlanilhasModule } from "./modules/planilhas/planilhas.module";
 import { BackupModule } from "./modules/backup/backup.module";
+import { SecurityModule } from "./modules/security/security.module";
+import { WebscrapingModule } from "./modules/webscraping/webscraping.module";
+import { AnnouncementsModule } from "./modules/announcements/announcements.module";
 
 // Guards
 import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
@@ -172,6 +175,9 @@ import { Projeto } from "./modules/projetos/entities/projeto.entity";
     PastasModule,
     PlanilhasModule,
     BackupModule,
+    SecurityModule,
+    WebscrapingModule,
+    AnnouncementsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

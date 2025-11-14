@@ -32,9 +32,11 @@ import { IsPublic } from "../../../common/decorators/is-public.decorator";
 import {
   NotificacoesService,
   NotificacoesSchedulerService,
+  NotificationPreferencesService,
   CreateNotificacaoDto,
   QueryNotificacoesDto,
 } from "../services";
+import { UpdateNotificationPreferencesDto } from "../dto";
 import {
   Notificacao,
   TipoNotificacao,
@@ -49,6 +51,7 @@ export class NotificacoesController {
   constructor(
     private readonly notificacoesService: NotificacoesService,
     private readonly notificacoesSchedulerService: NotificacoesSchedulerService,
+    private readonly notificationPreferencesService: NotificationPreferencesService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -214,6 +217,114 @@ export class NotificacoesController {
           }) as MessageEvent,
       ),
     );
+  }
+
+  // ========== ENDPOINTS DE PREFERÊNCIAS DE NOTIFICAÇÃO ==========
+
+  @Get("preferences")
+  @ApiOperation({ summary: "Obter preferências de notificação do usuário" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Preferências retornadas com sucesso",
+  })
+  async getPreferences(@Request() req: any) {
+    const preferences = await this.notificationPreferencesService.getPreferences(
+      req.user.id,
+    );
+
+    return {
+      success: true,
+      data: preferences,
+    };
+  }
+
+  @Patch("preferences")
+  @ApiOperation({ summary: "Atualizar preferências de notificação do usuário" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Preferências atualizadas com sucesso",
+  })
+  async updatePreferences(
+    @Request() req: any,
+    @Body() updateDto: UpdateNotificationPreferencesDto,
+  ) {
+    const preferences = await this.notificationPreferencesService.updatePreferences(
+      req.user.id,
+      updateDto,
+    );
+
+    return {
+      success: true,
+      data: preferences,
+      message: "Preferências atualizadas com sucesso",
+    };
+  }
+
+  @Post("preferences/reset")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Resetar preferências para valores padrão" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Preferências resetadas com sucesso",
+  })
+  async resetPreferences(@Request() req: any) {
+    const preferences = await this.notificationPreferencesService.resetToDefaults(
+      req.user.id,
+    );
+
+    return {
+      success: true,
+      data: preferences,
+      message: "Preferências resetadas para valores padrão",
+    };
+  }
+
+  @Post("preferences/push-subscription")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Atualizar push subscription" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Push subscription atualizada com sucesso",
+  })
+  async updatePushSubscription(
+    @Request() req: any,
+    @Body() subscription: {
+      endpoint: string;
+      keys: {
+        p256dh: string;
+        auth: string;
+      };
+    },
+  ) {
+    const preferences = await this.notificationPreferencesService.updatePushSubscription(
+      req.user.id,
+      subscription,
+    );
+
+    return {
+      success: true,
+      data: preferences,
+      message: "Push subscription atualizada com sucesso",
+    };
+  }
+
+  @Delete("preferences/push-subscription")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Remover push subscription" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Push subscription removida com sucesso",
+  })
+  async removePushSubscription(@Request() req: any) {
+    const preferences = await this.notificationPreferencesService.removePushSubscription(
+      req.user.id,
+    );
+
+    return {
+      success: true,
+      data: preferences,
+      message: "Push subscription removida com sucesso",
+    };
   }
 
   @Get(":id")

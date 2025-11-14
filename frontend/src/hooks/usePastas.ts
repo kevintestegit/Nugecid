@@ -30,6 +30,13 @@ export interface CreatePastaInput {
   planilhas?: File[];
 }
 
+export interface UpdatePastaInput {
+  id: string;
+  nome?: string;
+  descricao?: string;
+  tags?: string[];
+}
+
 export interface UploadArquivosInput {
   pastaId: string;
   imagens?: File[];
@@ -209,6 +216,14 @@ const deletePasta = async (id: string): Promise<void> => {
   await api.delete(`/pastas/${id}`);
 };
 
+const updatePasta = async ({ id, ...payload }: UpdatePastaInput): Promise<Pasta> => {
+  const { data } = await api.patch(`/pastas/${id}`, {
+    ...payload,
+    tags: payload.tags ?? undefined,
+  });
+  return normalizePasta(data);
+};
+
 const deletePastaArquivo = async (input: { pastaId: string; arquivoId: string }): Promise<void> => {
   await apiService.deletePastaArquivo(input.pastaId, input.arquivoId);
 };
@@ -297,6 +312,18 @@ export function usePastas() {
     },
   });
 
+  const updatePastaMutation = useMutation<Pasta, Error, UpdatePastaInput>({
+    mutationFn: updatePasta,
+    onSuccess: (_pasta, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pastas'] });
+      if (variables?.id) {
+        queryClient.invalidateQueries({
+          queryKey: ['pastas', 'detalhes', variables.id],
+        });
+      }
+    },
+  });
+
   const uploadArquivosMutation = useMutation<Pasta, Error, UploadArquivosInput>({
     mutationFn: uploadArquivos,
     onSuccess: (_pasta, variables) => {
@@ -307,6 +334,7 @@ export function usePastas() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['pastas', 'item-search'] });
+      queryClient.invalidateQueries({ queryKey: ['planilhas-controle', 'geral'] });
     },
   });
 
@@ -320,6 +348,7 @@ export function usePastas() {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['pastas', 'item-search'] });
+      queryClient.invalidateQueries({ queryKey: ['planilhas-controle', 'geral'] });
     },
   });
 
@@ -329,10 +358,12 @@ export function usePastas() {
     error,
     createPasta: createPastaMutation.mutateAsync,
     deletePasta: deletePastaMutation.mutateAsync,
+    updatePasta: updatePastaMutation.mutateAsync,
     uploadArquivos: uploadArquivosMutation.mutateAsync,
     isUploadingArquivos: uploadArquivosMutation.isPending,
     deleteArquivo: deleteArquivoMutation.mutateAsync,
     isDeletingArquivo: deleteArquivoMutation.isPending,
+    isUpdatingPasta: updatePastaMutation.isPending,
   };
 }
 

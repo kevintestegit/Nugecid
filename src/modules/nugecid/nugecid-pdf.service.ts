@@ -8,7 +8,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import PdfPrinter from "pdfmake";
+import * as PdfMake from "pdfmake/build/pdfmake";
+import * as pdfFonts from "pdfmake/build/vfs_fonts";
+const PdfPrinter = require("pdfmake");
 import { TDocumentDefinitions } from "pdfmake/interfaces";
 import htmlToPdfmake from "html-to-pdfmake";
 import { JSDOM } from "jsdom";
@@ -33,7 +35,7 @@ export interface TermoDesarquivamentoOptions {
 @Injectable()
 export class NugecidPdfService {
   private readonly logger = new Logger(NugecidPdfService.name);
-  private readonly pdfPrinter: PdfPrinter;
+  private readonly pdfPrinter: any;
 
   constructor(
     @InjectRepository(DesarquivamentoTypeOrmEntity)

@@ -15,18 +15,22 @@ export class DesarquivamentoAnexoTypeOrmEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "desarquivamento_id", nullable: false })
-  desarquivamentoId: number;
+  @Column({ name: "desarquivamento_id", nullable: true })
+  desarquivamentoId?: number;
 
   @ManyToOne(
     () => DesarquivamentoTypeOrmEntity,
     (desarquivamento) => desarquivamento.anexos,
     {
       onDelete: "CASCADE",
+      nullable: true,
     },
   )
   @JoinColumn({ name: "desarquivamento_id" })
-  desarquivamento: DesarquivamentoTypeOrmEntity;
+  desarquivamento?: DesarquivamentoTypeOrmEntity;
+
+  @Column({ name: "numero_processo", length: 255, nullable: true })
+  numeroProcesso?: string;
 
   @Column({ name: "usuario_id", nullable: false })
   usuarioId: number;
@@ -137,5 +141,29 @@ export class DesarquivamentoAnexoTypeOrmEntity {
 
   isOwner(userId: number): boolean {
     return this.usuarioId === userId;
+  }
+
+  /**
+   * Verifica se o anexo está vinculado a um processo
+   */
+  isAnexoDeProcesso(): boolean {
+    return !!this.numeroProcesso && !this.desarquivamentoId;
+  }
+
+  /**
+   * Verifica se o anexo está vinculado a uma solicitação específica
+   */
+  isAnexoDeSolicitacao(): boolean {
+    return !!this.desarquivamentoId;
+  }
+
+  /**
+   * Retorna o tipo de vínculo do anexo
+   */
+  getTipoVinculo(): "processo" | "solicitacao" | "ambos" {
+    if (this.desarquivamentoId && this.numeroProcesso) return "ambos";
+    if (this.numeroProcesso) return "processo";
+    if (this.desarquivamentoId) return "solicitacao";
+    return "solicitacao"; // fallback
   }
 }

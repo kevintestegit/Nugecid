@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, User, Shield, Calendar, CheckCircle, XCircle } from 'lucide-react'
 import { useUser } from '@/hooks/useUsers'
 import { format } from 'date-fns'
@@ -40,12 +41,32 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ userId, onClose }) =>
     }
   }
 
-  return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [onClose])
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
+  const modalContent = (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+        onClick={handleBackdropClick}
+      />
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto mx-4 pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center gap-3">
@@ -176,9 +197,12 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({ userId, onClose }) =>
             Fechar
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
 export default UserDetailModal

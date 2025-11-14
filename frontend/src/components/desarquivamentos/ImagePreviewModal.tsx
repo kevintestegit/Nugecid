@@ -75,7 +75,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   canEdit = false,
   allImages = []
 }) => {
-  const resolvedPreviewUrl = previewUrl ?? anexo?.previewUrl ?? anexo?.url ?? null
+  // Priorizar o previewUrl do prop (blob URL) em vez do anexo.previewUrl (API URL)
+  const resolvedPreviewUrl = previewUrl || anexo?.previewUrl || anexo?.url || null
   const isOpen = Boolean(resolvedPreviewUrl && anexo)
 
   if (!isOpen || !anexo) return null
@@ -92,7 +93,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const imagesToShow = allImages.length > 0 ? allImages : [anexo]
   
   const slides = imagesToShow.map((img) => {
-    const imgPreviewUrl = img.previewUrl ?? img.url ?? ''
+    // Para a imagem atual, usar o previewUrl do prop (blob URL)
+    // Para outras imagens, usar a URL da API (podem não estar carregadas)
+    const imgPreviewUrl = img.id === anexo.id && previewUrl 
+      ? previewUrl 
+      : (img.previewUrl || img.url || '')
     const imgFormattedSize = formatBytes(img.tamanhoBytes)
     const imgUploadedBy = img.usuario?.nome
     const imgUploadedAt = img.createdAt

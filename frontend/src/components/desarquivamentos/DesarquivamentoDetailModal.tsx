@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import {
@@ -14,6 +14,8 @@ import {
   Printer,
   Eye,
   ChevronDown,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   useDesarquivamento,
@@ -86,6 +88,43 @@ export const DesarquivamentoDetailModal: React.FC<
     };
   }, []);
 
+  const handleViewDetails = useCallback(() => {
+    onClose();
+    navigate(`/desarquivamentos/${id}`);
+  }, [id, navigate, onClose]);
+
+  const handleEdit = useCallback(() => {
+    onClose();
+    navigate(`/desarquivamentos/${id}/editar`);
+  }, [id, navigate, onClose]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        const target = event.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === 'TEXTAREA' ||
+            target.tagName === 'INPUT' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable)
+        ) {
+          return;
+        }
+        event.preventDefault();
+        handleViewDetails();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleViewDetails, onClose]);
+
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -108,11 +147,6 @@ export const DesarquivamentoDetailModal: React.FC<
         'Não foi possível adicionar o comentário.';
       toast.error(message);
     }
-  };
-
-  const handleEdit = () => {
-    onClose();
-    navigate(`/desarquivamentos/${id}/editar`);
   };
 
   const placeholderTemplate = useMemo(
@@ -318,11 +352,13 @@ export const DesarquivamentoDetailModal: React.FC<
       --page-padding-x: 10mm;
       --header-height: 115px;
       --footer-height: 80px;
+      --page-height: 297mm;
+      --page-margin: 10mm;
     }
     * { box-sizing: border-box; }
     body {
       font-family: Calibri, "Segoe UI", Arial, sans-serif;
-      margin: 0;
+      margin: 0; /* Reset de margem */
       color: #000;
     }
     p { margin: 0; }
@@ -367,42 +403,28 @@ export const DesarquivamentoDetailModal: React.FC<
     .rodape { border-top: 0.75pt solid #000; padding-top: 2pt; margin-top: 5pt; }
     .autenticacao { margin-top: 20pt; font-size: 10pt; text-align: center; }
 
-    /* Layout padrão - sem fixed positioning */
-    header.print-header,
-    footer.print-footer {
+    /* Layout com Flexbox para garantir o rodapé no final */
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(var(--page-height) - (2 * var(--page-margin)));
       padding: 0 var(--page-padding-x);
-      background: #fff;
     }
-
     main.print-body {
-      padding: 0 var(--page-padding-x);
+      flex-grow: 1; /* Faz o conteúdo principal crescer e empurrar o rodapé */
     }
-
-    /* Layout para múltiplas páginas - com fixed positioning */
-    body.multipage header.print-header,
-    body.multipage footer.print-footer {
-      position: fixed;
-      left: 0;
-      right: 0;
-      z-index: 10;
+    header.print-header {
+      height: var(--header-height);
     }
-    body.multipage header.print-header { top: 0; height: var(--header-height); }
-    body.multipage footer.print-footer { bottom: 0; min-height: var(--footer-height); }
-    body.multipage main.print-body {
-      margin-top: calc(var(--header-height) + 10px);
-      margin-bottom: calc(var(--footer-height) + 10px);
+    footer.print-footer {
+      min-height: var(--footer-height);
     }
 
     @page {
       margin: 10mm;
     }
-    /* Impressão */
+
     @media print {
-      body { margin: 0; }
-      body.multipage main.print-body {
-        margin-top: calc(var(--header-height) + 10px);
-        margin-bottom: calc(var(--footer-height) + 10px);
-      }
       .faixa {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -419,43 +441,6 @@ export const DesarquivamentoDetailModal: React.FC<
       .autenticacao { margin-top: 20pt; page-break-inside: avoid; text-align: center; }
     }
   </style>
-  <script>
-    // Detecta se o conteúdo precisa de múltiplas páginas
-    window.addEventListener('load', function() {
-      // Aguarda um frame para garantir que o layout está completo
-      requestAnimationFrame(function() {
-        const body = document.body;
-        const main = document.querySelector('main.print-body');
-
-        if (!main) return;
-
-        // Altura de uma página A4 em pixels (aproximadamente 297mm - margens)
-        // 297mm - 20mm (10mm top + 10mm bottom) = 277mm ≈ 1047px @ 96dpi
-        const pageHeightMm = 297;
-        const marginTopBottomMm = 20; // 10mm top + 10mm bottom
-        const usablePageHeightMm = pageHeightMm - marginTopBottomMm;
-        const dpi = 96;
-        const mmToPx = dpi / 25.4;
-        const pageHeight = usablePageHeightMm * mmToPx;
-
-        // Altura do cabeçalho e rodapé quando fixos
-        const headerHeight = 115; // var(--header-height)
-        const footerHeight = 80; // var(--footer-height)
-
-        // Calcula a altura total do conteúdo
-        const contentHeight = main.scrollHeight;
-
-        const totalHeight = contentHeight + headerHeight + footerHeight;
-
-        if (totalHeight > pageHeight) {
-          body.classList.add('multipage');
-          console.log('Modo multipágina ativado - Altura total:', totalHeight, 'Altura de página:', pageHeight);
-        } else {
-          console.log('Modo página única - Altura total:', totalHeight, 'Altura de página:', pageHeight);
-        }
-      });
-    });
-  </script>
 </head>
 <body>
   <header class="print-header">
@@ -560,10 +545,10 @@ export const DesarquivamentoDetailModal: React.FC<
     </table>
 
     <!-- Nota -->
-    <p class="center fs10 mt-8"><strong>* Observar as orientações da portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe quanto aos prazos e instruções normativas.</strong></p>
+    <p class="center fs10 mt-8"><strong></strong></p>
 
     <div class="autenticacao fs10 center">
-      <p><em>Documento assinado digitalmente por ${userName} - ${matricula} às ${horaAssinatura} - ${dataAssinatura}.</em></p>
+      <p><em></em></p>
     </div>
   </main>
 
@@ -575,6 +560,13 @@ export const DesarquivamentoDetailModal: React.FC<
       <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
       <p>Email: arquivogeral@pci.rn.gov.br</p>
     </div>
+    <!-- Nota -->
+    <p class="center fs10 mt-8"><strong>* Observar as orientações da portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe quanto aos prazos e instruções normativas.</strong></p>
+
+    <div class="autenticacao fs10 center">
+      <p><em>Documento assinado digitalmente por ${userName} às ${horaAssinatura} - ${dataAssinatura}.</em></p>
+    </div>
+  </main>
   </footer>
 </body>
 </html>`;
@@ -706,6 +698,7 @@ export const DesarquivamentoDetailModal: React.FC<
   const modalNode = (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[10000]"
+      style={{ top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
       onClick={handleBackdropClick}
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -800,7 +793,7 @@ export const DesarquivamentoDetailModal: React.FC<
                         : item.numeroNicLaudoAuto
                     }
                   />
-                  <DetailRow label="Nº Processo" value={item.numeroProcesso} />
+                  <DetailRow label="Nº Processo" value={item.numeroProcesso} copyable />
                   <DetailRow
                     label="Tipo de Documento"
                     value={item.tipoDocumento}
@@ -1108,24 +1101,123 @@ export const DesarquivamentoDetailModal: React.FC<
   return createPortal(modalNode, document.body);
 };
 
-const DetailRow = ({ 
-  label, 
-  value, 
-  fullWidth = false, 
-  highlight = false 
-}: { 
-  label: string; 
-  value?: any; 
+const copyTextSafely = async (text: string): Promise<boolean> => {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (error) {
+    // fallback below
+  }
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.opacity = '0';
+  textArea.style.pointerEvents = 'none';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  let successful = false;
+  try {
+    successful = document.execCommand('copy');
+  } catch (error) {
+    successful = false;
+  } finally {
+    document.body.removeChild(textArea);
+  }
+  return successful;
+};
+
+const DetailRow = ({
+  label,
+  value,
+  fullWidth = false,
+  highlight = false,
+  copyable = false,
+}: {
+  label: string;
+  value?: any;
   fullWidth?: boolean;
   highlight?: boolean;
-}) => (
-  <div className={fullWidth ? 'md:col-span-2' : ''}>
-    <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">{label}</div>
-    <div className={`text-sm font-medium break-words ${highlight ? 'text-orange-600 italic' : 'text-gray-900'}`}>
-      {value || '-'}
+  copyable?: boolean;
+}) => {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    if (copied) {
+      timer = window.setTimeout(() => setCopied(false), 1500);
+    }
+    return () => {
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [copied]);
+
+  const handleCopy = async () => {
+    if (!value) return;
+    try {
+      const success = await copyTextSafely(String(value));
+      if (!success) {
+        throw new Error('Copy command was unsuccessful');
+      }
+      setCopied(true);
+    } catch (error) {
+      console.error('Erro ao copiar número do processo:', error);
+      toast.error('Não foi possível copiar o valor.');
+    }
+  };
+
+  const baseValueClasses = `text-sm font-medium break-words ${
+    highlight ? 'text-orange-600 italic' : 'text-gray-900'
+  }`;
+
+  if (!copyable) {
+    return (
+      <div className={fullWidth ? 'md:col-span-2' : ''}>
+        <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+          {label}
+        </div>
+        <div className={baseValueClasses}>{value || '-'}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={fullWidth ? 'md:col-span-2' : ''}>
+      <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+        {label}
+      </div>
+      <div className={`${baseValueClasses} flex items-center gap-2`}>
+        <span className="font-mono break-all">{value || '-'}</span>
+        {value && (
+          <>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              title="Copiar valor"
+              aria-label="Copiar valor"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </button>
+            {copied && (
+              <span className="text-xs text-emerald-600">Copiado</span>
+            )}
+          </>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const Detail = ({ label, value }: { label: string; value?: any }) => (
   <div>
