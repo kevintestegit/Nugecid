@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom toast styles */
+.toast-custom {
+  @apply border border-border/50 shadow-lg rounded-lg;
+  @apply transition-all duration-300 ease-in-out;
+}
+
+.toast-custom[data-type="warning"] {
+  background-color: hsl(var(--warning) / 0.1);
+  border-color: hsl(var(--warning) / 0.5);
+}
+
+.toast-custom[data-type="warning"] .toast-title {
+  color: hsl(var(--warning-foreground));
+}
+
+.toast-title {
+  @apply font-semibold text-foreground;
+}
+
+.toast-description {
+  @apply text-muted-foreground;
+}
+
+.toast-icon {
+  @apply scale-110;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -20,6 +47,8 @@
     --accent-foreground: 224 71% 20%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 48 96% 10%;
     --border: 215 20% 90%;
     --input: 215 20% 90%;
     --ring: 221 83% 53%;
@@ -43,6 +72,8 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
+    --warning: 45 93% 47%;
+    --warning-foreground: 48 96% 98%;
     --border: 215 28% 15%;
     --input: 215 28% 20%;
     --ring: 221 83% 63%;

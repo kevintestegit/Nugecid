@@ -1,4 +1,6 @@
 import { toast as sonnerToast } from 'sonner';
+import { AlertTriangle } from 'lucide-react';
+import React from 'react';
 
 export const toast = {
   success: (message: string, description?: string) => {
@@ -25,7 +27,8 @@ export const toast = {
   warning: (message: string, description?: string) => {
     sonnerToast.warning(message, {
       description,
-      duration: 3000,
+      duration: 5000,
+      icon: <AlertTriangle className="w-5 h-5" />,
     });
   },
 
