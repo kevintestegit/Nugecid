@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Bell, X, Check, CheckCheck, Trash2, AlertCircle, Info, Clock } from 'lucide-react';
 import { useNotificacoes, type Notificacao } from '../../hooks/useNotificacoes';
 import { cn } from '../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
 interface NotificationBellProps {
   className?: string;
@@ -13,6 +14,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   
   const {
     naoLidas,
@@ -50,6 +52,28 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     }
     setIsOpen(!isOpen);
   };
+
+  const getNotificationDestination = (notificacao: Notificacao) => {
+    if (notificacao.link) return notificacao.link;
+    if (notificacao.processoId) return `/desarquivamentos/${notificacao.processoId}`;
+    if (notificacao.solicitacaoId) return `/desarquivamentos/${notificacao.solicitacaoId}`;
+    if (notificacao.tarefaId) return `/tarefas/${notificacao.tarefaId}`;
+    return null;
+  };
+
+  const handleNotificationClick = useCallback(
+    (notificacao: Notificacao) => {
+      const destination = getNotificationDestination(notificacao);
+      if (!destination) return;
+
+      navigate(destination);
+      if (!notificacao.lida) {
+        marcarComoLida(notificacao.id);
+      }
+      setIsOpen(false);
+    },
+    [navigate, marcarComoLida]
+  );
 
   // Obter ícone baseado no tipo da notificação
   const getNotificationIcon = (tipo: string, prioridade: string) => {
@@ -101,14 +125,28 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       notificacao.detalhes?.acao_requerida && `Ação: ${notificacao.detalhes?.acao_requerida}`,
     ].filter(Boolean)
 
+    const destination = getNotificationDestination(notificacao);
+    const isClickable = Boolean(destination);
+
     return (
       <div
         key={notificacao.id}
         className={cn(
-          'p-3 border-l-4 transition-all duration-200 hover:bg-gray-50',
+          'p-3 border-l-4 transition-all duration-200',
+          isClickable ? 'hover:bg-gray-50 cursor-pointer' : '',
           getPriorityColor(notificacao.prioridade),
           !notificacao.lida && 'bg-blue-50 border-l-blue-500'
         )}
+        role={isClickable ? 'button' : undefined}
+        tabIndex={isClickable ? 0 : undefined}
+        onClick={() => isClickable && handleNotificationClick(notificacao)}
+        onKeyDown={(e) => {
+          if (!isClickable) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleNotificationClick(notificacao);
+          }
+        }}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -180,8 +218,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       <button
         onClick={handleToggleDropdown}
         className={cn(
-          'relative p-2 text-gray-600 hover:text-gray-900 transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg',
+          'relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors',
+          'text-gray-600 hover:text-gray-900 bg-muted/60 hover:bg-muted/80',
+          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
           hasNotificacoes && 'animate-pulse'
         )}
         title={`${totalNaoLidas} notificações não lidas`}
@@ -190,7 +229,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
         
         {/* Badge com contador */}
         {totalNaoLidas > 0 && (
-          <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full min-w-[1.25rem] h-5">
+          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full min-w-[1.25rem] h-5 shadow-md">
             {totalNaoLidas > 99 ? '99+' : totalNaoLidas}
           </span>
         )}

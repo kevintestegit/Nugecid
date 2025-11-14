@@ -58,7 +58,7 @@ export class ApiService {
       (response) => response,
       async (error) => {
         const originalRequest = error.config
-        
+
         console.log('🔍 Interceptor de resposta - erro capturado:', {
           code: error.code,
           message: error.message,
@@ -76,27 +76,27 @@ export class ApiService {
         if (originalRequest.url === '/auth/login') {
           return Promise.reject(error)
         }
-        
+
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
-          
+
           try {
             const refreshToken = localStorage.getItem('refreshToken')
             if (refreshToken) {
               console.log('🔄 Tentando renovar token via interceptor...')
               const response = await this.api.post('/auth/refresh', { refreshToken })
               const { accessToken } = response.data // Direct access since backend returns { accessToken, expiresIn }
-              
+
               localStorage.setItem('accessToken', accessToken)
               console.log('✅ Token renovado com sucesso via interceptor')
-              
+
               // Retry the original request with the new token
               originalRequest.headers.Authorization = `Bearer ${accessToken}`
               return this.api(originalRequest)
             }
           } catch (refreshError: any) {
             console.error('❌ Falha ao renovar token via interceptor:', refreshError)
-            
+
             // Só fazer logout se não for erro de conectividade
             if (refreshError.code !== 'ERR_NETWORK' && !refreshError.message?.includes('ERR_ABORTED')) {
               console.log('🚪 Fazendo logout devido a falha de autenticação')
@@ -108,7 +108,7 @@ export class ApiService {
             return Promise.reject(refreshError)
           }
         }
-        
+
         // Só fazer logout para 401 se não for erro de conectividade
         if (error.response?.status === 401) {
           console.log('🚪 Token inválido - fazendo logout')
@@ -117,7 +117,7 @@ export class ApiService {
           localStorage.removeItem('user')
           window.location.href = '/login'
         }
-        
+
         return Promise.reject(error)
       }
     )
@@ -470,7 +470,13 @@ export class ApiService {
     }
   }
 
-  async uploadDesarquivamentoAnexo(desarquivamentoId: number, file: File, descricao?: string, tipoAnexo?: 'desarquivamento' | 'rearquivamento'): Promise<ApiResponse<any>> {
+  async uploadDesarquivamentoAnexo(
+    desarquivamentoId: number, 
+    file: File, 
+    descricao?: string, 
+    tipoAnexo?: 'desarquivamento' | 'rearquivamento',
+    anexarAoProcesso?: boolean
+  ): Promise<ApiResponse<any>> {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -479,6 +485,9 @@ export class ApiService {
       }
       if (tipoAnexo) {
         formData.append('tipoAnexo', tipoAnexo);
+      }
+      if (anexarAoProcesso !== undefined) {
+        formData.append('anexarAoProcesso', String(anexarAoProcesso));
       }
 
       const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
@@ -563,6 +572,196 @@ export class ApiService {
         typesCounts: {}
       }
     }
+  }
+
+  // Security endpoints
+  async getIpAccessStats(days: number = 7, limit: number = 100): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get('/security/ip-access-stats', {
+        params: { days, limit }
+      })
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] getIpAccessStats error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async getIpAccessDetails(ipAddress: string, days: number = 30): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(`/security/ip-access-details/${ipAddress}`, {
+        params: { days }
+      })
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] getIpAccessDetails error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async listBlockedIps(includeInactive: boolean = false): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get('/security/blocked-ips', {
+        params: { includeInactive }
+      })
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] listBlockedIps error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async blockIp(ipAddress: string, reason?: string, expiresAt?: string): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/security/blocked-ips', {
+        ipAddress,
+        reason,
+        expiresAt
+      })
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] blockIp error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async unblockIp(ipAddress: string): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.api.delete(`/security/blocked-ips/${ipAddress}`)
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] unblockIp error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async autoBlockSuspiciousIps(config?: {
+    failedAttemptsThreshold?: number
+    timeWindowMinutes?: number
+    blockDurationHours?: number
+  }): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.post('/security/auto-block', config || {})
+      return response.data
+    } catch (error: any) {
+      console.error('[ApiService] autoBlockSuspiciousIps error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async deletePastaArquivo(pastaId: string, arquivoId: string): Promise<void> {
+    try {
+      await this.api.delete(`/pastas/${pastaId}/arquivos/${arquivoId}`)
+    } catch (error: any) {
+      console.error('[ApiService] deletePastaArquivo error:', error?.response?.status, error?.response?.data || error?.message)
+      throw error
+    }
+  }
+
+  // Notification preferences endpoints
+  async getNotificationPreferences(): Promise<ApiResponse<{
+    id: number
+    userId: number
+    inAppEnabled: boolean
+    pushEnabled: boolean
+    soundEnabled: boolean
+    enabledTypes: Record<string, boolean>
+    pushSubscription: any | null
+    createdAt: string
+    updatedAt: string
+  }>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get('/notificacoes/preferences')
+    return response.data
+  }
+
+  async updateNotificationPreferences(preferences: {
+    inAppEnabled?: boolean
+    pushEnabled?: boolean
+    soundEnabled?: boolean
+    enabledTypes?: Record<string, boolean>
+    pushSubscription?: any | null
+  }): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.patch('/notificacoes/preferences', preferences)
+    return response.data
+  }
+
+  async resetNotificationPreferences(): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/notificacoes/preferences/reset')
+    return response.data
+  }
+
+  async updatePushSubscription(subscription: {
+    endpoint: string
+    keys: {
+      p256dh: string
+      auth: string
+    }
+  }): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/notificacoes/preferences/push-subscription', subscription)
+    return response.data
+  }
+
+  async removePushSubscription(): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.delete('/notificacoes/preferences/push-subscription')
+    return response.data
+  }
+
+  // System Announcements endpoints
+  async getAnnouncements(includeInactive = false): Promise<ApiResponse<any[]>> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(`/announcements?includeInactive=${includeInactive}`)
+    return response.data
+  }
+
+  async getActiveAnnouncements(): Promise<ApiResponse<any[]>> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get('/announcements/active')
+    return response.data
+  }
+
+  async getAnnouncement(id: number): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/announcements/${id}`)
+    return response.data
+  }
+
+  async createAnnouncement(data: {
+    title: string
+    content: string
+    imageUrl?: string
+    priority: 'low' | 'medium' | 'high' | 'critical'
+    startDate: string
+    endDate: string
+    active?: boolean
+    targetRoles?: string[]
+  }): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post('/announcements', data)
+    return response.data
+  }
+
+  async updateAnnouncement(id: number, data: Partial<{
+    title: string
+    content: string
+    imageUrl?: string
+    priority: 'low' | 'medium' | 'high' | 'critical'
+    startDate: string
+    endDate: string
+    active?: boolean
+    targetRoles?: string[]
+  }>): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.patch(`/announcements/${id}`, data)
+    return response.data
+  }
+
+  async deleteAnnouncement(id: number): Promise<void> {
+    await this.api.delete(`/announcements/${id}`)
+  }
+
+  async markAnnouncementAsViewed(id: number): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(`/announcements/${id}/mark-viewed`)
+    return response.data
+  }
+
+  async getAnnouncementStats(id: number): Promise<ApiResponse<any>> {
+    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(`/announcements/${id}/stats`)
+    return response.data
   }
 }
 

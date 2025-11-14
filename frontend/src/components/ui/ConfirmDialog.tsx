@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { AlertTriangle, X } from 'lucide-react'
@@ -27,8 +28,6 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   variant = 'danger',
   isLoading = false
 }) => {
-  if (!isOpen) return null
-
   const getVariantStyles = () => {
     switch (variant) {
       case 'danger':
@@ -74,12 +73,35 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     }
   }
 
-  return (
-    <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={handleBackdropClick}
-    >
-      <Card className="w-full max-w-md mx-auto">
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isLoading) {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [isLoading, onClose])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  const modalContent = (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+        onClick={handleBackdropClick}
+      />
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+        <Card className="relative w-full max-w-md mx-4 pointer-events-auto">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-3">
@@ -132,9 +154,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             </Button>
           </div>
         </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
 export { ConfirmDialog }

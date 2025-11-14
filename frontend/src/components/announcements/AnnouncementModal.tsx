@@ -1,0 +1,190 @@
+import React, { useState, useEffect } from 'react';
+import { X, AlertCircle, AlertTriangle, Info, Megaphone } from 'lucide-react';
+import { apiService } from '@/services/api';
+
+interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  imageUrl: string | null;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  startDate: string;
+  endDate: string;
+}
+
+const priorityConfig = {
+  low: {
+    icon: Info,
+    bgColor: 'from-blue-500 to-blue-600',
+    borderColor: 'border-blue-500',
+    iconColor: 'text-blue-500',
+  },
+  medium: {
+    icon: Megaphone,
+    bgColor: 'from-yellow-500 to-yellow-600',
+    borderColor: 'border-yellow-500',
+    iconColor: 'text-yellow-500',
+  },
+  high: {
+    icon: AlertTriangle,
+    bgColor: 'from-orange-500 to-orange-600',
+    borderColor: 'border-orange-500',
+    iconColor: 'text-orange-500',
+  },
+  critical: {
+    icon: AlertCircle,
+    bgColor: 'from-red-500 to-red-600',
+    borderColor: 'border-red-500',
+    iconColor: 'text-red-500',
+  },
+};
+
+interface AnnouncementModalProps {
+  onClose: () => void;
+}
+
+export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose }) => {
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, []);
+
+  const loadAnnouncements = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getActiveAnnouncements();
+      if (response.success && response.data && response.data.length > 0) {
+        setAnnouncements(response.data);
+      } else {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Erro ao carregar avisos:', error);
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    const currentAnnouncement = announcements[currentIndex];
+
+    try {
+      await apiService.markAnnouncementAsViewed(currentAnnouncement.id);
+    } catch (error) {
+      console.error('Erro ao marcar aviso como visualizado:', error);
+    }
+
+    if (currentIndex < announcements.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      onClose();
+    }
+  };
+
+  if (loading || announcements.length === 0) {
+    return null;
+  }
+
+  const currentAnnouncement = announcements[currentIndex];
+  const config = priorityConfig[currentAnnouncement.priority];
+  const Icon = config.icon;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl mx-4 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        {/* Header com gradiente */}
+        <div className={`bg-gradient-to-r ${config.bgColor} p-6 text-white relative`}>
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                <Icon className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">{currentAnnouncement.title}</h2>
+                {announcements.length > 1 && (
+                  <p className="text-sm text-white/80 mt-1">
+                    Aviso {currentIndex + 1} de {announcements.length}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              title="Fechar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Conteúdo */}
+        <div className="p-6 max-h-[60vh] overflow-y-auto">
+          {currentAnnouncement.imageUrl && (
+            <div className="mb-6 rounded-xl overflow-hidden shadow-lg">
+              <img
+                src={currentAnnouncement.imageUrl}
+                alt={currentAnnouncement.title}
+                className="w-full h-auto object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
+          <div className="prose dark:prose-invert max-w-none">
+            <p className="text-gray-700 dark:text-gray-300 text-lg leading-relaxed whitespace-pre-wrap">
+              {currentAnnouncement.content}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {announcements.length > 1 ? (
+                <span>
+                  Pressione "Entendi" para ver o próximo aviso
+                </span>
+              ) : (
+                <span>
+                  Pressione "Entendi" para continuar
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleConfirm}
+              className={`px-8 py-3 bg-gradient-to-r ${config.bgColor} text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200`}
+            >
+              {currentIndex < announcements.length - 1 ? 'Próximo' : 'Entendi'}
+            </button>
+          </div>
+
+          {/* Indicadores de progresso */}
+          {announcements.length > 1 && (
+            <div className="flex gap-2 mt-4 justify-center">
+              {announcements.map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    index === currentIndex
+                      ? `w-8 bg-gradient-to-r ${config.bgColor}`
+                      : index < currentIndex
+                      ? 'w-2 bg-green-500'
+                      : 'w-2 bg-gray-300 dark:bg-gray-600'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

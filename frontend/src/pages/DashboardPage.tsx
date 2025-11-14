@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useOnlineUsers } from '@/hooks/useOnlineUsers'
@@ -12,6 +12,7 @@ import SystemInfo from '@/components/dashboard/SystemInfo'
 import UserTasks from '@/components/dashboard/UserTasks'
 import PrazosCalendar from '@/components/dashboard/PrazosCalendar'
 import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer'
+import { AnnouncementModal } from '@/components/announcements/AnnouncementModal'
 import { Sun, Moon, AlertTriangle, Users, User, Settings2 } from 'lucide-react'
 
 const DashboardPage: React.FC = () => {
@@ -19,6 +20,7 @@ const DashboardPage: React.FC = () => {
   const { data: stats, isLoading, error } = useDashboardStats()
   const { data: onlineUsers, isLoading: loadingOnline, error: errorOnline } = useOnlineUsers()
   const { data: userTasks, isLoading: loadingTasks } = useUserTasks()
+  const [showAnnouncements, setShowAnnouncements] = useState(true)
   
   const {
     visibleCards,
@@ -284,6 +286,11 @@ const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {visibleCards.map((card) => renderCard(card.type))}
       </div>
+
+      {/* System Announcements Modal */}
+      {showAnnouncements && (
+        <AnnouncementModal onClose={() => setShowAnnouncements(false)} />
+      )}
     </div>
   )
 }

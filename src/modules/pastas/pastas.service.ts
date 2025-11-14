@@ -399,8 +399,28 @@ export class PastasService {
         };
       }
 
-      const headerRow = Array.isArray(rawRows[0]) ? rawRows[0] : [];
-      const dataRows = rawRows.slice(1);
+      const headerIndex = rawRows.findIndex(
+        (row) =>
+          Array.isArray(row) &&
+          row.some(
+            (valor) => valor !== undefined && String(valor ?? "").trim().length,
+          ),
+      );
+
+      if (headerIndex === -1) {
+        return {
+          planilhaId: arquivo.id,
+          planilhaNome: arquivo.nomeOriginal,
+          sheetName,
+          colunas: [],
+          itens: [],
+        };
+      }
+
+      const headerRow = Array.isArray(rawRows[headerIndex])
+        ? rawRows[headerIndex]
+        : [];
+      const dataRows = rawRows.slice(headerIndex + 1);
       const totalColumns = Math.max(
         headerRow.length,
         ...dataRows.map((row) => (Array.isArray(row) ? row.length : 0)),
@@ -444,7 +464,7 @@ export class PastasService {
           return;
         }
 
-        const linha = rowIndex + 2; // considerando cabecalho na primeira linha
+        const linha = headerIndex + 2 + rowIndex; // considerando linhas em branco antes do cabecalho
 
         itens.push({
           id: `${arquivo.id}:${linha}`,

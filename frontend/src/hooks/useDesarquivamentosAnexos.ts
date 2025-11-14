@@ -10,7 +10,8 @@ const DESARQUIVAMENTOS_ANEXOS_QUERY_KEY = 'desarquivamentos-anexos'
 
 export interface DesarquivamentoAnexo {
   id: number
-  desarquivamentoId: number
+  desarquivamentoId: number | null
+  numeroProcesso?: string | null
   usuarioId: number
   nomeOriginal: string
   nomeArquivo: string
@@ -19,6 +20,7 @@ export interface DesarquivamentoAnexo {
   tamanhoBytes: number
   descricao?: string
   tipoAnexo: 'desarquivamento' | 'rearquivamento'
+  tipoVinculo?: 'processo' | 'solicitacao' | 'ambos'
   createdAt: string
   usuario?: {
     id: number
@@ -56,13 +58,14 @@ export const useUploadDesarquivamentoAnexo = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ desarquivamentoId, file, descricao, tipoAnexo }: { 
+    mutationFn: ({ desarquivamentoId, file, descricao, tipoAnexo, anexarAoProcesso }: { 
       desarquivamentoId: number
       file: File
       descricao?: string
       tipoAnexo?: 'desarquivamento' | 'rearquivamento'
+      anexarAoProcesso?: boolean
     }) =>
-      apiService.uploadDesarquivamentoAnexo(desarquivamentoId, file, descricao, tipoAnexo),
+      apiService.uploadDesarquivamentoAnexo(desarquivamentoId, file, descricao, tipoAnexo, anexarAoProcesso),
     onSuccess: (result, variables) => {
       // Invalida apenas a query específica do tipo de anexo que foi enviado
       queryClient.invalidateQueries({

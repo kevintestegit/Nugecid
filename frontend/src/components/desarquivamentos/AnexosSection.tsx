@@ -24,7 +24,8 @@ interface AnexosSectionProps {
   isLoading: boolean
   canEdit: boolean
   tipoAnexo: 'desarquivamento' | 'rearquivamento'
-  onUpload: (file: File, descricao: string) => Promise<void>
+  numeroProcesso?: string | null
+  onUpload: (file: File, descricao: string, anexarAoProcesso?: boolean) => Promise<void>
   onDownload: (anexoId: number) => Promise<void>
   onDelete: (anexoId: number) => Promise<void>
   onView?: (anexo: DesarquivamentoAnexo) => void
@@ -39,6 +40,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
   isLoading,
   canEdit,
   tipoAnexo,
+  numeroProcesso,
   onUpload,
   onDownload,
   onDelete,
@@ -48,6 +50,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileDescricao, setFileDescricao] = useState('')
+  const [anexarAoProcesso, setAnexarAoProcesso] = useState(false)
   const [editingAnexoId, setEditingAnexoId] = useState<number | null>(null)
   const [editDescricao, setEditDescricao] = useState('')
 
@@ -63,9 +66,10 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
     if (!selectedFile) return
 
     try {
-      await onUpload(selectedFile, fileDescricao)
+      await onUpload(selectedFile, fileDescricao, anexarAoProcesso)
       setSelectedFile(null)
       setFileDescricao('')
+      setAnexarAoProcesso(false)
       toast.success('Anexo enviado com sucesso!')
     } catch (error: any) {
       const message =
@@ -173,6 +177,26 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                       className="w-full"
                     />
                   </div>
+                  {numeroProcesso && (
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded border border-blue-200">
+                      <input
+                        type="checkbox"
+                        id={`anexarAoProcesso-${tipoAnexo}`}
+                        checked={anexarAoProcesso}
+                        onChange={(e) => setAnexarAoProcesso(e.target.checked)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <Label 
+                        htmlFor={`anexarAoProcesso-${tipoAnexo}`} 
+                        className="text-sm font-medium text-blue-900 cursor-pointer flex-1"
+                      >
+                        Anexar ao processo inteiro
+                        <span className="block text-xs font-normal text-blue-700 mt-0.5">
+                          Este anexo ficará disponível em todas as {anexos.filter(a => a.numeroProcesso === numeroProcesso).length || 'outras'} solicitações do processo {numeroProcesso}
+                        </span>
+                      </Label>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={handleUpload}
@@ -218,15 +242,29 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     <div className="flex-shrink-0">
                       <ImageThumbnail
                         desarquivamentoId={anexo.desarquivamentoId}
+                        numeroProcesso={anexo.numeroProcesso}
                         anexoId={anexo.id}
                         nomeOriginal={anexo.nomeOriginal}
                         tipoMime={anexo.tipoMime}
+                        previewUrl={anexo.previewUrl}
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {anexo.nomeOriginal}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {anexo.nomeOriginal}
+                        </p>
+                        {anexo.tipoVinculo === 'processo' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
+                            Processo
+                          </span>
+                        )}
+                        {anexo.tipoVinculo === 'solicitacao' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0">
+                            Solicitação
+                          </span>
+                        )}
+                      </div>
                       {editingAnexoId === anexo.id ? (
                         <div className="mt-2 flex gap-2">
                           <Input

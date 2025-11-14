@@ -129,11 +129,7 @@ export class TypeOrmUserRepository implements IUserRepository {
       queryBuilder.andWhere("user.deletedAt IS NULL");
     }
 
-    // Debug: Log da query gerada para verificar se está correta
-      "🔍 [DEBUG] Query SQL gerada (paginação):",
-      queryBuilder.getSql(),
-    );
-
+    // Debug: Query gerada para paginação
     const total = await queryBuilder.getCount();
     const entities = await queryBuilder
       .skip((page - 1) * limit)

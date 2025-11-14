@@ -27,7 +27,9 @@ import {
   Download,
   Trash2,
   Paperclip,
-  X
+  X,
+  Copy,
+  Check
 } from 'lucide-react'
 import { getStatusLabel } from '@/utils/format'
 import { StatusDesarquivamento } from '@/types'
@@ -54,6 +56,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   const comments = commentsResponse?.data ?? [];
   const addCommentMutation = useAddDesarquivamentoComment(Number(id));
   const [commentText, setCommentText] = useState('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Anexos - Separados por tipo
   const { data: anexosDesarquivamento, isLoading: isLoadingAnexosDesarq } = 
@@ -106,24 +109,72 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     }
   };
 
-  const handleUploadDesarquivamento = async (file: File, descricao: string) => {
+  const handleUploadDesarquivamento = async (file: File, descricao: string, anexarAoProcesso?: boolean) => {
     if (!id) return;
     await uploadAnexoMutation.mutateAsync({
       desarquivamentoId: Number(id),
       file,
       descricao: descricao.trim() || undefined,
-      tipoAnexo: 'desarquivamento'
+      tipoAnexo: 'desarquivamento',
+      anexarAoProcesso
     });
   };
 
-  const handleUploadRearquivamento = async (file: File, descricao: string) => {
+  const handleUploadRearquivamento = async (file: File, descricao: string, anexarAoProcesso?: boolean) => {
     if (!id) return;
     await uploadAnexoMutation.mutateAsync({
       desarquivamentoId: Number(id),
       file,
       descricao: descricao.trim() || undefined,
-      tipoAnexo: 'rearquivamento'
+      tipoAnexo: 'rearquivamento',
+      anexarAoProcesso
     });
+  };
+
+  const handleCopyToClipboard = async (value?: string, fieldKey?: string) => {
+    if (!value) return;
+
+    const markAsCopied = () => {
+      setCopiedField(fieldKey ?? null);
+      setTimeout(() => {
+        setCopiedField((prev) => (prev === fieldKey ? null : prev));
+      }, 2000);
+    };
+
+    const fallbackCopy = () => {
+      const textArea = document.createElement('textarea');
+      textArea.value = value;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      textArea.style.pointerEvents = 'none';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          markAsCopied();
+        } else {
+          throw new Error('execCommand falhou');
+        }
+      } catch (error) {
+        toast.error('Não foi possível copiar o conteúdo.');
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    };
+
+    if (navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        markAsCopied();
+        return;
+      } catch (error) {
+        // fallback abaixo
+      }
+    }
+
+    fallbackCopy();
   };
 
   const handleDownloadTermo = (format: 'pdf' | 'docx') => {
@@ -160,11 +211,42 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     const allAnexos = [...(anexosDesarquivamento ?? []), ...(anexosRearquivamento ?? [])];
     const anexo = allAnexos.find(a => a.id === anexoId);
 
+    if (!anexo) {
+      toast.error('Anexo não encontrado');
+      return;
+    }
+
     try {
-      const blob = await downloadAnexoMutation.mutateAsync({
-        desarquivamentoId: Number(id),
-        anexoId,
-      });
+      let blob: Blob
+
+      // Se anexo tem URL (vem do backend com URL correta), usar ela
+      if (anexo.url) {
+        const response = await fetch(anexo.url, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        })
+        if (!response.ok) throw new Error('Erro ao baixar anexo')
+        blob = await response.blob()
+      } else if (anexo.desarquivamentoId) {
+        // Anexo de solicitação
+        blob = await downloadAnexoMutation.mutateAsync({
+          desarquivamentoId: Number(id),
+          anexoId,
+        });
+      } else if (anexo.numeroProcesso) {
+        // Anexo de processo
+        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso)
+        const response = await fetch(`/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/download`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        })
+        if (!response.ok) throw new Error('Erro ao baixar anexo')
+        blob = await response.blob()
+      } else {
+        throw new Error('Anexo sem vínculo válido')
+      }
 
       // Criar URL para download
       const url = window.URL.createObjectURL(blob);
@@ -192,10 +274,36 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     if (!id) return;
 
     try {
-      const blob = await viewAnexoMutation.mutateAsync({
-        desarquivamentoId: Number(id),
-        anexoId: anexo.id,
-      });
+      let blob: Blob
+      
+      // Se anexo tem previewUrl (URL correta do backend), usar ela
+      if (anexo.previewUrl) {
+        const response = await fetch(anexo.previewUrl, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        })
+        if (!response.ok) throw new Error('Erro ao carregar visualização')
+        blob = await response.blob()
+      } else if (anexo.desarquivamentoId) {
+        // Anexo de solicitação
+        blob = await viewAnexoMutation.mutateAsync({
+          desarquivamentoId: Number(id),
+          anexoId: anexo.id,
+        });
+      } else if (anexo.numeroProcesso) {
+        // Anexo de processo
+        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso)
+        const response = await fetch(`/api/nugecid/processo/${encodedProcesso}/anexos/${anexo.id}/view`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          },
+        })
+        if (!response.ok) throw new Error('Erro ao carregar visualização')
+        blob = await response.blob()
+      } else {
+        throw new Error('Anexo sem vínculo válido')
+      }
 
       // Criar URL temporária do blob
       const url = URL.createObjectURL(blob);
@@ -433,7 +541,29 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-600">Número do Processo</p>
-              <p className="font-mono text-lg font-medium">{desarquivamento.numeroProcesso}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="font-mono text-lg font-medium break-all">{desarquivamento.numeroProcesso || 'N/A'}</p>
+                {desarquivamento.numeroProcesso && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyToClipboard(desarquivamento.numeroProcesso, 'numeroProcesso')}
+                      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                      title="Copiar número do processo"
+                      aria-label="Copiar número do processo"
+                    >
+                      {copiedField === 'numeroProcesso' ? (
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                    {copiedField === 'numeroProcesso' && (
+                      <span className="text-xs text-emerald-600">Copiado</span>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
             <div>
               <p className="text-sm text-gray-600">Tipo de Desarquivamento</p>
@@ -749,6 +879,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           isLoading={isLoadingAnexosDesarq}
           canEdit={canEdit}
           tipoAnexo="desarquivamento"
+          numeroProcesso={desarquivamento?.numeroProcesso}
           onUpload={handleUploadDesarquivamento}
           onDownload={handleDownloadAnexo}
           onDelete={handleDeleteAnexo}
@@ -764,6 +895,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           isLoading={isLoadingAnexosRearq}
           canEdit={canEdit}
           tipoAnexo="rearquivamento"
+          numeroProcesso={desarquivamento?.numeroProcesso}
           onUpload={handleUploadRearquivamento}
           onDownload={handleDownloadAnexo}
           onDelete={handleDeleteAnexo}

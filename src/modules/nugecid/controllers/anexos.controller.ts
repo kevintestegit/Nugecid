@@ -62,6 +62,11 @@ export class AnexosController {
           description: "Tipo do anexo (padrão: desarquivamento)",
           default: "desarquivamento",
         },
+        anexarAoProcesso: {
+          type: "boolean",
+          description: "Se true, anexa ao processo (todas solicitações). Se false, anexa apenas a esta solicitação",
+          default: false,
+        },
       },
     },
   })
@@ -84,14 +89,19 @@ export class AnexosController {
     @UploadedFile() file: Express.Multer.File,
     @Body("descricao") descricao: string | undefined,
     @Body("tipoAnexo") tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
+    @Body("anexarAoProcesso") anexarAoProcesso: string | boolean = false,
     @Request() req: any,
   ): Promise<{ success: boolean; data: any }> {
+    // Converter string "true"/"false" para boolean
+    const anexarProcesso = anexarAoProcesso === true || anexarAoProcesso === "true";
+
     const anexo = await this.anexosService.uploadAnexo(
       desarquivamentoId,
       file,
       req.user,
       descricao,
       tipoAnexo || "desarquivamento",
+      anexarProcesso,
     );
     return {
       success: true,
@@ -255,5 +265,106 @@ export class AnexosController {
     @Request() req: any,
   ): Promise<void> {
     return this.anexosService.deleteAnexo(id, req.user);
+  }
+}
+
+// Controller adicional para anexos de processo
+@ApiTags("Anexos de Processo")
+@Controller("nugecid/processo/:numeroProcesso/anexos")
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class AnexosProcessoController {
+  constructor(private readonly anexosService: NugecidAnexosService) {}
+
+  @Get()
+  @ApiOperation({ summary: "Listar anexos de um processo" })
+  @ApiParam({
+    name: "numeroProcesso",
+    description: "Número do processo",
+    example: "2024.001.123456",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Lista de anexos do processo retornada com sucesso",
+    type: [DesarquivamentoAnexoTypeOrmEntity],
+  })
+  async findAnexosByProcesso(
+    @Param("numeroProcesso") numeroProcesso: string,
+    @Query("tipo") tipo?: "desarquivamento" | "rearquivamento",
+  ): Promise<{ success: boolean; data: any[] }> {
+    const anexos = await this.anexosService.findAnexosByProcesso(
+      numeroProcesso,
+      tipo,
+    );
+    return {
+      success: true,
+      data: anexos,
+    };
+  }
+
+  @Get(":id/download")
+  @ApiOperation({ summary: "Fazer download de um anexo do processo" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Arquivo retornado com sucesso",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "Anexo não encontrado",
+  })
+  async downloadAnexo(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("numeroProcesso") numeroProcesso: string,
+    @Request() req: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, anexo } = await this.anexosService.downloadAnexo(id);
+
+    res.setHeader("Content-Type", anexo.tipoMime);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${anexo.nomeOriginal}"`,
+    );
+    res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
+
+    res.send(buffer);
+  }
+
+  @Get(":id/view")
+  @ApiOperation({
+    summary: "Visualizar um anexo do processo (para imagens e PDFs)",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Arquivo retornado para visualização",
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "Anexo não encontrado",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Tipo de arquivo não suportado para visualização",
+  })
+  async viewAnexo(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("numeroProcesso") numeroProcesso: string,
+    @Request() req: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, anexo } = await this.anexosService.downloadAnexo(id);
+
+    if (!anexo.canPreview()) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message:
+          "Este tipo de arquivo não pode ser visualizado inline. Use o download.",
+      });
+      return;
+    }
+
+    res.setHeader("Content-Type", anexo.tipoMime);
+    res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
+
+    res.send(buffer);
   }
 }

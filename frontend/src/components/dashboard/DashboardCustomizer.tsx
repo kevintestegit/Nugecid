@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, Settings } from 'lucide-react';
 import { DashboardCard } from '@/types/dashboard';
 
@@ -19,9 +20,33 @@ export const DashboardCustomizer: React.FC<DashboardCustomizerProps> = ({
   onReset,
   onClose
 }) => {
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden border border-border shadow-2xl">
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  const modalContent = (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+        style={{ top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
+        onClick={onClose}
+      />
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+        <div className="relative bg-card rounded-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-hidden border border-border shadow-2xl pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border bg-muted/30">
           <div className="flex items-center gap-3">
@@ -126,9 +151,12 @@ export const DashboardCustomizer: React.FC<DashboardCustomizerProps> = ({
             Concluir
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 function getCardDescription(type: DashboardCard['type']): string {

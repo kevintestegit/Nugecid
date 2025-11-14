@@ -7,6 +7,7 @@ import {
   Shield,
   Database,
   Save,
+  Megaphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -14,8 +15,9 @@ import { GeneralSettings } from './Configuracoes/GeneralSettings';
 import { SystemSettings } from './Configuracoes/SystemSettings';
 import { SecuritySettings } from './Configuracoes/SecuritySettings';
 import { UserSettings } from './Configuracoes/UserSettings';
+import { AnnouncementsSettings } from './Configuracoes/AnnouncementsSettings';
 
-type TabType = 'geral' | 'sistema' | 'seguranca' | 'usuario';
+type TabType = 'geral' | 'sistema' | 'seguranca' | 'usuario' | 'avisos';
 
 const ConfiguracoesPage: React.FC = () => {
   const { user } = useAuth();
@@ -41,6 +43,7 @@ const ConfiguracoesPage: React.FC = () => {
   const tabs = [
     { id: 'geral' as TabType, label: 'Geral', icon: Settings, available: true },
     { id: 'sistema' as TabType, label: 'Sistema', icon: Database, available: isAdmin },
+    { id: 'avisos' as TabType, label: 'Avisos', icon: Megaphone, available: isAdmin },
     { id: 'seguranca' as TabType, label: 'Segurança', icon: Shield, available: isCoordenador },
     { id: 'usuario' as TabType, label: 'Usuário', icon: User, available: true }
   ].filter(tab => tab.available);
@@ -83,6 +86,7 @@ const ConfiguracoesPage: React.FC = () => {
       <div className="mb-6">
         {activeTab === 'geral' && <GeneralSettings />}
         {activeTab === 'sistema' && isAdmin && <SystemSettings />}
+        {activeTab === 'avisos' && isAdmin && <AnnouncementsSettings />}
         {activeTab === 'seguranca' && isCoordenador && <SecuritySettings />}
         {activeTab === 'usuario' && <UserSettings />}
       </div>

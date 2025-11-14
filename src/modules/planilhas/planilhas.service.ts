@@ -378,12 +378,27 @@ export class PlanilhasService {
       return null;
     }
 
-    const headerRow = Array.isArray(rawRows[0])
-      ? rawRows[0].map((coluna) => String(coluna ?? "").trim())
+    const headerIndex = rawRows.findIndex(
+      (row) =>
+        Array.isArray(row) &&
+        row.some(
+          (valor) => valor !== undefined && String(valor ?? "").trim().length,
+        ),
+    );
+
+    if (headerIndex === -1) {
+      return null;
+    }
+
+    const headerRow = Array.isArray(rawRows[headerIndex])
+      ? rawRows[headerIndex].map((coluna) => String(coluna ?? "").trim())
       : [];
+    const normalizedHeaders = Array.from(
+      new Set(["Pasta", "Planilha", "Linha", ...headerRow]),
+    );
 
     const dataRows = rawRows
-      .slice(1)
+      .slice(headerIndex + 1)
       .filter(
         (row) =>
           Array.isArray(row) &&
@@ -396,14 +411,29 @@ export class PlanilhasService {
       return null;
     }
 
-    const linhas = dataRows.map((row) => {
+    const linhas = dataRows.map((row, index) => {
       const linha: PlanilhaGeralLinha = {};
-      headerRow.forEach((coluna, index) => {
-        linha[coluna] =
-          row[index] !== undefined && row[index] !== null
-            ? String(row[index])
-            : "";
+      normalizedHeaders.forEach((coluna, colIndex) => {
+        if (headerRow.includes(coluna)) {
+          const idx = headerRow.indexOf(coluna);
+          linha[coluna] =
+            row[idx] !== undefined && row[idx] !== null
+              ? String(row[idx])
+              : "";
+        } else {
+          linha[coluna] = "";
+        }
       });
+
+      const pastaValor =
+        (pastaColumn &&
+          row[headerRow.indexOf(pastaColumn)] &&
+          String(row[headerRow.indexOf(pastaColumn)])) ||
+        "";
+      linha.Pasta = pastaValor || registro.nomeOriginal || "Planilha Geral";
+      linha.Planilha = linha.Planilha || registro.nomeOriginal || "Planilha Geral";
+      linha.Linha = (headerIndex + 1 + index).toString();
+
       return linha;
     });
 
@@ -483,7 +513,7 @@ export class PlanilhasService {
       totalPastas: grupos.length,
       totalPlanilhas: 1,
       totalItens: linhas.length,
-      colunas: headerRow,
+      colunas: normalizedHeaders,
       linhas,
       grupos,
     };

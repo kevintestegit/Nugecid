@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { NovaPastaModal } from '@/components/arquivos/NovaPastaModal';
+import { EditarPastaModal } from '@/components/arquivos/EditarPastaModal';
 
 import {
   FolderOpen,
@@ -110,17 +111,120 @@ const ArquivoPage: React.FC = () => {
     refetchPlanilhaGeral,
   } = usePlanilhasControle();
 
-  const { pastas, isLoading, error, createPasta, deletePasta } = usePastas();
+  const {
+    pastas,
+    isLoading,
+    error,
+    createPasta,
+    deletePasta,
+    updatePasta,
+    isUpdatingPasta,
+  } = usePastas();
   const safePastas: Pasta[] = Array.isArray(pastas) ? pastas : [];
   const [caixas] = useState<Caixa[]>([]);
 
   const totalPastas = safePastas.length;
   const totalImagens = useMemo(() => safePastas.reduce((acc, pasta) => acc + pasta.imagens, 0), [safePastas]);
   const totalPlanilhas = useMemo(() => safePastas.reduce((acc, pasta) => acc + pasta.planilhas, 0), [safePastas]);
+  const [editingPasta, setEditingPasta] = useState<Pasta | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const planilhasControleIds = useMemo(
+    () => new Set(planilhasControle.map(planilha => planilha.id)),
+    [planilhasControle],
+  );
+
+  const planilhaGeralSections = useMemo(() => {
+    if (!planilhaGeral?.linhas?.length) {
+      return [];
+    }
+
+    const colunasBase =
+      planilhaGeral.colunas && planilhaGeral.colunas.length > 0
+        ? planilhaGeral.colunas
+        : Object.keys(planilhaGeral.linhas[0] ?? {});
+
+    if (!planilhaGeral.grupos?.length) {
+      return [
+        {
+          id: 'planilha-geral',
+          titulo: planilhaGeral.linhas[0]?.Planilha || 'Planilha Consolidada',
+          subtitulo: `${planilhaGeral.totalItens} item(s)`,
+          planilhaId:
+            planilhaGeral.grupos?.[0]?.planilhas?.[0]?.planilhaId ||
+            planilhaGeral.linhas[0]?.planilhaId,
+          sheetName: planilhaGeral.grupos?.[0]?.planilhas?.[0]?.sheetName ?? 'Principal',
+          linhas: planilhaGeral.linhas,
+          colunas: colunasBase,
+          pastaNome: planilhaGeral.linhas[0]?.Pasta || undefined,
+        },
+      ];
+    }
+
+    const sections: Array<{
+      id: string;
+      titulo: string;
+      subtitulo: string;
+      planilhaId?: string;
+      sheetName?: string;
+      linhas: Record<string, string>[];
+      colunas: string[];
+      pastaNome?: string;
+    }> = [];
+
+    planilhaGeral.grupos.forEach(grupo => {
+      grupo.planilhas.forEach(planilha => {
+        const linhasFiltradas = planilhaGeral.linhas.filter(linha => {
+          const linhaPasta = linha['Pasta'] ?? linha['Prateleira/NºTOMBO'] ?? linha['Prateleira'] ?? '';
+          const linhaPlanilha = linha['Planilha'] ?? '';
+          const pastaMatches =
+            !grupo.pastaNome ||
+            linhaPasta === grupo.pastaNome ||
+            linhaPasta === grupo.pastaId;
+          const planilhaMatches =
+            !planilha.planilhaNome ||
+            !linhaPlanilha ||
+            linhaPlanilha === planilha.planilhaNome;
+
+          return pastaMatches && planilhaMatches;
+        });
+
+        sections.push({
+          id: `${grupo.pastaId}-${planilha.planilhaId}`,
+          titulo: planilha.planilhaNome || grupo.pastaNome || 'Planilha',
+          subtitulo: `Aba: ${planilha.sheetName || 'Principal'} (${planilha.totalItens} ${
+            planilha.totalItens === 1 ? 'item' : 'itens'
+          })`,
+          planilhaId: planilha.planilhaId,
+          sheetName: planilha.sheetName,
+          linhas: linhasFiltradas.length ? linhasFiltradas : planilhaGeral.linhas,
+          colunas: colunasBase,
+          pastaNome: grupo.pastaNome,
+        });
+      });
+    });
+
+    return sections;
+  }, [planilhaGeral]);
 
   const handleAddPasta = async (novaPasta: CreatePastaInput) => {
     await createPasta(novaPasta);
     setShowUploadModal(false);
+  };
+
+  const handleUpdatePasta = async (values: { nome: string; descricao: string; tags: string[] }) => {
+    if (!editingPasta) return;
+    try {
+      await updatePasta({
+        id: editingPasta.id,
+        ...values,
+      });
+      toast.success('Pasta atualizada com sucesso!');
+      setShowEditModal(false);
+      setEditingPasta(null);
+    } catch (err) {
+      console.error(err);
+      toast.error('Não foi possível atualizar a pasta.');
+    }
   };
 
   const handleDelete = async (pastaId: string) => {
@@ -215,8 +319,8 @@ const ArquivoPage: React.FC = () => {
               Arquivo - NUGECID/SAG
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Sistema de gerenciamento do acervo documental do Núcleo de Gestao
-              do Conhecimento, Informacao, Documentação e Memória.
+              Sistema de gerenciamento do acervo documental do Núcleo de Gestão
+              do Conhecimento, Informação, Documentação e Memória.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -389,7 +493,8 @@ const ArquivoPage: React.FC = () => {
                         <DropdownMenuItem
                           onClick={event => {
                             event.stopPropagation();
-                            console.log('Editar pasta', pasta.id);
+                            setEditingPasta(pasta);
+                            setShowEditModal(true);
                           }}
                         >
                           <Edit className="mr-2 h-4 w-4" />
@@ -595,7 +700,7 @@ const ArquivoPage: React.FC = () => {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Consolidando dados das planilhas...
                 </div>
-              ) : planilhaGeral.totalItens > 0 ? (
+              ) : planilhaGeralSections.length ? (
                 <>
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div className="rounded-lg border border-border/60 bg-background/70 px-4 py-3">
@@ -639,12 +744,74 @@ const ArquivoPage: React.FC = () => {
                     </div>
                   ) : null}
 
-                  <SpreadsheetPreview
-                    headers={planilhaGeral.colunas}
-                    data={planilhaGeral.linhas}
-                    maxHeight="max-h-[480px]"
-                    showRowNumbers
-                  />
+                  {planilhaGeralSections.length ? (
+                    <div className="space-y-5">
+                      {planilhaGeralSections.map(section => (
+                        <div
+                          key={section.id}
+                          className="rounded-xl border border-border/60 bg-background/80 p-5"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-base font-semibold text-foreground flex items-center gap-2">
+                                <FileSpreadsheet className="h-4 w-4 text-primary" />
+                                {section.titulo}
+                              </h4>
+                              <p className="text-xs text-muted-foreground">
+                                {section.subtitulo}
+                                {section.pastaNome ? ` • ${section.pastaNome}` : ''}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (section.planilhaId) {
+                                  window.open(
+                                    `/api/planilhas/${section.planilhaId}/download`,
+                                    '_blank',
+                                    'noopener',
+                                  );
+                                }
+                              }}
+                              disabled={
+                                !section.planilhaId ||
+                                !planilhasControleIds.has(section.planilhaId)
+                              }
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Baixar planilha
+                            </Button>
+                          </div>
+                          <div className="mt-4">
+                            {section.linhas.length ? (
+                              <SpreadsheetPreview
+                                headers={section.colunas}
+                                data={section.linhas}
+                                maxHeight="max-h-[420px]"
+                                showRowNumbers
+                              />
+                            ) : (
+                              <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 py-10 text-center text-sm text-muted-foreground">
+                                Nenhum item foi encontrado para esta planilha.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : planilhaGeral.linhas.length ? (
+                    <SpreadsheetPreview
+                      headers={planilhaGeral.colunas}
+                      data={planilhaGeral.linhas}
+                      maxHeight="max-h-[480px]"
+                      showRowNumbers
+                    />
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border/60 bg-background/70 py-10 text-center text-sm text-muted-foreground">
+                      Nenhum dado consolidado disponível no momento.
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="rounded-lg border border-dashed border-border/60 bg-background/70 py-10 text-center text-sm text-muted-foreground">
@@ -724,6 +891,17 @@ const ArquivoPage: React.FC = () => {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onAddPasta={handleAddPasta}
+      />
+
+      <EditarPastaModal
+        isOpen={showEditModal && Boolean(editingPasta)}
+        pasta={editingPasta}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingPasta(null);
+        }}
+        onSubmit={handleUpdatePasta}
+        isSubmitting={isUpdatingPasta}
       />
     </div>
   );

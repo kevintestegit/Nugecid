@@ -14,6 +14,7 @@ import {
   Clock,
   Key,
 } from 'lucide-react';
+import { IpMonitoring } from '@/components/Security/IpMonitoring';
 
 export const SecuritySettings: React.FC = () => {
   const [securityConfig, setSecurityConfig] = useState({
@@ -124,6 +125,9 @@ export const SecuritySettings: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Monitoramento de IPs */}
+      <IpMonitoring />
     </div>
   );
 };

@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -60,12 +61,41 @@ export const NovaPastaModal: React.FC<NovaPastaModalProps> = ({
     }
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSubmitting) {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isOpen, isSubmitting, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
+  const modalContent = (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+        style={{ top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
+        onClick={() => {
+          if (!isSubmitting) onClose();
+        }}
+      />
+      <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
+        <Card className="relative w-full max-w-2xl mx-4 pointer-events-auto">
+          <CardHeader>
           <CardTitle>Nova Pasta/Prateleira</CardTitle>
           <Button
             variant="ghost"
@@ -77,7 +107,7 @@ export const NovaPastaModal: React.FC<NovaPastaModalProps> = ({
             <X className="h-4 w-4" />
           </Button>
         </CardHeader>
-        <CardContent>
+          <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label
@@ -196,8 +226,11 @@ export const NovaPastaModal: React.FC<NovaPastaModalProps> = ({
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
+
+  return createPortal(modalContent, document.body);
 };

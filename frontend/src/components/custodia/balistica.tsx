@@ -26,7 +26,7 @@ import {
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Copy, Printer } from 'lucide-react'
 
-const QR_CODE_TARGET_URL = 'http://10.9.218.84:3001/custodia'
+const QR_CODE_TARGET_URL = 'http://10.9.233.136:3001/custodia'
 
 const QR_CODE_DATA_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEX///8AAABVwtN+AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAA/ElEQVRYhd2Y0Q6FMAhD4cv9c7jSdpqZ+G4vLotynpqxjhnxGkcj8F6R52Civk2QazwkNYn0JaMTSlvk1Fr2ZOYahX9CZlCnO1ElziB51qgXkVNgZ0nn7iFe5Ir5yi1jSQ7qXGaeTbllTOB7M7MIl52bEi4a5jlmCyh10hoSmASML5ZHhJzCkqhrkDtIKjuhDxOC0O7p27RNScTlCMqNJ7ASLQm9beaUYdMQXAlbA3Q8Okt5CnmSFSzHvHeXKTkoLaSQHY/82pJIJ9avpHTrr91IsxtdYq9aNCen1tQPhNru26ZEhah1Mybyie5O/d2xJiy86LsUcaVzJa/xAxr8HJc3ZfzyAAAAAElFTkSuQmCC'
@@ -80,9 +80,9 @@ const cduClasses: CduClass[] = [
             label: 'Exame toxicológico',
             appliesTo: ['100.1.11', '100.1.12', '100.1.13']
           }
-        ]
-      }
     ]
+  }
+]
   },
   {
     code: '200',
@@ -350,7 +350,40 @@ const cduClasses: CduClass[] = [
   }
 ];
 
-
+const delegacias = [
+  '1ª DP (PLANTÃO - ZONA SUL)',
+  '2ª DP (PLANTÃO - ZONA NORTE)',
+  '3ª DP (PLANTÃO - PARNAMIRIM)',
+  '1ª DP (NATAL)',
+  '2ª DP (NATAL)',
+  '3ª DP (NATAL)',
+  '4ª DP (NATAL)',
+  '5ª DP (NATAL)',
+  '6ª DP (NATAL)',
+  '7ª DP (NATAL)',
+  '8ª DP (NATAL)',
+  '9ª DP (NATAL)',
+  '10ª DP (NATAL)',
+  '11ª DP (NATAL)',
+  '12ª DP (NATAL)',
+  '13ª DP (NATAL)',
+  '14ª DP (NATAL - RODOVIÁRIA)',
+  '15ª DP (NATAL)',
+  '16ª DP (NATAL)',
+  '17ª DP (PARNAMIRIM)',
+  '18ª DP (PARNAMIRIM)',
+  '20ª DP (MACAÍBA)',
+  '21ª DP (SÃO GONÇALO DO AMARANTE)',
+  '22ª DP (CEARÁ-MIRIM)',
+  '23ª DP (EXTREMOZ)',
+  '24ª DP (SÃO JOSÉ DE MIPIBU)',
+  '25ª DP (NÍSIA FLORESTA)',
+  '27ª DP (MONTE ALEGRE)',
+  '29ª DP (LELMO MARINHO)',
+  '30ª DP (BOM JESUS)',
+  '31ª DP (PUREZA)',
+  '32ª DP (TAIPU)'
+];
 
 const getInitialMonthValue = () => {
   const now = new Date()
@@ -374,6 +407,8 @@ const CustodiaBalistica: React.FC = () => {
   const [selectedFacets, setSelectedFacets] = useState<string[]>([])
   const [vestigioNumber, setVestigioNumber] = useState<string>('')
   const [casoNumber, setCasoNumber] = useState<string>('')
+  const [categoria, setCategoria] = useState<string>('')
+  const [delegacia, setDelegacia] = useState<string>('')
   const [facetDescriptions, setFacetDescriptions] = useState<Record<string, string>>({})
   const [referenceMonth, setReferenceMonth] = useState<string>(getInitialMonthValue)
   const [copied, setCopied] = useState<boolean>(false)
@@ -515,15 +550,27 @@ const CustodiaBalistica: React.FC = () => {
   }, [selectedFacets, availableFacets, facetDescriptions])
 
   const labelPreview = useMemo(() => {
+    const categoryLine = categoria.trim()
+    const delegaciaLine = delegacia.trim()
     const lines = [
       classificationCode,
       vestigioNumber ? buildLineWithSuffix(`VG-${vestigioNumber}`) : '',
       casoNumber ? buildLineWithSuffix(`CA-${casoNumber}`) : '',
+      categoryLine,
+      delegaciaLine,
       ...descriptionLines
     ].filter(Boolean)
 
     return lines.join('\n')
-  }, [classificationCode, vestigioNumber, casoNumber, buildLineWithSuffix, descriptionLines])
+  }, [
+    classificationCode,
+    vestigioNumber,
+    casoNumber,
+    categoria,
+    delegacia,
+    buildLineWithSuffix,
+    descriptionLines
+  ])
 
   const handleCopy = useCallback(async () => {
     if (!labelPreview) return
@@ -557,21 +604,27 @@ const CustodiaBalistica: React.FC = () => {
               color: #111827;
             }
             .preview {
-              display: grid;
-              gap: 24px;
-              grid-template-columns: minmax(0, 1fr) 160px;
+              display: inline-grid;
+              gap: 12px;
+              grid-template-columns: auto auto;
               align-items: center;
+              margin: 0 auto;
+              padding: 16px 32px;
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              background: #fff;
             }
             pre {
               white-space: pre-wrap;
               font-family: 'Courier New', Courier, monospace;
-              font-size: 16px;
-              line-height: 1.7;
+              font-size: 12px;
+              line-height: 1.4;
               margin: 0;
+              text-align: center;
             }
             img {
-              width: 160px;
-              height: 160px;
+              width: 110px;
+              height: 110px;
               object-fit: contain;
             }
           </style>
@@ -618,6 +671,10 @@ const CustodiaBalistica: React.FC = () => {
               VG-4102-1025
               <br />
               CA-4305-1025
+              <br />
+              BALIS
+              <br />
+              3º DP (NATAL)
             </span>
           </AlertDescription>
         </Alert>
@@ -789,6 +846,34 @@ const CustodiaBalistica: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="categoria">Categoria</Label>
+                  <Input
+                    id="categoria"
+                    type="text"
+                    placeholder="Ex: BALIS"
+                    value={categoria}
+                    onChange={event => setCategoria(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="delegacia">Delegacia</Label>
+                  <Select
+                    value={delegacia}
+                    onValueChange={value => setDelegacia(value)}
+                  >
+                    <SelectTrigger id="delegacia">
+                      <SelectValue placeholder="Selecione a delegacia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {delegacias.map(item => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="mes-referencia">Mes/ano da etiqueta</Label>
                   <Input
                     id="mes-referencia"
@@ -862,7 +947,7 @@ const CustodiaBalistica: React.FC = () => {
                   </div>
                 ) : (
                   <div className="flex items-center justify-center text-xs text-muted-foreground">
-                    QR code disponivel apos gerar a etiqueta.
+                    QR code disponível após gerar a etiqueta.
                   </div>
                 )}
               </div>
@@ -870,19 +955,19 @@ const CustodiaBalistica: React.FC = () => {
 
             <ul className="space-y-1 pl-4 text-xs text-muted-foreground">
               <li>
-                A etiqueta combina a classificacao SCV selecionada com os codigos informados para
+                A etiqueta combina a classificação SCV selecionada com os códigos informados para
                 vestígio e caso.
               </li>
               <li>
-                O sufixo referente ao mes/ano (formato MMyy) e adicionado automaticamente ao final
-                dos codigos alfanumericos separado por hifen.
+                O sufixo referente ao mês/ano (formato MMyy) é adicionado automaticamente ao final
+                dos códigos alfanuméricos separado por hífen.
               </li>
               <li>
                 O QR code redireciona para <code className="font-mono">{QR_CODE_TARGET_URL}</code>{' '}
                 durante os testes. (apenas dentro da rede PCI-servidores)
               </li>
               <li>
-                Marque os complementos disponiveis para detalhar o tipo de arma (ex.: pistola).
+                Marque os complementos disponíveis para detalhar o tipo de arma (ex.: pistola).
               </li>
             </ul>
           </aside>

@@ -73,17 +73,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.data) {
         const { accessToken } = response.data
         localStorage.setItem('accessToken', accessToken)
-        
+
         // Schedule next refresh
         scheduleTokenRefresh()
-        
+
         console.log('✅ Token renovado com sucesso')
       } else {
         throw new Error('Failed to refresh token')
       }
     } catch (error: any) {
       console.error('❌ Falha na renovação do token:', error)
-      
+
       // Verificar se é erro de conectividade com o backend
       if (error.code === 'ERR_NETWORK' || error.message?.includes('fetch')) {
         console.warn('🔌 Backend indisponível - mantendo sessão temporariamente')
@@ -94,13 +94,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }, 30000)
         return
       }
-      
+
       // Para outros erros (token inválido, expirado, etc.), fazer logout
       console.log('🚪 Fazendo logout devido a erro de autenticação')
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       updateUser(null)
-      
+
       // Clear refresh timer
       if (refreshTimer) {
         clearTimeout(refreshTimer)
@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const accessToken = localStorage.getItem('accessToken')
       const refreshToken = localStorage.getItem('refreshToken')
       const savedUser = localStorage.getItem('user')
-      
+
       if (accessToken && refreshToken && savedUser) {
         const localUser = JSON.parse(savedUser)
         console.log('📦 Usuário do localStorage:', { id: localUser.id, nome: localUser.nome, avatarUrl: localUser.avatarUrl })
@@ -135,14 +135,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         } catch (error: any) {
           console.log('🔍 Erro ao verificar usuário atual:', error)
-          
+
           // Verificar se é erro de conectividade
           if (error.code === 'ERR_NETWORK' || error.message?.includes('fetch')) {
             console.warn('🔌 Backend indisponível durante verificação - mantendo dados locais')
             // Manter usuário logado com dados do localStorage
             return
           }
-          
+
           // Se o token expirou, tentar renovar
           if (error.response?.status === 401) {
             console.log('🔄 Token expirado, tentando renovar...')
@@ -169,16 +169,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (credentials: LoginDto) => {
     try {
       const response = await apiService.login(credentials)
-      
+
       if (response.success && response.data) {
         const { user: userData, accessToken, refreshToken } = response.data
-        
+
         localStorage.setItem('accessToken', accessToken)
         if (refreshToken) {
           localStorage.setItem('refreshToken', refreshToken)
         }
         updateUser(userData)
-        
+
         // Schedule token refresh
         scheduleTokenRefresh()
       } else {
@@ -199,7 +199,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       updateUser(null)
-      
+
       // Clear refresh timer
       if (refreshTimer) {
         clearTimeout(refreshTimer)

@@ -111,7 +111,7 @@ export class AuthController {
       // Salva usuário na sessão (opcional, mas útil para renderização no lado do servidor)
       req.session.user = result.user;
 
-      // Se for requisição AJAX/API, retorna JSON
+      // Se for requisição AJAX/API, retorna JSON com tokens
       if (req.headers.accept?.includes("application/json")) {
         return res.json({
           success: true,
