@@ -89,7 +89,7 @@ export class BackupService {
   }
 
   /**
-   * Cria um backup completo do banco de dados
+   * Cria um backup completo do banco de dados e arquivos
    */
   async createFullBackup(): Promise<BackupResult> {
     const startTime = Date.now();
@@ -97,43 +97,80 @@ export class BackupService {
       .toISOString()
       .replace(/[:.]/g, '-')
       .slice(0, -5);
-    const filename = `backup_full_${timestamp}.sql`;
-    const filepath = path.join(this.backupDir, filename);
+    const sqlFilename = `backup_full_${timestamp}.sql`;
+    const sqlFilepath = path.join(this.backupDir, sqlFilename);
+    const tarFilename = `backup_full_${timestamp}.tar.gz`;
+    const tarFilepath = path.join(this.backupDir, tarFilename);
 
     try {
-      this.logger.log(`Criando backup completo: ${filename}`);
+      this.logger.log(`Criando backup completo: ${tarFilename}`);
 
+      // 1. Backup do banco de dados
+      this.logger.log('📦 Exportando banco de dados...');
       const dbConfig = this.getDatabaseConfig();
-      const command = this.buildBackupCommand(dbConfig, filepath, false);
-
+      const command = this.buildBackupCommand(dbConfig, sqlFilepath, false);
       await execAsync(command);
 
-      // Verifica se o arquivo foi criado
-      if (!fs.existsSync(filepath)) {
-        throw new Error('Arquivo de backup não foi criado');
+      if (!fs.existsSync(sqlFilepath)) {
+        throw new Error('Arquivo de backup do banco não foi criado');
       }
 
-      const stats = fs.statSync(filepath);
-      const duration = Date.now() - startTime;
+      // 2. Backup dos arquivos uploads/
+      this.logger.log('📁 Compactando arquivos uploads/...');
+      const uploadsPath = path.join(process.cwd(), 'uploads');
 
-      this.logger.log(
-        `✅ Backup completo criado: ${filename} (${this.formatBytes(stats.size)}) em ${duration}ms`,
-      );
+      if (fs.existsSync(uploadsPath)) {
+        // Criar tar.gz com DB + uploads
+        const tarCommand = `tar -czf "${tarFilepath}" -C "${this.backupDir}" "${sqlFilename}" -C "${process.cwd()}" uploads/`;
+        await execAsync(tarCommand);
 
-      return {
-        success: true,
-        filename,
-        filepath,
-        size: this.formatBytes(stats.size),
-        timestamp: new Date(),
-        duration,
-      };
+        // Remover arquivo SQL temporário
+        fs.unlinkSync(sqlFilepath);
+
+        if (!fs.existsSync(tarFilepath)) {
+          throw new Error('Arquivo de backup compactado não foi criado');
+        }
+
+        const stats = fs.statSync(tarFilepath);
+        const duration = Date.now() - startTime;
+
+        this.logger.log(
+          `✅ Backup completo criado: ${tarFilename} (${this.formatBytes(stats.size)}) em ${duration}ms`,
+        );
+
+        return {
+          success: true,
+          filename: tarFilename,
+          filepath: tarFilepath,
+          size: this.formatBytes(stats.size),
+          timestamp: new Date(),
+          duration,
+        };
+      } else {
+        // Se não houver uploads, retorna apenas o SQL
+        this.logger.warn('⚠️ Diretório uploads/ não encontrado. Backup apenas do banco de dados.');
+
+        const stats = fs.statSync(sqlFilepath);
+        const duration = Date.now() - startTime;
+
+        return {
+          success: true,
+          filename: sqlFilename,
+          filepath: sqlFilepath,
+          size: this.formatBytes(stats.size),
+          timestamp: new Date(),
+          duration,
+        };
+      }
     } catch (error) {
       this.logger.error(`Erro ao criar backup completo: ${error.message}`);
-      
-      // Remove arquivo parcial se existir
-      if (fs.existsSync(filepath)) {
-        fs.unlinkSync(filepath);
+
+      // Limpar arquivos temporários
+      if (fs.existsSync(sqlFilepath)) {
+        fs.unlinkSync(sqlFilepath);
+      }
+      if (fs.existsSync(tarFilepath)) {
+        fs.unlinkSync(tarFilepath);
       }
 
       return {
@@ -207,10 +244,25 @@ export class BackupService {
     try {
       const files = fs.readdirSync(this.backupDir);
       const backups = files
-        .filter((file) => file.endsWith('.sql') && file.startsWith('backup_'))
+        .filter((file) =>
+          (file.endsWith('.sql') || file.endsWith('.tar.gz')) &&
+          file.startsWith('backup_')
+        )
         .map((file) => {
           const filepath = path.join(this.backupDir, file);
           const stats = fs.statSync(filepath);
+
+          let type = 'full';
+          let includesFiles = false;
+
+          if (file.includes('desarquivamentos')) {
+            type = 'desarquivamentos';
+          }
+
+          if (file.endsWith('.tar.gz')) {
+            includesFiles = true;
+          }
+
           return {
             filename: file,
             filepath,
@@ -218,9 +270,8 @@ export class BackupService {
             sizeBytes: stats.size,
             created: stats.birthtime,
             modified: stats.mtime,
-            type: file.includes('desarquivamentos')
-              ? 'desarquivamentos'
-              : 'full',
+            type,
+            includesFiles,
           };
         })
         .sort((a, b) => b.created.getTime() - a.created.getTime());
@@ -243,7 +294,10 @@ export class BackupService {
       let deletedCount = 0;
 
       for (const file of files) {
-        if (file.endsWith('.sql') && file.startsWith('backup_')) {
+        if (
+          (file.endsWith('.sql') || file.endsWith('.tar.gz')) &&
+          file.startsWith('backup_')
+        ) {
           const filepath = path.join(this.backupDir, file);
           const stats = fs.statSync(filepath);
           const age = now - stats.mtime.getTime();
@@ -256,8 +310,25 @@ export class BackupService {
         }
       }
 
+      // Limpar diretórios de uploads antigos
+      for (const file of files) {
+        if (file.startsWith('uploads_old_')) {
+          const filepath = path.join(this.backupDir, file);
+          const stats = fs.statSync(filepath);
+          const age = now - stats.mtime.getTime();
+
+          if (age > maxAge) {
+            await execAsync(`rm -rf "${filepath}"`);
+            deletedCount++;
+            this.logger.log(`🗑️ Backup de uploads antigo removido: ${file}`);
+          }
+        }
+      }
+
       if (deletedCount > 0) {
-        this.logger.log(`🧹 Limpeza concluída: ${deletedCount} arquivo(s) removido(s)`);
+        this.logger.log(
+          `🧹 Limpeza concluída: ${deletedCount} arquivo(s) removido(s)`
+        );
       }
 
       return deletedCount;
@@ -268,10 +339,12 @@ export class BackupService {
   }
 
   /**
-   * Restaura um backup específico
+   * Restaura um backup específico (banco de dados e arquivos)
    */
   async restoreBackup(filename: string): Promise<BackupResult> {
     const filepath = path.join(this.backupDir, filename);
+    const startTime = Date.now();
+    let tempSqlFile: string | null = null;
 
     try {
       if (!fs.existsSync(filepath)) {
@@ -280,21 +353,99 @@ export class BackupService {
 
       this.logger.warn(`⚠️ Restaurando backup: ${filename}`);
 
-      const dbConfig = this.getDatabaseConfig();
-      const command = this.buildRestoreCommand(dbConfig, filepath);
+      // Verificar se é um backup completo (.tar.gz) ou apenas banco (.sql)
+      if (filename.endsWith('.tar.gz')) {
+        this.logger.log('📦 Extraindo backup completo...');
 
-      await execAsync(command);
+        // Extrair o arquivo tar.gz
+        const extractDir = path.join(this.backupDir, 'temp_restore');
+        if (!fs.existsSync(extractDir)) {
+          fs.mkdirSync(extractDir, { recursive: true });
+        }
 
-      this.logger.log(`✅ Backup restaurado com sucesso: ${filename}`);
+        // Extrair tar.gz
+        await execAsync(`tar -xzf "${filepath}" -C "${extractDir}"`);
+
+        // Procurar o arquivo SQL dentro do extraído
+        const extractedFiles = fs.readdirSync(extractDir);
+        const sqlFile = extractedFiles.find((f) => f.endsWith('.sql'));
+
+        if (!sqlFile) {
+          throw new Error('Arquivo SQL não encontrado no backup');
+        }
+
+        tempSqlFile = path.join(extractDir, sqlFile);
+
+        // 1. Restaurar banco de dados
+        this.logger.log('🔄 Restaurando banco de dados...');
+        const dbConfig = this.getDatabaseConfig();
+        const restoreCommand = this.buildRestoreCommand(dbConfig, tempSqlFile);
+        await execAsync(restoreCommand);
+
+        // 2. Restaurar arquivos uploads/ se existirem
+        const uploadsInBackup = path.join(extractDir, 'uploads');
+        if (fs.existsSync(uploadsInBackup)) {
+          this.logger.log('📁 Restaurando arquivos uploads/...');
+          const uploadsDestination = path.join(process.cwd(), 'uploads');
+
+          // Fazer backup do uploads atual antes de sobrescrever
+          const backupOldUploads = path.join(
+            this.backupDir,
+            `uploads_old_${Date.now()}`
+          );
+          if (fs.existsSync(uploadsDestination)) {
+            this.logger.log(
+              `💾 Fazendo backup do diretório uploads/ atual em ${backupOldUploads}`
+            );
+            await execAsync(
+              `cp -r "${uploadsDestination}" "${backupOldUploads}"`
+            );
+          }
+
+          // Restaurar uploads
+          await execAsync(
+            `rm -rf "${uploadsDestination}" && cp -r "${uploadsInBackup}" "${uploadsDestination}"`
+          );
+
+          this.logger.log('✅ Arquivos restaurados com sucesso');
+        } else {
+          this.logger.warn('⚠️ Nenhum arquivo de uploads encontrado no backup');
+        }
+
+        // Limpar diretório temporário
+        await execAsync(`rm -rf "${extractDir}"`);
+      } else {
+        // Backup apenas do banco de dados (.sql)
+        this.logger.log('🔄 Restaurando apenas banco de dados...');
+        const dbConfig = this.getDatabaseConfig();
+        const command = this.buildRestoreCommand(dbConfig, filepath);
+        await execAsync(command);
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `✅ Backup restaurado com sucesso: ${filename} em ${duration}ms`
+      );
 
       return {
         success: true,
         filename,
         filepath,
         timestamp: new Date(),
+        duration,
       };
     } catch (error) {
       this.logger.error(`Erro ao restaurar backup: ${error.message}`);
+
+      // Limpar arquivos temporários em caso de erro
+      if (tempSqlFile && fs.existsSync(path.dirname(tempSqlFile))) {
+        try {
+          await execAsync(`rm -rf "${path.dirname(tempSqlFile)}"`);
+        } catch (cleanupError) {
+          this.logger.error('Erro ao limpar arquivos temporários');
+        }
+      }
+
       return {
         success: false,
         error: error.message,

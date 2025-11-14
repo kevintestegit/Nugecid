@@ -18,6 +18,7 @@ export interface BackupListItem {
   created: string;
   modified: string;
   type: 'full' | 'desarquivamentos';
+  includesFiles: boolean;
 }
 
 export interface BackupListResponse {
