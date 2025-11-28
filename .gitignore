@@ -5,11 +5,13 @@
 
 # Node
 node_modules/
+
 # Build outputs
 dist/
 build/
 .vite/
 .cache/
+
 # Editor configs
 .vscode/
 .idea/
@@ -24,4 +26,14 @@ coverage/
 .DS_Store
 # TypeScript
 *.tsbuildinfo
+
+# Environment
+.env
+.env.*
+.env.example
+webscraping-service/.env.example
+
+# Uploads / backups
+uploads/
+backups/
 
