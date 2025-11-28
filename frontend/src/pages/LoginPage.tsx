@@ -4,13 +4,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import type { AxiosError } from 'axios'
+import { Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ButtonLoading } from '@/components/ui/Loading'
-import { Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
 import { toast } from 'sonner'
 
 const loginSchema = z.object({
@@ -20,28 +20,12 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>
 
-interface FieldErrorProps {
-  id: string
-  message?: string
-}
-
-const FieldError: React.FC<FieldErrorProps> = ({ id, message }) => {
-  if (!message) return null
-
-  return (
-    <div id={id} className="flex items-center gap-2 text-sm text-red-600">
-      <AlertCircle className="h-4 w-4" />
-      {message}
-    </div>
-  )
-}
-
 const LoginPage: React.FC = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const from = (location.state as any)?.from?.pathname || '/'
 
@@ -100,11 +84,11 @@ const LoginPage: React.FC = () => {
                   autoComplete="username"
                   disabled={isLoading}
                   aria-invalid={!!errors.usuario}
-                  aria-describedby={errors.usuario ? 'usuario-error' : undefined}
                   {...register('usuario')}
-                  className={errors.usuario ? 'border-red-500' : ''}
                 />
-                <FieldError id="usuario-error" message={errors.usuario?.message} />
+                {errors.usuario && (
+                  <p className="text-sm text-destructive">{errors.usuario.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -117,24 +101,21 @@ const LoginPage: React.FC = () => {
                     autoComplete="current-password"
                     disabled={isLoading}
                     aria-invalid={!!errors.senha}
-                    aria-describedby={errors.senha ? 'senha-error' : undefined}
+                    className="pr-10"
                     {...register('senha')}
-                    className={`${errors.senha ? 'border-red-500 ' : ''}pr-10`}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(prev => !prev)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
-                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    tabIndex={-1}
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <FieldError id="senha-error" message={errors.senha?.message} />
+                {errors.senha && (
+                  <p className="text-sm text-destructive">{errors.senha.message}</p>
+                )}
               </div>
 
               <Button

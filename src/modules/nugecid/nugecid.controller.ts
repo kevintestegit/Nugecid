@@ -165,20 +165,21 @@ export class NugecidController {
       // Pegar os primeiros 10 erros para mostrar ao usuário
       const primeirosErros = result.errors.slice(0, 10);
       const mensagensErro = primeirosErros.map(
-        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`,
       );
 
-      const mensagemResumo = result.errors.length > 10
-        ? `\n\n... e mais ${result.errors.length - 10} erros.`
-        : '';
+      const mensagemResumo =
+        result.errors.length > 10
+          ? `\n\n... e mais ${result.errors.length - 10} erros.`
+          : "";
 
       return res.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: `Falha na importação: todos os ${result.totalRows} registros contêm erros de validação.`,
         error: {
-          type: 'VALIDATION_ERROR',
+          type: "VALIDATION_ERROR",
           totalErrors: result.errorCount,
-          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join('\n')}${mensagemResumo}`,
+          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join("\n")}${mensagemResumo}`,
           errors: result.errors, // Todos os erros detalhados
         },
         data: {
@@ -193,16 +194,16 @@ export class NugecidController {
     if (result.errorCount > 0) {
       const primeirosErros = result.errors.slice(0, 5);
       const mensagensErro = primeirosErros.map(
-        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`,
       );
 
       return res.status(HttpStatus.OK).json({
         success: true,
         message: `Importação parcial: ${result.successCount} de ${result.totalRows} registros importados. ${result.errorCount} registros com erros.`,
         warning: {
-          type: 'PARTIAL_IMPORT',
+          type: "PARTIAL_IMPORT",
           errorsFound: result.errorCount,
-          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join('\n')}`,
+          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join("\n")}`,
           errors: result.errors,
         },
         data: result,
@@ -304,20 +305,21 @@ export class NugecidController {
       // Pegar os primeiros 10 erros para mostrar ao usuário
       const primeirosErros = result.errors.slice(0, 10);
       const mensagensErro = primeirosErros.map(
-        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`,
       );
 
-      const mensagemResumo = result.errors.length > 10
-        ? `\n\n... e mais ${result.errors.length - 10} erros.`
-        : '';
+      const mensagemResumo =
+        result.errors.length > 10
+          ? `\n\n... e mais ${result.errors.length - 10} erros.`
+          : "";
 
       return res.status(HttpStatus.BAD_REQUEST).json({
         success: false,
         message: `Falha na importação: todos os ${result.totalRows} registros contêm erros de validação.`,
         error: {
-          type: 'VALIDATION_ERROR',
+          type: "VALIDATION_ERROR",
           totalErrors: result.errorCount,
-          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join('\n')}${mensagemResumo}`,
+          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join("\n")}${mensagemResumo}`,
           errors: result.errors, // Todos os erros detalhados
         },
         data: {
@@ -332,16 +334,16 @@ export class NugecidController {
     if (result.errorCount > 0) {
       const primeirosErros = result.errors.slice(0, 5);
       const mensagensErro = primeirosErros.map(
-        (erro) => `• Linha ${erro.row}: ${erro.details.message}`
+        (erro) => `• Linha ${erro.row}: ${erro.details.message}`,
       );
 
       return res.status(HttpStatus.OK).json({
         success: true,
         message: `Importação parcial: ${result.successCount} de ${result.totalRows} registros importados. ${result.errorCount} registros com erros.`,
         warning: {
-          type: 'PARTIAL_IMPORT',
+          type: "PARTIAL_IMPORT",
           errorsFound: result.errorCount,
-          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join('\n')}`,
+          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join("\n")}`,
           errors: result.errors,
         },
         data: result,
@@ -476,6 +478,41 @@ export class NugecidController {
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=termo_de_entrega_${id}.docx`,
+    );
+    res.send(buffer);
+  }
+
+  @Get(":id/termo-pdf")
+  @ApiOperation({
+    summary:
+      "Gerar termo de entrega de desarquivamento em PDF com cabeçalho/rodapé fixos",
+  })
+  @ApiParam({
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "number",
+  })
+  @ApiBearerAuth()
+  @Header("Content-Type", "application/pdf")
+  async getTermoDeEntregaPdf(
+    @Param("id", ParseIntPipe) id: number,
+    @Res() res: Response,
+    @CurrentUser() currentUser: User,
+  ) {
+    const desarquivamento = await this.findDesarquivamentoByIdUseCase.execute({
+      id,
+      userId: currentUser.id,
+      userRoles: [currentUser.role?.name || "USER"],
+    });
+    const buffer =
+      await this.nugecidPdfService.generatePdfWithFixedHeaderFooter(
+        desarquivamento as any,
+      );
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename=termo_de_entrega_${id}.pdf`,
     );
     res.send(buffer);
   }
@@ -844,7 +881,7 @@ export class NugecidController {
       result,
       null,
       request.ip,
-      request.get('user-agent'),
+      request.get("user-agent"),
     );
 
     return {
@@ -896,12 +933,6 @@ export class NugecidController {
     @CurrentUser() currentUser: User,
   ) {
     try {
-      // Log para debug
-      console.log('[Controller] updateDesarquivamentoDto recebido:', {
-        dataDevolucaoSetor: updateDesarquivamentoDto.dataDevolucaoSetor,
-        hasProp: 'dataDevolucaoSetor' in updateDesarquivamentoDto,
-      });
-
       const result = await this.updateDesarquivamentoUseCase.execute({
         id,
         ...updateDesarquivamentoDto,

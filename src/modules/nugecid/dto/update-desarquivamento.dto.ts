@@ -59,7 +59,9 @@ export class UpdateDesarquivamentoDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(100, { message: "Número NIC/Laudo/Auto deve ter no máximo 100 caracteres" })
+  @MaxLength(100, {
+    message: "Número NIC/Laudo/Auto deve ter no máximo 100 caracteres",
+  })
   @Transform(({ value }) => {
     if (!value) return value;
     const trimmed = value.trim();
@@ -98,15 +100,15 @@ export class UpdateDesarquivamentoDto {
     type: "string",
   })
   @IsOptional()
-  @IsFlexibleDate({ message: "Data da solicitação deve estar no formato válido" })
+  @IsFlexibleDate({
+    message: "Data da solicitação deve estar no formato válido",
+  })
   @Transform(({ value }) => {
     if (!value) return null;
 
-    console.log('[UpdateDTO] dataSolicitacao recebida:', value, 'tipo:', typeof value);
-
     // Se for YYYY-MM-DD, converte para Date UTC
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z');
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z");
     }
 
     // Converte qualquer outro formato para Date
@@ -115,20 +117,21 @@ export class UpdateDesarquivamentoDto {
   dataSolicitacao?: Date;
 
   @ApiPropertyOptional({
-    description: "Data do desarquivamento pelo SAG (aceita YYYY-MM-DD ou ISO 8601)",
+    description:
+      "Data do desarquivamento pelo SAG (aceita YYYY-MM-DD ou ISO 8601)",
     example: "2024-01-20",
     type: "string",
   })
   @IsOptional()
-  @IsFlexibleDate({ message: "Data do desarquivamento SAG deve estar no formato válido" })
+  @IsFlexibleDate({
+    message: "Data do desarquivamento SAG deve estar no formato válido",
+  })
   @Transform(({ value }) => {
     if (!value) return null;
 
-    console.log('[UpdateDTO] dataDesarquivamentoSAG recebida:', value, 'tipo:', typeof value);
-
     // Se for YYYY-MM-DD, converte para Date UTC
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z');
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z");
     }
 
     // Converte qualquer outro formato para Date
@@ -137,20 +140,21 @@ export class UpdateDesarquivamentoDto {
   dataDesarquivamentoSAG?: Date;
 
   @ApiPropertyOptional({
-    description: "Data de devolução ao setor demandante (aceita YYYY-MM-DD ou ISO 8601)",
+    description:
+      "Data de devolução ao setor demandante (aceita YYYY-MM-DD ou ISO 8601)",
     example: "2024-01-25",
     type: "string",
   })
   @IsOptional()
-  @IsFlexibleDate({ message: "Data de devolução ao setor deve estar no formato válido" })
+  @IsFlexibleDate({
+    message: "Data de devolução ao setor deve estar no formato válido",
+  })
   @Transform(({ value }) => {
     if (!value) return null;
 
-    console.log('[UpdateDTO] dataDevolucaoSetor recebida:', value, 'tipo:', typeof value);
-
     // Se for YYYY-MM-DD, converte para Date UTC
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z');
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z");
     }
 
     // Converte qualquer outro formato para Date

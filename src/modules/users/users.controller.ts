@@ -76,6 +76,9 @@ import * as multer from "multer";
 import { UserMapper } from "./infrastructure/mappers/user.mapper";
 import { RoleMapper } from "./infrastructure/mappers/role.mapper";
 
+// Utils
+import { FileValidator } from "../../common/utils/file-validator";
+
 @ApiTags("Usuários")
 @Controller("users")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -321,13 +324,18 @@ export class UsersController {
       throw new BadRequestException("O arquivo enviado deve ser uma imagem");
     }
 
-    const extension = (extname(file.originalname || "") || ".png").toLowerCase();
+    const extension = (
+      extname(file.originalname || "") || ".png"
+    ).toLowerCase();
     const allowedExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
     if (!allowedExtensions.includes(extension)) {
       throw new BadRequestException(
         "Formato de imagem não suportado. Use PNG, JPG, JPEG, GIF ou WEBP",
       );
     }
+
+    // Validar conteúdo real do arquivo por magic bytes
+    await FileValidator.validateImage(file.buffer);
 
     const avatarDir = this.getAvatarDirectory();
     await this.ensureDirectoryExists(avatarDir);
@@ -748,14 +756,17 @@ export class UsersController {
       typeof rawItemsPerPage === "number"
         ? rawItemsPerPage
         : typeof rawItemsPerPage === "string"
-        ? Number(rawItemsPerPage)
-        : undefined;
+          ? Number(rawItemsPerPage)
+          : undefined;
 
     if (
       typeof parsedItemsPerPage === "number" &&
       Number.isFinite(parsedItemsPerPage)
     ) {
-      const clamped = Math.min(100, Math.max(5, Math.round(parsedItemsPerPage)));
+      const clamped = Math.min(
+        100,
+        Math.max(5, Math.round(parsedItemsPerPage)),
+      );
       sanitized.itemsPerPage = clamped;
     }
 
@@ -779,32 +790,32 @@ export class UsersController {
 
   // ============= USER PREFERENCES ENDPOINTS =============
 
-  @Get('me/preferences')
-  @ApiOperation({ summary: 'Get all preferences of current user' })
-  @ApiResponse({ status: 200, description: 'User preferences retrieved successfully' })
+  @Get("me/preferences")
+  @ApiOperation({ summary: "Get all preferences of current user" })
+  @ApiResponse({
+    status: 200,
+    description: "User preferences retrieved successfully",
+  })
   async getMyPreferences(@CurrentUser() user: User) {
     return this.userPreferencesService.getAllPreferences(user.id);
   }
 
-  @Get('me/preferences/:key')
-  @ApiOperation({ summary: 'Get specific preference of current user' })
-  @ApiResponse({ status: 200, description: 'Preference retrieved successfully' })
-  @ApiResponse({ status: 404, description: 'Preference not found' })
-  async getMyPreference(
-    @CurrentUser() user: User,
-    @Param('key') key: string,
-  ) {
+  @Get("me/preferences/:key")
+  @ApiOperation({ summary: "Get specific preference of current user" })
+  @ApiResponse({
+    status: 200,
+    description: "Preference retrieved successfully",
+  })
+  @ApiResponse({ status: 404, description: "Preference not found" })
+  async getMyPreference(@CurrentUser() user: User, @Param("key") key: string) {
     const value = await this.userPreferencesService.getPreference(user.id, key);
-    if (value === null) {
-      throw new BadRequestException(`Preference "${key}" not found`);
-    }
     return { key, value };
   }
 
-  @Post('me/preferences')
+  @Post("me/preferences")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Set preference for current user' })
-  @ApiResponse({ status: 200, description: 'Preference saved successfully' })
+  @ApiOperation({ summary: "Set preference for current user" })
+  @ApiResponse({ status: 200, description: "Preference saved successfully" })
   async setMyPreference(
     @CurrentUser() user: User,
     @Body() dto: UpdateUserPreferenceDto,
@@ -815,7 +826,7 @@ export class UsersController {
       dto.value,
     );
     return {
-      message: 'Preference saved successfully',
+      message: "Preference saved successfully",
       preference: {
         key: preference.preferenceKey,
         value: preference.preferenceValue,
@@ -824,22 +835,25 @@ export class UsersController {
     };
   }
 
-  @Delete('me/preferences/:key')
+  @Delete("me/preferences/:key")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete specific preference of current user' })
-  @ApiResponse({ status: 204, description: 'Preference deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Preference not found' })
+  @ApiOperation({ summary: "Delete specific preference of current user" })
+  @ApiResponse({ status: 204, description: "Preference deleted successfully" })
+  @ApiResponse({ status: 404, description: "Preference not found" })
   async deleteMyPreference(
     @CurrentUser() user: User,
-    @Param('key') key: string,
+    @Param("key") key: string,
   ) {
     await this.userPreferencesService.deletePreference(user.id, key);
   }
 
-  @Delete('me/preferences')
+  @Delete("me/preferences")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete all preferences of current user' })
-  @ApiResponse({ status: 204, description: 'All preferences deleted successfully' })
+  @ApiOperation({ summary: "Delete all preferences of current user" })
+  @ApiResponse({
+    status: 204,
+    description: "All preferences deleted successfully",
+  })
   async deleteAllMyPreferences(@CurrentUser() user: User) {
     await this.userPreferencesService.deleteAllPreferences(user.id);
   }

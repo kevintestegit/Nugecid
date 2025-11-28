@@ -123,7 +123,7 @@ export class NugecidAuditService {
   }
 
   private extractPreviousValues(changes: any): any {
-    if (!changes || typeof changes !== 'object') {
+    if (!changes || typeof changes !== "object") {
       return null;
     }
 
@@ -131,7 +131,7 @@ export class NugecidAuditService {
 
     // Extrai os valores "from" de cada mudança
     for (const [key, value] of Object.entries(changes)) {
-      if (value && typeof value === 'object' && 'from' in value) {
+      if (value && typeof value === "object" && "from" in value) {
         previousValues[key] = value.from;
       }
     }

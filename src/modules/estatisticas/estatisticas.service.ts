@@ -4,12 +4,13 @@ import { Repository } from "typeorm";
 import { DesarquivamentoTypeOrmEntity } from "../nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
 import { StatusDesarquivamentoEnum } from "../nugecid/domain/enums/status-desarquivamento.enum";
 import * as path from "path";
-import * as fs from "fs";
+import { promises as fs } from "fs";
+import { existsSync } from "fs";
 
 export interface CardData {
   totalDesarquivamentos: number;
-  atendimentosPendentes: number;
-  atendimentosEsteMes: number;
+  requisicoesPendentes: number;
+  requisicoesEsteMes: number;
   recentes: any[];
 }
 
@@ -28,229 +29,316 @@ export class EstatisticasService {
     private readonly desarquivamentoRepo: Repository<DesarquivamentoTypeOrmEntity>,
   ) {}
 
-  async getCardData(): Promise<CardData> {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(
-      now.getFullYear(),
-      now.getMonth() + 1,
-      0,
-      23,
-      59,
-      59,
-      999,
-    );
+  async getCardData(filtros?: {
+    dataInicio?: Date;
+    dataFim?: Date;
+  }): Promise<CardData> {
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
 
-    const [total, pendentes, esteMes, recentes] = await Promise.all([
-      this.desarquivamentoRepo.count(),
-      this.desarquivamentoRepo.count({
-        where: { status: StatusDesarquivamentoEnum.SOLICITADO },
-      }),
-      this.desarquivamentoRepo
-        .createQueryBuilder("d")
-        .where("d.createdAt BETWEEN :start AND :end", {
-          start: startOfMonth,
-          end: endOfMonth,
-        })
-        .getCount(),
-      // Buscar últimas 10 atividades recentes
-      this.desarquivamentoRepo
-        .createQueryBuilder("d")
-        .leftJoinAndSelect("d.criadoPor", "criadoPor")
-        .leftJoinAndSelect("d.responsavel", "responsavel")
-        .orderBy("d.createdAt", "DESC")
-        .take(10)
-        .getMany(),
-    ]);
+      // Query builder para total com filtros opcionais
+      let totalQuery = this.desarquivamentoRepo.createQueryBuilder("d");
+      if (filtros?.dataInicio || filtros?.dataFim) {
+        if (filtros.dataInicio) {
+          totalQuery = totalQuery.andWhere("d.dataSolicitacao >= :dataInicio", {
+            dataInicio: filtros.dataInicio,
+          });
+        }
+        if (filtros.dataFim) {
+          totalQuery = totalQuery.andWhere("d.dataSolicitacao <= :dataFim", {
+            dataFim: filtros.dataFim,
+          });
+        }
+      }
 
-    return {
-      totalDesarquivamentos: total,
-      atendimentosPendentes: pendentes,
-      atendimentosEsteMes: esteMes,
-      recentes: recentes.map((item) => ({
-        id: item.id,
-        nomeCompleto: item.nomeCompleto,
-        numeroNicLaudoAuto: item.numeroNicLaudoAuto,
-        numeroProcesso: item.numeroProcesso,
-        tipoDocumento: item.tipoDocumento,
-        status: item.status,
-        tipoDesarquivamento: item.tipoDesarquivamento,
-        dataSolicitacao: item.dataSolicitacao,
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        setorDemandante: item.setorDemandante,
-        servidorResponsavel: item.servidorResponsavel,
-        finalidadeDesarquivamento: item.finalidadeDesarquivamento,
-        solicitacaoProrrogacao: item.solicitacaoProrrogacao,
-        urgente: item.urgente,
-        criadoPorId: item.criadoPorId,
-        responsavelId: item.responsavelId,
-        usuario: item.criadoPor
-          ? {
-              id: (item.criadoPor as any).id,
-              nome: (item.criadoPor as any).nome,
-              usuario: (item.criadoPor as any).usuario,
-            }
-          : null,
-        responsavel: item.responsavel
-          ? {
-              id: (item.responsavel as any).id,
-              nome: (item.responsavel as any).nome,
-              usuario: (item.responsavel as any).usuario,
-            }
-          : null,
-      })),
-    };
+      // Query para requisições do mês atual usando dataSolicitacao
+      const esteMesQuery = this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .where("d.dataSolicitacao >= :start", { start: startOfMonth })
+        .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth });
+
+      const [total, pendentes, esteMes, recentes] = await Promise.all([
+        totalQuery.getCount(),
+        this.desarquivamentoRepo.count({
+          where: { status: StatusDesarquivamentoEnum.SOLICITADO },
+        }),
+        esteMesQuery.getCount(),
+        // Buscar últimas 10 atividades recentes por data de solicitação
+        this.desarquivamentoRepo
+          .createQueryBuilder("d")
+          .leftJoinAndSelect("d.criadoPor", "criadoPor")
+          .leftJoinAndSelect("d.responsavel", "responsavel")
+          .orderBy("d.dataSolicitacao", "DESC")
+          .take(10)
+          .getMany(),
+      ]);
+
+      return {
+        totalDesarquivamentos: total,
+        requisicoesPendentes: pendentes,
+        requisicoesEsteMes: esteMes,
+        recentes: recentes.map((item) => ({
+          id: item.id,
+          nomeCompleto: item.nomeCompleto,
+          numeroNicLaudoAuto: item.numeroNicLaudoAuto,
+          numeroProcesso: item.numeroProcesso,
+          tipoDocumento: item.tipoDocumento,
+          status: item.status,
+          tipoDesarquivamento: item.tipoDesarquivamento,
+          dataSolicitacao: item.dataSolicitacao,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          setorDemandante: item.setorDemandante,
+          servidorResponsavel: item.servidorResponsavel,
+          finalidadeDesarquivamento: item.finalidadeDesarquivamento,
+          solicitacaoProrrogacao: item.solicitacaoProrrogacao,
+          urgente: item.urgente,
+          criadoPorId: item.criadoPorId,
+          responsavelId: item.responsavelId,
+          usuario: item.criadoPor
+            ? {
+                id: (item.criadoPor as any).id,
+                nome: (item.criadoPor as any).nome,
+                usuario: (item.criadoPor as any).usuario,
+              }
+            : null,
+          responsavel: item.responsavel
+            ? {
+                id: (item.responsavel as any).id,
+                nome: (item.responsavel as any).nome,
+                usuario: (item.responsavel as any).usuario,
+              }
+            : null,
+        })),
+      };
+    } catch (error) {
+      this.logger.error("Erro ao buscar dados dos cards", error);
+      throw new Error(
+        "Falha ao carregar dados dos cards de estatísticas. Verifique se as datas estão no formato correto.",
+      );
+    }
   }
 
-  async getAtendimentosPorMes(): Promise<ChartData[]> {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  async getRequisicoesPorMes(filtros?: {
+    dataInicio?: Date;
+    dataFim?: Date;
+  }): Promise<ChartData[]> {
+    try {
+      const now = new Date();
+      const start = filtros?.dataInicio || new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const end = filtros?.dataFim || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    // Obter contagens por mês (últimos 12 meses)
-    const rows: Array<{ mes: string; total: number }> =
-      await this.desarquivamentoRepo
+      // Buscar todos os desarquivamentos no período usando dataSolicitacao
+      const desarquivamentos = await this.desarquivamentoRepo
         .createQueryBuilder("d")
-        .select("TO_CHAR(d.createdAt, 'YYYY-MM')", "mes")
-        .addSelect("COUNT(d.id)", "total")
-        .where("d.createdAt >= :start", { start })
-        .groupBy("TO_CHAR(d.createdAt, 'YYYY-MM')")
-        .orderBy("TO_CHAR(d.createdAt, 'YYYY-MM')", "ASC")
+        .select("d.dataSolicitacao", "dataSolicitacao")
+        .where("d.dataSolicitacao >= :start", { start })
+        .andWhere("d.dataSolicitacao <= :end", { end })
         .getRawMany();
 
-    // Normalizar para incluir meses sem registros
-    const result: ChartData[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      const found = rows.find((r) => r.mes === key);
-      const label = d.toLocaleDateString("pt-BR", {
-        month: "short",
-        year: "numeric",
-      });
-      result.push({ name: label, total: Number(found?.total || 0) });
-    }
+      // Agrupar por mês usando JavaScript (agnóstico de banco)
+      const contagemPorMes = new Map<string, number>();
 
-    return result;
+      desarquivamentos.forEach((item) => {
+        if (item.dataSolicitacao) {
+          const data = new Date(item.dataSolicitacao);
+          const key = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+          contagemPorMes.set(key, (contagemPorMes.get(key) || 0) + 1);
+        }
+      });
+
+      // Normalizar para incluir meses sem registros
+      const result: ChartData[] = [];
+      const mesesDiferenca = this.calcularMesesEntre(start, end);
+
+      for (let i = mesesDiferenca; i >= 0; i--) {
+        const d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const total = contagemPorMes.get(key) || 0;
+        const label = d.toLocaleDateString("pt-BR", {
+          month: "short",
+          year: "numeric",
+        });
+        result.push({ name: label, total });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error("Erro ao buscar requisições por mês", error);
+      throw new Error(
+        "Falha ao carregar dados de requisições por mês. Verifique os parâmetros de filtro.",
+      );
+    }
   }
 
-  async getStatusDistribuicao(): Promise<ChartData[]> {
-    const rows: Array<{ status: string; total: number }> =
-      await this.desarquivamentoRepo
+  private calcularMesesEntre(dataInicio: Date, dataFim: Date): number {
+    const anos = dataFim.getFullYear() - dataInicio.getFullYear();
+    const meses = dataFim.getMonth() - dataInicio.getMonth();
+    return Math.max(0, Math.min(anos * 12 + meses, 11)); // Máximo 12 meses
+  }
+
+  async getStatusDistribuicao(filtros?: {
+    dataInicio?: Date;
+    dataFim?: Date;
+  }): Promise<ChartData[]> {
+    try {
+      let query = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .select("d.status", "status")
-        .addSelect("COUNT(d.id)", "total")
+        .addSelect("COUNT(d.id)", "total");
+
+      // Aplicar filtros de data se fornecidos
+      if (filtros?.dataInicio) {
+        query = query.andWhere("d.dataSolicitacao >= :dataInicio", {
+          dataInicio: filtros.dataInicio,
+        });
+      }
+      if (filtros?.dataFim) {
+        query = query.andWhere("d.dataSolicitacao <= :dataFim", {
+          dataFim: filtros.dataFim,
+        });
+      }
+
+      const rows: Array<{ status: string; total: number }> = await query
         .groupBy("d.status")
         .getRawMany();
 
-    const mapNome: Record<string, string> = {
-      ["SOLICITADO"]: "Solicitado",
-      ["DESARQUIVADO"]: "Desarquivado",
-      ["FINALIZADO"]: "Finalizado",
-      ["NAO_LOCALIZADO"]: "Não Localizado",
-      ["NAO_COLETADO"]: "Não Coletado",
-      ["RETIRADO_PELO_SETOR"]: "Retirado pelo Setor",
-      ["REARQUIVAMENTO_SOLICITADO"]: "Rearquivamento Solicitado",
-    };
+      const mapNome: Record<string, string> = {
+        ["SOLICITADO"]: "Solicitado",
+        ["DESARQUIVADO"]: "Desarquivado",
+        ["FINALIZADO"]: "Finalizado",
+        ["NAO_LOCALIZADO"]: "Não Localizado",
+        ["NAO_COLETADO"]: "Não Coletado",
+        ["RETIRADO_PELO_SETOR"]: "Retirado pelo Setor",
+        ["REARQUIVAMENTO_SOLICITADO"]: "Rearquivamento Solicitado",
+      };
 
-    return rows.map((r) => ({
-      name: mapNome[r.status] || r.status,
-      value: Number(r.total),
-    }));
-  }
-
-  async generateRelatorioPdf(): Promise<Buffer> {
-    const [cardData, atendimentosPorMes, statusDistribuicao] =
-      await Promise.all([
-        this.getCardData(),
-        this.getAtendimentosPorMes(),
-        this.getStatusDistribuicao(),
-      ]);
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { chromium } = require("playwright");
-
-      const browser = await chromium.launch({
-        args: ["--no-sandbox", "--font-render-hinting=none"],
-      });
-      const page = await browser.newPage();
-
-      const html = this.buildRelatorioHTML(
-        cardData,
-        atendimentosPorMes,
-        statusDistribuicao,
+      return rows.map((r) => ({
+        name: mapNome[r.status] || r.status,
+        value: Number(r.total),
+      }));
+    } catch (error) {
+      this.logger.error("Erro ao buscar distribuição por status", error);
+      throw new Error(
+        "Falha ao carregar distribuição por status. Verifique os parâmetros de filtro.",
       );
-      await page.setContent(html, { waitUntil: "load" });
-
-      const pdf = await page.pdf({
-        format: "A4",
-        printBackground: true,
-      });
-
-      await browser.close();
-      return Buffer.from(pdf);
-    } catch (err) {
-      this.logger.warn(
-        "Playwright indisponível ou falhou. Usando fallback PDFKit simplificado.",
-        err,
-      );
-
-      // Fallback: PDFKit com conteúdo mínimo
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const PDFDocument: any = require("pdfkit");
-
-      return await new Promise<Buffer>((resolve, reject) => {
-        const doc = new PDFDocument({
-          size: "A4",
-          margins: { top: 50, bottom: 50, left: 50, right: 50 },
-        });
-        const buffers: Buffer[] = [];
-        doc.on("data", (d: Buffer) => buffers.push(d));
-        doc.on("end", () => resolve(Buffer.concat(buffers)));
-        doc.on("error", (e: any) => reject(e));
-
-        doc
-          .font("Helvetica-Bold")
-          .fontSize(16)
-          .text("RELATÓRIO DE ESTATÍSTICAS", { align: "center" });
-        doc.moveDown();
-
-        doc.font("Helvetica-Bold").fontSize(14).text("Resumo Geral");
-        doc.font("Helvetica").fontSize(12);
-        doc.text(
-          `Total de Desarquivamentos: ${cardData.totalDesarquivamentos}`,
-        );
-        doc.text(`Atendimentos Pendentes: ${cardData.atendimentosPendentes}`);
-        doc.text(`Atendimentos Este Mês: ${cardData.atendimentosEsteMes}`);
-        doc.moveDown();
-
-        doc.font("Helvetica-Bold").fontSize(14).text("Status Distribuição");
-        doc.font("Helvetica").fontSize(12);
-        statusDistribuicao.forEach((item) => {
-          doc.text(`${item.name}: ${item.value}`);
-        });
-
-        doc.moveDown();
-        doc
-          .fontSize(10)
-          .text(
-            "Para visualizar gráficos completos, habilite o Playwright no ambiente de execução.",
-            { align: "center" },
-          );
-
-        doc.end();
-      });
     }
   }
 
-  private buildRelatorioHTML(
+  async generateRelatorioPdf(filtros?: {
+    dataInicio?: Date;
+    dataFim?: Date;
+  }): Promise<Buffer> {
+    try {
+      const [cardData, requisicoesPorMes, statusDistribuicao] =
+        await Promise.all([
+          this.getCardData(filtros),
+          this.getRequisicoesPorMes(filtros),
+          this.getStatusDistribuicao(filtros),
+        ]);
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { chromium } = require("playwright");
+
+        const browser = await chromium.launch({
+          args: ["--no-sandbox", "--font-render-hinting=none"],
+        });
+        const page = await browser.newPage();
+
+        const html = await this.buildRelatorioHTML(
+          cardData,
+          requisicoesPorMes,
+          statusDistribuicao,
+          filtros,
+        );
+        await page.setContent(html, { waitUntil: "load" });
+
+        const pdf = await page.pdf({
+          format: "A4",
+          printBackground: true,
+        });
+
+        await browser.close();
+        return Buffer.from(pdf);
+      } catch (err) {
+        this.logger.warn(
+          "Playwright indisponível ou falhou. Usando fallback PDFKit simplificado.",
+          err,
+        );
+
+        // Fallback: PDFKit com conteúdo mínimo
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const PDFDocument: any = require("pdfkit");
+
+        return await new Promise<Buffer>((resolve, reject) => {
+          const doc = new PDFDocument({
+            size: "A4",
+            margins: { top: 50, bottom: 50, left: 50, right: 50 },
+          });
+          const buffers: Buffer[] = [];
+          doc.on("data", (d: Buffer) => buffers.push(d));
+          doc.on("end", () => resolve(Buffer.concat(buffers)));
+          doc.on("error", (e: any) => reject(e));
+
+          doc
+            .font("Helvetica-Bold")
+            .fontSize(16)
+            .text("RELATÓRIO DE ESTATÍSTICAS", { align: "center" });
+          doc.moveDown();
+
+          doc.font("Helvetica-Bold").fontSize(14).text("Resumo Geral");
+          doc.font("Helvetica").fontSize(12);
+          doc.text(
+            `Total de Desarquivamentos: ${cardData.totalDesarquivamentos}`,
+          );
+          doc.text(`Requisições Pendentes: ${cardData.requisicoesPendentes}`);
+          doc.text(`Requisições Este Mês: ${cardData.requisicoesEsteMes}`);
+          doc.moveDown();
+
+          doc.font("Helvetica-Bold").fontSize(14).text("Status Distribuição");
+          doc.font("Helvetica").fontSize(12);
+          statusDistribuicao.forEach((item) => {
+            doc.text(`${item.name}: ${item.value}`);
+          });
+
+          doc.moveDown();
+          doc
+            .fontSize(10)
+            .text(
+              "Para visualizar gráficos completos, habilite o Playwright no ambiente de execução.",
+              { align: "center" },
+            );
+
+          doc.end();
+        });
+      }
+    } catch (error) {
+      this.logger.error("Erro ao gerar relatório PDF", error);
+      throw new Error(
+        "Falha ao gerar relatório PDF. Verifique os logs para mais detalhes.",
+      );
+    }
+  }
+
+  private async buildRelatorioHTML(
     cardData: CardData,
-    atendimentosPorMes: ChartData[],
+    requisicoesPorMes: ChartData[],
     statusDistribuicao: ChartData[],
-  ): string {
+    filtros?: { dataInicio?: Date; dataFim?: Date },
+  ): Promise<string> {
     // Carregar logos
-    const rnLogo = this.getImageDataUri(
+    const rnLogo = await this.getImageDataUri(
       path.join(
         process.cwd(),
         "frontend",
@@ -261,7 +349,7 @@ export class EstatisticasService {
       ),
       "image/png",
     );
-    const itepLogo = this.getImageDataUri(
+    const itepLogo = await this.getImageDataUri(
       path.join(
         process.cwd(),
         "frontend",
@@ -283,11 +371,17 @@ export class EstatisticasService {
 
     const css = this.getRelatorioPrintCSS();
 
+    // Informações sobre período do relatório
+    const periodoInfo = filtros?.dataInicio || filtros?.dataFim
+      ? `<div class="periodo-info">Período: ${filtros.dataInicio ? new Date(filtros.dataInicio).toLocaleDateString("pt-BR") : "Início"} até ${filtros.dataFim ? new Date(filtros.dataFim).toLocaleDateString("pt-BR") : "Hoje"}</div>`
+      : "";
+
     // Criar dados para o gráfico de barras
-    const maxValue = Math.max(...atendimentosPorMes.map((d) => d.total || 0));
-    const barChartHTML = atendimentosPorMes
+    const maxValue = Math.max(...requisicoesPorMes.map((d) => d.total || 0));
+    const barChartHTML = requisicoesPorMes
       .map((item) => {
-        const percentage = maxValue > 0 ? ((item.total || 0) / maxValue) * 100 : 0;
+        const percentage =
+          maxValue > 0 ? ((item.total || 0) / maxValue) * 100 : 0;
         return `
         <div class="bar-item">
           <div class="bar-label">${item.name}</div>
@@ -350,6 +444,7 @@ export class EstatisticasService {
     <!-- BODY -->
     <main class="print-body">
       <div class="data-geracao">Gerado em: ${dataGeracao}</div>
+      ${periodoInfo}
 
       <!-- Cards -->
       <div class="cards-grid">
@@ -358,18 +453,18 @@ export class EstatisticasService {
           <div class="card-value">${cardData.totalDesarquivamentos}</div>
         </div>
         <div class="card">
-          <div class="card-title">Atendimentos Pendentes</div>
-          <div class="card-value">${cardData.atendimentosPendentes}</div>
+          <div class="card-title">Requisições Pendentes</div>
+          <div class="card-value">${cardData.requisicoesPendentes}</div>
         </div>
         <div class="card">
-          <div class="card-title">Atendimentos Este Mês</div>
-          <div class="card-value">${cardData.atendimentosEsteMes}</div>
+          <div class="card-title">Requisições Este Mês</div>
+          <div class="card-value">${cardData.requisicoesEsteMes}</div>
         </div>
       </div>
 
       <!-- Gráfico de Barras -->
       <div class="chart-section">
-        <h2 class="chart-title">Atendimentos por Mês (Último Ano)</h2>
+        <h2 class="chart-title">Requisições por Mês</h2>
         <div class="bar-chart">
           ${barChartHTML}
         </div>
@@ -423,8 +518,9 @@ export class EstatisticasService {
   .header-text .bold { font-weight:700; }
   .title-bar { background:#555; color:#fff; padding:8px 10px; font-weight:700; letter-spacing:.2px; border-radius:4px; margin:8px auto 12px; text-transform:uppercase; text-align:center; }
 
-  /* Data de geração */
-  .data-geracao { text-align: right; font-size: 11px; color: #666; margin-bottom: 16px; }
+  /* Data de geração e período */
+  .data-geracao { text-align: right; font-size: 11px; color: #666; margin-bottom: 8px; }
+  .periodo-info { text-align: right; font-size: 11px; color: #2563eb; font-weight: 600; margin-bottom: 16px; }
 
   /* Cards Grid */
   .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
@@ -459,16 +555,19 @@ export class EstatisticasService {
   `;
   }
 
-  private getImageDataUri(filePath: string, mime = "image/png"): string {
+  private async getImageDataUri(
+    filePath: string,
+    mime = "image/png",
+  ): Promise<string> {
     try {
       const abs = path.isAbsolute(filePath)
         ? filePath
         : path.resolve(process.cwd(), filePath);
-      if (!fs.existsSync(abs)) {
+      if (!existsSync(abs)) {
         this.logger.warn(`Logo não encontrada em: ${abs}`);
         return "";
       }
-      const buf = fs.readFileSync(abs);
+      const buf = await fs.readFile(abs);
       return `data:${mime};base64,${buf.toString("base64")}`;
     } catch (e) {
       this.logger.warn(
@@ -478,120 +577,172 @@ export class EstatisticasService {
     }
   }
 
-  async generateRelatorioMensalPdf(ano: number, mes: number): Promise<Buffer> {
-    // Calcular início e fim do mês
-    const startOfMonth = new Date(ano, mes - 1, 1);
-    const endOfMonth = new Date(ano, mes, 0, 23, 59, 59, 999);
-
-    // Buscar desarquivamentos do mês com informações do solicitante
-    const desarquivamentos = await this.desarquivamentoRepo
-      .createQueryBuilder("d")
-      .leftJoinAndSelect("d.criadoPor", "criadoPor")
-      .leftJoinAndSelect("d.responsavel", "responsavel")
-      .where("d.createdAt BETWEEN :start AND :end", {
-        start: startOfMonth,
-        end: endOfMonth,
-      })
-      .orderBy("d.createdAt", "ASC")
-      .getMany();
-
-    // Agrupar por solicitante
-    const solicitantesMap = new Map<string, any[]>();
-    desarquivamentos.forEach((desarquivamento) => {
-      const solicitanteNome = (desarquivamento.criadoPor as any)?.nome || "Não informado";
-      if (!solicitantesMap.has(solicitanteNome)) {
-        solicitantesMap.set(solicitanteNome, []);
-      }
-      solicitantesMap.get(solicitanteNome)!.push(desarquivamento);
-    });
-
+  async generateRelatorioMensalPdf(
+    ano: number,
+    mes: number,
+    paginacao?: { pagina?: number; limite?: number },
+  ): Promise<Buffer> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { chromium } = require("playwright");
+      // Calcular início e fim do mês
+      const startOfMonth = new Date(ano, mes - 1, 1);
+      const endOfMonth = new Date(ano, mes, 0, 23, 59, 59, 999);
 
-      const browser = await chromium.launch({
-        args: ["--no-sandbox", "--font-render-hinting=none"],
+      // Paginação
+      const pagina = paginacao?.pagina || 1;
+      const limite = paginacao?.limite || 50;
+      const skip = (pagina - 1) * limite;
+
+      // Buscar total de registros
+      const total = await this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .where("d.dataSolicitacao >= :start", { start: startOfMonth })
+        .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth })
+        .getCount();
+
+      // Buscar desarquivamentos do mês com informações do solicitante usando dataSolicitacao
+      const desarquivamentos = await this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .leftJoinAndSelect("d.criadoPor", "criadoPor")
+        .leftJoinAndSelect("d.responsavel", "responsavel")
+        .where("d.dataSolicitacao >= :start", { start: startOfMonth })
+        .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth })
+        .orderBy("d.dataSolicitacao", "ASC")
+        .skip(skip)
+        .take(limite)
+        .getMany();
+
+      // Agrupar por solicitante
+      const solicitantesMap = new Map<string, any[]>();
+      desarquivamentos.forEach((desarquivamento) => {
+        const solicitanteNome =
+          (desarquivamento.criadoPor as any)?.nome || "Não informado";
+        if (!solicitantesMap.has(solicitanteNome)) {
+          solicitantesMap.set(solicitanteNome, []);
+        }
+        solicitantesMap.get(solicitanteNome)!.push(desarquivamento);
       });
-      const page = await browser.newPage();
 
-      const html = this.buildRelatorioMensalHTML(
-        ano,
-        mes,
-        desarquivamentos,
-        solicitantesMap
-      );
-      await page.setContent(html, { waitUntil: "load" });
+      // Calcular informações de paginação
+      const totalPaginas = Math.ceil(total / limite);
+      const paginacaoInfo = {
+        pagina,
+        limite,
+        total,
+        totalPaginas,
+        exibindo: desarquivamentos.length,
+      };
 
-      const pdf = await page.pdf({
-        format: "A4",
-        printBackground: true,
-      });
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { chromium } = require("playwright");
 
-      await browser.close();
-      return Buffer.from(pdf);
-    } catch (err) {
-      this.logger.warn(
-        "Playwright indisponível ou falhou. Usando fallback PDFKit simplificado.",
-        err,
-      );
-
-      // Fallback: PDFKit com conteúdo mínimo
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const PDFDocument: any = require("pdfkit");
-
-      return await new Promise<Buffer>((resolve, reject) => {
-        const doc = new PDFDocument({
-          size: "A4",
-          margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        const browser = await chromium.launch({
+          args: ["--no-sandbox", "--font-render-hinting=none"],
         });
-        const buffers: Buffer[] = [];
-        doc.on("data", (d: Buffer) => buffers.push(d));
-        doc.on("end", () => resolve(Buffer.concat(buffers)));
-        doc.on("error", (e: any) => reject(e));
+        const page = await browser.newPage();
 
-        const mesNome = new Date(ano, mes - 1, 1).toLocaleDateString("pt-BR", {
-          month: "long",
-          year: "numeric",
+        const html = await this.buildRelatorioMensalHTML(
+          ano,
+          mes,
+          desarquivamentos,
+          solicitantesMap,
+          paginacaoInfo,
+        );
+        await page.setContent(html, { waitUntil: "load" });
+
+        const pdf = await page.pdf({
+          format: "A4",
+          printBackground: true,
         });
 
-        doc
-          .font("Helvetica-Bold")
-          .fontSize(16)
-          .text(`RELATÓRIO MENSAL - ${mesNome.toUpperCase()}`, { align: "center" });
-        doc.moveDown();
+        await browser.close();
+        return Buffer.from(pdf);
+      } catch (err) {
+        this.logger.warn(
+          "Playwright indisponível ou falhou. Usando fallback PDFKit simplificado.",
+          err,
+        );
 
-        doc.font("Helvetica-Bold").fontSize(14).text("Resumo");
-        doc.font("Helvetica").fontSize(12);
-        doc.text(`Total de Desarquivamentos: ${desarquivamentos.length}`);
-        doc.moveDown();
+        // Fallback: PDFKit com conteúdo mínimo
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const PDFDocument: any = require("pdfkit");
 
-        doc.font("Helvetica-Bold").fontSize(14).text("Por Solicitante");
-        doc.font("Helvetica").fontSize(12);
-        solicitantesMap.forEach((desarquivamentos, solicitante) => {
-          doc.text(`${solicitante}: ${desarquivamentos.length} desarquivamento(s)`);
-        });
+        return await new Promise<Buffer>((resolve, reject) => {
+          const doc = new PDFDocument({
+            size: "A4",
+            margins: { top: 50, bottom: 50, left: 50, right: 50 },
+          });
+          const buffers: Buffer[] = [];
+          doc.on("data", (d: Buffer) => buffers.push(d));
+          doc.on("end", () => resolve(Buffer.concat(buffers)));
+          doc.on("error", (e: any) => reject(e));
 
-        doc.moveDown();
-        doc
-          .fontSize(10)
-          .text(
-            "Para visualizar relatório completo, habilite o Playwright no ambiente de execução.",
-            { align: "center" },
+          const mesNome = new Date(ano, mes - 1, 1).toLocaleDateString(
+            "pt-BR",
+            {
+              month: "long",
+              year: "numeric",
+            },
           );
 
-        doc.end();
-      });
+          doc
+            .font("Helvetica-Bold")
+            .fontSize(16)
+            .text(`RELATÓRIO MENSAL - ${mesNome.toUpperCase()}`, {
+              align: "center",
+            });
+          doc.moveDown();
+
+          doc.font("Helvetica-Bold").fontSize(14).text("Resumo");
+          doc.font("Helvetica").fontSize(12);
+          doc.text(`Total de Requisições: ${total}`);
+          doc.text(
+            `Exibindo: ${desarquivamentos.length} (Página ${pagina} de ${totalPaginas})`,
+          );
+          doc.moveDown();
+
+          doc.font("Helvetica-Bold").fontSize(14).text("Por Solicitante");
+          doc.font("Helvetica").fontSize(12);
+          solicitantesMap.forEach((desarquivamentos, solicitante) => {
+            doc.text(
+              `${solicitante}: ${desarquivamentos.length} requisição(ões)`,
+            );
+          });
+
+          doc.moveDown();
+          doc
+            .fontSize(10)
+            .text(
+              "Para visualizar relatório completo, habilite o Playwright no ambiente de execução.",
+              { align: "center" },
+            );
+
+          doc.end();
+        });
+      }
+    } catch (error) {
+      this.logger.error("Erro ao gerar relatório mensal PDF", error);
+      throw new Error(
+        "Falha ao gerar relatório mensal PDF. Verifique os parâmetros fornecidos.",
+      );
     }
   }
 
-  private buildRelatorioMensalHTML(
+  private async buildRelatorioMensalHTML(
     ano: number,
     mes: number,
     desarquivamentos: any[],
-    solicitantesMap: Map<string, any[]>
-  ): string {
+    solicitantesMap: Map<string, any[]>,
+    paginacaoInfo?: {
+      pagina: number;
+      limite: number;
+      total: number;
+      totalPaginas: number;
+      exibindo: number;
+    },
+  ): Promise<string> {
     // Carregar logos
-    const rnLogo = this.getImageDataUri(
+    const rnLogo = await this.getImageDataUri(
       path.join(
         process.cwd(),
         "frontend",
@@ -602,7 +753,7 @@ export class EstatisticasService {
       ),
       "image/png",
     );
-    const itepLogo = this.getImageDataUri(
+    const itepLogo = await this.getImageDataUri(
       path.join(
         process.cwd(),
         "frontend",
@@ -629,12 +780,20 @@ export class EstatisticasService {
 
     const css = this.getRelatorioPrintCSS();
 
+    // Informações de paginação
+    const paginacaoHTML = paginacaoInfo
+      ? `<div class="paginacao-info">Exibindo ${paginacaoInfo.exibindo} de ${paginacaoInfo.total} requisições (Página ${paginacaoInfo.pagina} de ${paginacaoInfo.totalPaginas})</div>`
+      : "";
+
     // Criar seções por solicitante
     const solicitantesHTML = Array.from(solicitantesMap.entries())
       .map(([solicitante, desarquivamentos]) => {
         const desarquivamentosHTML = desarquivamentos
           .map((d) => {
-            const dataSolicitacao = new Date(d.createdAt).toLocaleDateString("pt-BR");
+            // Usar dataSolicitacao em vez de createdAt
+            const dataSolicitacao = d.dataSolicitacao
+              ? new Date(d.dataSolicitacao).toLocaleDateString("pt-BR")
+              : "N/A";
             const status = this.mapStatusNome(d.status);
             return `
             <tr>
@@ -649,7 +808,7 @@ export class EstatisticasService {
 
         return `
         <div class="solicitante-section">
-          <h3 class="solicitante-title">${solicitante} (${desarquivamentos.length} desarquivamento(s))</h3>
+          <h3 class="solicitante-title">${solicitante} (${desarquivamentos.length} requisição(ões))</h3>
           <table class="desarquivamentos-table">
             <thead>
               <tr>
@@ -678,6 +837,7 @@ export class EstatisticasService {
   <title>Relatório Mensal - ${mesNome}</title>
   <style>${css}</style>
   <style>
+    .paginacao-info { text-align: center; font-size: 12px; color: #2563eb; font-weight: 600; margin-bottom: 16px; padding: 8px; background: #eff6ff; border-radius: 4px; }
     .solicitante-section { margin-bottom: 24px; page-break-inside: avoid; }
     .solicitante-title { font-size: 14px; font-weight: 700; color: #222; margin-bottom: 12px; border-bottom: 1px solid #555; padding-bottom: 6px; }
     .desarquivamentos-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
@@ -706,22 +866,27 @@ export class EstatisticasService {
     <!-- BODY -->
     <main class="print-body">
       <div class="data-geracao">Gerado em: ${dataGeracao}</div>
+      ${paginacaoHTML}
 
       <!-- Resumo -->
       <div class="cards-grid">
         <div class="card">
-          <div class="card-title">Total de Desarquivamentos</div>
+          <div class="card-title">Total de Requisições${paginacaoInfo ? " (nesta página)" : ""}</div>
           <div class="card-value">${desarquivamentos.length}</div>
         </div>
         <div class="card">
           <div class="card-title">Solicitantes Diferentes</div>
           <div class="card-value">${solicitantesMap.size}</div>
         </div>
+        ${paginacaoInfo ? `<div class="card">
+          <div class="card-title">Total Geral no Mês</div>
+          <div class="card-value">${paginacaoInfo.total}</div>
+        </div>` : ""}
       </div>
 
       <!-- Detalhes por Solicitante -->
       <div class="chart-section">
-        <h2 class="chart-title">Desarquivamentos por Solicitante</h2>
+        <h2 class="chart-title">Requisições por Solicitante</h2>
         ${solicitantesHTML}
       </div>
     </main>

@@ -33,10 +33,7 @@ export function normalizeTipoDesarquivamento(value: string): string {
 export function normalizeStatus(value: string): string {
   if (!value) return "SOLICITADO";
 
-  console.log('[normalization] normalizeStatus - Input:', value);
-
   const normalized = normalize(value);
-  console.log('[normalization] normalizeStatus - Normalized:', normalized);
 
   if (normalized.includes("FINALIZADO")) return "FINALIZADO";
   if (normalized.includes("DESARQUIVADO")) return "DESARQUIVADO";
@@ -45,9 +42,7 @@ export function normalizeStatus(value: string): string {
   if (normalized.includes("RETIRADO")) return "RETIRADO_PELO_SETOR";
   if (normalized.includes("NAO") && normalized.includes("LOCALIZADO")) return "NAO_LOCALIZADO";
 
-  const result = "SOLICITADO";
-  console.log('[normalization] normalizeStatus - Result:', result);
-  return result;
+  return "SOLICITADO";
 }
 
 /**

@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Loading } from '../components/ui/Loading';
 import { Alert } from '../components/ui/Alert';
+import { EnhancedConfirmDialog } from '../components/ui/EnhancedConfirmDialog';
 import { ArrowLeft, Settings, Users, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +51,10 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
   const [selectedColumn, setSelectedColumn] = useState<Coluna | null>(null);
   const [selectedTask, setSelectedTask] = useState<Tarefa | null>(null);
   const [selectedColumnId, setSelectedColumnId] = useState<number | null>(null);
+
+  // Estados para confirmação de exclusão
+  const [deleteColumn, setDeleteColumn] = useState<{ id: number; nome: string } | null>(null);
+  const [deleteTask, setDeleteTask] = useState<{ id: number; titulo: string } | null>(null);
 
   // Hook do Kanban
   const kanban = useKanban({ projetoId: projectId! });
@@ -105,13 +110,20 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
     openModal('editColumn', coluna);
   };
 
-  const handleDeleteColumn = async (colunaId: number) => {
-    if (window.confirm('Tem certeza que deseja excluir esta coluna? Todas as tarefas serão perdidas.')) {
-      try {
-        await kanban.deleteColuna(colunaId);
-      } catch (error) {
-        console.error('Erro ao excluir coluna:', error);
-      }
+  const handleDeleteColumn = (colunaId: number, colunaNome: string) => {
+    setDeleteColumn({ id: colunaId, nome: colunaNome });
+  };
+
+  const handleConfirmDeleteColumn = async () => {
+    if (!deleteColumn) return;
+    try {
+      await kanban.deleteColuna(deleteColumn.id);
+      toast.success('Coluna excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir coluna:', error);
+      toast.error('Erro ao excluir coluna');
+    } finally {
+      setDeleteColumn(null);
     }
   };
 
@@ -140,10 +152,10 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
     openModal('editTask', tarefa);
   };
 
-  const handleTaskDelete = async (tarefaId: number) => {
+  const handleTaskDelete = (tarefaId: number, tarefaTitulo: string) => {
     const tarefa = kanban.tarefas.find(t => t.id === tarefaId);
     if (!tarefa) return;
-    
+
     if (!checkPermission('delete', 'tarefas')) {
       toast.error('Você não tem permissão para excluir tarefas');
       return;
@@ -153,13 +165,20 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
       toast.error('Você só pode excluir suas próprias tarefas');
       return;
     }
-    
-    if (window.confirm('Tem certeza que deseja excluir esta tarefa?')) {
-      try {
-        await kanban.deleteTarefa(tarefaId);
-      } catch (error) {
-        console.error('Erro ao excluir tarefa:', error);
-      }
+
+    setDeleteTask({ id: tarefaId, titulo: tarefaTitulo });
+  };
+
+  const handleConfirmDeleteTask = async () => {
+    if (!deleteTask) return;
+    try {
+      await kanban.deleteTarefa(deleteTask.id);
+      toast.success('Tarefa excluída com sucesso!');
+    } catch (error) {
+      console.error('Erro ao excluir tarefa:', error);
+      toast.error('Erro ao excluir tarefa');
+    } finally {
+      setDeleteTask(null);
     }
   };
 
@@ -359,6 +378,39 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
         onClose={() => closeModal('projectSettings')}
         project={kanban.projeto}
         onSuccess={kanban.refresh}
+      />
+
+      {/* Diálogos de confirmação */}
+      <EnhancedConfirmDialog
+        isOpen={deleteColumn !== null}
+        onClose={() => setDeleteColumn(null)}
+        onConfirm={handleConfirmDeleteColumn}
+        title="Excluir coluna"
+        description={`Tem certeza que deseja excluir a coluna "${deleteColumn?.nome}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir esta coluna permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Todas as tarefas da coluna podem ser perdidas',
+          'O histórico da coluna será apagado'
+        ]}
+      />
+
+      <EnhancedConfirmDialog
+        isOpen={deleteTask !== null}
+        onClose={() => setDeleteTask(null)}
+        onConfirm={handleConfirmDeleteTask}
+        title="Excluir tarefa"
+        description={`Tem certeza que deseja excluir a tarefa "${deleteTask?.titulo}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir esta tarefa permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Todos os dados da tarefa serão perdidos',
+          'O histórico da tarefa será apagado'
+        ]}
       />
     </div>
   );

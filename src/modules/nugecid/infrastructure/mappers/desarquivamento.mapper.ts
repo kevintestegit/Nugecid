@@ -76,8 +76,11 @@ export class DesarquivamentoMapper {
     entity.dataSolicitacao = domain.dataSolicitacao;
     entity.dataDesarquivamentoSAG = domain.dataDesarquivamentoSAG;
     // Converter undefined para null para forçar atualização no banco de dados
-    const dataDevolucao = domain.dataDevolucaoSetor === undefined ? null : domain.dataDevolucaoSetor;
-    console.log('[Mapper] toTypeOrm - Convertendo dataDevolucaoSetor:', {
+    const dataDevolucao =
+      domain.dataDevolucaoSetor === undefined
+        ? null
+        : domain.dataDevolucaoSetor;
+    console.log("[Mapper] toTypeOrm - Convertendo dataDevolucaoSetor:", {
       domain: domain.dataDevolucaoSetor,
       entity: dataDevolucao,
     });

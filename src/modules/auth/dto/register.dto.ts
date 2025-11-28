@@ -33,12 +33,15 @@ export class RegisterDto {
   usuario: string;
 
   @ApiProperty({
-    description: "Senha do usuário",
-    example: "senha123",
+    description: "Senha do usuário (mínimo 6 caracteres)",
+    example: "Senha@123",
     minLength: 6,
+    maxLength: 100,
   })
   @IsString({ message: "Senha deve ser uma string" })
   @IsNotEmpty({ message: "Senha é obrigatória" })
+  @MinLength(6, { message: "Senha deve ter pelo menos 6 caracteres" })
+  @MaxLength(100, { message: "Senha deve ter no máximo 100 caracteres" })
   senha: string;
 
   @ApiProperty({

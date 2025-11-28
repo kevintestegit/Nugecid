@@ -27,25 +27,27 @@ import { useUsers } from '@/hooks/useUsers'
 import { Tarefa, StatusTarefa, PrioridadeTarefa, UpdateTarefaDto } from '@/types'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
 
 const DetalheTarefaPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { 
-    getTarefa, 
-    updateTarefa, 
-    deleteTarefa, 
+  const {
+    getTarefa,
+    updateTarefa,
+    deleteTarefa,
     getHistoricoTarefa,
-    loading 
+    loading
   } = useTarefas()
   const { data: usersResponse, isLoading: loadingUsers } = useUsers({ page: 1, limit: 1000 })
   const usuarios = usersResponse?.data ?? []
-  
+
   const [tarefa, setTarefa] = useState<Tarefa | null>(null)
   const [historico, setHistorico] = useState<any[]>([])
   const [isEditing, setIsEditing] = useState(false)
   const [loadingTarefa, setLoadingTarefa] = useState(true)
   const [loadingHistorico, setLoadingHistorico] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -98,18 +100,22 @@ const DetalheTarefaPage: React.FC = () => {
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    setShowDeleteDialog(true)
+  }
+
+  const handleConfirmDelete = async () => {
     if (!tarefa) return
-    
-    if (window.confirm('Tem certeza que deseja excluir esta tarefa? Esta ação não pode ser desfeita.')) {
-      try {
-        await deleteTarefa(tarefa.id)
-        toast.success('Tarefa excluída com sucesso!')
-        navigate('/tarefas')
-      } catch (error) {
-        console.error('Erro ao excluir tarefa:', error)
-        toast.error('Erro ao excluir tarefa')
-      }
+
+    try {
+      await deleteTarefa(tarefa.id)
+      toast.success('Tarefa excluída com sucesso!')
+      navigate('/tarefas')
+    } catch (error) {
+      console.error('Erro ao excluir tarefa:', error)
+      toast.error('Erro ao excluir tarefa')
+    } finally {
+      setShowDeleteDialog(false)
     }
   }
 
@@ -457,6 +463,23 @@ const DetalheTarefaPage: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Enhanced Confirm Dialog */}
+      <EnhancedConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir tarefa"
+        description={`Tem certeza que deseja excluir a tarefa "${tarefa?.titulo}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir esta tarefa permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Todos os dados da tarefa serão perdidos',
+          'O histórico será apagado'
+        ]}
+      />
     </div>
   )
 }

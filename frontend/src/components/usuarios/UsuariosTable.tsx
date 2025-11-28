@@ -1,22 +1,26 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  Edit, 
-  Trash2, 
-  RotateCcw, 
-  ChevronLeft, 
-  ChevronRight, 
+import {
+  Edit,
+  Trash2,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
   Users,
   Loader2,
   Shield,
   User,
   Crown,
-  Eye
+  Eye,
+  UserPlus
 } from 'lucide-react'
 import { User as UserType, PaginationMeta } from '@/types'
 import { useReactivateUser } from '@/hooks/useUsers'
 import UserDetailModal from './UserDetailModal'
 import EditUserModal from './EditUserModal'
+import { NoResultsFound } from '@/components/ui/EmptyState'
+import { TableLoading } from '@/components/ui/Loading'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 
 interface UsuariosTableProps {
   users: UserType[]
@@ -83,26 +87,20 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
   }
 
   if (isLoading) {
-    return (
-      <div className="p-8">
-        <div className="flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-gray-600">Carregando usuários...</span>
-        </div>
-      </div>
-    )
+    return <SkeletonTable rows={10} columns={5} />
   }
 
   if (!users.length) {
     return (
-      <div className="p-8 text-center">
-        <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Nenhum usuário encontrado
-        </h3>
-        <p className="text-gray-600">
-          Não há usuários que correspondam aos filtros aplicados.
-        </p>
+      <div className="p-8">
+        <NoResultsFound
+          description="Não há usuários que correspondam aos filtros aplicados."
+          secondaryAction={{
+            label: 'Limpar filtros',
+            onClick: () => window.location.reload()
+          }}
+          variant="compact"
+        />
       </div>
     )
   }

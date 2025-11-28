@@ -33,6 +33,10 @@ RUN npm ci --only=production && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 
+# Copy assets (logos for PDF/DOCX generation)
+COPY --from=builder /app/src/assets ./src/assets
+COPY --from=builder /app/frontend/src/components/img ./frontend/src/components/img
+
 # Create necessary directories
 RUN mkdir -p /app/uploads /app/backups
 

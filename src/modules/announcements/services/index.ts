@@ -1,1 +1,1 @@
-export { AnnouncementsService } from './announcements.service';
+export { AnnouncementsService } from "./announcements.service";

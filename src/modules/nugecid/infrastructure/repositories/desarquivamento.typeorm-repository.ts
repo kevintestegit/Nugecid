@@ -56,12 +56,12 @@ export class DesarquivamentoTypeOrmRepository
     desarquivamento: DesarquivamentoDomain,
   ): Promise<DesarquivamentoDomain> {
     const entity = this.mapper.toTypeOrm(desarquivamento);
-    console.log('[Repository] update - Entity antes do save:', {
+    console.log("[Repository] update - Entity antes do save:", {
       id: entity.id,
       dataDevolucaoSetor: entity.dataDevolucaoSetor,
     });
     const savedEntity = await this.repository.save(entity);
-    console.log('[Repository] update - Entity após o save:', {
+    console.log("[Repository] update - Entity após o save:", {
       id: savedEntity.id,
       dataDevolucaoSetor: savedEntity.dataDevolucaoSetor,
     });

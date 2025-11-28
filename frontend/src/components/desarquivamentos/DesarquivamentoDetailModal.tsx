@@ -16,11 +16,13 @@ import {
   ChevronDown,
   Copy,
   Check,
+  Download,
 } from 'lucide-react';
 import {
   useDesarquivamento,
   useDesarquivamentoComments,
   useAddDesarquivamentoComment,
+  useDownloadTermoDocx,
 } from '@/hooks/useDesarquivamentos';
 import {
   getStatusLabel,
@@ -48,6 +50,7 @@ export const DesarquivamentoDetailModal: React.FC<
     useDesarquivamentoComments(id);
   const comments = commentsResponse?.data ?? [];
   const addCommentMutation = useAddDesarquivamentoComment(id);
+  const downloadDocxMutation = useDownloadTermoDocx();
   const [commentText, setCommentText] = useState('');
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
@@ -318,7 +321,7 @@ export const DesarquivamentoDetailModal: React.FC<
       const nomeRegistro = escapeHtml(item.nomeCompleto ?? '-');
 
       const rowsHtml = detailRows
-        .map(row => {
+        .map((row) => {
           const isFirstRow = row.index === 1;
           const typeCell = isFirstRow
             ? placeholderTemplate.tipoDocumentoPrimeiroItem
@@ -336,7 +339,6 @@ export const DesarquivamentoDetailModal: React.FC<
         <td class="col-type">${typeCell}</td>
         <td class="col-name">${nameCell}</td>
         <td class="col-num">${numberCell}</td>
-
       </tr>`;
         })
         .join('');
@@ -358,9 +360,14 @@ export const DesarquivamentoDetailModal: React.FC<
     * { box-sizing: border-box; }
     body {
       font-family: Calibri, "Segoe UI", Arial, sans-serif;
-      margin: 0; /* Reset de margem */
+      font-size: 12pt;
+      margin: 0;
       color: #000;
     }
+    .hdr-text{
+      font-family: "Liberation Serif", "Times New Roman", serif;
+      font-size: 10pt;
+    }  
     p { margin: 0; }
     .center { text-align: center; }
     .mt-8 { margin-top: 6pt; }
@@ -374,7 +381,7 @@ export const DesarquivamentoDetailModal: React.FC<
     .hdr .logo { width: 95.25pt; text-align: center; }
     .hdr .miolo { width: 341.25pt; }
     .hdr .logo-dir { width: 83.25pt; text-align: left; }
-
+    
     /* Título */
     h1 { margin: 6pt 0 5pt 0; font-size: 14pt; text-align: center; text-transform: none; }
 
@@ -403,21 +410,28 @@ export const DesarquivamentoDetailModal: React.FC<
     .rodape { border-top: 0.75pt solid #000; padding-top: 2pt; margin-top: 5pt; }
     .autenticacao { margin-top: 20pt; font-size: 10pt; text-align: center; }
 
-    /* Layout com Flexbox para garantir o rodapé no final */
-    body {
-      display: flex;
-      flex-direction: column;
-      min-height: calc(var(--page-height) - (2 * var(--page-margin)));
-      padding: 0 var(--page-padding-x);
+    /* Documento completo com cabeçalho e rodapé repetíveis */
+    table.documento-completo {
+      width: 100%;
+      border-collapse: collapse;
     }
-    main.print-body {
-      flex-grow: 1; /* Faz o conteúdo principal crescer e empurrar o rodapé */
+    table.documento-completo thead {
+      display: table-header-group;
     }
-    header.print-header {
-      height: var(--header-height);
+    table.documento-completo tfoot {
+      display: table-footer-group;
     }
-    footer.print-footer {
-      min-height: var(--footer-height);
+    table.documento-completo thead td,
+    table.documento-completo tfoot td {
+      border: none;
+      padding: 0;
+    }
+
+    /* Bloco de assinaturas - nunca quebrar entre páginas */
+    .assinaturas-bloco {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      margin-top: 20pt;
     }
 
     @page {
@@ -433,141 +447,153 @@ export const DesarquivamentoDetailModal: React.FC<
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      header.print-header,
-      footer.print-footer {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+      /* Cabeçalho e rodapé repetem em cada página */
+      table.documento-completo thead {
+        display: table-header-group;
+      }
+      table.documento-completo tfoot {
+        display: table-footer-group;
+      }
+      /* Bloco de assinaturas nunca quebra */
+      .assinaturas-bloco {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
       }
       .autenticacao { margin-top: 20pt; page-break-inside: avoid; text-align: center; }
     }
   </style>
 </head>
 <body>
-  <header class="print-header">
-    <!-- Cabeçalho com 3 colunas (logo, textos, logo) -->
-    <table class="hdr">
-      <tr style="height:75pt;">
-        <td class="logo">
-          <img src="${logoRN}" alt="Brasão RN" width="90" height="75" />
-        </td>
-        <td class="miolo" style="line-height: 1.2;">
-          <p class="center fs10"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong><br/>
-          <strong>SECRETARIA DE SEGURANÇA PÚBLICA E DEFESA SOCIAL</strong><br/>
-          <strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong><br/>
-          <strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
-          <p class="center fs10 mt-8"><strong>ARQUIVO GERAL - PCIRN</strong></p>
-        </td>
-        <td class="logo-dir">
-          <img src="${logoITEP}" alt="Brasão ITEP" width="80" height="80" />
+  <table class="documento-completo">
+    <thead>
+      <tr>
+        <td>
+          <table class="hdr">
+            <tr style="height:75pt;">
+              <td class="logo">
+                <img src="${logoRN}" alt="Brasão RN" height="100" />
+              </td>
+              <td class="miolo" style="line-height: 1.2;">
+                <p class="center fs10 hdr-text"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong><br/>
+                <strong>SECRETARIA DE SEGURANÇA PÚBLICA E DEFESA SOCIAL</strong><br/>
+                <strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong><br/>
+                <strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
+                <p class="center fs10 hdr-text"><strong>ARQUIVO GERAL - PCIRN</strong></p>
+              </td>
+              <td class="logo-dir">
+                <img src="${logoITEP}" alt="Brasão ITEP" height="100" />
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
-    </table>
-  </header>
+    </thead>
+    <tfoot>
+      <tr>
+        <td>
+          <div class="rodape fs10 center" style="line-height: 1.3; border-top: 0.75pt solid #000; padding-top: 8pt; margin-top: 15pt;">
+            <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
+            <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
+            <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
+            <p>Email: arquivogeral@pci.rn.gov.br</p>
+          </div>
+        </td>
+      </tr>
+    </tfoot>
+    <tbody>
+      <tr>
+        <td>
+          <!-- Título -->
+          <h1><strong>TERMO DE DESARQUIVAMENTO DE DOCUMENTO</strong></h1>
 
-  <main class="print-body">
-    <!-- Título -->
-    <h1><strong>TERMO DE DESARQUIVAMENTO DE DOCUMENTO</strong></h1>
+          <!-- Intro -->
+          <p class="center mb-7 fs12" style="text-align:justify">Ao servidor responsável pelo desarquivamento compete ter ciência que esta solicitação de desarquivamento de documento deve estar vinculada a uma demanda da Polícia Científica do Rio Grande do Norte, ou jurisdição de órgão público através de autoridade competente.</p>
+          <p class="fs12" style="text-indent:35.4pt; text-align:justify;">
+            Estar ciente quanto às orientações e normativas descritas na portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe sobre o acesso e o fluxo de desarquivamento de documentos no âmbito do Setor de Arquivo Geral da Polícia Científica do Rio Grande do Norte.
+          </p>
 
-    <!-- Intro -->
-    <p class="center mb-7 fs10">Ao servidor responsável pelo desarquivamento compete ter ciência que esta solicitação de desarquivamento de documento deve estar vinculada a uma demanda da Polícia Científica do Rio Grande do Norte, ou jurisdição de órgão público através de autoridade competente.</p>
-    <p class="fs10" style="text-indent:35.4pt; text-align:justify;">
-      Estar ciente quanto às orientações e normativas descritas na portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe sobre o acesso e o fluxo de desarquivamento de documentos no âmbito do Setor de Arquivo Geral da Polícia Científica do Rio Grande do Norte.
-    </p>
+          <!-- Nº Processo Eletrônico -->
+          <table class="borda mt-12">
+            <tbody>
+              <tr>
+                <td colspan="4" class="faixa center fs12" style="background-color: #bfbfbf !important;"><strong>Nº. DE PROCESSO ELETRÔNICO</strong></td>
+              </tr>
+              <tr>
+                <td colspan="4" class="faixa center fs12">
+                  ${placeholderTemplate.processoEletronico || ''}
+                </td>
+              </tr>
 
-    <!-- Nº Processo Eletrônico -->
-    <table class="borda mt-12">
-      <tbody>
-        <tr>
-          <td colspan="4" class="faixa center fs12" style="background-color: #bfbfbf !important;"><strong>Nº. DE PROCESSO ELETRÔNICO</strong></td>
-        </tr>
-        <tr>
-          <td colspan="4" class="faixa center fs11">
-            ${placeholderTemplate.processoEletronico || ''}
-          </td>
-        </tr>
+              <!-- Cabeçalho de itens -->
+              <tr class="faixa">
+                <td class="center fs12" colspan="2" style="width: 124.65pt;">
+                  <strong>TIPO DE DOCUMENTO</strong><br/>
+                  <span class="sub">Ex: Prontuário, Laudo, Parecer, Relatório.</span>
+                </td>
+                <td class="center fs12" style="width: 169.9pt;"><strong>NOME</strong></td>
+                <td class="center fs12" style="width: 181.2pt;"><strong>NÚMERO</strong></td>
+              </tr>
 
-        <!-- Cabeçalho de itens -->
-        <tr class="faixa">
-          <td class="center fs12" colspan="2" style="width: 124.65pt;">
-            <strong>TIPO DE DOCUMENTO</strong><br/>
-            <span class="sub">Ex: Prontuário, Laudo, Parecer, Relatório.</span>
-          </td>
-          <td class="center fs12" style="width: 169.9pt;"><strong>NOME</strong></td>
-          <td class="center fs12" style="width: 181.2pt;"><strong>NÚMERO</strong></td>
-        </tr>
+              <!-- Linhas geradas -->
+              ${rowsHtml}
+            </tbody>
+          </table>
 
-        <!-- Linhas geradas -->
-        ${rowsHtml}
-      </tbody>
-    </table>
+          <!-- Espaço -->
+          <p class="mb-0" style="line-height:100%; margin-top: 6pt;">&nbsp;</p>
 
-    <!-- Espaço -->
-    <p class="mb-0" style="line-height:100%; margin-top: 6pt;">&nbsp;</p>
+          <!-- Assinaturas - bloco que não deve ser quebrado -->
+          <div class="assinaturas-bloco">
+            <table class="borda">
+              <tbody>
+                <tr class="faixa">
+                  <td style="width: 201.6pt;">
+                    <p class="center fs11"><strong>SETOR DE ARQUIVO GERAL</strong></p>
+                    <p class="center sub">Responsável pela ENTREGA</p>
+                  </td>
+                  <td colspan="2">
+                    <p class="center fs11"><strong>SETOR SOLICITANTE</strong></p>
+                    <p class="center sub">Responsável pelo RECEBIMENTO</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td rowspan="5" style="vertical-align:middle; text-align:center;">
+                    <div class="ass-linha"></div>
+                    <p class="center fs11"><strong>ASSINATURA</strong></p>
+                  </td>
+                  <td class="fs11 vermelho" style="width:103.2pt;"><strong>SETOR</strong></td>
+                  <td class="fs11" style="width:144.5pt;">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td class="fs11 vermelho"><strong>ASSINATURA DO SERVIDOR</strong></td>
+                  <td class="fs11">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td class="fs11 vermelho"><strong>MATRÍCULA</strong></td>
+                  <td class="fs11">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td class="fs11 vermelho"><strong>DATA DE RETIRADA</strong></td>
+                  <td class="fs11">${dataRetirada || '&nbsp;'}</td>
+                </tr>
+                <tr>
+                  <td class="fs11 vermelho"><strong>DATA DE DEVOLUÇÃO</strong></td>
+                  <td class="fs11">&nbsp;</td>
+                </tr>
+              </tbody>
+            </table>
 
-    <!-- Assinaturas -->
-    <table class="borda">
-      <tbody>
-        <tr class="faixa">
-          <td style="width: 201.6pt;">
-            <p class="center fs11"><strong>SETOR DE ARQUIVO GERAL</strong></p>
-            <p class="center sub">Responsável pela ENTREGA</p>
-          </td>
-          <td colspan="2">
-            <p class="center fs11"><strong>SETOR SOLICITANTE</strong></p>
-            <p class="center sub">Responsável pelo RECEBIMENTO</p>
-          </td>
-        </tr>
-        <tr>
-          <td rowspan="5" style="vertical-align:middle; text-align:center;">
-            <div class="ass-linha"></div>
-            <p class="center fs11"><strong>ASSINATURA</strong></p>
-          </td>
-          <td class="fs11 vermelho" style="width:103.2pt;"><strong>SETOR</strong></td>
-          <td class="fs11" style="width:144.5pt;">&nbsp;</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>ASSINATURA DO SERVIDOR</strong></td>
-          <td class="fs11">&nbsp;</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>MATRÍCULA</strong></td>
-          <td class="fs11">&nbsp;</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>DATA DE RETIRADA</strong></td>
-          <td class="fs11">${dataRetirada || '&nbsp;'}</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>DATA DE DEVOLUÇÃO</strong></td>
-          <td class="fs11">&nbsp;</td>
-        </tr>
-      </tbody>
-    </table>
+            <!-- Nota -->
+            <p class="center fs10 mt-8"><strong>* Observar as orientações da portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe quanto aos prazos e instruções normativas.</strong></p>
 
-    <!-- Nota -->
-    <p class="center fs10 mt-8"><strong></strong></p>
-
-    <div class="autenticacao fs10 center">
-      <p><em></em></p>
-    </div>
-  </main>
-
-  <footer class="print-footer fs10 center">
-    <!-- Rodapé -->
-    <div class="rodape fs10 center" style="line-height: 1.3;">
-      <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
-      <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
-      <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
-      <p>Email: arquivogeral@pci.rn.gov.br</p>
-    </div>
-    <!-- Nota -->
-    <p class="center fs10 mt-8"><strong>* Observar as orientações da portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe quanto aos prazos e instruções normativas.</strong></p>
-
-    <div class="autenticacao fs10 center">
-      <p><em>Documento assinado digitalmente por ${userName} às ${horaAssinatura} - ${dataAssinatura}.</em></p>
-    </div>
-  </main>
-  </footer>
+            <div class="autenticacao fs10 center">
+              <p><em>Documento assinado digitalmente por ${userName} às ${horaAssinatura} - ${dataAssinatura}.</em></p>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </body>
 </html>`;
 
@@ -626,6 +652,21 @@ export const DesarquivamentoDetailModal: React.FC<
     }
   };
 
+  const handleDownloadDocx = async () => {
+    if (!item) {
+      toast.error('Não foi possível localizar os dados para gerar o documento.');
+      return;
+    }
+
+    try {
+      await downloadDocxMutation.mutateAsync(id);
+      toast.success('Documento DOCX baixado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao baixar DOCX:', error);
+      toast.error('Erro ao baixar documento DOCX');
+    }
+  };
+
   const handlePrintRearquivamento = async () => {
     if (!item) {
       toast.error('Não foi possível localizar os dados para gerar o termo.');
@@ -633,6 +674,35 @@ export const DesarquivamentoDetailModal: React.FC<
     }
 
     try {
+      // Buscar registros relacionados pelo mesmo número de processo com status REARQUIVAMENTO_SOLICITADO
+      const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      });
+
+      if (!relatedResponse.ok) {
+        throw new Error('Erro ao buscar registros relacionados');
+      }
+
+      const relatedData = await relatedResponse.json();
+      const relatedRecords = relatedData.success ? relatedData.data : [item];
+
+      // Filtrar apenas registros com status REARQUIVAMENTO_SOLICITADO
+      const eligibleRecords = (relatedRecords || []).filter((record: any) => {
+        const statusValue = String(record?.status ?? '')
+          .trim()
+          .toUpperCase();
+        return statusValue === 'REARQUIVAMENTO_SOLICITADO';
+      });
+
+      if (!eligibleRecords.length) {
+        toast.error(
+          'Somente registros com status "Rearquivamento Solicitado" podem gerar o termo de rearquivamento.',
+        );
+        return;
+      }
+
       const escapeHtml = (value: unknown): string => {
         if (value === null || value === undefined) {
           return '';
@@ -677,6 +747,19 @@ export const DesarquivamentoDetailModal: React.FC<
         formatDate(new Date()) || '-',
       );
 
+      // Montar lista de itens para o template (NIC/Laudo no campo NÚMERO, tipoDocumento - NomeCompleto no campo DESCRIÇÃO)
+      const itens = eligibleRecords.map((record: any) => {
+        const tipo = record.tipoDocumento || 
+          getTipoDesarquivamentoLabel(record.tipoDesarquivamento) || '';
+        const nome = record.nomeCompleto || '';
+        const descricao = tipo && nome ? `${tipo} - ${nome}` : tipo || nome || '';
+        
+        return {
+          numeroNicLaudoAuto: record.numeroNicLaudoAuto || '',
+          descricao,
+        };
+      });
+
       printRearquivamento({
         processNumber,
         dataHoraRecebimento,
@@ -684,6 +767,7 @@ export const DesarquivamentoDetailModal: React.FC<
         matricula,
         dataAssinatura,
         horaAssinatura,
+        itens,
       });
     } catch (error) {
       console.error('Erro ao gerar termo de rearquivamento:', error);

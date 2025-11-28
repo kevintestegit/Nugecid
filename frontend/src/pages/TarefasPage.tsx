@@ -22,6 +22,8 @@ import { toast } from 'sonner'
 import { api } from '@/services/api'
 import tarefasService from '@/services/tarefasService'
 import { useAuth } from '@/contexts/AuthContext'
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
+import { SkeletonKanbanCard, Skeleton } from '@/components/ui/Skeleton'
 
 interface ApiResponse<T> {
   success: boolean
@@ -159,6 +161,8 @@ const TarefasPage: React.FC = () => {
   const [loadingBoard, setLoadingBoard] = useState(false)
   const [isMutating, setIsMutating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleteColumn, setDeleteColumn] = useState<{ id: number; nome: string } | null>(null)
+  const [deleteTask, setDeleteTask] = useState<{ id: number; titulo: string } | null>(null)
 
   const loadProjects = useCallback(async () => {
     setLoadingProjects(true)
@@ -200,7 +204,6 @@ const TarefasPage: React.FC = () => {
   }, [])
 
   const loadBoardData = useCallback(async (projectId: number) => {
-    console.log('📥 Carregando dados do projeto:', projectId)
     setLoadingBoard(true)
     try {
       setError(null)
@@ -210,29 +213,14 @@ const TarefasPage: React.FC = () => {
       }
 
       const project = response.data.data
-      console.log('📦 Dados recebidos:', {
-        projeto: project.nome,
-        colunas: project.colunas?.length,
-        tarefas: project.tarefas?.length
-      })
       
       setProjectDetails(project)
       const mappedColumns = mapColumns(project.colunas, project.id)
       const mappedTasks = mapTasks(project.tarefas)
       
-      console.log('📊 Dados mapeados:', {
-        columns: mappedColumns.length,
-        tasks: mappedTasks.length,
-        tasksByColumn: mappedTasks.reduce((acc, task) => {
-          acc[task.coluna_id] = (acc[task.coluna_id] || 0) + 1
-          return acc
-        }, {} as Record<number, number>)
-      })
-      
       setColumns(mappedColumns)
       setTasks(mappedTasks)
     } catch (err) {
-      console.error('❌ Erro ao carregar quadro de tarefas:', err)
       setError('Não foi possível carregar o quadro de tarefas.')
       toast.error('Não foi possível carregar o quadro de tarefas.')
       setColumns([])
@@ -338,13 +326,6 @@ const TarefasPage: React.FC = () => {
     async (taskId: number, _sourceColumnId: number, targetColumnId: number, targetIndex: number) => {
       if (!selectedProjectId) return
       
-      console.log('🔄 handleMoveTask chamado:', {
-        taskId,
-        sourceColumnId: _sourceColumnId,
-        targetColumnId,
-        targetIndex,
-      })
-      
       setIsMutating(true)
       
       try {
@@ -353,14 +334,11 @@ const TarefasPage: React.FC = () => {
           ordem: targetIndex + 1,
         })
         
-        console.log('✅ API retornou sucesso, recarregando dados...')
-        
         // Recarregar dados do servidor para garantir sincronização
         await loadBoardData(selectedProjectId)
         
         toast.success('Tarefa movida com sucesso!')
       } catch (error) {
-        console.error('❌ Erro ao mover tarefa:', error)
         toast.error('Não foi possível mover a tarefa.')
         await loadBoardData(selectedProjectId)
       } finally {
@@ -448,14 +426,16 @@ const TarefasPage: React.FC = () => {
     }
   }, [loadBoardData, selectedProjectId])
 
-  const handleDeleteColumn = useCallback(async (colunaId: number) => {
-    if (!selectedProjectId) return
-    const confirmed = window.confirm('Deseja realmente excluir esta coluna? Certifique-se de que não há tarefas importantes nela.')
-    if (!confirmed) return
+  const handleDeleteColumn = useCallback((colunaId: number, colunaNome: string) => {
+    setDeleteColumn({ id: colunaId, nome: colunaNome })
+  }, [])
+
+  const handleConfirmDeleteColumn = useCallback(async () => {
+    if (!selectedProjectId || !deleteColumn) return
 
     setIsMutating(true)
     try {
-      const response = await api.delete<ApiResponse<unknown>>(`/colunas/${colunaId}`)
+      const response = await api.delete<ApiResponse<unknown>>(`/colunas/${deleteColumn.id}`)
       if (!response.data.success) {
         throw new Error(response.data.message || 'Não foi possível excluir a coluna.')
       }
@@ -467,8 +447,9 @@ const TarefasPage: React.FC = () => {
       await loadBoardData(selectedProjectId)
     } finally {
       setIsMutating(false)
+      setDeleteColumn(null)
     }
-  }, [loadBoardData, selectedProjectId])
+  }, [loadBoardData, selectedProjectId, deleteColumn])
 
   const handleAddTask = useCallback(
     (colunaId?: number) => {
@@ -495,15 +476,17 @@ const TarefasPage: React.FC = () => {
     navigate(`/tarefas/${tarefa.id}`)
   }, [navigate])
 
-  const handleTaskDelete = useCallback(
-    async (taskId: number) => {
-      if (!selectedProjectId) return
-      const confirmed = window.confirm('Deseja realmente excluir esta tarefa?')
-      if (!confirmed) return
+  const handleTaskDelete = useCallback((taskId: number, taskTitulo: string) => {
+    setDeleteTask({ id: taskId, titulo: taskTitulo })
+  }, [])
+
+  const handleConfirmDeleteTask = useCallback(
+    async () => {
+      if (!selectedProjectId || !deleteTask) return
 
       setIsMutating(true)
       try {
-        await tarefasService.deleteTarefa(taskId)
+        await tarefasService.deleteTarefa(deleteTask.id)
         toast.success('Tarefa removida com sucesso!')
         await loadBoardData(selectedProjectId)
       } catch (error) {
@@ -512,9 +495,10 @@ const TarefasPage: React.FC = () => {
         await loadBoardData(selectedProjectId)
       } finally {
         setIsMutating(false)
+        setDeleteTask(null)
       }
     },
-    [loadBoardData, selectedProjectId]
+    [loadBoardData, selectedProjectId, deleteTask]
   )
 
   const handleRefresh = useCallback(() => {
@@ -649,12 +633,22 @@ const TarefasPage: React.FC = () => {
       </Card>
 
       {loadingProjects && !projects.length ? (
-        <Card className="py-16 text-center text-gray-600">
-          <CardContent>
-            <Loader2 className="mb-4 h-6 w-6 animate-spin text-gray-400" />
-            <p>Carregando projetos...</p>
-          </CardContent>
-        </Card>
+        <div className="min-h-[500px] rounded-lg border border-gray-200 bg-white p-4">
+          <div className="flex gap-4 overflow-x-auto">
+            {Array.from({ length: 3 }).map((_, colIndex) => (
+              <div key={colIndex} className="flex-shrink-0 w-80">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <Skeleton variant="text" height={24} width="60%" className="mb-4" />
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, cardIndex) => (
+                      <SkeletonKanbanCard key={cardIndex} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : projects.length === 0 ? (
         <Card className="py-16 text-center text-gray-600">
           <CardContent>
@@ -685,6 +679,38 @@ const TarefasPage: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Enhanced Confirm Dialogs */}
+      <EnhancedConfirmDialog
+        isOpen={deleteColumn !== null}
+        onClose={() => setDeleteColumn(null)}
+        onConfirm={handleConfirmDeleteColumn}
+        title="Excluir coluna"
+        description={`Tem certeza que deseja excluir a coluna "${deleteColumn?.nome}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir esta coluna permanentemente"
+        warningList={[
+          'Certifique-se de que não há tarefas importantes nela',
+          'Esta ação não pode ser desfeita',
+          'Todas as tarefas da coluna podem ser perdidas'
+        ]}
+      />
+
+      <EnhancedConfirmDialog
+        isOpen={deleteTask !== null}
+        onClose={() => setDeleteTask(null)}
+        onConfirm={handleConfirmDeleteTask}
+        title="Excluir tarefa"
+        description={`Tem certeza que deseja excluir a tarefa "${deleteTask?.titulo}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir esta tarefa permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Todos os dados da tarefa serão perdidos'
+        ]}
+      />
     </div>
   )
 }

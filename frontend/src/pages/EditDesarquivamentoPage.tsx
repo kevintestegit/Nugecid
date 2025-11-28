@@ -100,9 +100,6 @@ const EditDesarquivamentoPage: React.FC = () => {
     // Aplica normalização completa antes de enviar
     const normalizedPayload = normalizeDesarquivamentoData(payload)
 
-    console.log('[EditDesarquivamento] Payload original:', payload)
-    console.log('[EditDesarquivamento] Payload normalizado:', normalizedPayload)
-
     try {
       await updateDesarquivamento.mutateAsync({ id: id!, data: normalizedPayload })
       toast.success('Solicita\u00e7\u00e3o atualizada com sucesso!')

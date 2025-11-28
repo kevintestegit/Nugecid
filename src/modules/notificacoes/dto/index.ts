@@ -2,4 +2,4 @@ export {
   UpdateNotificationPreferencesDto,
   EnabledTypesDto,
   PushSubscriptionDto,
-} from './update-notification-preferences.dto';
+} from "./update-notification-preferences.dto";

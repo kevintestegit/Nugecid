@@ -89,9 +89,7 @@ const DesarquivamentosPage: React.FC = () => {
 
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: StatusDesarquivamento }) => {
-      console.log('[DesarquivamentosPage] Atualizando status:', { id, status })
       const payload = { status }
-      console.log('[DesarquivamentosPage] Payload enviado:', JSON.stringify(payload))
       return apiService.updateDesarquivamento(id, payload)
     },
     onSuccess: () => {
@@ -101,7 +99,6 @@ const DesarquivamentosPage: React.FC = () => {
     },
     onError: (error: any) => {
       setEditingStatusId(null)
-      console.error('[DesarquivamentosPage] Erro ao atualizar status:', error)
       const message = error?.response?.data?.message || error?.message || 'Erro ao atualizar status'
       toast.error(`Erro ao atualizar status: ${message}`)
     }
@@ -147,13 +144,8 @@ const DesarquivamentosPage: React.FC = () => {
   })
 
   const handleDeleteClick = (item: Desarquivamento) => {
-    const timestamp = new Date().toISOString()
-    console.log(`[${timestamp}] 🎯 FRONTEND - handleDeleteClick chamado`)
-    console.log(`[${timestamp}] 📋 Item completo recebido:`, item)
-    
     // Verificar se o ID existe e é válido
     if (!item || !item.id) {
-      console.error(`[${timestamp}] ❌ ERRO: Item ou ID não encontrado`, { item, id: item?.id });
       toast.error('Erro', {
         description: 'Não foi possível identificar o registro para exclusão.',
         duration: 5000,
@@ -161,7 +153,6 @@ const DesarquivamentosPage: React.FC = () => {
       return;
     }
     
-    console.log(`[${timestamp}] 📋 Item ID validado: ${item.id} (tipo: ${typeof item.id})`)
     setDeleteConfirm({ isOpen: true, item })
   }
 
@@ -170,29 +161,9 @@ const DesarquivamentosPage: React.FC = () => {
       const itemId = deleteConfirm.item.id
       const itemNic = deleteConfirm.item.numeroNicLaudoAuto || 'N/A'
       
-      const timestamp = new Date().toISOString()
-      console.log(`[${timestamp}] 🚀 FRONTEND - INICIANDO EXCLUSÃO`)
-      console.log(`[${timestamp}] 📋 Dados do item:`, {
-        id: itemId,
-        idType: typeof itemId,
-        idValue: itemId,
-        nic: itemNic,
-        fullItem: deleteConfirm.item
-      })
-      
       try {
-          // Validar se o ID é válido (pode ser número ou string)
-          console.log(`[${timestamp}] 🔍 Validando ID: ${itemId} (tipo: ${typeof itemId})`);
-          
           // Verificar se o ID não é nulo, undefined ou zero
           if (itemId === null || itemId === undefined || itemId === 0) {
-            console.error(`[${timestamp}] ❌ ID inválido detectado:`, {
-              original: itemId,
-              type: typeof itemId,
-              isNull: itemId === null,
-              isUndefined: itemId === undefined,
-              isZero: itemId === 0
-            });
             toast.error('ID inválido', {
               description: 'O ID do desarquivamento não é válido.',
               duration: 5000,
@@ -201,18 +172,10 @@ const DesarquivamentosPage: React.FC = () => {
             return
           }
           
-          console.log(`[${timestamp}] ✅ ID válido: ${itemId}`);
-
-          console.log(`[${timestamp}] 📡 FRONTEND - Chamando deleteDesarquivamento.mutateAsync(${itemId})`);
-          
           const result = await deleteDesarquivamento.mutateAsync(itemId)
-          
-          const responseTimestamp = new Date().toISOString()
-          console.log(`[${responseTimestamp}] 📥 FRONTEND - Resposta recebida:`, result)
           
           // Verifica se a exclusão foi bem-sucedida
           if (result?.success) {
-            console.log(`[${responseTimestamp}] ✅ FRONTEND - Exclusão confirmada como bem-sucedida`)
             toast.success('Desarquivamento excluído com sucesso!', {
               description: `O item foi removido do banco de dados e movido para a lixeira.`,
               duration: 5000,
@@ -221,7 +184,6 @@ const DesarquivamentosPage: React.FC = () => {
             // A atualização da lista agora é gerenciada pelo onSuccess do hook useDeleteDesarquivamento
             // O refetch() manual foi removido para evitar condições de corrida.
           } else {
-            console.error(`[${responseTimestamp}] ❌ FRONTEND - Exclusão NÃO foi confirmada pelo servidor`)
             toast.error('Erro na exclusão', {
               description: 'A exclusão não foi confirmada pelo servidor.',
             })

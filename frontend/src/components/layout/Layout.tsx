@@ -20,7 +20,9 @@ import {
   FolderOpen,
   Kanban,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  Database
 } from 'lucide-react'
 
 const Layout: React.FC = () => {
@@ -33,6 +35,11 @@ const Layout: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed')
     return saved ? JSON.parse(saved) : false
+  })
+
+  // Controle de submenu para Custódia de Vestígios
+  const [custodiaExpanded, setCustodiaExpanded] = useState(() => {
+    return location.pathname.startsWith('/custodia')
   })
 
   // Save sidebar state to localStorage whenever it changes
@@ -91,7 +98,22 @@ const Layout: React.FC = () => {
       name: 'Custódia de Vestígios',
       href: '/custodia',
       icon: Shield,
-      current: location.pathname.startsWith('/custodia')
+      current: location.pathname.startsWith('/custodia'),
+      hasSubmenu: true,
+      submenu: [
+        {
+          name: 'Etiquetas',
+          href: '/custodia',
+          icon: Shield,
+          current: location.pathname === '/custodia'
+        },
+        {
+          name: 'Banco de Vestígios',
+          href: '/custodia/banco-vestigios',
+          icon: Database,
+          current: location.pathname === '/custodia/banco-vestigios'
+        }
+      ]
     },
     {
       name: 'Relatórios',
@@ -146,7 +168,7 @@ const Layout: React.FC = () => {
       {/* Mobile sidebar */}
       <div className={cn('fixed inset-0 z-50 lg:hidden', sidebarOpen ? 'block' : 'hidden')}>
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-card border-r border-border shadow-lg animate-slide-in-left">
+        <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-background/80 backdrop-blur-xl backdrop-saturate-150 border-r border-border/50 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.4)] animate-slide-in-left">
           <div className="flex h-16 items-center justify-between px-4">
             <Link to="/" className="flex items-center">
               <NugecidLogo showText={true} className="h-10 w-auto" />
@@ -158,6 +180,60 @@ const Layout: React.FC = () => {
           <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 pt-4 pb-6">
             {filteredNavigation.map((item) => {
               const Icon = item.icon
+              
+              // Se tem submenu, renderizar com expansão
+              if (item.hasSubmenu && item.submenu) {
+                const isExpanded = custodiaExpanded
+                
+                return (
+                  <div key={item.name}>
+                    <button
+                      onClick={() => setCustodiaExpanded(!isExpanded)}
+                      className={cn(
+                        'group flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        item.current
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <div className="flex items-center">
+                        <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
+                        <span>{item.name}</span>
+                      </div>
+                      <ChevronDown className={cn(
+                        "h-4 w-4 transition-transform",
+                        isExpanded ? "rotate-180" : ""
+                      )} />
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {item.submenu.map((subItem) => {
+                          const SubIcon = subItem.icon
+                          return (
+                            <Link
+                              key={subItem.name}
+                              to={subItem.href}
+                              className={cn(
+                                'group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                subItem.current
+                                  ? 'bg-primary text-primary-foreground shadow-sm'
+                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              )}
+                              onClick={() => setSidebarOpen(false)}
+                            >
+                              <SubIcon className="mr-3 h-4 w-4 flex-shrink-0" />
+                              <span>{subItem.name}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              
+              // Item normal sem submenu
               return (
                 <Link
                   key={item.name}
@@ -239,50 +315,39 @@ const Layout: React.FC = () => {
       {/* Desktop sidebar */}
       <div
         className={cn(
-          "hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col lg:z-30",
-          sidebarCollapsed ? "lg:w-16" : "lg:w-64"
+          "hidden lg:fixed lg:inset-y-0 lg:left-0 lg:flex lg:flex-col lg:z-30 lg:w-64",
+          sidebarCollapsed && "lg:w-16"
         )}
         style={{
-          transition: 'width 0.5s ease-in-out',
-          willChange: 'width',
-          transform: 'translateZ(0)', // Force hardware acceleration
-          backfaceVisibility: 'hidden', // Prevent flickering
-          perspective: 1000 // Improve 3D context
+          transition: 'width 0.2s ease-out',
         }}
       >
-        <div className="flex flex-col h-full border-r border-border bg-card shadow-lg">
+        <div className="flex flex-col h-full bg-background/80 backdrop-blur-xl backdrop-saturate-150 border-r border-border/50 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.4)]">
           {/* Toggle Button - Minimalist Design */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className={cn(
-              "absolute top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-300 ease-in-out hover:h-7 hover:w-7 hover:bg-card hover:text-foreground hover:shadow-md hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95",
+              "absolute top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm hover:h-7 hover:w-7 hover:bg-card hover:text-foreground hover:shadow-md hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95",
               "-right-3"
             )}
-            style={{
-              transform: 'translateZ(0)', // Force hardware acceleration
-              willChange: 'transform',
-              position: 'absolute'
-            }}
+            style={{ transition: 'transform 0.15s ease-out, box-shadow 0.15s ease-out' }}
             title={sidebarCollapsed ? "Expandir sidebar" : "Recolher sidebar"}
           >
             <div className="relative flex items-center justify-center">
-              {/* Background ripple effect */}
-              <div className="absolute inset-0 rounded-full bg-primary/10 opacity-0 transition-opacity duration-200 group-active:opacity-100" />
-
               {/* Icon with rotation animation */}
-              <div className={cn(
-                "relative z-10 transition-transform duration-300 ease-in-out",
-                sidebarCollapsed ? "rotate-180" : "rotate-0"
-              )}>
-                <ChevronLeft className="h-3 w-3 transition-all duration-200 group-hover:scale-110" />
+              <div 
+                className="relative z-10"
+                style={{ 
+                  transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease-out'
+                }}
+              >
+                <ChevronLeft className="h-3 w-3" />
               </div>
-
-              {/* Subtle indicator dot */}
-              <div className="absolute -bottom-1 left-1/2 h-0.5 w-0.5 -translate-x-1/2 rounded-full bg-primary/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
             </div>
           </button>
 
-          <div className="flex h-16 flex-shrink-0 items-center border-b border-border/80 px-4">
+          <div className="flex h-16 flex-shrink-0 items-center px-4">
             <Link to="/" className="flex items-center justify-center w-full">
               <NugecidLogo
                 showText={!sidebarCollapsed}
@@ -297,6 +362,68 @@ const Layout: React.FC = () => {
           <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 pb-6 pt-4">
             {filteredNavigation.map((item, index) => {
               const Icon = item.icon
+              
+              // Se tem submenu, renderizar com expansão
+              if (item.hasSubmenu && item.submenu) {
+                const isExpanded = custodiaExpanded
+                
+                return (
+                  <div key={item.name}>
+                    <button
+                      onClick={() => setCustodiaExpanded(!isExpanded)}
+                      className={cn(
+                        'group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        sidebarCollapsed ? 'justify-center' : 'justify-between',
+                        item.current
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                      title={sidebarCollapsed ? item.name : undefined}
+                    >
+                      <div className="flex items-center">
+                        <Icon
+                          className={cn(
+                            'h-5 w-5 flex-shrink-0 transition-transform duration-300',
+                            sidebarCollapsed ? 'mr-0' : 'mr-3'
+                          )}
+                        />
+                        {!sidebarCollapsed && <span>{item.name}</span>}
+                      </div>
+                      {!sidebarCollapsed && (
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform",
+                          isExpanded ? "rotate-180" : ""
+                        )} />
+                      )}
+                    </button>
+                    
+                    {isExpanded && !sidebarCollapsed && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {item.submenu.map((subItem) => {
+                          const SubIcon = subItem.icon
+                          return (
+                            <Link
+                              key={subItem.name}
+                              to={subItem.href}
+                              className={cn(
+                                'group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                                subItem.current
+                                  ? 'bg-primary text-primary-foreground shadow-sm'
+                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              )}
+                            >
+                              <SubIcon className="mr-3 h-4 w-4 flex-shrink-0" />
+                              <span>{subItem.name}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              
+              // Item normal sem submenu
               return (
                 <Link
                   key={item.name}
@@ -403,12 +530,15 @@ const Layout: React.FC = () => {
       </div>
 
       {/* Main content */}
-      <div className={cn(
-        "transition-all duration-300 ease-in-out",
-        sidebarCollapsed ? "lg:pl-16" : "lg:pl-64"
-      )}>
+      <div 
+        className={cn(
+          "lg:pl-64",
+          sidebarCollapsed && "lg:pl-16"
+        )}
+        style={{ transition: 'padding-left 0.2s ease-out' }}
+      >
         {/* Top bar - Modern glassmorphism */}
-        <div className="sticky top-0 z-40 flex shrink-0 items-center gap-x-4 border-b border-border bg-background px-4 sm:gap-x-6 sm:px-6 lg:px-8" style={{height: '64px'}}>
+        <div className="sticky top-0 z-40 flex shrink-0 items-center gap-x-4 bg-background/80 backdrop-blur-xl backdrop-saturate-150 px-4 sm:gap-x-6 sm:px-6 lg:px-8" style={{height: '64px'}}>
           <Button
             variant="ghost"
             size="icon"
@@ -427,12 +557,6 @@ const Layout: React.FC = () => {
               
               {/* Notifications - Novo componente integrado */}
               <NotificationBell />
-              
-              <div className="hidden sm:block">
-                <span className="text-sm font-medium text-foreground">
-                  Bem-vindo, <span className="font-semibold">{user?.nome}</span>
-                </span>
-              </div>
             </div>
           </div>
         </div>

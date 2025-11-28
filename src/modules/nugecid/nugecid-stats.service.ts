@@ -30,43 +30,10 @@ export class NugecidStatsService {
   ) {}
 
   async getDashboardStats(): Promise<DashboardStats> {
-    const total = await this.desarquivamentoRepository.count();
-
-    const pendentes = await this.desarquivamentoRepository.count({
-      where: { status: StatusDesarquivamentoEnum.SOLICITADO },
-    });
-
-    const emAndamento = await this.desarquivamentoRepository.count({
-      where: { status: StatusDesarquivamentoEnum.DESARQUIVADO },
-    });
-
-    const concluidos = await this.desarquivamentoRepository.count({
-      where: { status: StatusDesarquivamentoEnum.FINALIZADO },
-    });
-
-    const urgentes = await this.desarquivamentoRepository.count({
-      where: { urgente: true },
-    });
-
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const vencidos = await this.desarquivamentoRepository
-      .createQueryBuilder("desarquivamento")
-      .where("desarquivamento.dataSolicitacao < :thirtyDaysAgo", {
-        thirtyDaysAgo,
-      })
-      .andWhere("desarquivamento.status != :finalizado", {
-        finalizado: "FINALIZADO",
-      })
-      .getCount();
 
-    // Buscar dados do mês anterior para comparação
     const mesAtual = new Date();
-    const inicioMesAtual = new Date(
-      mesAtual.getFullYear(),
-      mesAtual.getMonth(),
-      1,
-    );
     const inicioMesAnterior = new Date(
       mesAtual.getFullYear(),
       mesAtual.getMonth() - 1,
@@ -81,69 +48,115 @@ export class NugecidStatsService {
       59,
     );
 
-    const totalMesAnterior = await this.desarquivamentoRepository
-      .createQueryBuilder("desarquivamento")
-      .where("desarquivamento.createdAt >= :inicio", {
-        inicio: inicioMesAnterior,
-      })
-      .andWhere("desarquivamento.createdAt <= :fim", { fim: fimMesAnterior })
-      .getCount();
+    // Executar todas as queries em paralelo
+    const [
+      statsResult,
+      mesAnteriorResult,
+      porStatusArray,
+      porTipoArray,
+      recentes,
+    ] = await Promise.all([
+      // Query única para contagens principais
+      this.desarquivamentoRepository
+        .createQueryBuilder("d")
+        .select("COUNT(*)", "total")
+        .addSelect(
+          `SUM(CASE WHEN d.status = '${StatusDesarquivamentoEnum.SOLICITADO}' THEN 1 ELSE 0 END)`,
+          "pendentes",
+        )
+        .addSelect(
+          `SUM(CASE WHEN d.status = '${StatusDesarquivamentoEnum.DESARQUIVADO}' THEN 1 ELSE 0 END)`,
+          "emAndamento",
+        )
+        .addSelect(
+          `SUM(CASE WHEN d.status = '${StatusDesarquivamentoEnum.FINALIZADO}' THEN 1 ELSE 0 END)`,
+          "concluidos",
+        )
+        .addSelect(
+          `SUM(CASE WHEN d.urgente = true THEN 1 ELSE 0 END)`,
+          "urgentes",
+        )
+        .addSelect(
+          `SUM(CASE WHEN d.dataSolicitacao < :thirtyDaysAgo AND d.status != 'FINALIZADO' THEN 1 ELSE 0 END)`,
+          "vencidos",
+        )
+        .setParameter("thirtyDaysAgo", thirtyDaysAgo)
+        .getRawOne(),
 
-    const pendentesMesAnterior = await this.desarquivamentoRepository
-      .createQueryBuilder("desarquivamento")
-      .where("desarquivamento.createdAt >= :inicio", {
-        inicio: inicioMesAnterior,
-      })
-      .andWhere("desarquivamento.createdAt <= :fim", { fim: fimMesAnterior })
-      .andWhere("desarquivamento.status = :status", {
-        status: StatusDesarquivamentoEnum.SOLICITADO,
-      })
-      .getCount();
+      // Query para dados do mês anterior
+      this.desarquivamentoRepository
+        .createQueryBuilder("d")
+        .select("COUNT(*)", "total")
+        .addSelect(
+          `SUM(CASE WHEN d.status = '${StatusDesarquivamentoEnum.SOLICITADO}' THEN 1 ELSE 0 END)`,
+          "pendentes",
+        )
+        .where("d.createdAt >= :inicio", { inicio: inicioMesAnterior })
+        .andWhere("d.createdAt <= :fim", { fim: fimMesAnterior })
+        .getRawOne(),
 
-    // Agrupar por status
-    const porStatusArray = await this.desarquivamentoRepository
-      .createQueryBuilder("desarquivamento")
-      .select("desarquivamento.status", "status")
-      .addSelect("COUNT(desarquivamento.id)", "count")
-      .groupBy("desarquivamento.status")
-      .getRawMany();
+      // Agrupar por status
+      this.desarquivamentoRepository
+        .createQueryBuilder("d")
+        .select("d.status", "status")
+        .addSelect("COUNT(d.id)", "count")
+        .groupBy("d.status")
+        .getRawMany(),
+
+      // Agrupar por tipo
+      this.desarquivamentoRepository
+        .createQueryBuilder("d")
+        .select("d.tipoDesarquivamento", "tipo")
+        .addSelect("COUNT(d.id)", "count")
+        .groupBy("d.tipoDesarquivamento")
+        .getRawMany(),
+
+      // Recentes
+      this.desarquivamentoRepository
+        .createQueryBuilder("d")
+        .leftJoinAndSelect("d.criadoPor", "criadoPor")
+        .select([
+          "d.id",
+          "d.nomeCompleto",
+          "d.numeroNicLaudoAuto",
+          "d.numeroProcesso",
+          "d.status",
+          "d.tipoDesarquivamento",
+          "d.dataSolicitacao",
+          "d.createdAt",
+          "d.urgente",
+          "criadoPor.id",
+          "criadoPor.nome",
+        ])
+        .orderBy("d.createdAt", "DESC")
+        .take(10)
+        .getMany(),
+    ]);
 
     const porStatus: Record<string, number> = {};
     porStatusArray.forEach((item) => {
-      porStatus[item.status] = parseInt(item.count);
+      porStatus[item.status] = parseInt(item.count, 10);
     });
-
-    // Agrupar por tipo
-    const porTipoArray = await this.desarquivamentoRepository
-      .createQueryBuilder("desarquivamento")
-      .select("desarquivamento.tipoDesarquivamento", "tipo")
-      .addSelect("COUNT(desarquivamento.id)", "count")
-      .groupBy("desarquivamento.tipoDesarquivamento")
-      .getRawMany();
 
     const porTipo: Record<string, number> = {};
     porTipoArray.forEach((item) => {
-      porTipo[item.tipo] = parseInt(item.count);
-    });
-
-    const recentes = await this.desarquivamentoRepository.find({
-      relations: ["criadoPor"],
-      order: { createdAt: "DESC" },
-      take: 10,
+      if (item.tipo) {
+        porTipo[item.tipo] = parseInt(item.count, 10);
+      }
     });
 
     return {
-      total,
-      pendentes,
-      emAndamento,
-      concluidos,
-      vencidos,
-      urgentes,
+      total: parseInt(statsResult.total, 10) || 0,
+      pendentes: parseInt(statsResult.pendentes, 10) || 0,
+      emAndamento: parseInt(statsResult.emAndamento, 10) || 0,
+      concluidos: parseInt(statsResult.concluidos, 10) || 0,
+      vencidos: parseInt(statsResult.vencidos, 10) || 0,
+      urgentes: parseInt(statsResult.urgentes, 10) || 0,
       porStatus,
       porTipo,
       recentes,
-      totalMesAnterior,
-      pendentesMesAnterior,
+      totalMesAnterior: parseInt(mesAnteriorResult.total, 10) || 0,
+      pendentesMesAnterior: parseInt(mesAnteriorResult.pendentes, 10) || 0,
     };
   }
 

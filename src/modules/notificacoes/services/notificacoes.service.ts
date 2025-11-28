@@ -219,37 +219,76 @@ export class NotificacoesService {
     porTipo: Record<string, number>;
     porPrioridade: Record<string, number>;
   }> {
-    const notificacoes = await this.notificacaoRepository.find({
-      where: { usuarioId, deletedAt: null },
-    });
+    // Otimizado: usar queries SQL agregadas ao invés de carregar tudo em memória
+    const [contagens, porTipoResult, porPrioridadeResult] = await Promise.all([
+      // Contagem total, lidas e não lidas em uma única query
+      this.notificacaoRepository
+        .createQueryBuilder("n")
+        .select("COUNT(*)", "total")
+        .addSelect("SUM(CASE WHEN n.lida = true THEN 1 ELSE 0 END)", "lidas")
+        .addSelect("SUM(CASE WHEN n.lida = false THEN 1 ELSE 0 END)", "naoLidas")
+        .where("n.usuarioId = :usuarioId", { usuarioId })
+        .andWhere("n.deletedAt IS NULL")
+        .getRawOne(),
 
-    const total = notificacoes.length;
-    const naoLidas = notificacoes.filter((n) => !n.lida).length;
-    const lidas = notificacoes.filter((n) => n.lida).length;
+      // Contagem por tipo
+      this.notificacaoRepository
+        .createQueryBuilder("n")
+        .select("n.tipo", "tipo")
+        .addSelect("COUNT(*)", "count")
+        .where("n.usuarioId = :usuarioId", { usuarioId })
+        .andWhere("n.deletedAt IS NULL")
+        .groupBy("n.tipo")
+        .getRawMany(),
 
-    const porTipo = notificacoes.reduce(
-      (acc, n) => {
-        acc[n.tipo] = (acc[n.tipo] || 0) + 1;
+      // Contagem por prioridade
+      this.notificacaoRepository
+        .createQueryBuilder("n")
+        .select("n.prioridade", "prioridade")
+        .addSelect("COUNT(*)", "count")
+        .where("n.usuarioId = :usuarioId", { usuarioId })
+        .andWhere("n.deletedAt IS NULL")
+        .groupBy("n.prioridade")
+        .getRawMany(),
+    ]);
+
+    const porTipo = porTipoResult.reduce(
+      (acc, row) => {
+        acc[row.tipo] = parseInt(row.count, 10);
         return acc;
       },
       {} as Record<string, number>,
     );
 
-    const porPrioridade = notificacoes.reduce(
-      (acc, n) => {
-        acc[n.prioridade] = (acc[n.prioridade] || 0) + 1;
+    const porPrioridade = porPrioridadeResult.reduce(
+      (acc, row) => {
+        acc[row.prioridade] = parseInt(row.count, 10);
         return acc;
       },
       {} as Record<string, number>,
     );
 
     return {
-      total,
-      naoLidas,
-      lidas,
+      total: parseInt(contagens.total, 10) || 0,
+      naoLidas: parseInt(contagens.naoLidas, 10) || 0,
+      lidas: parseInt(contagens.lidas, 10) || 0,
       porTipo,
       porPrioridade,
     };
+  }
+
+  async findLatestByTipo(
+    tipo: TipoNotificacao,
+    usuarioId?: number,
+  ): Promise<Notificacao | null> {
+    const where: any = { tipo, deletedAt: null };
+    if (usuarioId) {
+      where.usuarioId = usuarioId;
+    }
+    return this.notificacaoRepository.findOne({
+      where,
+      order: { createdAt: "DESC" },
+    });
   }
 
   // Métodos específicos para tipos de notificação
@@ -310,27 +349,49 @@ export class NotificacoesService {
 
     const notificacoesCriadas: Notificacao[] = [];
 
-    // Buscar desarquivamentos com status SOLICITADO há mais de 5 dias
-    const desarquivamentosPendentes = await this.desarquivamentoRepository.find(
-      {
+    // Buscar desarquivamentos e gestores em paralelo
+    const [desarquivamentosPendentes, gestores] = await Promise.all([
+      this.desarquivamentoRepository.find({
         where: {
           status: StatusDesarquivamentoEnum.SOLICITADO,
           dataSolicitacao: LessThan(cincoDiasAtras),
         },
-      },
-    );
+      }),
+      this.userRepository.find({
+        where: [{ role: { name: "coordenador" } }, { role: { name: "admin" } }],
+        relations: ["role"],
+      }),
+    ]);
 
-    const gestores = await this.userRepository.find({
-      where: [
-        { role: { name: "coordenador" } },
-        { role: { name: "admin" } },
-      ],
-      relations: ["role"],
-    });
     const gestoresIds = gestores.map((g) => g.id);
 
-    for (const desarquivamento of desarquivamentosPendentes) {
+    // Coletar todos os IDs de desarquivamentos e usuários para buscar notificações existentes de uma vez
+    const desarquivamentoIds = desarquivamentosPendentes.map((d) => d.id);
+    
+    // Buscar todas as notificações existentes de uma vez (evita N+1)
+    const notificacoesExistentes = desarquivamentoIds.length > 0
+      ? await this.notificacaoRepository
+          .createQueryBuilder("n")
+          .select(["n.processoId", "n.usuarioId"])
+          .where("n.tipo = :tipo", { tipo: TipoNotificacao.SOLICITACAO_PENDENTE })
+          .andWhere("n.processoId IN (:...ids)", { ids: desarquivamentoIds })
+          .andWhere("n.lida = false")
+          .getRawMany()
+      : [];
 
+    // Criar um Set para lookup rápido
+    const notificacoesExistentesSet = new Set(
+      notificacoesExistentes.map((n) => `${n.n_processoId}-${n.n_usuarioId}`),
+    );
+
+    // Processar desarquivamentos
+    const notificacoesParaCriar: Array<{
+      usuarioId: number;
+      desarquivamento: DesarquivamentoTypeOrmEntity;
+      diasPendentes: number;
+    }> = [];
+
+    for (const desarquivamento of desarquivamentosPendentes) {
       const diasPendentes = Math.floor(
         (Date.now() - new Date(desarquivamento.dataSolicitacao).getTime()) /
           (1000 * 60 * 60 * 24),
@@ -347,27 +408,21 @@ export class NotificacoesService {
       for (const usuarioId of destinatarios) {
         if (!usuarioId) continue;
 
-        const notificacaoExistente = await this.notificacaoRepository.findOne({
-          where: {
-            tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
-            processoId: desarquivamento.id,
-            usuarioId,
-            lida: false,
-          },
-        });
-
-        if (notificacaoExistente) {
-          continue;
+        const chave = `${desarquivamento.id}-${usuarioId}`;
+        if (!notificacoesExistentesSet.has(chave)) {
+          notificacoesParaCriar.push({ usuarioId, desarquivamento, diasPendentes });
         }
-
-        const notificacao = await this.criarNotificacaoArquivoSolicitado(
-          usuarioId,
-          desarquivamento,
-          diasPendentes,
-        );
-
-        notificacoesCriadas.push(notificacao);
       }
+    }
+
+    // Criar notificações em lote
+    for (const { usuarioId, desarquivamento, diasPendentes } of notificacoesParaCriar) {
+      const notificacao = await this.criarNotificacaoArquivoSolicitado(
+        usuarioId,
+        desarquivamento,
+        diasPendentes,
+      );
+      notificacoesCriadas.push(notificacao);
     }
 
     // Buscar tarefas que não foram movimentadas há mais de 5 dias
@@ -380,33 +435,41 @@ export class NotificacoesService {
       })
       .getMany();
 
+    // Buscar notificações existentes para tarefas de uma vez
+    const tarefaIds = solicitacoesPendentes.map((s) => s.id);
+    const notificacoesTarefasExistentes = tarefaIds.length > 0
+      ? await this.notificacaoRepository
+          .createQueryBuilder("n")
+          .select("n.solicitacaoId")
+          .where("n.tipo = :tipo", { tipo: TipoNotificacao.SOLICITACAO_PENDENTE })
+          .andWhere("n.solicitacaoId IN (:...ids)", { ids: tarefaIds })
+          .andWhere("n.lida = false")
+          .getRawMany()
+      : [];
+
+    const tarefasComNotificacao = new Set(
+      notificacoesTarefasExistentes.map((n) => n.n_solicitacaoId),
+    );
+
     for (const solicitacao of solicitacoesPendentes) {
-      // Verificar se já existe notificação para esta solicitação
-      const notificacaoExistente = await this.notificacaoRepository.findOne({
-        where: {
-          tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
-          solicitacaoId: solicitacao.id,
-          lida: false,
-        },
-      });
+      if (tarefasComNotificacao.has(solicitacao.id)) {
+        continue;
+      }
 
-      if (!notificacaoExistente) {
-        const diasPendentes = Math.floor(
-          (Date.now() - solicitacao.updatedAt.getTime()) /
-            (1000 * 60 * 60 * 24),
+      const diasPendentes = Math.floor(
+        (Date.now() - solicitacao.updatedAt.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+
+      const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;
+
+      if (usuarioId) {
+        const notificacao = await this.criarNotificacaoSolicitacaoPendente(
+          usuarioId,
+          solicitacao.id,
+          diasPendentes,
         );
-
-        // Criar notificação para o responsável ou criador
-        const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;
-
-        if (usuarioId) {
-          const notificacao = await this.criarNotificacaoSolicitacaoPendente(
-            usuarioId,
-            solicitacao.id,
-            diasPendentes,
-          );
-          notificacoesCriadas.push(notificacao);
-        }
+        notificacoesCriadas.push(notificacao);
       }
     }
 
@@ -428,15 +491,16 @@ export class NotificacoesService {
       desarquivamento.nomeCompleto || "Desarquivamento"
     } — aguardando há ${diasPendentes} dia${diasPendentes === 1 ? "" : "s"}`;
 
-    const descricao = [
-      desarquivamento.numeroProcesso
-        ? `Processo ${desarquivamento.numeroProcesso}`
-        : null,
-      desarquivamento.tipoDocumento,
-      `Solicitado em ${dataSolicitacaoFormatada}`,
-    ]
-      .filter(Boolean)
-      .join(" • ") || "Desarquivamento permanece sem retorno.";
+    const descricao =
+      [
+        desarquivamento.numeroProcesso
+          ? `Processo ${desarquivamento.numeroProcesso}`
+          : null,
+        desarquivamento.tipoDocumento,
+        `Solicitado em ${dataSolicitacaoFormatada}`,
+      ]
+        .filter(Boolean)
+        .join(" • ") || "Desarquivamento permanece sem retorno.";
 
     const detalhes = {
       dias_pendentes: diasPendentes,
@@ -679,26 +743,35 @@ export class NotificacoesService {
 
     const tarefas = await this.tarefaRepository
       .createQueryBuilder("tarefa")
+      .select(["tarefa.id", "tarefa.prazo", "tarefa.responsavelId"])
       .where("tarefa.prazo >= :hoje", { hoje })
       .andWhere("tarefa.prazo <= :doisDias", { doisDias: doisDiasDepois })
       .andWhere("tarefa.deletedAt IS NULL")
+      .andWhere("tarefa.responsavelId IS NOT NULL")
       .getMany();
+
+    if (tarefas.length === 0) {
+      return [];
+    }
+
+    // Buscar notificações existentes de uma vez
+    const tarefaIds = tarefas.map((t) => t.id);
+    const notificacoesExistentes = await this.notificacaoRepository
+      .createQueryBuilder("n")
+      .select("n.tarefaId")
+      .where("n.tipo = :tipo", { tipo: TipoNotificacao.PRAZO_PROXIMO })
+      .andWhere("n.tarefaId IN (:...ids)", { ids: tarefaIds })
+      .andWhere("n.lida = false")
+      .getRawMany();
+
+    const tarefasComNotificacao = new Set(
+      notificacoesExistentes.map((n) => n.n_tarefaId),
+    );
 
     const notificacoes: Notificacao[] = [];
 
     for (const tarefa of tarefas) {
-      if (!tarefa.responsavelId) continue;
-
-      // Verificar se já existe notificação recente
-      const notificacaoExistente = await this.notificacaoRepository.findOne({
-        where: {
-          tipo: TipoNotificacao.PRAZO_PROXIMO,
-          tarefaId: tarefa.id,
-          lida: false,
-        },
-      });
-
-      if (notificacaoExistente) continue;
+      if (tarefasComNotificacao.has(tarefa.id)) continue;
 
       const diasRestantes = Math.ceil(
         (new Date(tarefa.prazo).getTime() - hoje.getTime()) /
@@ -723,28 +796,37 @@ export class NotificacoesService {
 
     const tarefas = await this.tarefaRepository
       .createQueryBuilder("tarefa")
+      .select(["tarefa.id", "tarefa.prazo", "tarefa.responsavelId"])
       .where("tarefa.prazo < :hoje", { hoje })
       .andWhere("tarefa.deletedAt IS NULL")
+      .andWhere("tarefa.responsavelId IS NOT NULL")
       .getMany();
+
+    if (tarefas.length === 0) {
+      return [];
+    }
+
+    // Buscar notificações existentes de uma vez (últimas 24h)
+    const umDiaAtras = new Date();
+    umDiaAtras.setDate(umDiaAtras.getDate() - 1);
+
+    const tarefaIds = tarefas.map((t) => t.id);
+    const notificacoesExistentes = await this.notificacaoRepository
+      .createQueryBuilder("n")
+      .select("n.tarefaId")
+      .where("n.tipo = :tipo", { tipo: TipoNotificacao.TAREFA_ATRASADA })
+      .andWhere("n.tarefaId IN (:...ids)", { ids: tarefaIds })
+      .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
+      .getRawMany();
+
+    const tarefasComNotificacao = new Set(
+      notificacoesExistentes.map((n) => n.n_tarefaId),
+    );
 
     const notificacoes: Notificacao[] = [];
 
     for (const tarefa of tarefas) {
-      if (!tarefa.responsavelId) continue;
-
-      // Verificar se já existe notificação recente (últimas 24h)
-      const umDiaAtras = new Date();
-      umDiaAtras.setDate(umDiaAtras.getDate() - 1);
-
-      const notificacaoExistente = await this.notificacaoRepository.findOne({
-        where: {
-          tipo: TipoNotificacao.TAREFA_ATRASADA,
-          tarefaId: tarefa.id,
-          createdAt: LessThan(umDiaAtras),
-        },
-      });
-
-      if (notificacaoExistente) continue;
+      if (tarefasComNotificacao.has(tarefa.id)) continue;
 
       const diasAtrasados = Math.floor(
         (hoje.getTime() - new Date(tarefa.prazo).getTime()) /

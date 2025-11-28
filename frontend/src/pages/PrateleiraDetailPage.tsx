@@ -27,6 +27,7 @@ import {
 } from '@/hooks/usePastas';
 import { toast } from 'sonner';
 import { ImagePreviewModal, PreviewAttachment } from '@/components/desarquivamentos/ImagePreviewModal';
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
 
 const PrateleiraDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const PrateleiraDetailPage: React.FC = () => {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [selectedPlanilhas, setSelectedPlanilhas] = useState<File[]>([]);
   const [previewImageId, setPreviewImageId] = useState<string | null>(null);
+  const [deleteArquivoItem, setDeleteArquivoItem] = useState<{ id: string; nome: string } | null>(null);
 
   const { data, isLoading, error, refetch } = usePastaDetalhes(pastaId);
   const { uploadArquivos, isUploadingArquivos, deleteArquivo, isDeletingArquivo } = usePastas();
@@ -119,15 +121,16 @@ const PrateleiraDetailPage: React.FC = () => {
   };
 
 
-  const handleDeleteArquivo = async (arquivoId: string) => {
+  const handleDeleteArquivo = (arquivoId: string, arquivoNome: string) => {
     if (!pastaId || !arquivoId) return;
-    if (!window.confirm('Tem certeza que deseja excluir este anexo?')) {
-      return;
-    }
+    setDeleteArquivoItem({ id: arquivoId, nome: arquivoNome });
+  };
 
+  const handleConfirmDeleteArquivo = async () => {
+    if (!deleteArquivoItem || !pastaId) return;
     try {
-      await deleteArquivo({ pastaId, arquivoId });
-      if (previewImageId === arquivoId) {
+      await deleteArquivo({ pastaId, arquivoId: deleteArquivoItem.id });
+      if (previewImageId === deleteArquivoItem.id) {
         setPreviewImageId(null);
       }
       toast.success('Anexo removido com sucesso.');
@@ -135,6 +138,8 @@ const PrateleiraDetailPage: React.FC = () => {
     } catch (err) {
       console.error(err);
       toast.error('Não foi possível remover o anexo.');
+    } finally {
+      setDeleteArquivoItem(null);
     }
   };
 
@@ -337,7 +342,7 @@ const PrateleiraDetailPage: React.FC = () => {
                         className="h-8 w-8"
                         onClick={event => {
                           event.stopPropagation();
-                          handleDeleteArquivo(imagem.id);
+                          handleDeleteArquivo(imagem.id, imagem.nomeOriginal);
                         }}
                         disabled={isDeletingArquivo}
                       >
@@ -455,7 +460,7 @@ const PrateleiraDetailPage: React.FC = () => {
                         size="icon"
                         variant="destructive"
                         className="h-8 w-8"
-                        onClick={() => handleDeleteArquivo(planilha.id)}
+                        onClick={() => handleDeleteArquivo(planilha.id, planilha.nomeOriginal)}
                         disabled={isDeletingArquivo}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -586,6 +591,22 @@ const PrateleiraDetailPage: React.FC = () => {
           tamanhoBytes: img.tamanhoBytes,
           createdAt: img.dataUpload,
         }))}
+      />
+
+      <EnhancedConfirmDialog
+        isOpen={deleteArquivoItem !== null}
+        onClose={() => setDeleteArquivoItem(null)}
+        onConfirm={handleConfirmDeleteArquivo}
+        title="Excluir anexo"
+        description={`Tem certeza que deseja excluir o anexo "${deleteArquivoItem?.nome}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir este anexo permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'O arquivo será removido permanentemente',
+          'Não será possível recuperar este anexo'
+        ]}
       />
     </div>
   );

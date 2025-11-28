@@ -9,6 +9,7 @@ import { useTarefas } from '@/hooks/useTarefas'
 import { useUsers } from '@/hooks/useUsers'
 import { CreateTarefaDto } from '@/types'
 import { api } from '@/services/api'
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
 
 interface ApiResponse<T> {
   success: boolean
@@ -53,6 +54,7 @@ const NovaTarefaPage: React.FC = () => {
   const [loadingProjetos, setLoadingProjetos] = useState(false)
   const [loadingColunas, setLoadingColunas] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
 
   const selectedProjetoRef = useRef<number | null>(initialProjetoId)
   const initialColunaRef = useRef<number | null>(initialColunaId)
@@ -217,12 +219,14 @@ const NovaTarefaPage: React.FC = () => {
 
   const handleCancel = () => {
     if (isDirty) {
-      const confirmar = window.confirm('Deseja realmente cancelar? As alterações não salvas serão perdidas.')
-      if (!confirmar) {
-        return
-      }
+      setShowCancelDialog(true)
+      return
     }
+    navigate('/tarefas')
+  }
 
+  const handleConfirmCancel = () => {
+    setShowCancelDialog(false)
     navigate('/tarefas')
   }
 
@@ -310,6 +314,16 @@ const NovaTarefaPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      <EnhancedConfirmDialog
+        isOpen={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+        onConfirm={handleConfirmCancel}
+        title="Cancelar criação de tarefa"
+        description="Deseja realmente cancelar? As alterações não salvas serão perdidas."
+        variant="warning"
+        confirmationType="none"
+      />
     </div>
   )
 }

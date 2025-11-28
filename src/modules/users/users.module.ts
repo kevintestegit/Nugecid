@@ -41,7 +41,10 @@ import {
 } from "./infrastructure/repositories";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Role, UserPreference, Auditoria]), AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([User, Role, UserPreference, Auditoria]),
+    AuthModule,
+  ],
   controllers: [UsersController],
   providers: [
     UserPreferencesService,

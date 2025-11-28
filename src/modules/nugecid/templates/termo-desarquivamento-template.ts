@@ -1,4 +1,5 @@
-import * as fs from "fs";
+import { promises as fs } from "fs";
+import { existsSync } from "fs";
 import * as path from "path";
 import { Logger } from "@nestjs/common";
 
@@ -40,11 +41,11 @@ const ITEP_LOGO_PATH = path.join(
   "Brasão-ITEP.png",
 );
 
-export const loadTermoTemplateLogos = (
+export const loadTermoTemplateLogos = async (
   logger?: Logger,
-): TermoTemplateLogos => ({
-  rnLogo: readImageAsDataUri(RN_LOGO_PATH, "image/png", logger),
-  itepLogo: readImageAsDataUri(ITEP_LOGO_PATH, "image/png", logger),
+): Promise<TermoTemplateLogos> => ({
+  rnLogo: await readImageAsDataUri(RN_LOGO_PATH, "image/png", logger),
+  itepLogo: await readImageAsDataUri(ITEP_LOGO_PATH, "image/png", logger),
 });
 
 export const buildTermoTemplateHtml = ({
@@ -134,9 +135,7 @@ export const buildTermoTemplateHtml = ({
           <td class="col-name">${
             row.name ? escapeHtml(row.name) : "&nbsp;"
           }</td>
-          <td class="col-num">${
-            row.code ? escapeHtml(row.code) : "&nbsp;"
-          }</td>
+          <td class="col-num">${row.code ? escapeHtml(row.code) : "&nbsp;"}</td>
         </tr>`,
     )
     .join("");
@@ -145,8 +144,30 @@ export const buildTermoTemplateHtml = ({
   const placeholderTemplate = {
     processoEletronico,
   };
-  const userName =
-    servidorSolicitante || "Responsável não informado";
+  const userName = servidorSolicitante || "Responsável não informado";
+
+  // Calcula se precisa forçar quebra de página antes das assinaturas
+  // Estimativas de altura em pontos (pt):
+  // - Cabeçalho institucional: ~115pt
+  // - Título + intro: ~80pt
+  // - Cabeçalho da tabela de documentos: ~60pt
+  // - Cada linha de documento: ~18pt
+  // - Bloco de assinaturas + nota + autenticação: ~180pt
+  // - Margem de segurança: ~40pt
+  // Altura útil da página A4: ~750pt (297mm - 20mm margens)
+  const alturaFixa = 115 + 80 + 60 + 180 + 40; // ~475pt
+  const alturaDisponivelParaDocumentos = 750 - alturaFixa; // ~275pt
+  const alturaPorDocumento = 18;
+  const documentosQueCabemNaPrimeiraPagina = Math.floor(
+    alturaDisponivelParaDocumentos / alturaPorDocumento,
+  ); // ~15
+
+  const totalDocumentos = rowsWithIndex.length;
+  // Se os documentos ocupam mais que o espaço disponível na primeira página,
+  // verifica se o bloco de assinaturas cairia no meio de uma quebra
+  const forcarQuebraPagina =
+    totalDocumentos > documentosQueCabemNaPrimeiraPagina &&
+    totalDocumentos <= documentosQueCabemNaPrimeiraPagina + 10; // Entre 15 e 25 docs pode cortar
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -208,30 +229,98 @@ export const buildTermoTemplateHtml = ({
     .rodape { border-top: 0.75pt solid #000; padding-top: 2pt; margin-top: 5pt; }
     .autenticacao { margin-top: 20pt; font-size: 10pt; text-align: center; }
 
-    /* Layout padrão - sem fixed positioning */
-    header.print-header,
-    footer.print-footer {
-      padding: 0 var(--page-padding-x);
-      background: #fff;
+    /* Controle de quebra de página */
+    .no-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    /* Tabela de documentos - cabeçalho repetível em todas as páginas */
+    table.borda thead {
+      display: table-header-group;
+    }
+    table.borda tbody {
+      display: table-row-group;
+    }
+    
+    /* Bloco de assinaturas - nunca quebrar */
+    .assinaturas-bloco {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-before: auto;
+    }
+    
+    /* Wrapper de assinaturas usando flexbox */
+    .assinaturas-wrapper {
+      display: flex;
+      width: 100%;
+      border: 0.75pt solid #000;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    .assinaturas-esquerda {
+      width: 40%;
+      border-right: 0.75pt solid #000;
+      display: flex;
+      flex-direction: column;
+    }
+    .assinaturas-esquerda-header {
+      background: #bfbfbf;
+      padding: 3pt 5pt;
+      border-bottom: 0.75pt solid #000;
+      text-align: center;
+    }
+    .assinaturas-esquerda-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 15pt 5pt;
+    }
+    .assinaturas-direita {
+      width: 60%;
+      display: flex;
+      flex-direction: column;
+    }
+    .assinaturas-direita-header {
+      background: #bfbfbf;
+      padding: 3pt 5pt;
+      border-bottom: 0.75pt solid #000;
+      text-align: center;
+    }
+    .assinaturas-direita-row {
+      display: flex;
+      border-bottom: 0.75pt solid #000;
+    }
+    .assinaturas-direita-row:last-child {
+      border-bottom: none;
+    }
+    .assinaturas-direita-label {
+      width: 45%;
+      padding: 3pt 5pt;
+      border-right: 0.75pt solid #000;
+    }
+    .assinaturas-direita-value {
+      width: 55%;
+      padding: 3pt 5pt;
     }
 
-    main.print-body {
-      padding: 0 var(--page-padding-x);
+    /* Documento completo com cabeçalho e rodapé repetíveis */
+    table.documento-completo {
+      width: 100%;
+      border-collapse: collapse;
     }
-
-    /* Layout para múltiplas páginas - com fixed positioning */
-    body.multipage header.print-header,
-    body.multipage footer.print-footer {
-      position: fixed;
-      left: 0;
-      right: 0;
-      z-index: 10;
+    table.documento-completo thead {
+      display: table-header-group;
     }
-    body.multipage header.print-header { top: 0; height: var(--header-height); }
-    body.multipage footer.print-footer { bottom: 0; min-height: var(--footer-height); }
-    body.multipage main.print-body {
-      margin-top: calc(var(--header-height) + 10px);
-      margin-bottom: calc(var(--footer-height) + 10px);
+    table.documento-completo tfoot {
+      display: table-footer-group;
+    }
+    table.documento-completo thead td,
+    table.documento-completo tfoot td {
+      border: none;
+      padding: 0;
     }
 
     @page {
@@ -240,10 +329,6 @@ export const buildTermoTemplateHtml = ({
     /* Impressão */
     @media print {
       body { margin: 0; }
-      body.multipage main.print-body {
-        margin-top: calc(var(--header-height) + 10px);
-        margin-bottom: calc(var(--footer-height) + 10px);
-      }
       .faixa {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -252,180 +337,180 @@ export const buildTermoTemplateHtml = ({
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      header.print-header,
-      footer.print-footer {
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
       .autenticacao { margin-top: 20pt; page-break-inside: avoid; text-align: center; }
+      
+      /* Controle de quebras de página para impressão */
+      .assinaturas-bloco {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      
+      /* Wrapper de assinaturas nunca quebrar */
+      .assinaturas-wrapper {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      
+      /* Cabeçalho e rodapé repetem em cada página */
+      table.documento-completo thead {
+        display: table-header-group;
+      }
+      table.documento-completo tfoot {
+        display: table-footer-group;
+      }
+      
+      /* Evitar quebra dentro de linhas da tabela */
+      table.borda tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
     }
   </style>
-  <script>
-    // Detecta se o conteúdo precisa de múltiplas páginas
-    window.addEventListener('load', function() {
-      // Aguarda um frame para garantir que o layout está completo
-      requestAnimationFrame(function() {
-        const body = document.body;
-        const main = document.querySelector('main.print-body');
-
-        if (!main) return;
-
-        // Altura de uma página A4 em pixels (aproximadamente 297mm - margens)
-        // 297mm - 20mm (10mm top + 10mm bottom) = 277mm ≈ 1047px @ 96dpi
-        const pageHeightMm = 297;
-        const marginTopBottomMm = 20; // 10mm top + 10mm bottom
-        const usablePageHeightMm = pageHeightMm - marginTopBottomMm;
-        const dpi = 96;
-        const mmToPx = dpi / 25.4;
-        const pageHeight = usablePageHeightMm * mmToPx;
-
-        // Altura do cabeçalho e rodapé quando fixos
-        const headerHeight = 115; // var(--header-height)
-        const footerHeight = 80; // var(--footer-height)
-
-        // Calcula a altura total do conteúdo
-        const contentHeight = main.scrollHeight;
-
-        const totalHeight = contentHeight + headerHeight + footerHeight;
-
-        if (totalHeight > pageHeight) {
-          body.classList.add('multipage');
-          console.log('Modo multipágina ativado - Altura total:', totalHeight, 'Altura de página:', pageHeight);
-        } else {
-          console.log('Modo página única - Altura total:', totalHeight, 'Altura de página:', pageHeight);
-        }
-      });
-    });
-  </script>
 </head>
 <body>
-  <header class="print-header">
-    <!-- Cabeçalho com 3 colunas (logo, textos, logo) -->
-    <table class="hdr">
-      <tr style="height:75pt;">
-        <td class="logo">
-          ${
-            logos?.rnLogo
-              ? `<img src="${logos.rnLogo}" alt="Brasão RN" width="90" height="75" />`
-              : "&nbsp;"
-          }
-        </td>
-        <td class="miolo" style="line-height: 1.2;">
-          <p class="center fs10"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong><br/>
-          <strong>SECRETARIA DE SEGURANÇA PÚBLICA E DEFESA SOCIAL</strong><br/>
-          <strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong><br/>
-          <strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
-          <p class="center fs10 mt-8"><strong>ARQUIVO GERAL - PCIRN</strong></p>
-        </td>
-        <td class="logo-dir">
-          ${
-            logos?.itepLogo
-              ? `<img src="${logos.itepLogo}" alt="Brasão ITEP" width="80" height="80" />`
-              : "&nbsp;"
-          }
+  <table class="documento-completo">
+    <thead>
+      <tr>
+        <td>
+          <table class="hdr">
+            <tr style="height:75pt;">
+              <td class="logo">
+                ${
+                  logos?.rnLogo
+                    ? `<img src="${logos.rnLogo}" alt="Brasão RN" width="90" height="75" />`
+                    : "&nbsp;"
+                }
+              </td>
+              <td class="miolo" style="line-height: 1.2;">
+                <p class="center fs10"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong><br/>
+                <strong>SECRETARIA DE SEGURANÇA PÚBLICA E DEFESA SOCIAL</strong><br/>
+                <strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong><br/>
+                <strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
+                <p class="center fs10 mt-8"><strong>ARQUIVO GERAL - PCIRN</strong></p>
+              </td>
+              <td class="logo-dir">
+                ${
+                  logos?.itepLogo
+                    ? `<img src="${logos.itepLogo}" alt="Brasão ITEP" width="80" height="80" />`
+                    : "&nbsp;"
+                }
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
-    </table>
-  </header>
+    </thead>
+    <tfoot>
+      <tr>
+        <td>
+          <div class="rodape fs10 center" style="line-height: 1.3; border-top: 0.75pt solid #000; padding-top: 5pt; margin-top: 10pt;">
+            <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
+            <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
+            <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
+            <p>Email: arquivogeral@pci.rn.gov.br</p>
+          </div>
+        </td>
+      </tr>
+    </tfoot>
+    <tbody>
+      <tr>
+        <td>
+          <!-- Título -->
+          <h1><strong>TERMO DE DESARQUIVAMENTO DE DOCUMENTO</strong></h1>
 
-  <main class="print-body">
-    <!-- Título -->
-    <h1><strong>TERMO DE DESARQUIVAMENTO DE DOCUMENTO</strong></h1>
+          <!-- Intro -->
+          <p class="center mb-7 fs10">Ao servidor responsável pelo desarquivamento compete ter ciência que esta solicitação de desarquivamento de documento deve estar vinculada a uma demanda da Polícia Científica do Rio Grande do Norte, ou jurisdição de órgão público através de autoridade competente.</p>
+          <p class="fs10" style="text-indent:35.4pt; text-align:justify;">
+            Estar ciente quanto às orientações e normativas descritas na portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe sobre o acesso e o fluxo de desarquivamento de documentos no âmbito do Setor de Arquivo Geral da Polícia Científica do Rio Grande do Norte.
+          </p>
 
-    <!-- Intro -->
-    <p class="center mb-7 fs10">Ao servidor responsável pelo desarquivamento compete ter ciência que esta solicitação de desarquivamento de documento deve estar vinculada a uma demanda da Polícia Científica do Rio Grande do Norte, ou jurisdição de órgão público através de autoridade competente.</p>
-    <p class="fs10" style="text-indent:35.4pt; text-align:justify;">
-      Estar ciente quanto às orientações e normativas descritas na portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe sobre o acesso e o fluxo de desarquivamento de documentos no âmbito do Setor de Arquivo Geral da Polícia Científica do Rio Grande do Norte.
-    </p>
+          <!-- Nº Processo Eletrônico -->
+          <table class="borda mt-12">
+            <thead>
+              <tr>
+                <td colspan="4" class="faixa center fs12" style="background-color: #bfbfbf !important;"><strong>Nº. DE PROCESSO ELETRÔNICO</strong></td>
+              </tr>
+              <tr>
+                <td colspan="4" class="faixa center fs11">
+                  ${placeholderTemplate.processoEletronico || ""}
+                </td>
+              </tr>
 
-    <!-- Nº Processo Eletrônico -->
-    <table class="borda mt-12">
-      <tbody>
-        <tr>
-          <td colspan="4" class="faixa center fs12" style="background-color: #bfbfbf !important;"><strong>Nº. DE PROCESSO ELETRÔNICO</strong></td>
-        </tr>
-        <tr>
-          <td colspan="4" class="faixa center fs11">
-            ${placeholderTemplate.processoEletronico || ""}
-          </td>
-        </tr>
+              <!-- Cabeçalho de itens -->
+              <tr class="faixa">
+                <td class="center fs12" colspan="2" style="width: 124.65pt;">
+                  <strong>TIPO DE DOCUMENTO</strong><br/>
+                  <span class="sub">Ex: Prontuário, Laudo, Parecer, Relatório.</span>
+                </td>
+                <td class="center fs12" style="width: 169.9pt;"><strong>NOME</strong></td>
+                <td class="center fs12" style="width: 181.2pt;"><strong>NÚMERO</strong></td>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Linhas geradas -->
+              ${rowsHtml}
+            </tbody>
+          </table>
 
-        <!-- Cabeçalho de itens -->
-        <tr class="faixa">
-          <td class="center fs12" colspan="2" style="width: 124.65pt;">
-            <strong>TIPO DE DOCUMENTO</strong><br/>
-            <span class="sub">Ex: Prontuário, Laudo, Parecer, Relatório.</span>
-          </td>
-          <td class="center fs12" style="width: 169.9pt;"><strong>NOME</strong></td>
-          <td class="center fs12" style="width: 181.2pt;"><strong>NÚMERO</strong></td>
-        </tr>
+          <!-- Espaço -->
+          <p class="mb-0" style="line-height:100%; margin-top: 6pt;">&nbsp;</p>
 
-        <!-- Linhas geradas -->
-        ${rowsHtml}
-      </tbody>
-    </table>
+          <!-- Assinaturas - bloco que nunca deve ser quebrado -->
+          <div class="assinaturas-bloco" ${forcarQuebraPagina ? 'style="page-break-before: always; break-before: page;"' : ""}>
+            <div class="assinaturas-wrapper">
+              <!-- Coluna esquerda - Arquivo Geral -->
+              <div class="assinaturas-esquerda">
+                <div class="assinaturas-esquerda-header">
+                  <p class="fs11"><strong>SETOR DE ARQUIVO GERAL</strong></p>
+                  <p class="sub">Responsável pela ENTREGA</p>
+                </div>
+                <div class="assinaturas-esquerda-body">
+                  <div class="ass-linha" style="width: 80%;"></div>
+                  <p class="fs11"><strong>ASSINATURA</strong></p>
+                </div>
+              </div>
+              <!-- Coluna direita - Setor Solicitante -->
+              <div class="assinaturas-direita">
+                <div class="assinaturas-direita-header">
+                  <p class="fs11"><strong>SETOR SOLICITANTE</strong></p>
+                  <p class="sub">Responsável pelo RECEBIMENTO</p>
+                </div>
+                <div class="assinaturas-direita-row">
+                  <div class="assinaturas-direita-label fs11 vermelho"><strong>SETOR</strong></div>
+                  <div class="assinaturas-direita-value fs11">${setorSolicitante || "&nbsp;"}</div>
+                </div>
+                <div class="assinaturas-direita-row">
+                  <div class="assinaturas-direita-label fs11 vermelho"><strong>ASSINATURA DO SERVIDOR</strong></div>
+                  <div class="assinaturas-direita-value fs11">${servidorSolicitante || "&nbsp;"}</div>
+                </div>
+                <div class="assinaturas-direita-row">
+                  <div class="assinaturas-direita-label fs11 vermelho"><strong>MATRÍCULA</strong></div>
+                  <div class="assinaturas-direita-value fs11">${matricula || "&nbsp;"}</div>
+                </div>
+                <div class="assinaturas-direita-row">
+                  <div class="assinaturas-direita-label fs11 vermelho"><strong>DATA DE RETIRADA</strong></div>
+                  <div class="assinaturas-direita-value fs11">${dataRetirada || "&nbsp;"}</div>
+                </div>
+                <div class="assinaturas-direita-row">
+                  <div class="assinaturas-direita-label fs11 vermelho"><strong>DATA DE DEVOLUÇÃO</strong></div>
+                  <div class="assinaturas-direita-value fs11">&nbsp;</div>
+                </div>
+              </div>
+            </div>
 
-    <!-- Espaço -->
-    <p class="mb-0" style="line-height:100%; margin-top: 6pt;">&nbsp;</p>
+            <!-- Nota -->
+            <p class="center fs10 mt-8"><strong>* Observar as orientações da portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe quanto aos prazos e instruções normativas.</strong></p>
 
-    <!-- Assinaturas -->
-    <table class="borda">
-      <tbody>
-        <tr class="faixa">
-          <td style="width: 201.6pt;">
-            <p class="center fs11"><strong>SETOR DE ARQUIVO GERAL</strong></p>
-            <p class="center sub">Responsável pela ENTREGA</p>
-          </td>
-          <td colspan="2">
-            <p class="center fs11"><strong>SETOR SOLICITANTE</strong></p>
-            <p class="center sub">Responsável pelo RECEBIMENTO</p>
-          </td>
-        </tr>
-        <tr>
-          <td rowspan="5" style="vertical-align:middle; text-align:center;">
-            <div class="ass-linha"></div>
-            <p class="center fs11"><strong>ASSINATURA</strong></p>
-          </td>
-          <td class="fs11 vermelho" style="width:103.2pt;"><strong>SETOR</strong></td>
-          <td class="fs11" style="width:144.5pt;">${setorSolicitante || "&nbsp;"}</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>ASSINATURA DO SERVIDOR</strong></td>
-          <td class="fs11">${servidorSolicitante || "&nbsp;"}</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>MATRÍCULA</strong></td>
-          <td class="fs11">${matricula || "&nbsp;"}</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>DATA DE RETIRADA</strong></td>
-          <td class="fs11">${dataRetirada || "&nbsp;"}</td>
-        </tr>
-        <tr>
-          <td class="fs11 vermelho"><strong>DATA DE DEVOLUÇÃO</strong></td>
-          <td class="fs11">&nbsp;</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- Nota -->
-    <p class="center fs10 mt-8"><strong>* Observar as orientações da portaria nº 188/2023-GDG/ITEP no DOE nº 15433 de 25/05/2023, que dispõe quanto aos prazos e instruções normativas.</strong></p>
-
-    <div class="autenticacao fs10 center">
-      <p><em>Documento assinado digitalmente por ${userName} - ${matricula ||
-        "Matrícula não informada"} às ${horaAssinatura} - ${dataAssinaturaStr}.</em></p>
-    </div>
-  </main>
-
-  <footer class="print-footer fs10 center">
-    <!-- Rodapé -->
-    <div class="rodape fs10 center" style="line-height: 1.3;">
-      <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
-      <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
-      <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
-      <p>Email: arquivogeral@pci.rn.gov.br</p>
-    </div>
-  </footer>
+            <div class="autenticacao fs10 center">
+              <p><em>Documento assinado digitalmente por ${userName} - ${
+                matricula || "Matrícula não informada"
+              } às ${horaAssinatura} - ${dataAssinaturaStr}.</em></p>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </body>
 </html>`;
 };
@@ -453,20 +538,20 @@ const formatDate = (date?: Date | string | null): string => {
   }
 };
 
-const readImageAsDataUri = (
+const readImageAsDataUri = async (
   filePath: string,
   mime = "image/png",
   logger?: Logger,
-): string => {
+): Promise<string> => {
   try {
     const absolutePath = path.isAbsolute(filePath)
       ? filePath
       : path.resolve(process.cwd(), filePath);
-    if (!fs.existsSync(absolutePath)) {
+    if (!existsSync(absolutePath)) {
       logger?.warn?.(`Logo não encontrada em: ${absolutePath}`);
       return "";
     }
-    const buffer = fs.readFileSync(absolutePath);
+    const buffer = await fs.readFile(absolutePath);
     return `data:${mime};base64,${buffer.toString("base64")}`;
   } catch (error) {
     logger?.warn?.(

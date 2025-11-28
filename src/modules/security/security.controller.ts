@@ -10,7 +10,12 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
 
 import { SecurityService, BlockIpDto } from "./security.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -81,7 +86,9 @@ export class SecurityController {
   @ApiOperation({ summary: "Lista IPs bloqueados" })
   @ApiResponse({ status: 200, description: "Lista de IPs bloqueados" })
   @ApiResponse({ status: 403, description: "Acesso negado" })
-  async listBlockedIps(@Query("includeInactive") includeInactive: string = "false") {
+  async listBlockedIps(
+    @Query("includeInactive") includeInactive: string = "false",
+  ) {
     const blockedIps = await this.securityService.listBlockedIps(
       includeInactive === "true",
     );

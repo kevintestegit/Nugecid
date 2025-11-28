@@ -64,7 +64,8 @@ export class AnexosController {
         },
         anexarAoProcesso: {
           type: "boolean",
-          description: "Se true, anexa ao processo (todas solicitações). Se false, anexa apenas a esta solicitação",
+          description:
+            "Se true, anexa ao processo (todas solicitações). Se false, anexa apenas a esta solicitação",
           default: false,
         },
       },
@@ -88,12 +89,14 @@ export class AnexosController {
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
     @UploadedFile() file: Express.Multer.File,
     @Body("descricao") descricao: string | undefined,
-    @Body("tipoAnexo") tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
+    @Body("tipoAnexo")
+    tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
     @Body("anexarAoProcesso") anexarAoProcesso: string | boolean = false,
     @Request() req: any,
   ): Promise<{ success: boolean; data: any }> {
     // Converter string "true"/"false" para boolean
-    const anexarProcesso = anexarAoProcesso === true || anexarAoProcesso === "true";
+    const anexarProcesso =
+      anexarAoProcesso === true || anexarAoProcesso === "true";
 
     const anexo = await this.anexosService.uploadAnexo(
       desarquivamentoId,
@@ -124,8 +127,10 @@ export class AnexosController {
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
     @Query("tipo") tipo?: "desarquivamento" | "rearquivamento",
   ): Promise<{ success: boolean; data: any[] }> {
-    const anexos =
-      await this.anexosService.findAnexosByDesarquivamento(desarquivamentoId, tipo);
+    const anexos = await this.anexosService.findAnexosByDesarquivamento(
+      desarquivamentoId,
+      tipo,
+    );
     return {
       success: true,
       data: anexos,

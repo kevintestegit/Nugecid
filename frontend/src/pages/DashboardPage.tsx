@@ -5,6 +5,7 @@ import { useOnlineUsers } from '@/hooks/useOnlineUsers'
 import { useUserTasks } from '@/hooks/useUserTasks'
 import { useDashboardLayout } from '@/hooks/useDashboardLayout'
 import { PageLoading } from '@/components/ui/Loading'
+import { SkeletonStatsCard, Skeleton } from '@/components/ui/Skeleton'
 import DashboardStats from '@/components/dashboard/DashboardStats'
 import RecentActivity from '@/components/dashboard/RecentActivity'
 import QuickActions from '@/components/dashboard/QuickActions'
@@ -48,20 +49,6 @@ const DashboardPage: React.FC = () => {
       }))
   }, [stats?.data?.recentes])
 
-  React.useEffect(() => {
-    console.log('🔄 [DASHBOARD] Estado do hook useOnlineUsers atualizado:', {
-      onlineUsers: onlineUsers?.length || 0,
-      loading: loadingOnline,
-      error: errorOnline?.message,
-      hasData: !!onlineUsers,
-      dataType: typeof onlineUsers
-    });
-
-    if (onlineUsers) {
-      console.log('👥 [DASHBOARD] Usuários online recebidos:', onlineUsers.map(u => `${u.nome} (${u.role})`));
-    }
-  }, [onlineUsers, loadingOnline, errorOnline]);
-
   const getTimeAgo = (lastActivity: string) => {
     const now = new Date();
     const activityDate = new Date(lastActivity);
@@ -81,7 +68,30 @@ const DashboardPage: React.FC = () => {
 
   // Returns condicionais DEPOIS de todos os hooks
   if (isLoading) {
-    return <PageLoading />
+    return (
+      <div className="space-y-8">
+        {/* Header Skeleton */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Skeleton variant="rounded" width={48} height={48} />
+              <div className="space-y-2">
+                <Skeleton variant="text" width={200} height={28} />
+                <Skeleton variant="text" width={350} height={18} />
+              </div>
+            </div>
+            <Skeleton variant="rounded" width={140} height={40} />
+          </div>
+        </div>
+
+        {/* Cards Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonStatsCard key={i} />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   if (error) {

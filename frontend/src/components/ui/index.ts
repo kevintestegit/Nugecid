@@ -63,3 +63,11 @@ export {
   DialogDescription,
 } from './Dialog';
 export { NugecidLogo } from './NugecidLogo';
+export {
+  Skeleton,
+  SkeletonCard,
+  SkeletonList,
+  SkeletonTable,
+  SkeletonStatsCard,
+  SkeletonKanbanCard
+} from './Skeleton';

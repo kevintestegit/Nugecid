@@ -22,6 +22,7 @@ import {
   SearchResponse
 } from '@/types'
 
+
 export class ApiService {
   private api: AxiosInstance
 
@@ -59,16 +60,9 @@ export class ApiService {
       async (error) => {
         const originalRequest = error.config
 
-        console.log('🔍 Interceptor de resposta - erro capturado:', {
-          code: error.code,
-          message: error.message,
-          status: error.response?.status,
-          url: originalRequest?.url
-        })
-
         // Verificar se é erro de conectividade (backend indisponível)
         if (error.code === 'ERR_NETWORK' || error.message?.includes('ERR_ABORTED') || error.message?.includes('fetch')) {
-          console.warn('🔌 Backend indisponível - não fazendo logout automático')
+          console.warn('Backend indisponível - não fazendo logout automático')
           return Promise.reject(error)
         }
 
@@ -80,7 +74,7 @@ export class ApiService {
         // IMPORTANTE: Não tentar renovar token se a requisição original já é de refresh
         // Isso evita loop infinito quando o refresh token está inválido/expirado
         if (originalRequest.url === '/auth/refresh') {
-          console.warn('🔄 Falha no refresh token - redirecionando para login')
+          console.warn('Falha no refresh token - redirecionando para login')
           localStorage.removeItem('accessToken')
           localStorage.removeItem('refreshToken')
           localStorage.removeItem('user')
@@ -94,23 +88,18 @@ export class ApiService {
           try {
             const refreshToken = localStorage.getItem('refreshToken')
             if (refreshToken) {
-              console.log('🔄 Tentando renovar token via interceptor...')
               const response = await this.api.post('/auth/refresh', { refreshToken })
               const { accessToken } = response.data // Direct access since backend returns { accessToken, expiresIn }
 
               localStorage.setItem('accessToken', accessToken)
-              console.log('✅ Token renovado com sucesso via interceptor')
 
               // Retry the original request with the new token
               originalRequest.headers.Authorization = `Bearer ${accessToken}`
               return this.api(originalRequest)
             }
           } catch (refreshError: any) {
-            console.error('❌ Falha ao renovar token via interceptor:', refreshError)
-
             // Só fazer logout se não for erro de conectividade
             if (refreshError.code !== 'ERR_NETWORK' && !refreshError.message?.includes('ERR_ABORTED')) {
-              console.log('🚪 Fazendo logout devido a falha de autenticação')
               localStorage.removeItem('accessToken')
               localStorage.removeItem('refreshToken')
               localStorage.removeItem('user')
@@ -122,7 +111,6 @@ export class ApiService {
 
         // Só fazer logout para 401 se não for erro de conectividade
         if (error.response?.status === 401) {
-          console.log('🚪 Token inválido - fazendo logout')
           localStorage.removeItem('accessToken')
           localStorage.removeItem('refreshToken')
           localStorage.removeItem('user')
@@ -132,6 +120,15 @@ export class ApiService {
         return Promise.reject(error)
       }
     )
+  }
+
+  // Métodos genéricos
+  async get<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+    return this.api.get<T>(url, config)
+  }
+
+  async post<T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> {
+    return this.api.post<T>(url, data, config)
   }
 
   // Auth endpoints
@@ -174,7 +171,7 @@ export class ApiService {
       // issues occur (304/Not Modified handled by proxy/browser can surface
       // as errors in some setups).
       // eslint-disable-next-line no-console
-      console.error('[ApiService] getDesarquivamentos error:', error?.message || error)
+      console.error(' getDesarquivamentos error:', error?.message || error)
 
       return {
         success: false,
@@ -201,7 +198,18 @@ export class ApiService {
     return response.data
   }
 
-  // Term reports
+  // Term reports - PDF com cabeçalho/rodapé fixos
+  async getTermoDeEntregaPdfFixo(id: number): Promise<Blob> {
+    const response: AxiosResponse<Blob> = await this.api.get(`/nugecid/${id}/termo-pdf`, {
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/pdf',
+      },
+    })
+    return response.data
+  }
+
+  // Term reports - PDF padrão (antigo)
   async getTermoDeEntregaPdf(id: number): Promise<Blob> {
     const response: AxiosResponse<Blob> = await this.api.get(`/nugecid/${id}/termo`, {
       responseType: 'blob',
@@ -234,23 +242,15 @@ export class ApiService {
   }
 
   async updateDesarquivamento(id: number, data: UpdateDesarquivamentoDto): Promise<ApiResponse<Desarquivamento>> {
-    console.log('[ApiService] updateDesarquivamento - Dados originais:', JSON.stringify(data))
-    
     // Importar normalização dinamicamente
     const { normalizeDesarquivamentoData } = await import('@/utils/normalization')
     const normalizedData = normalizeDesarquivamentoData(data)
-    
-    console.log('[ApiService] updateDesarquivamento - Dados normalizados:', JSON.stringify(normalizedData))
-    console.log('[ApiService] updateDesarquivamento - URL:', `/nugecid/${id}`)
     
     const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.patch(`/nugecid/${id}`, normalizedData)
     return response.data
   }
 
   async deleteDesarquivamento(id: string | number): Promise<ApiResponse<void>> {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] [ApiService] deleteDesarquivamento INICIADO - ID: ${id} (tipo: ${typeof id})`);
-    
     try {
       // Validar se o ID é válido
       if (id === null || id === undefined || id === '') {
@@ -272,32 +272,17 @@ export class ApiService {
       
       // Validar se é um número positivo
       if (numericId <= 0 || !Number.isInteger(numericId)) {
-        console.error(`[${timestamp}] [ApiService] ❌ ID INVÁLIDO - não é um número positivo: ${numericId}`);
         throw new Error(
           `ID deve ser um número inteiro positivo maior que zero. Recebido: ${numericId}`
         );
       }
       
-      console.log(`[${timestamp}] [ApiService] ✅ ID validado com sucesso: ${numericId}`);
-      
       // Enviar apenas o ID numérico validado
       const response: AxiosResponse<ApiResponse<void>> = await this.api.delete(`/nugecid/${numericId}`);
       
-      console.log(`[${timestamp}] [ApiService] deleteDesarquivamento SUCESSO - ID: ${numericId}`, response.data);
       return response.data;
     } catch (error: any) {
-      const errorTimestamp = new Date().toISOString();
-      console.error(`[${errorTimestamp}] [ApiService] deleteDesarquivamento ERRO:`, error);
-      
       if (axios.isAxiosError && axios.isAxiosError(error)) {
-        console.error(`[${errorTimestamp}] 📋 Detalhes do erro:`, {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          message: error.message,
-          stack: error.stack
-        });
-        
         // Re-throw com informações mais detalhadas
         throw new Error(
           error.response?.data?.message || 
@@ -338,7 +323,7 @@ export class ApiService {
       // issues occur (304/Not Modified handled by proxy/browser can surface
       // as errors in some setups).
       // eslint-disable-next-line no-console
-      console.error('[ApiService] getUsers error:', error?.message || error)
+      console.error(' getUsers error:', error?.message || error)
 
       return {
         success: false,
@@ -431,7 +416,7 @@ export class ApiService {
       const response: AxiosResponse<PaginatedResponse<Desarquivamento>> = await this.api.get('/nugecid/lixeira', { params })
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] getDesarquivamentosLixeira error:', error?.message || error)
+      console.error(' getDesarquivamentosLixeira error:', error?.message || error)
 
       return {
         success: false,
@@ -451,10 +436,10 @@ export class ApiService {
   async restoreDesarquivamento(id: string | number): Promise<ApiResponse<Desarquivamento>> {
     try {
       const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.patch(`/nugecid/lixeira/${id}/restaurar`)
-      console.debug('[ApiService] restoreDesarquivamento response:', response.status, response.data)
+      console.log(' restoreDesarquivamento response:', response.status, response.data)
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] restoreDesarquivamento error:', error?.response?.status, error?.response?.data || error?.message)
+      console.error(' restoreDesarquivamento error:', error?.response?.status, error?.response?.data || error?.message)
       throw error
     }
   }
@@ -464,7 +449,7 @@ export class ApiService {
       const response: AxiosResponse<ApiResponse<void>> = await this.api.delete(`/nugecid/lixeira/${id}/permanente`);
       return response.data;
     } catch (error: any) {
-      console.error('[ApiService] deleteDesarquivamentoPermanente error:', error?.response?.status, error?.response?.data || error?.message)
+      console.error(' deleteDesarquivamentoPermanente error:', error?.response?.status, error?.response?.data || error?.message)
       throw error;
     }
   }
@@ -476,7 +461,7 @@ export class ApiService {
       const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(`/nugecid/${desarquivamentoId}/anexos`, { params });
       return response.data;
     } catch (error: any) {
-      console.error('[ApiService] getDesarquivamentosAnexos error:', error?.response?.status, error?.response?.data || error?.message);
+      console.error(' getDesarquivamentosAnexos error:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
@@ -512,7 +497,7 @@ export class ApiService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('[ApiService] uploadDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      console.error(' uploadDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
@@ -525,7 +510,7 @@ export class ApiService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('[ApiService] updateDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      console.error(' updateDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
@@ -540,7 +525,7 @@ export class ApiService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('[ApiService] downloadDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      console.error(' downloadDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
@@ -555,7 +540,7 @@ export class ApiService {
       );
       return response.data;
     } catch (error: any) {
-      console.error('[ApiService] viewDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      console.error(' viewDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
@@ -564,7 +549,7 @@ export class ApiService {
     try {
       await this.api.delete(`/nugecid/${desarquivamentoId}/anexos/${anexoId}`);
     } catch (error: any) {
-      console.error('[ApiService] deleteDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
+      console.error(' deleteDesarquivamentoAnexo error:', error?.response?.status, error?.response?.data || error?.message);
       throw error;
     }
   }
@@ -575,7 +560,7 @@ export class ApiService {
       const response: AxiosResponse<SearchResponse> = await this.api.get('/search', { params })
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] search error:', error?.message || error)
+      console.error(' search error:', error?.message || error)
       return {
         results: [],
         total: 0,
@@ -593,7 +578,7 @@ export class ApiService {
       })
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] getIpAccessStats error:', error?.message || error)
+      console.error(' getIpAccessStats error:', error?.message || error)
       throw error
     }
   }
@@ -605,7 +590,7 @@ export class ApiService {
       })
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] getIpAccessDetails error:', error?.message || error)
+      console.error(' getIpAccessDetails error:', error?.message || error)
       throw error
     }
   }
@@ -617,7 +602,7 @@ export class ApiService {
       })
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] listBlockedIps error:', error?.message || error)
+      console.error(' listBlockedIps error:', error?.message || error)
       throw error
     }
   }
@@ -631,7 +616,7 @@ export class ApiService {
       })
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] blockIp error:', error?.message || error)
+      console.error(' blockIp error:', error?.message || error)
       throw error
     }
   }
@@ -641,7 +626,7 @@ export class ApiService {
       const response: AxiosResponse<ApiResponse<any>> = await this.api.delete(`/security/blocked-ips/${ipAddress}`)
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] unblockIp error:', error?.message || error)
+      console.error(' unblockIp error:', error?.message || error)
       throw error
     }
   }
@@ -655,7 +640,7 @@ export class ApiService {
       const response: AxiosResponse<ApiResponse<any[]>> = await this.api.post('/security/auto-block', config || {})
       return response.data
     } catch (error: any) {
-      console.error('[ApiService] autoBlockSuspiciousIps error:', error?.message || error)
+      console.error(' autoBlockSuspiciousIps error:', error?.message || error)
       throw error
     }
   }
@@ -664,7 +649,7 @@ export class ApiService {
     try {
       await this.api.delete(`/pastas/${pastaId}/arquivos/${arquivoId}`)
     } catch (error: any) {
-      console.error('[ApiService] deletePastaArquivo error:', error?.response?.status, error?.response?.data || error?.message)
+      console.error(' deletePastaArquivo error:', error?.response?.status, error?.response?.data || error?.message)
       throw error
     }
   }

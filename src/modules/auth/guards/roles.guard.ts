@@ -33,7 +33,6 @@ export class RolesGuard implements CanActivate {
       classRef,
     ]);
 
-
     if (!requiredRoles) {
       return true;
     }
@@ -55,7 +54,6 @@ export class RolesGuard implements CanActivate {
       const normalizedRequiredRole = role?.toLowerCase()?.trim();
       return userRoleName === normalizedRequiredRole;
     });
-
 
     if (!hasRole) {
       throw new ForbiddenException(

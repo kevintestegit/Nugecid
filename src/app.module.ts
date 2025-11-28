@@ -29,7 +29,6 @@ import { RegistrosModule } from "./modules/registros/registros.module";
 import { EstatisticasModule } from "./modules/estatisticas/estatisticas.module";
 import { HealthModule } from "./modules/health/health.module";
 import { TarefasModule } from "./modules/tarefas/tarefas.module";
-import { ProjetosModule } from "./modules/projetos/projetos.module";
 import { NotificacoesModule } from "./modules/notificacoes/notificacoes.module";
 import { PastasModule } from "./modules/pastas/pastas.module";
 import { PlanilhasModule } from "./modules/planilhas/planilhas.module";
@@ -37,6 +36,8 @@ import { BackupModule } from "./modules/backup/backup.module";
 import { SecurityModule } from "./modules/security/security.module";
 // import { WebscrapingModule } from "./modules/webscraping/webscraping.module";  // TEMPORARIAMENTE DESABILITADO
 import { AnnouncementsModule } from "./modules/announcements/announcements.module";
+import { VestigiosModule } from "./modules/vestigios/vestigios.module";
+import { EscavadorSeirnModule } from "./modules/escavador-seirn/escavador-seirn.module";
 
 // Guards
 import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
@@ -51,7 +52,7 @@ import { Role } from "./modules/users/entities/role.entity";
 import { Auditoria } from "./modules/audit/entities/auditoria.entity";
 import { DesarquivamentoTypeOrmEntity } from "./modules/nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
 import { Tarefa } from "./modules/tarefas/entities/tarefa.entity";
-import { Projeto } from "./modules/projetos/entities/projeto.entity";
+import { Projeto } from "./modules/tarefas/entities/projeto.entity";
 
 @Module({
   imports: [
@@ -87,14 +88,14 @@ import { Projeto } from "./modules/projetos/entities/projeto.entity";
           return {
             store: redisStore,
             url: redisUrl,
-            ttl: 300, // 5 minutes
+            ttl: 30, // 30 seconds - atualização rápida
             max: 100,
             isGlobal: true,
           };
         }
         // Fallback para cache em memória
         return {
-          ttl: 300,
+          ttl: 30, // 30 seconds - atualização rápida
           max: 100,
           isGlobal: true,
         };
@@ -170,7 +171,6 @@ import { Projeto } from "./modules/projetos/entities/projeto.entity";
     EstatisticasModule,
     HealthModule,
     TarefasModule,
-    ProjetosModule,
     NotificacoesModule,
     PastasModule,
     PlanilhasModule,
@@ -178,6 +178,8 @@ import { Projeto } from "./modules/projetos/entities/projeto.entity";
     SecurityModule,
     // WebscrapingModule,  // TEMPORARIAMENTE DESABILITADO
     AnnouncementsModule,
+    VestigiosModule,
+    EscavadorSeirnModule,
   ],
   controllers: [AppController],
   providers: [AppService],

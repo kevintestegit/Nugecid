@@ -15,6 +15,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { ImportModal } from '@/components/desarquivamentos/ImportModal'
 import { AdminConfirmDialog } from '@/components/ui/AdminConfirmDialog'
 import { toast } from 'sonner'
+import { ErrorState } from '@/components/ui/EmptyState'
 
 interface FilterState {
   search: string
@@ -256,16 +257,17 @@ const ListaDesarquivamentosPage: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center py-12">
-          <div className="text-red-600 mb-4">
-            <Filter className="h-12 w-12 mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Erro ao carregar dados</h3>
-            <p className="text-gray-600 mb-4">
-              Ocorreu um erro ao carregar as solicitações. Tente novamente.
-            </p>
-            <Button onClick={() => refetch()}>Tentar Novamente</Button>
-          </div>
-        </div>
+        <ErrorState
+          description="Ocorreu um erro ao carregar as solicitações de desarquivamento."
+          action={{
+            label: 'Tentar novamente',
+            onClick: () => refetch()
+          }}
+          secondaryAction={{
+            label: 'Voltar',
+            onClick: () => window.history.back()
+          }}
+        />
       </div>
     )
   }

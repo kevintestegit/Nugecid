@@ -1,6 +1,7 @@
 #documents
 .trae
 .vercel
+.claude
 
 # Node
 node_modules/

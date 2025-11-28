@@ -6,6 +6,7 @@ import UsuarioFilters from '@/components/usuarios/UsuarioFilters'
 import UsuariosTable from '@/components/usuarios/UsuariosTable'
 import DeleteUserModal from '@/components/usuarios/DeleteUserModal'
 import CreateUserModal from '@/components/usuarios/CreateUserModal'
+import { PageError } from '@/components/ui/ErrorMessage'
 
 const UsuariosPage: React.FC = () => {
   const [queryParams, setQueryParams] = useState<UsersQueryParams>({
@@ -72,25 +73,12 @@ const UsuariosPage: React.FC = () => {
   // Mostra tela de erro somente se houve erro E não há dados de usuários disponíveis.
   if (error && (!usersResponse || !usersResponse.data || usersResponse.data.length === 0)) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="text-red-500 mb-4">
-            <Users className="h-16 w-16 mx-auto" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            Erro ao carregar usuários
-          </h2>
-          <p className="text-gray-600 mb-4">
-            Ocorreu um erro ao carregar a lista de usuários.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      </div>
+      <PageError
+        title="Erro ao carregar usuários"
+        message="Ocorreu um erro ao carregar a lista de usuários. Tente novamente."
+        onRetry={() => refetch()}
+        onGoBack={() => window.history.back()}
+      />
     )
   }
 

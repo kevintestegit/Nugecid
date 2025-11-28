@@ -55,8 +55,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
     // Atualiza a atividade do usuário para cada requisição autenticada
     if (user && user.id) {
-      this.authService.updateUserActivity(user.id).catch((error) => {
-      });
+      this.authService.updateUserActivity(user.id).catch((error) => {});
     }
 
     return user;

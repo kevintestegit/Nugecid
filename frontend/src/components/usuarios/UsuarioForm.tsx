@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Eye, EyeOff, Save, X, User, Lock, Shield } from 'lucide-react'
+import { Save, X, User, Lock, Shield } from 'lucide-react'
 import { CreateUserDto, UpdateUserDto, UserRole } from '@/types'
+import { ValidatedInput } from '@/components/ui/ValidatedInput'
 
 interface UsuarioFormProps {
   initialData?: Partial<UpdateUserDto>
@@ -47,8 +48,6 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
   })
 
   const [errors, setErrors] = useState<FormErrors>({})
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     if (initialData) {
@@ -178,20 +177,27 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             <User className="inline h-4 w-4 mr-1" />
             Nome completo *
           </label>
-          <input
+          <ValidatedInput
             id="nome"
             type="text"
             value={formData.nome}
             onChange={(e) => handleInputChange('nome', e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.nome ? 'border-red-300' : 'border-gray-300'
-            }`}
             placeholder="Digite o nome completo"
             disabled={isLoading}
+            error={errors.nome}
+            showValidation={true}
+            validationRules={[
+              {
+                type: 'required',
+                message: 'Nome é obrigatório'
+              },
+              {
+                type: 'minLength',
+                value: 2,
+                message: 'Nome deve ter pelo menos 2 caracteres'
+              }
+            ]}
           />
-          {errors.nome && (
-            <p className="text-sm text-red-600">{errors.nome}</p>
-          )}
         </div>
 
         {/* Usuario */}
@@ -200,20 +206,36 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             <User className="inline h-4 w-4 mr-1" />
             Usuário *
           </label>
-          <input
+          <ValidatedInput
             id="usuario"
             type="text"
             value={formData.usuario}
             onChange={(e) => handleInputChange('usuario', e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.usuario ? 'border-red-300' : 'border-gray-300'
-            }`}
             placeholder="Digite o nome de usuário"
             disabled={isLoading}
+            error={errors.usuario}
+            showValidation={true}
+            validationRules={[
+              {
+                type: 'required',
+                message: 'Usuário é obrigatório'
+              },
+              {
+                type: 'minLength',
+                value: 3,
+                message: 'Usuário deve ter pelo menos 3 caracteres'
+              },
+              {
+                type: 'maxLength',
+                value: 50,
+                message: 'Usuário deve ter no máximo 50 caracteres'
+              },
+              {
+                type: 'alphanumeric',
+                message: 'Usuário deve conter apenas letras, números, pontos, hífens e underscores'
+              }
+            ]}
           />
-          {errors.usuario && (
-            <p className="text-sm text-red-600">{errors.usuario}</p>
-          )}
         </div>
 
         {/* Matrícula */}
@@ -222,20 +244,32 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             <User className="inline h-4 w-4 mr-1" />
             Matrícula *
           </label>
-          <input
+          <ValidatedInput
             id="matricula"
             type="text"
             value={formData.matricula}
             onChange={(e) => handleInputChange('matricula', e.target.value)}
-            className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-              errors.matricula ? 'border-red-300' : 'border-gray-300'
-            }`}
             placeholder="Informe a matrícula"
             disabled={isLoading}
+            error={errors.matricula}
+            showValidation={true}
+            validationRules={[
+              {
+                type: 'required',
+                message: 'Matrícula é obrigatória'
+              },
+              {
+                type: 'minLength',
+                value: 3,
+                message: 'Matrícula deve ter pelo menos 3 caracteres'
+              },
+              {
+                type: 'maxLength',
+                value: 50,
+                message: 'Matrícula deve ter no máximo 50 caracteres'
+              }
+            ]}
           />
-          {errors.matricula && (
-            <p className="text-sm text-red-600">{errors.matricula}</p>
-          )}
         </div>
 
         {/* Senha */}
@@ -244,29 +278,38 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             <Lock className="inline h-4 w-4 mr-1" />
             Senha {mode === 'create' ? '*' : '(deixe em branco para manter)'}
           </label>
-          <div className="relative">
-            <input
-              id="senha"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.senha}
-              onChange={(e) => handleInputChange('senha', e.target.value)}
-              className={`w-full px-3 py-2 pr-10 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                errors.senha ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder={mode === 'create' ? 'Digite a senha' : 'Nova senha (opcional)'}
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.senha && (
-            <p className="text-sm text-red-600">{errors.senha}</p>
-          )}
+          <ValidatedInput
+            id="senha"
+            type="password"
+            value={formData.senha}
+            onChange={(e) => handleInputChange('senha', e.target.value)}
+            placeholder={mode === 'create' ? 'Digite a senha' : 'Nova senha (opcional)'}
+            disabled={isLoading}
+            error={errors.senha}
+            showValidation={true}
+            showPasswordToggle={true}
+            validationRules={
+              mode === 'create'
+                ? [
+                    {
+                      type: 'required',
+                      message: 'Senha é obrigatória'
+                    },
+                    {
+                      type: 'minLength',
+                      value: 6,
+                      message: 'Senha deve ter pelo menos 6 caracteres'
+                    }
+                  ]
+                : formData.senha ? [
+                    {
+                      type: 'minLength',
+                      value: 6,
+                      message: 'Senha deve ter pelo menos 6 caracteres'
+                    }
+                  ] : []
+            }
+          />
         </div>
 
         {/* Confirmar Senha */}
@@ -275,29 +318,38 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             <Lock className="inline h-4 w-4 mr-1" />
             Confirmar senha {mode === 'create' ? '*' : ''}
           </label>
-          <div className="relative">
-            <input
-              id="confirmSenha"
-              type={showConfirmPassword ? 'text' : 'password'}
-              value={formData.confirmSenha}
-              onChange={(e) => handleInputChange('confirmSenha', e.target.value)}
-              className={`w-full px-3 py-2 pr-10 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-                errors.confirmSenha ? 'border-red-300' : 'border-gray-300'
-              }`}
-              placeholder="Confirme a senha"
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-            >
-              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.confirmSenha && (
-            <p className="text-sm text-red-600">{errors.confirmSenha}</p>
-          )}
+          <ValidatedInput
+            id="confirmSenha"
+            type="password"
+            value={formData.confirmSenha}
+            onChange={(e) => handleInputChange('confirmSenha', e.target.value)}
+            placeholder="Confirme a senha"
+            disabled={isLoading}
+            error={errors.confirmSenha}
+            showValidation={true}
+            showPasswordToggle={true}
+            validationRules={
+              mode === 'create'
+                ? [
+                    {
+                      type: 'required',
+                      message: 'Confirmação de senha é obrigatória'
+                    },
+                    {
+                      type: 'match',
+                      value: formData.senha,
+                      message: 'Senhas não coincidem'
+                    }
+                  ]
+                : formData.senha ? [
+                    {
+                      type: 'match',
+                      value: formData.senha,
+                      message: 'Senhas não coincidem'
+                    }
+                  ] : []
+            }
+          />
         </div>
 
         {/* Papel */}

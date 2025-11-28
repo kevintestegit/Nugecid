@@ -254,7 +254,7 @@ export class AuthController {
       };
 
       this.logger.debug(
-        `[AuthController] Retornando perfil com avatarUrl: ${response.avatarUrl || 'null'}`,
+        `[AuthController] Retornando perfil com avatarUrl: ${response.avatarUrl || "null"}`,
       );
       return response;
     } catch (error) {

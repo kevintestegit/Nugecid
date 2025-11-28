@@ -98,22 +98,22 @@ export class CreateDesarquivamentoDto {
     example: "2025-01-15",
   })
   @Transform(({ value }) => {
-    if (!value) throw new Error('Data de solicitação é obrigatória');
+    if (!value) throw new Error("Data de solicitação é obrigatória");
 
     // Se já for ISO 8601, retorna
-    if (typeof value === 'string' && value.includes('T')) {
+    if (typeof value === "string" && value.includes("T")) {
       return value;
     }
 
     // Se for YYYY-MM-DD, converte para ISO 8601
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z').toISOString();
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z").toISOString();
     }
 
     // Tenta converter qualquer outro formato
     const date = new Date(value);
     if (isNaN(date.getTime())) {
-      throw new Error('Data de solicitação deve estar em formato válido');
+      throw new Error("Data de solicitação deve estar em formato válido");
     }
     return date.toISOString();
   })
@@ -121,7 +121,8 @@ export class CreateDesarquivamentoDto {
   dataSolicitacao: string;
 
   @ApiPropertyOptional({
-    description: "Data do desarquivamento no sistema SAG (aceita YYYY-MM-DD ou ISO 8601)",
+    description:
+      "Data do desarquivamento no sistema SAG (aceita YYYY-MM-DD ou ISO 8601)",
     example: "2025-01-20",
   })
   @IsOptional()
@@ -129,19 +130,21 @@ export class CreateDesarquivamentoDto {
     if (!value) return undefined;
 
     // Se já for ISO 8601, retorna
-    if (typeof value === 'string' && value.includes('T')) {
+    if (typeof value === "string" && value.includes("T")) {
       return value;
     }
 
     // Se for YYYY-MM-DD, converte para ISO 8601
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z').toISOString();
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z").toISOString();
     }
 
     // Tenta converter qualquer outro formato
     const date = new Date(value);
     if (isNaN(date.getTime())) {
-      throw new Error('Data de desarquivamento SAG deve estar em formato válido');
+      throw new Error(
+        "Data de desarquivamento SAG deve estar em formato válido",
+      );
     }
     return date.toISOString();
   })
@@ -156,19 +159,19 @@ export class CreateDesarquivamentoDto {
     if (!value) return undefined;
 
     // Se já for ISO 8601, retorna
-    if (typeof value === 'string' && value.includes('T')) {
+    if (typeof value === "string" && value.includes("T")) {
       return value;
     }
 
     // Se for YYYY-MM-DD, converte para ISO 8601
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z').toISOString();
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z").toISOString();
     }
 
     // Tenta converter qualquer outro formato
     const date = new Date(value);
     if (isNaN(date.getTime())) {
-      throw new Error('Data de devolução deve estar em formato válido');
+      throw new Error("Data de devolução deve estar em formato válido");
     }
     return date.toISOString();
   })

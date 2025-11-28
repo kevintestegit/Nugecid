@@ -1,1 +1,1 @@
-export { AnnouncementsController } from './announcements.controller';
+export { AnnouncementsController } from "./announcements.controller";

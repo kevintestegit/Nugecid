@@ -31,6 +31,9 @@ import {
   Lock,
   Unlock,
   RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { apiService } from '@/services/api';
 import { toast } from 'sonner';
@@ -68,6 +71,7 @@ export const IpMonitoring: React.FC = () => {
   const [selectedIp, setSelectedIp] = useState<IpAccessStat | null>(null);
   const [blockReason, setBlockReason] = useState('');
   const [blockDuration, setBlockDuration] = useState<string>('24');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     loadData();
@@ -150,6 +154,25 @@ export const IpMonitoring: React.FC = () => {
       toast.error('Erro ao executar auto-bloqueio');
     }
   };
+
+  const handleSortByLastAccess = () => {
+    setSortOrder(prevOrder => prevOrder === 'desc' ? 'asc' : 'desc');
+  };
+
+  const sortedIpStats = React.useMemo(() => {
+    const sorted = [...ipStats].sort((a, b) => {
+      const dateA = new Date(a.lastAttempt).getTime();
+      const dateB = new Date(b.lastAttempt).getTime();
+
+      if (sortOrder === 'desc') {
+        return dateB - dateA;
+      } else {
+        return dateA - dateB;
+      }
+    });
+
+    return sorted;
+  }, [ipStats, sortOrder]);
 
   const getThreatLevel = (stat: IpAccessStat): 'high' | 'medium' | 'low' => {
     const failureRate = stat.failedLogins / stat.totalAttempts;
@@ -259,8 +282,18 @@ export const IpMonitoring: React.FC = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Sucesso / Falha
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Último acesso
+                    <th
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={handleSortByLastAccess}
+                    >
+                      <div className="flex items-center gap-2">
+                        Último acesso
+                        {sortOrder === 'desc' ? (
+                          <ArrowDown className="h-4 w-4" />
+                        ) : (
+                          <ArrowUp className="h-4 w-4" />
+                        )}
+                      </div>
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Risco
@@ -274,7 +307,7 @@ export const IpMonitoring: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {ipStats.slice(0, 20).map((stat) => (
+                  {sortedIpStats.slice(0, 20).map((stat) => (
                     <tr key={stat.ipAddress} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-mono">
                         {stat.ipAddress}
