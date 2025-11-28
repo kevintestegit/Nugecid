@@ -10,11 +10,6 @@ dist/
 build/
 .vite/
 .cache/
-# Env files
-.env
-.env.*
-!.env.example
-.env.example
 # Editor configs
 .vscode/
 .idea/
@@ -27,16 +22,6 @@ yarn-debug.log*
 coverage/
 # OS
 .DS_Store
-# Uploads (binaries/user uploads)
-uploads/
 # TypeScript
 *.tsbuildinfo
-# Lockfiles (optional - uncomment if you want to track one)
-# package-lock.json
-# pnpm-lock.yaml
-# Other
-*.local
-.pnpm-store/
-node_modules
-/backups/*.sql
-/backups/*.tar.gz
+
