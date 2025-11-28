@@ -1,10 +1,12 @@
-import { Module, forwardRef } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { UsersModule } from "../users/users.module";
-import { ProjetosModule } from "../projetos/projetos.module";
 import { AuthModule } from "../auth/auth.module";
 import { NotificacoesModule } from "../notificacoes/notificacoes.module";
 import {
+  Projeto,
+  MembroProjeto,
+  Coluna,
   Tarefa,
   Comentario,
   HistoricoTarefa,
@@ -12,7 +14,6 @@ import {
   Checklist,
   ItemChecklist,
 } from "./entities";
-import { Projeto, MembroProjeto, Coluna } from "../projetos/entities";
 import { User } from "../users/entities/user.entity";
 import {
   ProjetosService,
@@ -43,7 +44,6 @@ import {
       User,
     ]),
     UsersModule,
-    forwardRef(() => ProjetosModule),
     AuthModule,
     NotificacoesModule,
   ],

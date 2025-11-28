@@ -7,13 +7,15 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository, TableColumn } from "typeorm";
-import * as fs from "fs";
+import { promises as fs } from "fs";
+import { existsSync } from "fs";
 import * as path from "path";
 import { v4 as uuidv4 } from "uuid";
 
 import { DesarquivamentoAnexoTypeOrmEntity } from "./infrastructure/entities/desarquivamento-anexo.typeorm-entity";
 import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 import { User } from "../users/entities/user.entity";
+import { FileValidator } from "../../common/utils/file-validator";
 
 @Injectable()
 export class NugecidAnexosService implements OnModuleInit {
@@ -30,14 +32,13 @@ export class NugecidAnexosService implements OnModuleInit {
     @InjectRepository(DesarquivamentoTypeOrmEntity)
     private readonly desarquivamentoRepository: Repository<DesarquivamentoTypeOrmEntity>,
     private readonly dataSource: DataSource,
-  ) {
-    // Criar diretório de uploads se não existir
-    if (!fs.existsSync(this.uploadPath)) {
-      fs.mkdirSync(this.uploadPath, { recursive: true });
-    }
-  }
+  ) {}
 
   async onModuleInit(): Promise<void> {
+    // Criar diretório de uploads se não existir (async)
+    if (!existsSync(this.uploadPath)) {
+      await fs.mkdir(this.uploadPath, { recursive: true });
+    }
     await this.ensureSchema();
   }
 
@@ -87,8 +88,10 @@ export class NugecidAnexosService implements OnModuleInit {
     anexarAoProcesso: boolean = false,
   ): Promise<any> {
     // DEBUG: Log para verificar o valor recebido
-    this.logger.log(`[DEBUG] uploadAnexo - desarquivamentoId: ${desarquivamentoId}, tipoAnexo: ${tipoAnexo}, anexarAoProcesso: ${anexarAoProcesso} (type: ${typeof anexarAoProcesso})`);
-    
+    this.logger.log(
+      `[DEBUG] uploadAnexo - desarquivamentoId: ${desarquivamentoId}, tipoAnexo: ${tipoAnexo}, anexarAoProcesso: ${anexarAoProcesso} (type: ${typeof anexarAoProcesso})`,
+    );
+
     // Verificar se o desarquivamento existe
     const desarquivamento = await this.desarquivamentoRepository.findOne({
       where: { id: desarquivamentoId },
@@ -98,17 +101,20 @@ export class NugecidAnexosService implements OnModuleInit {
       throw new NotFoundException("Desarquivamento não encontrado");
     }
 
-    // Validar tipo de arquivo
+    // Validar tipo de arquivo (tamanho e MIME type básico)
     this.validateFile(file);
+
+    // Validar conteúdo real do arquivo por magic bytes
+    await FileValidator.validateImageOrDocument(file.buffer);
 
     // Gerar nome único para o arquivo
     const fileExtension = path.extname(file.originalname);
     const uniqueFileName = `${uuidv4()}${fileExtension}`;
     const filePath = path.join(this.uploadPath, uniqueFileName);
 
-    // Salvar arquivo no sistema de arquivos
+    // Salvar arquivo no sistema de arquivos (async)
     try {
-      fs.writeFileSync(filePath, file.buffer);
+      await fs.writeFile(filePath, file.buffer);
     } catch (error) {
       this.logger.error("Erro ao salvar arquivo:", error);
       throw new BadRequestException("Erro ao salvar o arquivo");
@@ -195,7 +201,9 @@ export class NugecidAnexosService implements OnModuleInit {
 
     // Anexos do processo (se houver numeroProcesso)
     if (desarquivamento.numeroProcesso) {
-      const whereProcesso: any = { numeroProcesso: desarquivamento.numeroProcesso };
+      const whereProcesso: any = {
+        numeroProcesso: desarquivamento.numeroProcesso,
+      };
       if (tipoAnexo) {
         whereProcesso.tipoAnexo = tipoAnexo;
       }
@@ -249,14 +257,14 @@ export class NugecidAnexosService implements OnModuleInit {
     const anexo = await this.findAnexoById(id);
 
     // Verificar se o arquivo existe
-    if (!fs.existsSync(anexo.caminhoArquivo)) {
+    if (!existsSync(anexo.caminhoArquivo)) {
       throw new NotFoundException(
         "Arquivo não encontrado no sistema de arquivos",
       );
     }
 
     try {
-      const buffer = fs.readFileSync(anexo.caminhoArquivo);
+      const buffer = await fs.readFile(anexo.caminhoArquivo);
       return { buffer, anexo };
     } catch (error) {
       this.logger.error("Erro ao ler arquivo:", error);
@@ -274,10 +282,10 @@ export class NugecidAnexosService implements OnModuleInit {
       );
     }
 
-    // Remover arquivo do sistema de arquivos
+    // Remover arquivo do sistema de arquivos (async)
     try {
-      if (fs.existsSync(anexo.caminhoArquivo)) {
-        fs.unlinkSync(anexo.caminhoArquivo);
+      if (existsSync(anexo.caminhoArquivo)) {
+        await fs.unlink(anexo.caminhoArquivo);
       }
     } catch (error) {
       this.logger.error("Erro ao remover arquivo:", error);

@@ -16,6 +16,9 @@ import {
 import { toast } from 'sonner'
 import { DesarquivamentoAnexo } from '@/hooks/useDesarquivamentosAnexos'
 import { ImageThumbnail } from './ImageThumbnail'
+import { LinearProgress } from '@/components/ui/ProgressBar'
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
+import { NoFilesFound } from '@/components/ui/EmptyState'
 
 interface AnexosSectionProps {
   title: string
@@ -53,6 +56,8 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
   const [anexarAoProcesso, setAnexarAoProcesso] = useState(false)
   const [editingAnexoId, setEditingAnexoId] = useState<number | null>(null)
   const [editDescricao, setEditDescricao] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -66,12 +71,30 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
     if (!selectedFile) return
 
     try {
+      setUploadProgress(0)
+      // Simular progresso
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) return prev
+          return prev + 10
+        })
+      }, 200)
+
       await onUpload(selectedFile, fileDescricao, anexarAoProcesso)
-      setSelectedFile(null)
-      setFileDescricao('')
-      setAnexarAoProcesso(false)
+
+      clearInterval(progressInterval)
+      setUploadProgress(100)
+
+      setTimeout(() => {
+        setSelectedFile(null)
+        setFileDescricao('')
+        setAnexarAoProcesso(false)
+        setUploadProgress(0)
+      }, 1000)
+
       toast.success('Anexo enviado com sucesso!')
     } catch (error: any) {
+      setUploadProgress(0)
       const message =
         error?.response?.data?.message ||
         error?.message ||
@@ -80,11 +103,16 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
     }
   }
 
-  const handleDelete = async (anexoId: number) => {
-    if (!confirm('Deseja realmente excluir este anexo?')) return
+  const handleDeleteClick = (anexoId: number) => {
+    setDeleteAnexoId(anexoId)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteAnexoId) return
 
     try {
-      await onDelete(anexoId)
+      await onDelete(deleteAnexoId)
+      setDeleteAnexoId(null)
       toast.success('Anexo excluído com sucesso!')
     } catch (error: any) {
       const message =
@@ -197,6 +225,21 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                       </Label>
                     </div>
                   )}
+
+                  {/* Progress bar */}
+                  {isUploading && uploadProgress > 0 && (
+                    <div className="space-y-2">
+                      <LinearProgress
+                        value={uploadProgress}
+                        label={selectedFile.name}
+                        showLabel={true}
+                        animated={uploadProgress < 100}
+                        variant={uploadProgress === 100 ? 'success' : 'default'}
+                        size="sm"
+                      />
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <button
                       onClick={handleUpload}
@@ -210,7 +253,8 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                         setSelectedFile(null)
                         setFileDescricao('')
                       }}
-                      className="px-3 py-2 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                      disabled={isUploading}
+                      className="px-3 py-2 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
                     >
                       Cancelar
                     </button>
@@ -228,9 +272,10 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
               <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
             </div>
           ) : anexos.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-6">
-              Nenhum anexo encontrado.
-            </p>
+            <NoFilesFound
+              description="Nenhum anexo foi adicionado ainda."
+              variant="compact"
+            />
           ) : (
             anexos.map((anexo) => (
               <div
@@ -330,7 +375,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     </button>
                     {canEdit && (
                       <button
-                        onClick={() => handleDelete(anexo.id)}
+                        onClick={() => handleDeleteClick(anexo.id)}
                         className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
                         title="Excluir"
                       >
@@ -343,6 +388,23 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
             ))
           )}
         </div>
+
+        {/* Confirm Delete Dialog */}
+        <EnhancedConfirmDialog
+          isOpen={deleteAnexoId !== null}
+          onClose={() => setDeleteAnexoId(null)}
+          onConfirm={handleConfirmDelete}
+          title="Excluir anexo"
+          description="Tem certeza que deseja excluir este anexo?"
+          variant="danger"
+          confirmationType="checkbox"
+          checkboxLabel="Sim, quero excluir este anexo permanentemente"
+          warningList={[
+            'O anexo será removido permanentemente',
+            'Esta ação não pode ser desfeita',
+            'O arquivo será apagado do servidor'
+          ]}
+        />
       </CardContent>
     </Card>
   )

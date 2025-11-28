@@ -5,15 +5,17 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Loading } from '../components/ui/Loading';
+import { SkeletonCard } from '../components/ui/Skeleton';
 import { Alert } from '../components/ui/Alert';
 import { Input } from '../components/ui/Input';
 import { Label } from '../components/ui/Label';
 import { Textarea } from '../components/ui/Textarea';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/AlertDialog';
-import { 
-  Plus, 
-  Calendar, 
-  Users, 
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
+import {
+  Plus,
+  Calendar,
+  Users,
   MoreVertical,
   Edit,
   Trash2,
@@ -71,6 +73,8 @@ const ProjetosPage: React.FC = () => {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [deleteProject, setDeleteProject] = useState<Projeto | null>(null);
+  const [archiveProject, setArchiveProject] = useState<Projeto | null>(null);
 
   // Carregar projetos
   const loadProjetos = async () => {
@@ -199,21 +203,25 @@ const ProjetosPage: React.FC = () => {
     setShowEditModal(false);
     setSelectedProject(null);
   };
-  const handleDeleteProject = async (projeto: Projeto) => {
+  const handleDeleteProject = (projeto: Projeto) => {
     if (!checkPermission('delete', 'projetos')) {
       toast.error('Você não tem permissão para excluir projetos');
       return;
     }
+    setDeleteProject(projeto);
+  };
 
-    if (window.confirm(`Tem certeza que deseja excluir o projeto "${projeto.nome}"? Esta ação não pode ser desfeita.`)) {
-      try {
-        await kanbanService.deleteProjeto(projeto.id);
-        toast.success('Projeto excluído com sucesso');
-        loadProjetos();
-      } catch (error: any) {
-        console.error('Erro ao excluir projeto:', error);
-        toast.error(error.message || 'Erro ao excluir projeto');
-      }
+  const handleConfirmDelete = async () => {
+    if (!deleteProject) return;
+
+    try {
+      await kanbanService.deleteProjeto(deleteProject.id);
+      toast.success('Projeto excluído com sucesso');
+      setDeleteProject(null);
+      loadProjetos();
+    } catch (error: any) {
+      console.error('Erro ao excluir projeto:', error);
+      toast.error(error.message || 'Erro ao excluir projeto');
     }
   };
 
@@ -227,13 +235,17 @@ const ProjetosPage: React.FC = () => {
     }
   };
 
-  const handleArchiveProject = async (projeto: Projeto) => {
+  const handleArchiveProject = (projeto: Projeto) => {
+    setArchiveProject(projeto);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!archiveProject) return;
+
     try {
-      const action = projeto.ativo ? 'arquivar' : 'desarquivar';
-      if (window.confirm(`Tem certeza que deseja ${action} o projeto "${projeto.nome}"?`)) {
-        // Implementar arquivamento quando a API estiver disponível
-        toast.info('Funcionalidade em desenvolvimento');
-      }
+      // Implementar arquivamento quando a API estiver disponível
+      toast.info('Funcionalidade em desenvolvimento');
+      setArchiveProject(null);
     } catch (error: any) {
       console.error('Erro ao arquivar projeto:', error);
       toast.error(error.message || 'Erro ao arquivar projeto');
@@ -262,8 +274,16 @@ const ProjetosPage: React.FC = () => {
 
   if (state.loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loading />
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <div className="h-9 w-48 bg-gray-200 rounded animate-pulse mb-2" />
+          <div className="h-5 w-64 bg-gray-200 rounded animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} showImage={false} lines={4} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -540,9 +560,33 @@ const ProjetosPage: React.FC = () => {
         onClose={handleCloseEditModal}
         onSubmit={handleUpdateProjectSubmit}
       />
-      {/* Modais - serão implementados posteriormente */}
-      {/* CreateProjectModal */}
-      {/* EditProjectModal */}
+
+      {/* Enhanced Confirm Dialogs */}
+      <EnhancedConfirmDialog
+        isOpen={deleteProject !== null}
+        onClose={() => setDeleteProject(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir projeto"
+        description={`Tem certeza que deseja excluir o projeto "${deleteProject?.nome}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir este projeto permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Todas as tarefas do projeto serão perdidas',
+          'Os membros perderão acesso ao projeto'
+        ]}
+      />
+
+      <EnhancedConfirmDialog
+        isOpen={archiveProject !== null}
+        onClose={() => setArchiveProject(null)}
+        onConfirm={handleConfirmArchive}
+        title={archiveProject?.ativo ? 'Arquivar projeto' : 'Desarquivar projeto'}
+        description={`Tem certeza que deseja ${archiveProject?.ativo ? 'arquivar' : 'desarquivar'} o projeto "${archiveProject?.nome}"?`}
+        variant="warning"
+        confirmationType="none"
+      />
     </div>
   );
 };

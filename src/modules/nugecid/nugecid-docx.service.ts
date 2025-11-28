@@ -5,14 +5,14 @@ import {
   InternalServerErrorException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import HTMLToDOCX from "html-to-docx";
 import { Repository } from "typeorm";
 
 import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 import {
-  buildTermoTemplateHtml,
-  loadTermoTemplateLogos,
-} from "./templates/termo-desarquivamento-template";
+  generateDesarquivamentoDocx,
+  DesarquivamentoDocxData,
+  DesarquivamentoDocxItem,
+} from "./templates/termo-desarquivamento-docx.template";
 
 export interface TermoDesarquivamentoDocxOptions {
   incluirObservacoes?: boolean;
@@ -42,28 +42,39 @@ export class NugecidDocxService {
       );
     }
 
-    const html = buildTermoTemplateHtml({
-      base: baseEntity,
-      itens: somenteDesarquivados,
-      logos: loadTermoTemplateLogos(this.logger),
+    // Preparar dados para o template DOCX
+    const now = new Date();
+    const dataAssinatura = now.toLocaleDateString("pt-BR");
+    const horaAssinatura = now.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
 
+    const docxData: DesarquivamentoDocxData = {
+      numeroProcesso: baseEntity.numeroProcesso || "",
+      itens: somenteDesarquivados.map(
+        (item): DesarquivamentoDocxItem => ({
+          numeroSolicitacao: item.numeroSolicitacao,
+          tipoDocumento: item.tipoDocumento || "",
+          nomeCompleto: item.nomeCompleto || "",
+          numeroNicLaudoAuto: item.numeroNicLaudoAuto || "",
+        }),
+      ),
+      dataRetirada: dataAssinatura,
+      userName: "Servidor NUGECID",
+      dataAssinatura,
+      horaAssinatura,
+    };
+
     try {
-      const buffer = await HTMLToDOCX(html, undefined, undefined, {
-        table: { row: { cantSplit: true } },
-        footer: true,
-        recursiveList: true,
-      });
+      const buffer = await generateDesarquivamentoDocx(docxData, this.logger);
 
       this.logger.log(
-        `Gerado termo DOCX para processo ${baseEntity.numeroProcesso} com ${itensElegiveis.length} item(s).`,
+        `Gerado termo DOCX nativo para processo ${baseEntity.numeroProcesso} com ${somenteDesarquivados.length} item(s).`,
       );
       return buffer;
     } catch (error) {
-      this.logger.error(
-        "Erro ao gerar termo DOCX via template HTML.",
-        error as Error,
-      );
+      this.logger.error("Erro ao gerar termo DOCX nativo.", error as Error);
       throw new InternalServerErrorException(
         "Não foi possível gerar o termo de desarquivamento em DOCX. Tente novamente mais tarde.",
       );

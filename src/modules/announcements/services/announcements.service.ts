@@ -2,12 +2,18 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, IsNull, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { SystemAnnouncement, AnnouncementViewed } from '../entities';
-import { CreateAnnouncementDto, UpdateAnnouncementDto } from '../dto';
-import { User } from '../../users/entities/user.entity';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import {
+  Repository,
+  Not,
+  IsNull,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+} from "typeorm";
+import { SystemAnnouncement, AnnouncementViewed } from "../entities";
+import { CreateAnnouncementDto, UpdateAnnouncementDto } from "../dto";
+import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class AnnouncementsService {
@@ -33,7 +39,7 @@ export class AnnouncementsService {
 
     if (endDate <= startDate) {
       throw new BadRequestException(
-        'A data de fim deve ser posterior à data de início',
+        "A data de fim deve ser posterior à data de início",
       );
     }
 
@@ -53,12 +59,12 @@ export class AnnouncementsService {
    */
   async findAll(includeInactive = false): Promise<SystemAnnouncement[]> {
     const queryBuilder = this.announcementRepository
-      .createQueryBuilder('announcement')
-      .leftJoinAndSelect('announcement.createdBy', 'createdBy')
-      .orderBy('announcement.startDate', 'DESC');
+      .createQueryBuilder("announcement")
+      .leftJoinAndSelect("announcement.createdBy", "createdBy")
+      .orderBy("announcement.startDate", "DESC");
 
     if (!includeInactive) {
-      queryBuilder.andWhere('announcement.active = :active', { active: true });
+      queryBuilder.andWhere("announcement.active = :active", { active: true });
     }
 
     return queryBuilder.getMany();
@@ -70,11 +76,11 @@ export class AnnouncementsService {
   async findOne(id: number): Promise<SystemAnnouncement> {
     const announcement = await this.announcementRepository.findOne({
       where: { id },
-      relations: ['createdBy'],
+      relations: ["createdBy"],
     });
 
     if (!announcement) {
-      throw new NotFoundException('Aviso não encontrado');
+      throw new NotFoundException("Aviso não encontrado");
     }
 
     return announcement;
@@ -100,7 +106,7 @@ export class AnnouncementsService {
 
       if (endDate <= startDate) {
         throw new BadRequestException(
-          'A data de fim deve ser posterior à data de início',
+          "A data de fim deve ser posterior à data de início",
         );
       }
 
@@ -131,23 +137,23 @@ export class AnnouncementsService {
   async findActiveForUser(userId: number): Promise<SystemAnnouncement[]> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['role'],
+      relations: ["role"],
     });
 
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException("Usuário não encontrado");
     }
 
     const now = new Date();
 
     // Buscar avisos ativos no período
     const announcements = await this.announcementRepository
-      .createQueryBuilder('announcement')
-      .where('announcement.active = :active', { active: true })
-      .andWhere('announcement.startDate <= :now', { now })
-      .andWhere('announcement.endDate >= :now', { now })
-      .orderBy('announcement.priority', 'DESC')
-      .addOrderBy('announcement.startDate', 'DESC')
+      .createQueryBuilder("announcement")
+      .where("announcement.active = :active", { active: true })
+      .andWhere("announcement.startDate <= :now", { now })
+      .andWhere("announcement.endDate >= :now", { now })
+      .orderBy("announcement.priority", "DESC")
+      .addOrderBy("announcement.startDate", "DESC")
       .getMany();
 
     // Filtrar por role e visualizações
@@ -215,8 +221,8 @@ export class AnnouncementsService {
 
     const viewedBy = await this.viewedRepository.find({
       where: { announcementId },
-      relations: ['user'],
-      order: { viewedAt: 'DESC' },
+      relations: ["user"],
+      order: { viewedAt: "DESC" },
     });
 
     return {

@@ -44,6 +44,7 @@ import { usePastas, Pasta, CreatePastaInput } from '@/hooks/usePastas';
 import { usePlanilhasControle } from '@/hooks/usePlanilhasControle';
 import { toast } from 'sonner';
 import { SpreadsheetPreview } from '@/components/ui/SpreadsheetPreview';
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
 
 interface Caixa {
   id: string;
@@ -96,6 +97,8 @@ const ArquivoPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pastas' | 'planilhas' | 'caixas'>(
     'pastas',
   );
+  const [deletePastaId, setDeletePastaId] = useState<string | null>(null);
+  const [deletePlanilhaItem, setDeletePlanilhaItem] = useState<{ id: string; nome: string } | null>(null);
 
   const planilhaInputRef = useRef<HTMLInputElement | null>(null);
   const {
@@ -227,13 +230,21 @@ const ArquivoPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (pastaId: string) => {
-    if (window.confirm('Tem certeza que deseja excluir esta pasta?')) {
-      try {
-        await deletePasta(pastaId);
-      } catch (err) {
-        console.error(err);
-      }
+  const handleDelete = (pastaId: string) => {
+    setDeletePastaId(pastaId);
+  };
+
+  const handleConfirmDeletePasta = async () => {
+    if (!deletePastaId) return;
+
+    try {
+      await deletePasta(deletePastaId);
+      toast.success('Pasta excluída com sucesso!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Não foi possível excluir a pasta.');
+    } finally {
+      setDeletePastaId(null);
     }
   };
 
@@ -260,24 +271,22 @@ const ArquivoPage: React.FC = () => {
     }
   };
 
-  const handleDeletePlanilha = async (planilhaId: string) => {
-    if (!planilhaId) {
-      return;
-    }
+  const handleDeletePlanilha = (planilhaId: string, planilhaNome: string) => {
+    if (!planilhaId) return;
+    setDeletePlanilhaItem({ id: planilhaId, nome: planilhaNome });
+  };
 
-    const confirmed = window.confirm(
-      'Tem certeza que deseja remover esta planilha?',
-    );
-    if (!confirmed) {
-      return;
-    }
+  const handleConfirmDeletePlanilha = async () => {
+    if (!deletePlanilhaItem) return;
 
     try {
-      await deletePlanilha(planilhaId);
+      await deletePlanilha(deletePlanilhaItem.id);
       toast.success('Planilha removida com sucesso!');
     } catch (err) {
       console.error(err);
-      toast.error('Nao foi possivel remover a planilha.');
+      toast.error('Não foi possível remover a planilha.');
+    } finally {
+      setDeletePlanilhaItem(null);
     }
   };
 
@@ -902,6 +911,38 @@ const ArquivoPage: React.FC = () => {
         }}
         onSubmit={handleUpdatePasta}
         isSubmitting={isUpdatingPasta}
+      />
+
+      {/* Enhanced Confirm Dialogs */}
+      <EnhancedConfirmDialog
+        isOpen={deletePastaId !== null}
+        onClose={() => setDeletePastaId(null)}
+        onConfirm={handleConfirmDeletePasta}
+        title="Excluir pasta"
+        description="Tem certeza que deseja excluir esta pasta?"
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo excluir esta pasta permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Todos os arquivos da pasta serão perdidos',
+          'Imagens e planilhas serão removidas'
+        ]}
+      />
+
+      <EnhancedConfirmDialog
+        isOpen={deletePlanilhaItem !== null}
+        onClose={() => setDeletePlanilhaItem(null)}
+        onConfirm={handleConfirmDeletePlanilha}
+        title="Remover planilha"
+        description={`Tem certeza que deseja remover a planilha "${deletePlanilhaItem?.nome}"?`}
+        variant="danger"
+        confirmationType="checkbox"
+        checkboxLabel="Sim, desejo remover esta planilha permanentemente"
+        warningList={[
+          'Esta ação não pode ser desfeita',
+          'Os dados da planilha serão perdidos'
+        ]}
       />
     </div>
   );

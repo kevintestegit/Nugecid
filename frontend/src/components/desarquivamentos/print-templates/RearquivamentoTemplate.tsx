@@ -1,6 +1,11 @@
 import brasaorn from '@/components/img/Brasão-RN.png';
 import brasaoitep from '@/components/img/Brasão-ITEP.png';
 
+export interface RearquivamentoItem {
+  numeroNicLaudoAuto: string;
+  descricao?: string;
+}
+
 export interface RearquivamentoData {
   processNumber: string;
   dataHoraRecebimento: string;
@@ -8,6 +13,7 @@ export interface RearquivamentoData {
   matricula: string;
   dataAssinatura: string;
   horaAssinatura: string;
+  itens?: RearquivamentoItem[];
 }
 
 export const generateRearquivamentoHTML = (data: RearquivamentoData): string => {
@@ -16,6 +22,30 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
   
   const logoRN = toAbs(brasaorn);
   const logoITEP = toAbs(brasaoitep);
+
+  const escapeHtml = (value: unknown): string => {
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  // Gerar linhas da tabela com os itens (NIC/Laudo no campo NÚMERO)
+  const itens = data.itens || [];
+  const rowsHtml = itens.length > 0 
+    ? itens.map((item) => `
+    <tr>
+      <td class="fs11" style="height:30pt;">${escapeHtml(item.numeroNicLaudoAuto) || ''}</td>
+      <td class="fs11" style="height:30pt;">${escapeHtml(item.descricao) || ''}</td>
+    </tr>`).join('')
+    : `
+    <tr>
+      <td class="fs11" style="height:30pt;"></td>
+      <td class="fs11" style="height:30pt;"></td>
+    </tr>`;
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -35,9 +65,11 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
       margin: 0;
       padding: 20mm;
       color: #000;
-      min-height: 100vh;
-      position: relative;
     }
+    .hdr-text{
+      font-family: "Liberation Serif", "Times New Roman", serif;
+      font-size: 10pt;
+    }   
     p { margin: 0; }
     .center { text-align: center; }
     .mt-8 { margin-top: 8pt; }
@@ -45,12 +77,15 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
     .mt-24 { margin-top: 24pt; }
     .mb-0 { margin-bottom: 0; }
 
-    .hdr { width: 100%; border-collapse: collapse; margin-bottom: 20pt; }
-    .hdr td { vertical-align: top; }
-    .hdr .logo { width: 95.25pt; text-align: center; }
-    .hdr .miolo { width: 341.25pt; }
-    .hdr .logo-dir { width: 83.25pt; text-align: left; }
-
+    .hdr {
+      width: 100%;
+      border-collapse: collapse;
+      border: 0.75pt solid #000;
+    }
+    .hdr td {
+      vertical-align: top;
+      border: 0.75pt solid #000;
+    }
     h1 { 
       margin: 16pt 0; 
       font-size: 14pt; 
@@ -110,11 +145,25 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
       margin: 4pt 0; 
     }
     .print-footer {
-      position: absolute;
-      bottom: 20mm;
-      left: 20mm;
-      right: 20mm;
+      margin-top: 40pt;
       text-align: center;
+    }
+
+    /* Cabeçalho institucional repete em todas as páginas */
+    table.documento-completo {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table.documento-completo thead {
+      display: table-header-group;
+    }
+    table.documento-completo tfoot {
+      display: table-footer-group;
+    }
+    table.documento-completo thead td,
+    table.documento-completo tfoot td {
+      border: none;
+      padding: 0;
     }
 
     @media print {
@@ -125,82 +174,95 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
       body {
         margin: 0;
         padding: 10mm;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
       }
       .faixa {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      .print-footer {
-        margin-top: auto;
-        padding-top: 20pt;
+      /* Garante que o cabeçalho e rodapé repitam em cada página */
+      table.documento-completo thead {
+        display: table-header-group;
+      }
+      table.documento-completo tfoot {
+        display: table-footer-group;
       }
     }
   </style>
 </head>
 <body>
-  <table class="hdr">
-    <tr>
-      <td class="logo">
-        <img src="${logoRN}" alt="Brasão RN" style="width:80px;height:auto;" />
-      </td>
-      <td class="miolo">
-        <p class="center fs11 mb-0"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong></p>
-        <p class="center fs11 mb-0"><strong>SECRETARIA DE ESTADO DA SEGURANÇA PÚBLICA E DA DEFESA SOCIAL</strong></p>
-        <p class="center fs11 mb-0"><strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong></p>
-        <p class="center fs11 mt-8"><strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
-      </td>
-      <td class="logo-dir">
-        <img src="${logoITEP}" alt="Brasão ITEP" style="width:80px;height:auto;" />
-      </td>
-    </tr>
+  <table class="documento-completo">
+    <thead>
+      <tr>
+        <td>
+          <table class="hdr">
+            <tr>
+              <td class="logo">
+                <img src="${logoRN}" alt="Brasão RN" height="100" />
+              </td>
+              <td class="miolo">
+                <p class="center hdr-text mb-0"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong></p>
+                <p class="center hdr-text mb-0"><strong>SECRETARIA DE ESTADO DA SEGURANÇA PÚBLICA E DA DEFESA SOCIAL</strong></p>
+                <p class="center hdr-text mb-0"><strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong></p>
+                <p class="center hdr-text mt-8"><strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
+                <p class="center hdr-text mt-8"><strong>SETOR DE ARQUIVO GERAL - SAG</strong></p>
+              </td>
+              <td class="logo-dir">
+                <img src="${logoITEP}" alt="Brasão ITEP" height="100" />
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </thead>
+    <tfoot>
+      <tr>
+        <td>
+          <div class="print-footer fs10 center">
+            <hr style="border: none; border-top: 1px solid #000; margin-bottom: 10pt;" />
+            <div class="rodape fs10 center" style="line-height: 1.3;">
+              <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
+              <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
+              <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
+              <p>Email: arquivogeral@pci.rn.gov.br</p>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </tfoot>
+    <tbody>
+      <tr>
+        <td>
+          <table class="borda">
+            <tr>
+              <td class="fs11 center" colspan="2"><strong>PROTOCOLO DE REARQUIVAMENTO DE DOCUMENTO</strong></td>
+            </tr>
+            <tr>
+              <td class="faixa fs11" style="width:50%;"><strong>NÚMERO:</strong></td>
+              <td class="faixa fs11" style="width:50%;"><strong>DESCRIÇÃO:</strong></td>
+            </tr>
+            ${rowsHtml}
+          </table>
+
+          <div class="mt-24">
+            <p class="fs11"><strong>DATA:</strong> ${escapeHtml(data.dataAssinatura)}</p>
+          </div>
+
+          <div class="mt-24" style="display: flex; justify-content: space-between; gap: 40px;">
+            <div style="flex: 1; text-align: center;">
+              <div style="border-bottom: 1px solid #000; margin: 60pt 20pt 5pt 20pt;"></div>
+              <p class="fs10">NUGECID - PCIRN</p>
+              <p class="fs10">Assinatura do responsável</p>
+            </div>
+            <div style="flex: 1; text-align: center;">
+              <div style="border-bottom: 1px solid #000; margin: 60pt 20pt 5pt 20pt;"></div>
+              <p class="fs10">X-Solution Tecnologia da Informação</p>
+              <p class="fs10">Assinatura do responsável</p>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
   </table>
-
-
-  <table class="borda">
-    <tr>
-      <td class="fs11 center" colspan="2"><strong>PROTOCOLO DE REARQUIVAMENTO DE DOCUMENTO</strong></td>
-    </tr>
-    <tr>
-      <td class="faixa fs11" style="width:50%;"><strong>NÚMERO:</strong></td>
-      <td class="faixa fs11" style="width:50%;"><strong>DESCRIÇÃO:</strong></td>
-    </tr>
-    <tr>
-      <td class="fs11" style="height:30pt;"></td>
-      <td class="fs11" style="height:30pt;"></td>
-    </tr>
-  </table>
-
-  <div class="mt-24">
-    <p class="fs11"><strong>DATA:</strong> <span style="border-bottom: 1px solid #000; display: inline-block; width: 200px; margin-left: 10px;"></span></p>
-  </div>
-
-  <div class="mt-24" style="display: flex; justify-content: space-between; gap: 40px;">
-    <div style="flex: 1; text-align: center;">
-      <div style="border-bottom: 1px solid #000; margin: 60pt 20pt 5pt 20pt;"></div>
-      <p class="fs10">NUGECID - PCIRN</p>
-      <p class="fs10">Assinatura do responsável</p>
-    </div>
-    <div style="flex: 1; text-align: center;">
-      <div style="border-bottom: 1px solid #000; margin: 60pt 20pt 5pt 20pt;"></div>
-      <p class="fs10">X-Solution Tecnologia da Informação</p>
-      <p class="fs10">Assinatura do responsável</p>
-    </div>
-  </div>
-
-  <footer class="print-footer fs10 center">
-    <hr style="border: none; border-top: 1px solid #000; margin-bottom: 10pt;" />
-    <!-- Rodapé -->
-      <div class="rodape fs10 center" style="line-height: 1.3;">
-      <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
-      <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
-      <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
-      <p>Email: arquivogeral@pci.rn.gov.br</p>
-      </div>
-    </footer>
-
 </body>
 </html>`;
 };

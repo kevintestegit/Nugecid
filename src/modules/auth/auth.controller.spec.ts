@@ -11,6 +11,11 @@ import { Role } from "../users/entities/role.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
 import { LoginDto } from "./dto/login.dto";
 import { LoginV2Response } from "./auth.service";
+import {
+  TEST_CREDENTIALS,
+  TEST_TOKENS,
+  TEST_USERS,
+} from "../../common/constants/test.constants";
 
 describe("AuthController", () => {
   let controller: AuthController;
@@ -21,8 +26,8 @@ describe("AuthController", () => {
 
   const mockUser = {
     id: 1,
-    nome: "Test User",
-    usuario: "test@example.com",
+    nome: TEST_USERS.REGULAR.nome,
+    usuario: TEST_USERS.REGULAR.email,
     senha: "hashedPassword",
     ativo: true,
     role: {
@@ -57,7 +62,7 @@ describe("AuthController", () => {
   };
 
   const mockJwtService = {
-    sign: jest.fn().mockReturnValue("mock-jwt-token"),
+    sign: jest.fn().mockReturnValue(TEST_TOKENS.MOCK_JWT_TOKEN),
   };
 
   beforeEach(async () => {
@@ -103,8 +108,8 @@ describe("AuthController", () => {
 
   describe("loginV2", () => {
     const loginDto: LoginDto = {
-      usuario: "testuser",
-      senha: "password123",
+      usuario: TEST_USERS.REGULAR.usuario,
+      senha: TEST_CREDENTIALS.DEFAULT_PASSWORD,
     };
 
     it("should return JWT token with 50m expiration on successful login", async () => {
@@ -112,10 +117,10 @@ describe("AuthController", () => {
       const mockResponse: LoginV2Response = {
         user: {
           userId: 1,
-          usuario: "testuser",
+          usuario: TEST_USERS.REGULAR.usuario,
           role: "user",
         },
-        accessToken: "mock-jwt-token-50m",
+        accessToken: TEST_TOKENS.MOCK_JWT_TOKEN_50M,
         expiresIn: "50m",
       };
       mockAuthService.loginV2.mockResolvedValue(mockResponse);
@@ -180,17 +185,17 @@ describe("AuthController", () => {
 
     it("should call authService.loginV2 with correct parameters", async () => {
       const loginDto: LoginDto = {
-        usuario: "testuser",
-        senha: "password123",
+        usuario: TEST_USERS.REGULAR.usuario,
+        senha: TEST_CREDENTIALS.DEFAULT_PASSWORD,
       };
 
       const mockResponse: LoginV2Response = {
         user: {
           userId: 1,
-          usuario: "testuser",
+          usuario: TEST_USERS.REGULAR.usuario,
           role: "USER",
         },
-        accessToken: "jwt-token",
+        accessToken: TEST_TOKENS.MOCK_JWT_TOKEN,
         expiresIn: "50m",
       };
 
@@ -212,8 +217,8 @@ describe("AuthController", () => {
 
     it("should handle service errors properly", async () => {
       const loginDto: LoginDto = {
-        usuario: "testuser",
-        senha: "wrongpassword",
+        usuario: TEST_USERS.REGULAR.usuario,
+        senha: TEST_CREDENTIALS.INVALID_PASSWORD,
       };
 
       mockAuthService.loginV2.mockRejectedValue(

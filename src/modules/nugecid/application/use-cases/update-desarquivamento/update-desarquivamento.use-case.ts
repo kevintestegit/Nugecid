@@ -205,14 +205,6 @@ export class UpdateDesarquivamentoUseCase {
   ): Promise<DesarquivamentoDomain> {
     // Para a estrutura simplificada, usar métodos do domínio para atualizações
 
-    console.log('[UpdateUseCase] applyUpdates - Campos recebidos:', {
-      dataSolicitacao: request.dataSolicitacao,
-      dataDesarquivamentoSAG: request.dataDesarquivamentoSAG,
-      dataDevolucaoSetor: request.dataDevolucaoSetor,
-      nomeCompleto: request.nomeCompleto,
-      numeroNicLaudoAuto: request.numeroNicLaudoAuto,
-    });
-
     // Atualizar campos básicos (acesso direto aos campos privados via reflection)
     if (request.nomeCompleto !== undefined) {
       (desarquivamento as any)._nomeCompleto = request.nomeCompleto;
@@ -235,15 +227,18 @@ export class UpdateDesarquivamentoUseCase {
     }
 
     if (request.servidorResponsavel !== undefined) {
-      (desarquivamento as any)._servidorResponsavel = request.servidorResponsavel;
+      (desarquivamento as any)._servidorResponsavel =
+        request.servidorResponsavel;
     }
 
     if (request.finalidadeDesarquivamento !== undefined) {
-      (desarquivamento as any)._finalidadeDesarquivamento = request.finalidadeDesarquivamento;
+      (desarquivamento as any)._finalidadeDesarquivamento =
+        request.finalidadeDesarquivamento;
     }
 
     if (request.solicitacaoProrrogacao !== undefined) {
-      (desarquivamento as any)._solicitacaoProrrogacao = request.solicitacaoProrrogacao;
+      (desarquivamento as any)._solicitacaoProrrogacao =
+        request.solicitacaoProrrogacao;
     }
 
     if (request.urgente !== undefined) {
@@ -257,12 +252,10 @@ export class UpdateDesarquivamentoUseCase {
 
     // Definir datas
     if (request.dataSolicitacao !== undefined) {
-      console.log('[UpdateUseCase] Atualizando dataSolicitacao:', request.dataSolicitacao);
       desarquivamento.setDataSolicitacao(new Date(request.dataSolicitacao));
     }
 
     if (request.dataDesarquivamentoSAG !== undefined) {
-      console.log('[UpdateUseCase] Atualizando dataDesarquivamentoSAG:', request.dataDesarquivamentoSAG);
       desarquivamento.setDataDesarquivamentoSAG(
         new Date(request.dataDesarquivamentoSAG),
       );
@@ -270,14 +263,15 @@ export class UpdateDesarquivamentoUseCase {
 
     // Tratar dataDevolucaoSetor: pode ser removida (null/undefined) ou atualizada
     // Verifica explicitamente se o campo está presente no request
-    if ('dataDevolucaoSetor' in request) {
-      if (request.dataDevolucaoSetor === null || request.dataDevolucaoSetor === undefined) {
+    if ("dataDevolucaoSetor" in request) {
+      if (
+        request.dataDevolucaoSetor === null ||
+        request.dataDevolucaoSetor === undefined
+      ) {
         // Se vier null ou undefined, remove a data
-        console.log('[UpdateUseCase] Removendo dataDevolucaoSetor (valor:', request.dataDevolucaoSetor, ')');
         desarquivamento.clearDataDevolucaoSetor();
       } else {
         // Se vier com valor, atualiza a data
-        console.log('[UpdateUseCase] Atualizando dataDevolucaoSetor:', request.dataDevolucaoSetor);
         desarquivamento.setDataDevolucaoSetor(
           new Date(request.dataDevolucaoSetor),
         );
@@ -297,12 +291,6 @@ export class UpdateDesarquivamentoUseCase {
 
       await this.updateStatus(desarquivamento, request.status, isPrivileged);
     }
-
-    console.log('[UpdateUseCase] Desarquivamento após updates:', {
-      dataSolicitacao: desarquivamento.dataSolicitacao,
-      dataDesarquivamentoSAG: desarquivamento.dataDesarquivamentoSAG,
-      dataDevolucaoSetor: desarquivamento.dataDevolucaoSetor,
-    });
 
     return desarquivamento;
   }

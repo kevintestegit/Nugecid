@@ -1,3 +1,5 @@
+import { randomInt } from "crypto";
+
 export class CodigoBarras {
   private readonly _value: string;
   private static readonly PATTERN = /^DES\d{10}$/; // Formato: DES + 10 dígitos
@@ -37,7 +39,7 @@ export class CodigoBarras {
     const year = String(new Date().getFullYear()).slice(-2); // Últimos 2 dígitos do ano
     const month = String(new Date().getMonth() + 1).padStart(2, "0");
     const day = String(new Date().getDate()).padStart(2, "0");
-    const random = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+    const random = String(randomInt(0, 10000)).padStart(4, "0");
 
     const codigo = `DES${year}${month}${day}${random}`; // Total: DES + 10 dígitos
     return new CodigoBarras(codigo);

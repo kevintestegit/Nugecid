@@ -136,16 +136,6 @@ export function useUserPermissions() {
   const canManageUsers = normalizedRole === UserRole.ADMIN
   const canViewUsers = normalizedRole === UserRole.ADMIN || normalizedRole === UserRole.COORDENADOR
 
-  // Debug temporário
-  console.log('🔍 [useUserPermissions] Debug:', {
-    authUser: authUser ? { id: authUser.id, nome: (authUser as any).nome, role: (authUser as any).role } : null,
-    localUser: localUser ? { id: localUser.id, nome: (localUser as any).nome, role: (localUser as any).role } : null,
-    currentUser: currentUser ? { id: currentUser.id, nome: (currentUser as any).nome, role: (currentUser as any).role } : null,
-    normalizedRole,
-    canManageUsers,
-    canViewUsers
-  })
-
   return {
     canManageUsers,
     canViewUsers,

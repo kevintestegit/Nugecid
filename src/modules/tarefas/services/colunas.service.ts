@@ -59,11 +59,18 @@ export class ColunasService {
   }
 
   async findAll(projetoId: number, userId: number): Promise<Coluna[]> {
-    // Verificar se o projeto existe e se o usuário tem acesso
-    const projeto = await this.projetoRepository.findOne({
-      where: { id: projetoId },
-      relations: ["membros"],
-    });
+    // Buscar projeto e colunas em paralelo
+    const [projeto, colunas] = await Promise.all([
+      this.projetoRepository.findOne({
+        where: { id: projetoId },
+        relations: ["membros"],
+      }),
+      this.colunaRepository.find({
+        where: { projetoId },
+        relations: ["tarefas", "tarefas.responsavel"],
+        order: { ordem: "ASC" },
+      }),
+    ]);
 
     if (!projeto) {
       throw new NotFoundException("Projeto não encontrado");
@@ -75,11 +82,7 @@ export class ColunasService {
       );
     }
 
-    return this.colunaRepository.find({
-      where: { projetoId },
-      relations: ["tarefas", "tarefas.responsavel"],
-      order: { ordem: "ASC" },
-    });
+    return colunas;
   }
 
   async findOne(id: number, userId: number): Promise<Coluna> {

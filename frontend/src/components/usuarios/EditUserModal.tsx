@@ -123,6 +123,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ userId, onClose, onSucces
             initialData={{
               nome: user.nome,
               usuario: user.usuario,
+              matricula: user.matricula,
               role: user.role,
               ativo: user.ativo
             }}

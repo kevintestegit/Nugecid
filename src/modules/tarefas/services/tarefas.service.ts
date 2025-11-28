@@ -7,7 +7,7 @@
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, QueryFailedError } from "typeorm";
+import { Repository, QueryFailedError, DataSource } from "typeorm";
 import { NotificacoesService } from "../../notificacoes/services";
 import {
   Tarefa,
@@ -46,25 +46,26 @@ export class TarefasService {
     @InjectRepository(Checklist)
     private readonly checklistRepository: Repository<Checklist>,
     private readonly notificacoesService: NotificacoesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(
     createTarefaDto: CreateTarefaDto,
     criadorId: number,
   ): Promise<Tarefa> {
-    // Verificar se o projeto existe e se o usuÃ¡rio tem acesso
+    // Verificar se o projeto existe e se o usuário tem acesso
     const projeto = await this.projetoRepository.findOne({
       where: { id: createTarefaDto.projetoId },
       relations: ["membros"],
     });
 
     if (!projeto) {
-      throw new NotFoundException("Projeto nÃ£o encontrado");
+      throw new NotFoundException("Projeto não encontrado");
     }
 
     if (!projeto.canUserEdit(criadorId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para criar tarefas neste projeto",
+        "Você não tem permissão para criar tarefas neste projeto",
       );
     }
 
@@ -78,18 +79,18 @@ export class TarefasService {
 
     if (!coluna) {
       throw new NotFoundException(
-        "Coluna nÃ£o encontrada ou nÃ£o pertence ao projeto",
+        "Coluna não encontrada ou não pertence ao projeto",
       );
     }
 
-    // Verificar se o responsÃ¡vel existe e Ã© membro do projeto (se especificado)
+    // Verificar se o responsável existe e é membro do projeto (se especificado)
     if (createTarefaDto.responsavelId) {
       const responsavel = await this.userRepository.findOne({
         where: { id: createTarefaDto.responsavelId },
       });
 
       if (!responsavel) {
-        throw new NotFoundException("ResponsÃ¡vel nÃ£o encontrado");
+        throw new NotFoundException("Responsável não encontrado");
       }
 
       const isMember =
@@ -100,47 +101,56 @@ export class TarefasService {
 
       if (!isMember) {
         throw new BadRequestException(
-          "O responsÃ¡vel deve ser membro do projeto",
+          "O responsável deve ser membro do projeto",
         );
       }
     }
 
-    // Se nÃ£o foi especificada uma ordem, colocar no final da coluna
-    if (!createTarefaDto.ordem) {
-      const lastTarefa = await this.tarefaRepository.findOne({
-        where: { colunaId: createTarefaDto.colunaId },
-        order: { ordem: "DESC" },
-      });
-      createTarefaDto.ordem = lastTarefa ? lastTarefa.ordem + 1 : 1;
-    } else {
-      // Reordenar tarefas existentes se necessÃ¡rio
-      await this.reorderTasks(
-        createTarefaDto.colunaId,
-        createTarefaDto.ordem,
-        "insert",
-      );
-    }
+    // Executar criação dentro de transação
+    const savedTarefa = await this.dataSource.transaction(async (manager) => {
+      // Se não foi especificada uma ordem, colocar no final da coluna
+      if (!createTarefaDto.ordem) {
+        const lastTarefa = await manager.findOne(Tarefa, {
+          where: { colunaId: createTarefaDto.colunaId },
+          order: { ordem: "DESC" },
+        });
+        createTarefaDto.ordem = lastTarefa ? lastTarefa.ordem + 1 : 1;
+      } else {
+        // Reordenar tarefas existentes se necessário
+        await this.reorderTasksWithManager(
+          manager,
+          createTarefaDto.colunaId,
+          createTarefaDto.ordem,
+          "insert",
+        );
+      }
 
-    const tarefa = this.tarefaRepository.create({
-      ...createTarefaDto,
-      criadorId,
+      const tarefa = manager.create(Tarefa, {
+        ...createTarefaDto,
+        criadorId,
+      });
+
+      const saved = await manager.save(tarefa);
+
+      // Criar histórico
+      await this.createHistoryEntryWithManager(
+        manager,
+        saved.id,
+        criadorId,
+        "criacao",
+        "titulo",
+        null,
+        saved.titulo,
+      );
+
+      return saved;
     });
 
-    const savedTarefa = await this.tarefaRepository.save(tarefa);
+    // Notificação fora da transação (pode falhar sem comprometer os dados)
     await this.notificarAtribuicaoTarefa(
       createTarefaDto.responsavelId,
       criadorId,
       savedTarefa.id,
-    );
-
-    // Criar histÃ³rico
-    await this.createHistoryEntry(
-      savedTarefa.id,
-      criadorId,
-      "criacao",
-      "titulo",
-      null,
-      savedTarefa.titulo,
     );
 
     return this.findOne(savedTarefa.id, criadorId);
@@ -368,38 +378,41 @@ export class TarefasService {
   }
 
   async findOne(id: number, userId: number): Promise<Tarefa> {
-    const tarefa = await this.tarefaRepository.findOne({
-      where: { id },
-      relations: [
-        "projeto",
-        "projeto.membros",
-        "coluna",
-        "responsavel",
-        "criador",
-        "anexos",
-      ],
-    });
+    // Otimizado: carregar tarefa e relações complexas em paralelo
+    const [tarefa, comentarios, checklists] = await Promise.all([
+      this.tarefaRepository.findOne({
+        where: { id },
+        relations: [
+          "projeto",
+          "projeto.membros",
+          "coluna",
+          "responsavel",
+          "criador",
+          "anexos",
+        ],
+      }),
+      this.comentarioRepository.find({
+        where: { tarefaId: id },
+        relations: ["autor"],
+        order: { createdAt: "ASC" },
+      }),
+      this.checklistRepository.find({
+        where: { tarefaId: id },
+        relations: ["itens"],
+        order: { createdAt: "ASC" },
+      }),
+    ]);
 
     if (!tarefa) {
-      throw new NotFoundException("Tarefa nÃ£o encontrada");
+      throw new NotFoundException("Tarefa não encontrada");
     }
 
-    // Carregar relaÃ§Ãµes complexas separadamente para evitar erros de alias
-    tarefa.comentarios = await this.comentarioRepository.find({
-      where: { tarefaId: id },
-      relations: ["autor"],
-      order: { createdAt: "ASC" },
-    });
-
-    tarefa.checklists = await this.checklistRepository.find({
-      where: { tarefaId: id },
-      relations: ["itens"],
-      order: { createdAt: "ASC" },
-    });
+    tarefa.comentarios = comentarios;
+    tarefa.checklists = checklists;
 
     if (!tarefa.projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para acessar esta tarefa",
+        "Você não tem permissão para acessar esta tarefa",
       );
     }
 
@@ -508,14 +521,21 @@ export class TarefasService {
 
     if (!tarefa.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para deletar esta tarefa",
+        "Você não tem permissão para deletar esta tarefa",
       );
     }
 
-    // Reordenar tarefas apÃ³s remoÃ§Ã£o
-    await this.reorderTasks(tarefa.colunaId, tarefa.ordem, "delete");
+    const colunaId = tarefa.colunaId;
+    const ordem = tarefa.ordem;
 
-    await this.tarefaRepository.remove(tarefa);
+    // Executar remoção dentro de transação
+    await this.dataSource.transaction(async (manager) => {
+      // Remover a tarefa
+      await manager.remove(tarefa);
+
+      // Reordenar tarefas após remoção
+      await this.reorderTasksWithManager(manager, colunaId, ordem, "delete");
+    });
   }
 
   async moveTarefa(
@@ -527,7 +547,7 @@ export class TarefasService {
 
     if (!tarefa.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para mover esta tarefa",
+        "Você não tem permissão para mover esta tarefa",
       );
     }
 
@@ -538,95 +558,109 @@ export class TarefasService {
 
     if (!novaColuna) {
       throw new NotFoundException(
-        "Coluna de destino nÃ£o encontrada ou nÃ£o pertence ao projeto",
+        "Coluna de destino não encontrada ou não pertence ao projeto",
       );
     }
 
     const colunaAnterior = tarefa.coluna;
+    const colunaIdAnterior = tarefa.colunaId;
     const ordemAnterior = tarefa.ordem;
 
-    // Se mudou de coluna
-    if (moveTarefaDto.colunaId !== tarefa.colunaId) {
-      // Reordenar tarefas na coluna anterior
-      await this.reorderTasks(tarefa.colunaId, tarefa.ordem, "delete");
-
-      // Definir nova ordem na coluna de destino
-      if (!moveTarefaDto.ordem) {
-        const lastTarefa = await this.tarefaRepository.findOne({
-          where: { colunaId: moveTarefaDto.colunaId },
-          order: { ordem: "DESC" },
-        });
-        moveTarefaDto.ordem = lastTarefa ? lastTarefa.ordem + 1 : 1;
-      } else {
-        await this.reorderTasks(
-          moveTarefaDto.colunaId,
-          moveTarefaDto.ordem,
-          "insert",
+    // Executar movimentação dentro de transação
+    await this.dataSource.transaction(async (manager) => {
+      // Se mudou de coluna
+      if (moveTarefaDto.colunaId !== tarefa.colunaId) {
+        // Reordenar tarefas na coluna anterior
+        await this.reorderTasksWithManager(
+          manager,
+          tarefa.colunaId,
+          tarefa.ordem,
+          "delete",
         );
+
+        // Definir nova ordem na coluna de destino
+        if (!moveTarefaDto.ordem) {
+          const lastTarefa = await manager.findOne(Tarefa, {
+            where: { colunaId: moveTarefaDto.colunaId },
+            order: { ordem: "DESC" },
+          });
+          moveTarefaDto.ordem = lastTarefa ? lastTarefa.ordem + 1 : 1;
+        } else {
+          await this.reorderTasksWithManager(
+            manager,
+            moveTarefaDto.colunaId,
+            moveTarefaDto.ordem,
+            "insert",
+          );
+        }
+
+        tarefa.colunaId = moveTarefaDto.colunaId;
+        tarefa.ordem = moveTarefaDto.ordem;
+      } else if (moveTarefaDto.ordem && moveTarefaDto.ordem !== tarefa.ordem) {
+        // Apenas mudou de ordem na mesma coluna
+        await this.reorderTasksWithManager(
+          manager,
+          tarefa.colunaId,
+          moveTarefaDto.ordem,
+          "update",
+          tarefa.ordem,
+        );
+        tarefa.ordem = moveTarefaDto.ordem;
       }
 
-      tarefa.colunaId = moveTarefaDto.colunaId;
-      tarefa.ordem = moveTarefaDto.ordem;
-    } else if (moveTarefaDto.ordem && moveTarefaDto.ordem !== tarefa.ordem) {
-      // Apenas mudou de ordem na mesma coluna
-      await this.reorderTasks(
-        tarefa.colunaId,
-        moveTarefaDto.ordem,
-        "update",
-        tarefa.ordem,
+      // Usar UPDATE SQL direto (TypeORM tem problema com cache)
+      await manager.query(
+        "UPDATE tarefas SET coluna_id = $1, ordem = $2 WHERE id = $3",
+        [tarefa.colunaId, tarefa.ordem, id],
       );
-      tarefa.ordem = moveTarefaDto.ordem;
-    }
 
-    // Usar UPDATE SQL direto (TypeORM tem problema com cache)
-    await this.tarefaRepository.query(
-      "UPDATE tarefas SET coluna_id = $1, ordem = $2 WHERE id = $3",
-      [tarefa.colunaId, tarefa.ordem, id],
-    );
+      // Criar histórico de movimentação
+      if (moveTarefaDto.colunaId !== colunaIdAnterior) {
+        await this.createHistoryEntryWithManager(
+          manager,
+          id,
+          userId,
+          "movimentacao",
+          "coluna",
+          colunaAnterior.nome,
+          novaColuna.nome,
+        );
+      }
+    });
 
-    // Criar histÃ³rico de movimentaÃ§Ã£o
-    if (moveTarefaDto.colunaId !== colunaAnterior.id) {
-      await this.createHistoryEntry(
-        id,
-        userId,
-        "movimentacao",
-        "coluna",
-        colunaAnterior.nome,
-        novaColuna.nome,
-      );
-    }
-
-    // Limpar cache e buscar resultado atualizado
+    // Limpar cache e buscar resultado atualizado com relações em paralelo
     await this.tarefaRepository.manager.connection.queryResultCache?.clear();
 
-    const resultado = await this.tarefaRepository.findOne({
-      where: { id },
-      relations: [
-        "projeto",
-        "projeto.membros",
-        "coluna",
-        "responsavel",
-        "criador",
-        "anexos",
-      ],
-    });
+    const [resultado, comentarios, checklists] = await Promise.all([
+      this.tarefaRepository.findOne({
+        where: { id },
+        relations: [
+          "projeto",
+          "projeto.membros",
+          "coluna",
+          "responsavel",
+          "criador",
+          "anexos",
+        ],
+      }),
+      this.comentarioRepository.find({
+        where: { tarefaId: id },
+        relations: ["autor"],
+        order: { createdAt: "ASC" },
+      }),
+      this.checklistRepository.find({
+        where: { tarefaId: id },
+        relations: ["itens"],
+        order: { createdAt: "ASC" },
+      }),
+    ]);
 
     if (!resultado) {
-      throw new NotFoundException("Tarefa nÃ£o encontrada apÃ³s salvar");
+      throw new NotFoundException("Tarefa não encontrada após salvar");
     }
 
-    // Carregar relaÃ§Ãµes complexas
-    resultado.comentarios = await this.comentarioRepository.find({
-      where: { tarefaId: id },
-      relations: ["autor"],
-      order: { createdAt: "ASC" },
-    });
-
-    resultado.checklists = await this.checklistRepository.find({
-      where: { tarefaId: id },
-      relations: ["itens"],
-      order: { createdAt: "ASC" },
-    });
+    resultado.comentarios = comentarios;
+    resultado.checklists = checklists;
 
     return resultado;
   }
@@ -697,50 +731,63 @@ export class TarefasService {
     operation: "insert" | "update" | "delete",
     currentOrder?: number,
   ): Promise<void> {
-    const tarefas = await this.tarefaRepository.find({
-      where: { colunaId },
-      order: { ordem: "ASC" },
-    });
+    // Usar transação com row-level locking para evitar race conditions
+    await this.dataSource.transaction(async (manager) => {
+      // SELECT ... FOR UPDATE: bloqueia as linhas para garantir atomicidade
+      const tarefas = await manager
+        .createQueryBuilder(Tarefa, "tarefa")
+        .where("tarefa.colunaId = :colunaId", { colunaId })
+        .orderBy("tarefa.ordem", "ASC")
+        .setLock("pessimistic_write") // FOR UPDATE lock
+        .getMany();
 
-    switch (operation) {
-      case "insert":
-        for (const tarefa of tarefas) {
-          if (tarefa.ordem >= targetOrder) {
-            tarefa.ordem += 1;
-            await this.tarefaRepository.save(tarefa);
-          }
-        }
-        break;
+      const tarefasParaAtualizar: Tarefa[] = [];
 
-      case "update":
-        if (!currentOrder) return;
-
-        if (targetOrder > currentOrder) {
+      switch (operation) {
+        case "insert":
           for (const tarefa of tarefas) {
-            if (tarefa.ordem > currentOrder && tarefa.ordem <= targetOrder) {
-              tarefa.ordem -= 1;
-              await this.tarefaRepository.save(tarefa);
-            }
-          }
-        } else {
-          for (const tarefa of tarefas) {
-            if (tarefa.ordem >= targetOrder && tarefa.ordem < currentOrder) {
+            if (tarefa.ordem >= targetOrder) {
               tarefa.ordem += 1;
-              await this.tarefaRepository.save(tarefa);
+              tarefasParaAtualizar.push(tarefa);
             }
           }
-        }
-        break;
+          break;
 
-      case "delete":
-        for (const tarefa of tarefas) {
-          if (tarefa.ordem > targetOrder) {
-            tarefa.ordem -= 1;
-            await this.tarefaRepository.save(tarefa);
+        case "update":
+          if (!currentOrder) return;
+
+          if (targetOrder > currentOrder) {
+            for (const tarefa of tarefas) {
+              if (tarefa.ordem > currentOrder && tarefa.ordem <= targetOrder) {
+                tarefa.ordem -= 1;
+                tarefasParaAtualizar.push(tarefa);
+              }
+            }
+          } else {
+            for (const tarefa of tarefas) {
+              if (tarefa.ordem >= targetOrder && tarefa.ordem < currentOrder) {
+                tarefa.ordem += 1;
+                tarefasParaAtualizar.push(tarefa);
+              }
+            }
           }
-        }
-        break;
-    }
+          break;
+
+        case "delete":
+          for (const tarefa of tarefas) {
+            if (tarefa.ordem > targetOrder) {
+              tarefa.ordem -= 1;
+              tarefasParaAtualizar.push(tarefa);
+            }
+          }
+          break;
+      }
+
+      // Save em batch (uma única query)
+      if (tarefasParaAtualizar.length > 0) {
+        await manager.save(tarefasParaAtualizar);
+      }
+    });
   }
 
   private async createHistoryEntry(
@@ -761,6 +808,93 @@ export class TarefasService {
     });
 
     await this.historicoRepository.save(historico);
+  }
+
+  // Versão com EntityManager para uso em transações
+  private async createHistoryEntryWithManager(
+    manager: any,
+    tarefaId: number,
+    usuarioId: number,
+    acao: string,
+    campoAlterado?: string,
+    valorAnterior?: string,
+    valorNovo?: string,
+  ): Promise<void> {
+    const historico = manager.create(HistoricoTarefa, {
+      tarefaId,
+      usuarioId,
+      acao,
+      campoAlterado,
+      valorAnterior,
+      valorNovo,
+    });
+
+    await manager.save(historico);
+  }
+
+  // Versão com EntityManager para uso em transações
+  private async reorderTasksWithManager(
+    manager: any,
+    colunaId: number,
+    targetOrder: number,
+    operation: "insert" | "update" | "delete",
+    currentOrder?: number,
+  ): Promise<void> {
+    // SELECT ... FOR UPDATE: bloqueia as linhas para garantir atomicidade
+    // Evita race conditions quando múltiplos usuários movem tarefas simultaneamente
+    const tarefas = await manager
+      .createQueryBuilder(Tarefa, "tarefa")
+      .where("tarefa.colunaId = :colunaId", { colunaId })
+      .orderBy("tarefa.ordem", "ASC")
+      .setLock("pessimistic_write") // FOR UPDATE lock
+      .getMany();
+
+    const tarefasParaAtualizar: Tarefa[] = [];
+
+    switch (operation) {
+      case "insert":
+        for (const tarefa of tarefas) {
+          if (tarefa.ordem >= targetOrder) {
+            tarefa.ordem += 1;
+            tarefasParaAtualizar.push(tarefa);
+          }
+        }
+        break;
+
+      case "update":
+        if (!currentOrder) return;
+
+        if (targetOrder > currentOrder) {
+          for (const tarefa of tarefas) {
+            if (tarefa.ordem > currentOrder && tarefa.ordem <= targetOrder) {
+              tarefa.ordem -= 1;
+              tarefasParaAtualizar.push(tarefa);
+            }
+          }
+        } else {
+          for (const tarefa of tarefas) {
+            if (tarefa.ordem >= targetOrder && tarefa.ordem < currentOrder) {
+              tarefa.ordem += 1;
+              tarefasParaAtualizar.push(tarefa);
+            }
+          }
+        }
+        break;
+
+      case "delete":
+        for (const tarefa of tarefas) {
+          if (tarefa.ordem > targetOrder) {
+            tarefa.ordem -= 1;
+            tarefasParaAtualizar.push(tarefa);
+          }
+        }
+        break;
+    }
+
+    // Save em batch (uma única query)
+    if (tarefasParaAtualizar.length > 0) {
+      await manager.save(tarefasParaAtualizar);
+    }
   }
 
   async getTarefasAtrasadas(
@@ -801,38 +935,41 @@ export class TarefasService {
       throw new ForbiddenException("Acesso negado ao projeto");
     }
 
-    const [total, concluidas, emAndamento, atrasadas, porPrioridade] =
-      await Promise.all([
-        this.tarefaRepository.count({ where: { projetoId } }),
-        this.tarefaRepository
-          .createQueryBuilder("tarefa")
-          .leftJoin("tarefa.coluna", "coluna")
-          .where("tarefa.projetoId = :projetoId", { projetoId })
-          .andWhere("coluna.nome = :concluido", { concluido: "ConcluÃ­do" })
-          .getCount(),
-        this.tarefaRepository
-          .createQueryBuilder("tarefa")
-          .leftJoin("tarefa.coluna", "coluna")
-          .where("tarefa.projetoId = :projetoId", { projetoId })
-          .andWhere("coluna.nome = :emAndamento", {
-            emAndamento: "Em Andamento",
-          })
-          .getCount(),
-        this.tarefaRepository
-          .createQueryBuilder("tarefa")
-          .leftJoin("tarefa.coluna", "coluna")
-          .where("tarefa.projetoId = :projetoId", { projetoId })
-          .andWhere("tarefa.prazo < :hoje", { hoje: new Date() })
-          .andWhere("coluna.nome != :concluido", { concluido: "ConcluÃ­do" })
-          .getCount(),
-        this.tarefaRepository
-          .createQueryBuilder("tarefa")
-          .select("tarefa.prioridade", "prioridade")
-          .addSelect("COUNT(*)", "count")
-          .where("tarefa.projetoId = :projetoId", { projetoId })
-          .groupBy("tarefa.prioridade")
-          .getRawMany(),
-      ]);
+    const hoje = new Date();
+
+    // Otimização: Uma única query com agregações
+    const stats = await this.tarefaRepository
+      .createQueryBuilder("tarefa")
+      .leftJoin("tarefa.coluna", "coluna")
+      .select("COUNT(*)", "total")
+      .addSelect(
+        `SUM(CASE WHEN coluna.nome = 'Concluído' THEN 1 ELSE 0 END)`,
+        "concluidas",
+      )
+      .addSelect(
+        `SUM(CASE WHEN coluna.nome = 'Em Andamento' THEN 1 ELSE 0 END)`,
+        "emAndamento",
+      )
+      .addSelect(
+        `SUM(CASE WHEN tarefa.prazo < :hoje AND coluna.nome != 'Concluído' THEN 1 ELSE 0 END)`,
+        "atrasadas",
+      )
+      .where("tarefa.projetoId = :projetoId", { projetoId, hoje })
+      .getRawOne();
+
+    // Query separada apenas para prioridades (agregação diferente)
+    const porPrioridade = await this.tarefaRepository
+      .createQueryBuilder("tarefa")
+      .select("tarefa.prioridade", "prioridade")
+      .addSelect("COUNT(*)", "count")
+      .where("tarefa.projetoId = :projetoId", { projetoId })
+      .groupBy("tarefa.prioridade")
+      .getRawMany();
+
+    const total = parseInt(stats.total) || 0;
+    const concluidas = parseInt(stats.concluidas) || 0;
+    const emAndamento = parseInt(stats.emAndamento) || 0;
+    const atrasadas = parseInt(stats.atrasadas) || 0;
 
     return {
       total,
@@ -913,33 +1050,42 @@ export class TarefasService {
 
     if (!tarefa.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para arquivar esta tarefa",
+        "Você não tem permissão para arquivar esta tarefa",
       );
     }
 
-    // Encontrar ou criar coluna "Arquivadas"
-    let colunaArquivadas = await this.colunaRepository.findOne({
-      where: { projetoId: tarefa.projetoId, nome: "Arquivadas" },
+    // Executar arquivamento dentro de transação
+    let colunaArquivadasId: number;
+
+    await this.dataSource.transaction(async (manager) => {
+      // Encontrar ou criar coluna "Arquivadas"
+      let colunaArquivadas = await manager.findOne(Coluna, {
+        where: { projetoId: tarefa.projetoId, nome: "Arquivadas" },
+      });
+
+      if (!colunaArquivadas) {
+        const ultimaOrdem = await manager
+          .createQueryBuilder(Coluna, "coluna")
+          .where("coluna.projetoId = :projetoId", {
+            projetoId: tarefa.projetoId,
+          })
+          .orderBy("coluna.ordem", "DESC")
+          .getOne();
+
+        colunaArquivadas = manager.create(Coluna, {
+          projetoId: tarefa.projetoId,
+          nome: "Arquivadas",
+          ordem: ultimaOrdem ? ultimaOrdem.ordem + 1 : 1,
+        });
+        colunaArquivadas = await manager.save(colunaArquivadas);
+      }
+
+      colunaArquivadasId = colunaArquivadas.id;
     });
 
-    if (!colunaArquivadas) {
-      const ultimaOrdem = await this.colunaRepository
-        .createQueryBuilder("coluna")
-        .where("coluna.projetoId = :projetoId", { projetoId: tarefa.projetoId })
-        .orderBy("coluna.ordem", "DESC")
-        .getOne();
-
-      colunaArquivadas = this.colunaRepository.create({
-        projetoId: tarefa.projetoId,
-        nome: "Arquivadas",
-        ordem: ultimaOrdem ? ultimaOrdem.ordem + 1 : 1,
-      });
-      await this.colunaRepository.save(colunaArquivadas);
-    }
-
-    // Mover tarefa para coluna arquivadas
+    // Mover tarefa para coluna arquivadas (moveTarefa já tem sua própria transação)
     const moveTarefaDto: MoveTarefaDto = {
-      colunaId: colunaArquivadas.id,
+      colunaId: colunaArquivadasId,
     };
 
     return this.moveTarefa(id, moveTarefaDto, userId);

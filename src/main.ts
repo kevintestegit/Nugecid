@@ -69,19 +69,56 @@ async function bootstrap() {
     }),
   );
 
-  const rateLimitConfig = configService.get("app.security.rateLimit");
-  app.use(
+  // Helper para criar rate limiters
+  const createRateLimiter = (
+    max: number,
+    message: string,
+    windowMs = 15 * 60 * 1000,
+  ) =>
     rateLimit({
-      windowMs: rateLimitConfig.windowMs,
-      max: rateLimitConfig.max,
+      windowMs,
+      max,
       message: {
         error: "Too Many Requests",
-        message: "Muitas requisições deste IP, tente novamente mais tarde.",
+        message,
         statusCode: 429,
       },
       standardHeaders: true,
       legacyHeaders: false,
-    }),
+    });
+
+  // Rate limit geral para todas as rotas da API (aumentado para uploads)
+  app.use(
+    "/api/",
+    createRateLimiter(
+      1000,
+      "Muitas requisições deste IP. Aguarde 15 minutos e tente novamente.",
+    ),
+  );
+
+  // Rate limit específico para upload de arquivos (mais permissivo)
+  app.use(
+    "/api/pastas/*/arquivos",
+    createRateLimiter(
+      500,
+      "Muitas tentativas de upload. Aguarde antes de tentar novamente.",
+      5 * 60 * 1000, // 5 minutos
+    ),
+  );
+
+  // Rate limit específico para login (mais restritivo)
+  app.use(
+    "/api/auth/login",
+    createRateLimiter(
+      20,
+      "Muitas tentativas de login. Por segurança, aguarde 15 minutos antes de tentar novamente.",
+    ),
+  );
+
+  // Rate limit para registro de usuários
+  app.use(
+    "/api/auth/register",
+    createRateLimiter(10, "Muitas tentativas de registro. Aguarde 15 minutos."),
   );
 
   app.use(compression());

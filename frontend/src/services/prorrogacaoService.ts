@@ -177,10 +177,8 @@ class ProrrogacaoService {
       timestamp: new Date().toISOString()
     })
     
-    // Simular possível erro (5% de chance)
-    if (Math.random() < 0.05) {
-      throw new Error('Erro simulado na API')
-    }
+    // Simulação de erro removida por segurança
+    // Em produção, erros reais serão tratados adequadamente
   }
 
   /**

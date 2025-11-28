@@ -59,12 +59,12 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
       link: '/desarquivamentos'
     },
     {
-      title: 'Necessitam Atenção',
+      title: 'Atenção necessária',
       value: data?.pendentes || 0,
       icon: Clock,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50 dark:bg-yellow-950/30',
-      borderColor: 'border-l-yellow-500',
+      color: 'text-red-600',
+      bgColor: 'bg-red-50 dark:bg-red-950/30',
+      borderColor: 'border-l-red-500',
       tendencia: tendenciaPendentes,
       destaque: (data?.pendentes || 0) > 0,
       link: `/desarquivamentos?status=${StatusDesarquivamento.SOLICITADO}`
@@ -107,7 +107,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
                 className={cn(
                   "hover:shadow-lg transition-all duration-200 border-l-4 cursor-pointer",
                   stat.borderColor,
-                  stat.destaque && "ring-2 ring-yellow-200 shadow-lg"
+                  stat.destaque && "ring-2 ring-red-200 shadow-lg"
                 )}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -143,12 +143,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
                     {stat.tendencia.tipo === 'baixa' && `↘️ ${stat.tendencia.porcentagem}% em relação ao mês anterior`}
                     {stat.tendencia.tipo === 'neutro' && '→ Sem mudanças significativas'}
                   </p>
-                  
-                  {stat.destaque && stat.value > 0 && (
-                    <Badge variant="destructive" className="mt-2">
-                      Atenção necessária
-                    </Badge>
-                  )}
+
                   {stat.destaque && stat.value === 0 && (
                     <p className="text-sm text-green-600 dark:text-green-400 mt-2 font-medium">
                       ✓ Tudo em dia

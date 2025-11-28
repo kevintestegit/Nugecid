@@ -93,7 +93,8 @@ export class Desarquivamento {
   numeroNicLaudoAuto: string;
 
   @ApiProperty({
-    description: "Número extraído automaticamente do NIC/LAUDO/AUTO (4+ dígitos)",
+    description:
+      "Número extraído automaticamente do NIC/LAUDO/AUTO (4+ dígitos)",
     example: "146040",
   })
   @Column({
@@ -265,11 +266,11 @@ export class Desarquivamento {
     if (!value) return null;
 
     // Remove pontos, vírgulas, traços e espaços para facilitar busca
-    const cleaned = value.replace(/[.,\-\s]/g, '');
-    
+    const cleaned = value.replace(/[.,\-\s]/g, "");
+
     // Busca por sequências de 4 ou mais dígitos
     const match = cleaned.match(/\d{4,}/);
-    
+
     return match ? match[0] : null;
   }
 

@@ -10,11 +10,15 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { apiService } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
+import { ErrorState, EmptyFolder } from '@/components/ui/EmptyState';
+import { TableLoading } from '@/components/ui/Loading';
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
 
 const LixeiraPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const limit = 10;
   const navigate = useNavigate();
+  const [deleteItem, setDeleteItem] = useState<Desarquivamento | null>(null);
 
   const {
     data: lixeiraData,
@@ -24,29 +28,31 @@ const LixeiraPage: React.FC = () => {
   } = useDesarquivamentosLixeira({ page, limit });
 
   const restoreDesarquivamento = useRestoreDesarquivamento();
-  const handlePermanentDelete = async (desarquivamento: Desarquivamento) => {
+
+  const handleDeleteClick = (desarquivamento: Desarquivamento) => {
+    setDeleteItem(desarquivamento);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteItem) return;
+
     try {
-      const ok = window.confirm(`Excluir permanentemente o registro ${desarquivamento.numeroProcesso}? Esta ação é irreversível.`)
-      if (!ok) return
-
       // Chama endpoint de exclusão permanente (requer role ADMIN)
-      await apiService.deleteDesarquivamentoPermanente(desarquivamento.id)
+      await apiService.deleteDesarquivamentoPermanente(deleteItem.id);
 
-      toast.success('Desarquivamento excluído permanentemente')
-      refetch()
+      toast.success('Desarquivamento excluído permanentemente');
+      setDeleteItem(null);
+      refetch();
     } catch (error) {
-      console.error('Erro ao excluir permanentemente:', error)
-      toast.error('Erro ao excluir permanentemente. Verifique permissões.')
+      console.error('Erro ao excluir permanentemente:', error);
+      toast.error('Erro ao excluir permanentemente. Verifique permissões.');
     }
-  }
+  };
 
   const handleRestore = async (desarquivamento: Desarquivamento) => {
     try {
-      console.log('🔄 Iniciando restauração do desarquivamento:', desarquivamento.id);
-
       // Validar se o ID é válido
       if (!desarquivamento.id || desarquivamento.id <= 0) {
-        console.error('❌ ID inválido:', desarquivamento.id);
         toast.error('ID do desarquivamento é inválido.');
         return;
       }
@@ -54,12 +60,10 @@ const LixeiraPage: React.FC = () => {
       await restoreDesarquivamento.mutateAsync(desarquivamento.id);
 
       toast.success(`Desarquivamento "${desarquivamento.numeroProcesso}" restaurado com sucesso!`);
-      console.log('✅ Desarquivamento restaurado com sucesso:', desarquivamento.id);
 
       // Forçar atualização da lista
       refetch();
     } catch (error) {
-      console.error('❌ Erro ao restaurar desarquivamento:', error);
       toast.error('Erro ao restaurar desarquivamento. Tente novamente.');
     }
   };
@@ -95,9 +99,7 @@ const LixeiraPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Carregando itens da lixeira...</div>
-        </div>
+        <TableLoading />
       </div>
     );
   }
@@ -105,15 +107,17 @@ const LixeiraPage: React.FC = () => {
   if (error) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <div className="text-lg text-red-600">Erro ao carregar lixeira</div>
-            <Button onClick={() => refetch()} className="mt-4">
-              Tentar novamente
-            </Button>
-          </div>
-        </div>
+        <ErrorState
+          description="Erro ao carregar itens da lixeira."
+          action={{
+            label: 'Tentar novamente',
+            onClick: () => refetch()
+          }}
+          secondaryAction={{
+            label: 'Voltar',
+            onClick: () => navigate('/desarquivamentos')
+          }}
+        />
       </div>
     );
   }
@@ -149,15 +153,13 @@ const LixeiraPage: React.FC = () => {
       </div>
 
       {desarquivamentos.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Trash2 className="h-16 w-16 text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">Lixeira vazia</h3>
-            <p className="text-gray-500 text-center">
-              Não há itens excluídos para exibir.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyFolder
+          description="Não há itens excluídos para exibir."
+          action={{
+            label: 'Voltar para desarquivamentos',
+            onClick: () => navigate('/desarquivamentos')
+          }}
+        />
       ) : (
         <div className="space-y-4">
           {desarquivamentos.map((desarquivamento) => (
@@ -189,7 +191,7 @@ const LixeiraPage: React.FC = () => {
                     {restoreDesarquivamento.isPending ? 'Restaurando...' : 'Restaurar'}
                   </Button>
                   <Button
-                    onClick={() => handlePermanentDelete(desarquivamento)}
+                    onClick={() => handleDeleteClick(desarquivamento)}
                     size="sm"
                     variant="destructive"
                     className="ml-2"
@@ -269,6 +271,24 @@ const LixeiraPage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Enhanced Confirm Dialog */}
+      <EnhancedConfirmDialog
+        isOpen={deleteItem !== null}
+        onClose={() => setDeleteItem(null)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir permanentemente"
+        description={`Tem certeza que deseja excluir permanentemente o processo ${deleteItem?.numeroProcesso}?`}
+        variant="danger"
+        confirmationType="text"
+        confirmationKeyword="EXCLUIR"
+        warningList={[
+          'Esta ação é IRREVERSÍVEL',
+          'O registro será removido permanentemente do banco de dados',
+          'Todos os anexos e histórico serão perdidos',
+          'Não será possível recuperar este item'
+        ]}
+      />
     </div>
   );
 };

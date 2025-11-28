@@ -24,7 +24,9 @@ import {
   SelectValue
 } from '@/components/ui/Select'
 import { Checkbox } from '@/components/ui/Checkbox'
-import { Copy, Printer } from 'lucide-react'
+import { Copy, Printer, Database, CheckCircle } from 'lucide-react'
+import { toast } from '@/lib/toast'
+import { api } from '@/services/api'
 
 const QR_CODE_TARGET_URL = 'http://10.9.233.136:3001/custodia'
 
@@ -240,7 +242,7 @@ const cduClasses: CduClass[] = [
           { code: '903.14', label: 'perfurante' },
           { code: '903.15', label: 'traçante' },
           { code: '903.16', label: 'fragmentável' },
-
+  
           { code: '903.2', label: 'Projéteis deformados' },
           { code: '903.21', label: 'expandido' },
           { code: '903.22', label: 'achatado' },
@@ -412,6 +414,8 @@ const CustodiaBalistica: React.FC = () => {
   const [facetDescriptions, setFacetDescriptions] = useState<Record<string, string>>({})
   const [referenceMonth, setReferenceMonth] = useState<string>(getInitialMonthValue)
   const [copied, setCopied] = useState<boolean>(false)
+  const [saving, setSaving] = useState<boolean>(false)
+  const [saved, setSaved] = useState<boolean>(false)
 
   const selectedClass = useMemo(
     () => cduClasses.find(cduClass => cduClass.code === mainClass),
@@ -466,6 +470,12 @@ const CustodiaBalistica: React.FC = () => {
     const timeout = setTimeout(() => setCopied(false), 2000)
     return () => clearTimeout(timeout)
   }, [copied])
+
+  useEffect(() => {
+    if (!saved) return
+    const timeout = setTimeout(() => setSaved(false), 3000)
+    return () => clearTimeout(timeout)
+  }, [saved])
 
   const handleToggleFacet = useCallback((facet: CduFacet, checked: boolean) => {
     setSelectedFacets(prev => {
@@ -647,6 +657,77 @@ const CustodiaBalistica: React.FC = () => {
     `)
     printWindow.document.close()
   }, [labelPreview])
+
+  const handleSaveToDatabase = useCallback(async () => {
+    if (!labelPreview || !classificationCode) {
+      toast.error('Erro', 'Preencha os campos necessários antes de salvar')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const payload = {
+        codigoScv: classificationCode,
+        classePrincipal: mainClass,
+        grupoCodigo: groupCode || null,
+        subdivisaoCodigo: subdivisionCode || null,
+        facetas: selectedFacets,
+        facetasDescricoes: facetDescriptions,
+        numeroVestigio: vestigioNumber || null,
+        numeroCaso: casoNumber || null,
+        categoria: categoria || null,
+        delegacia: delegacia || null,
+        mesReferencia: referenceMonth || null,
+        etiquetaCompleta: labelPreview,
+        status: 'ativo',
+      }
+
+      await api.post('/vestigios', payload)
+
+      setSaved(true)
+      toast.success('Sucesso', 'Vestígio salvo no banco de dados com sucesso!')
+      
+      // Limpar o formulário após 1.5 segundos para dar tempo de ver a mensagem de sucesso
+      setTimeout(() => {
+        // Resetar campos de número
+        setVestigioNumber('')
+        setCasoNumber('')
+        
+        // Resetar seleções
+        setMainClass('')
+        setGroupCode('')
+        setSubdivisionCode('')
+        setSelectedFacets([])
+        setFacetDescriptions({})
+        
+        // Resetar categoria e delegacia (manter referenceMonth para facilitar)
+        setCategoria('')
+        setDelegacia('')
+        
+        // Resetar estado de salvamento
+        setSaved(false)
+      }, 1500)
+    } catch (error: any) {
+      console.error('Erro ao salvar vestígio:', error)
+      toast.error('Erro ao salvar', error.response?.data?.message || 'Não foi possível salvar o vestígio')
+    } finally {
+      setSaving(false)
+    }
+  }, [
+    labelPreview,
+    classificationCode,
+    mainClass,
+    groupCode,
+    subdivisionCode,
+    selectedFacets,
+    facetDescriptions,
+    vestigioNumber,
+    casoNumber,
+    categoria,
+    delegacia,
+    referenceMonth,
+  ])
 
   const referenceSuffixPreview = monthSuffix ? `-${monthSuffix}` : ''
 
@@ -951,6 +1032,32 @@ const CustodiaBalistica: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={handleSaveToDatabase}
+                disabled={!labelPreview || saving || saved}
+                className="w-full md:w-auto"
+              >
+                {saving ? (
+                  <>
+                    <Database className="mr-2 h-4 w-4 animate-pulse" />
+                    Salvando...
+                  </>
+                ) : saved ? (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Salvo com sucesso!
+                  </>
+                ) : (
+                  <>
+                    <Database className="mr-2 h-4 w-4" />
+                    Inserir no Banco de Vestígios
+                  </>
+                )}
+              </Button>
             </div>
 
             <ul className="space-y-1 pl-4 text-xs text-muted-foreground">

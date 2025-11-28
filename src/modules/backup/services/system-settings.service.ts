@@ -1,8 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SystemSettings } from '../entities/system-settings.entity';
-import { UpdateSystemSettingsDto } from '../dto/update-system-settings.dto';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { SystemSettings } from "../entities/system-settings.entity";
+import { UpdateSystemSettingsDto } from "../dto/update-system-settings.dto";
 
 @Injectable()
 export class SystemSettingsService {
@@ -25,13 +25,13 @@ export class SystemSettingsService {
     if (!settings) {
       settings = this.systemSettingsRepository.create({
         autoBackup: true,
-        backupFrequency: 'daily',
-        logLevel: 'info',
+        backupFrequency: "daily",
+        logLevel: "info",
         maintenanceMode: false,
         cacheEnabled: true,
       });
       settings = await this.systemSettingsRepository.save(settings);
-      this.logger.log('Configurações do sistema criadas com valores padrão');
+      this.logger.log("Configurações do sistema criadas com valores padrão");
     }
 
     return settings;
@@ -40,7 +40,9 @@ export class SystemSettingsService {
   /**
    * Atualiza as configurações do sistema
    */
-  async updateSettings(updateDto: UpdateSystemSettingsDto): Promise<SystemSettings> {
+  async updateSettings(
+    updateDto: UpdateSystemSettingsDto,
+  ): Promise<SystemSettings> {
     const settings = await this.getSettings();
 
     // Atualiza apenas os campos fornecidos
@@ -48,8 +50,8 @@ export class SystemSettingsService {
 
     const updatedSettings = await this.systemSettingsRepository.save(settings);
 
-    this.logger.log('Configurações do sistema atualizadas');
-    this.logger.debug('Novas configurações:', updatedSettings);
+    this.logger.log("Configurações do sistema atualizadas");
+    this.logger.debug("Novas configurações:", updatedSettings);
 
     return updatedSettings;
   }
@@ -61,14 +63,14 @@ export class SystemSettingsService {
     const settings = await this.getSettings();
 
     settings.autoBackup = true;
-    settings.backupFrequency = 'daily';
-    settings.logLevel = 'info';
+    settings.backupFrequency = "daily";
+    settings.logLevel = "info";
     settings.maintenanceMode = false;
     settings.cacheEnabled = true;
 
     const resetSettings = await this.systemSettingsRepository.save(settings);
 
-    this.logger.log('Configurações do sistema resetadas para valores padrão');
+    this.logger.log("Configurações do sistema resetadas para valores padrão");
 
     return resetSettings;
   }

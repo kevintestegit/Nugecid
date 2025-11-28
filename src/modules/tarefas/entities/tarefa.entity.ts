@@ -10,7 +10,7 @@ import {
 } from "typeorm";
 
 import { User } from "../../users/entities/user.entity";
-import { Projeto } from "../../projetos/entities/projeto.entity";
+import { Projeto } from "./projeto.entity";
 import { Coluna } from "./coluna.entity";
 import { Comentario } from "./comentario.entity";
 import { Anexo } from "./anexo.entity";

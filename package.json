@@ -71,6 +71,7 @@
     "docx": "^9.5.1",
     "express-rate-limit": "^7.1.5",
     "express-session": "^1.17.3",
+    "file-type": "^21.1.0",
     "helmet": "^7.1.0",
     "html-to-docx": "^1.8.0",
     "html-to-pdfmake": "^2.5.32",

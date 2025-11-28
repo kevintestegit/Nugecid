@@ -335,10 +335,12 @@ export class PlanilhasService {
   }
 
   private async carregarPlanilhaControleFallback(): Promise<PlanilhaGeralResumo | null> {
-    const registro = await this.planilhasRepository.findOne({
+    const registros = await this.planilhasRepository.find({
       order: { dataUpload: "DESC" },
+      take: 1,
     });
 
+    const registro = registros[0];
     if (!registro) {
       return null;
     }
@@ -417,9 +419,7 @@ export class PlanilhasService {
         if (headerRow.includes(coluna)) {
           const idx = headerRow.indexOf(coluna);
           linha[coluna] =
-            row[idx] !== undefined && row[idx] !== null
-              ? String(row[idx])
-              : "";
+            row[idx] !== undefined && row[idx] !== null ? String(row[idx]) : "";
         } else {
           linha[coluna] = "";
         }
@@ -431,7 +431,8 @@ export class PlanilhasService {
           String(row[headerRow.indexOf(pastaColumn)])) ||
         "";
       linha.Pasta = pastaValor || registro.nomeOriginal || "Planilha Geral";
-      linha.Planilha = linha.Planilha || registro.nomeOriginal || "Planilha Geral";
+      linha.Planilha =
+        linha.Planilha || registro.nomeOriginal || "Planilha Geral";
       linha.Linha = (headerIndex + 1 + index).toString();
 
       return linha;

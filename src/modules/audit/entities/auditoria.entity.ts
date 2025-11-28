@@ -73,7 +73,7 @@ export class Auditoria {
   timestamp: Date;
 
   // Relacionamentos
-  @ManyToOne(() => User, (user) => user.auditorias, { eager: true })
+  @ManyToOne(() => User, (user) => user.auditorias, { eager: false })
   @JoinColumn({ name: "user_id" })
   user: User;
 

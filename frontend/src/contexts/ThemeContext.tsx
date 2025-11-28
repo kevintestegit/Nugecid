@@ -11,6 +11,7 @@ import React, {
 import { useOptionalAuth } from '@/contexts/AuthContext'
 import { apiService } from '@/services/api'
 
+
 type Theme = 'light' | 'dark'
 
 interface ThemeContextType {

@@ -1,23 +1,28 @@
 import { registerAs } from "@nestjs/config";
 import * as crypto from "crypto";
 
-function validateSecret(secret: string | undefined, secretName: string): string {
+function validateSecret(
+  secret: string | undefined,
+  secretName: string,
+): string {
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
       throw new Error(
         `${secretName} must be set in production environment. ` +
-        `Generate a strong secret using: openssl rand -hex 32`
+          `Generate a strong secret using: openssl rand -hex 32`,
       );
     }
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString("hex");
   }
 
-  if (secret.includes("change-in-production") || 
-      secret.includes("change-me") ||
-      secret.includes("replace-with")) {
+  if (
+    secret.includes("change-in-production") ||
+    secret.includes("change-me") ||
+    secret.includes("replace-with")
+  ) {
     throw new Error(
       `${secretName} is using a default/placeholder value! ` +
-      `This is not secure.`
+        `This is not secure.`,
     );
   }
 
@@ -30,12 +35,15 @@ function validateSecret(secret: string | undefined, secretName: string): string 
 
 export default registerAs("auth", () => {
   const nodeEnv = process.env.NODE_ENV || "development";
-  
+
   return {
     jwt: {
       secret: validateSecret(process.env.JWT_SECRET, "JWT_SECRET"),
       expiresIn: process.env.JWT_EXPIRES_IN || "50m",
-      refreshSecret: validateSecret(process.env.JWT_REFRESH_SECRET, "JWT_REFRESH_SECRET"),
+      refreshSecret: validateSecret(
+        process.env.JWT_REFRESH_SECRET,
+        "JWT_REFRESH_SECRET",
+      ),
       refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
     },
     session: {

@@ -6,8 +6,8 @@ import {
   CardHeader,
   CardTitle,
   Button,
-  Switch,
   Badge,
+  Switch,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -27,7 +27,10 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import backupService, { BackupListItem } from '@/services/backupService';
+import escavadorService, { EscavadorStatus } from '@/services/escavadorService';
 import { toast } from 'sonner';
+import { LinearProgress, MultiStepProgress } from '@/components/ui/ProgressBar';
+import { ErrorMessage, getErrorMessage } from '@/components/ui/ErrorMessage';
 
 export const SystemSettings: React.FC = () => {
   const [systemConfig, setSystemConfig] = useState({
@@ -40,6 +43,7 @@ export const SystemSettings: React.FC = () => {
 
   // Estados para backup
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [backupProgress, setBackupProgress] = useState(0);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -47,11 +51,21 @@ export const SystemSettings: React.FC = () => {
   const [availableBackups, setAvailableBackups] = useState<BackupListItem[]>([]);
   const [selectedBackup, setSelectedBackup] = useState<BackupListItem | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreSteps, setRestoreSteps] = useState([
+    { label: 'Preparação', description: 'Validando backup', status: 'pending' as const },
+    { label: 'Banco de Dados', description: 'Restaurando dados', status: 'pending' as const },
+    { label: 'Arquivos', description: 'Restaurando uploads', status: 'pending' as const },
+    { label: 'Finalização', description: 'Concluindo operação', status: 'pending' as const },
+  ]);
   const [confirmationText, setConfirmationText] = useState('');
+  const [backupError, setBackupError] = useState<any>(null);
+  const [escavadorStatus, setEscavadorStatus] = useState<EscavadorStatus | null>(null);
+  const [isLoadingEscavador, setIsLoadingEscavador] = useState(false);
 
   // Carregar configurações ao montar o componente
   useEffect(() => {
     loadSettings();
+    loadEscavadorStatus();
   }, []);
 
   // Carregar configurações do backend
@@ -72,6 +86,18 @@ export const SystemSettings: React.FC = () => {
       });
     } finally {
       setIsLoadingSettings(false);
+    }
+  };
+
+  const loadEscavadorStatus = async () => {
+    setIsLoadingEscavador(true);
+    try {
+      const status = await escavadorService.getStatus();
+      setEscavadorStatus(status);
+    } catch (error: any) {
+      console.error('Erro ao carregar escavador:', error);
+    } finally {
+      setIsLoadingEscavador(false);
     }
   };
 
@@ -114,21 +140,43 @@ export const SystemSettings: React.FC = () => {
   // Criar backup completo
   const handleCreateBackup = async () => {
     setIsCreatingBackup(true);
+    setBackupProgress(0);
+    setBackupError(null);
+
     try {
+      // Simular progresso enquanto o backup está sendo criado
+      const progressInterval = setInterval(() => {
+        setBackupProgress(prev => {
+          if (prev >= 90) return prev;
+          return prev + 10;
+        });
+      }, 500);
+
       const result = await backupService.createFullBackup();
-      
+
+      clearInterval(progressInterval);
+      setBackupProgress(100);
+
       if (result.success) {
         toast.success('Backup criado com sucesso!', {
           description: `Arquivo: ${result.filename} (${result.size})`,
           duration: 5000,
         });
+
+        // Resetar progresso após 2 segundos
+        setTimeout(() => {
+          setBackupProgress(0);
+        }, 2000);
       } else {
         throw new Error(result.error || 'Falha ao criar backup');
       }
     } catch (error: any) {
-      toast.error('Erro ao criar backup', {
-        description: error.message,
+      setBackupError(error);
+      const errorInfo = getErrorMessage(error);
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
       });
+      setBackupProgress(0);
     } finally {
       setIsCreatingBackup(false);
     }
@@ -139,6 +187,14 @@ export const SystemSettings: React.FC = () => {
     setShowRestoreDialog(true);
     setConfirmationText('');
     setSelectedBackup(null);
+    setBackupError(null);
+    // Resetar os passos da restauração
+    setRestoreSteps([
+      { label: 'Preparação', description: 'Validando backup', status: 'pending' },
+      { label: 'Banco de Dados', description: 'Restaurando dados', status: 'pending' },
+      { label: 'Arquivos', description: 'Restaurando uploads', status: 'pending' },
+      { label: 'Finalização', description: 'Concluindo operação', status: 'pending' },
+    ]);
     await loadBackups();
   };
 
@@ -155,27 +211,63 @@ export const SystemSettings: React.FC = () => {
     }
 
     setIsRestoring(true);
+    setBackupError(null);
+
+    // Função para atualizar o status de um passo
+    const updateStepStatus = (stepIndex: number, status: 'pending' | 'current' | 'completed' | 'error') => {
+      setRestoreSteps(prev => prev.map((step, idx) =>
+        idx === stepIndex ? { ...step, status } : step
+      ));
+    };
+
     try {
+      // Passo 1: Preparação
+      updateStepStatus(0, 'current');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      updateStepStatus(0, 'completed');
+
+      // Passo 2: Banco de Dados
+      updateStepStatus(1, 'current');
       const result = await backupService.restoreBackup(selectedBackup.filename);
-      
-      if (result.success) {
-        toast.success('Backup restaurado com sucesso!', {
-          description: 'A aplicação será recarregada em 3 segundos...',
-          duration: 3000,
-        });
-        
-        // Recarregar a página após 3 segundos
-        setTimeout(() => {
-          window.location.reload();
-        }, 3000);
-        
-        setShowRestoreDialog(false);
-      } else {
+
+      if (!result.success) {
         throw new Error(result.error || 'Falha ao restaurar backup');
       }
+
+      updateStepStatus(1, 'completed');
+
+      // Passo 3: Arquivos
+      updateStepStatus(2, 'current');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      updateStepStatus(2, 'completed');
+
+      // Passo 4: Finalização
+      updateStepStatus(3, 'current');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      updateStepStatus(3, 'completed');
+
+      toast.success('Backup restaurado com sucesso!', {
+        description: 'A aplicação será recarregada em 3 segundos...',
+        duration: 3000,
+      });
+
+      // Recarregar a página após 3 segundos
+      setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+
+      setShowRestoreDialog(false);
     } catch (error: any) {
-      toast.error('Erro ao restaurar backup', {
-        description: error.message,
+      // Marcar o passo atual como erro
+      const currentStepIndex = restoreSteps.findIndex(step => step.status === 'current');
+      if (currentStepIndex >= 0) {
+        updateStepStatus(currentStepIndex, 'error');
+      }
+
+      setBackupError(error);
+      const errorInfo = getErrorMessage(error);
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
       });
     } finally {
       setIsRestoring(false);
@@ -233,28 +325,54 @@ export const SystemSettings: React.FC = () => {
             </select>
           </div>
           
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={handleCreateBackup}
-              disabled={isCreatingBackup}
-            >
-              {isCreatingBackup ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              {isCreatingBackup ? 'Criando backup...' : 'Fazer Backup Agora'}
-            </Button>
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={handleOpenRestoreDialog}
-            >
-              <Upload className="h-4 w-4" />
-              Restaurar Backup
-            </Button>
+          <div className="space-y-4">
+            {/* Progress Bar para Backup */}
+            {isCreatingBackup && backupProgress > 0 && (
+              <div className="space-y-2">
+                <LinearProgress
+                  value={backupProgress}
+                  label="Criando backup"
+                  showLabel={true}
+                  animated={backupProgress < 100}
+                  variant={backupProgress === 100 ? 'success' : 'default'}
+                />
+              </div>
+            )}
+
+            {/* Mensagem de erro */}
+            {backupError && !isCreatingBackup && (
+              <ErrorMessage
+                {...getErrorMessage(backupError)}
+                severity="error"
+                dismissible={true}
+                onDismiss={() => setBackupError(null)}
+              />
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={handleCreateBackup}
+                disabled={isCreatingBackup}
+              >
+                {isCreatingBackup ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                {isCreatingBackup ? 'Criando backup...' : 'Fazer Backup Agora'}
+              </Button>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={handleOpenRestoreDialog}
+                disabled={isCreatingBackup}
+              >
+                <Upload className="h-4 w-4" />
+                Restaurar Backup
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -333,6 +451,51 @@ export const SystemSettings: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Escavador SEIRN */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div>
+            <CardTitle className="text-lg">Escavador SEIRN</CardTitle>
+            <CardDescription>Monitora “Recebidos” no SEI e gera notificações internas.</CardDescription>
+          </div>
+          <Badge variant={escavadorStatus?.running ? 'success' : 'secondary'}>
+            {escavadorStatus?.running ? 'Rodando' : 'Parado'}
+          </Badge>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={loadEscavadorStatus} disabled={isLoadingEscavador}>
+              {isLoadingEscavador ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Atualizar status
+            </Button>
+            {escavadorStatus?.lastProcess && (
+              <Badge variant="outline">Último: {escavadorStatus.lastProcess}</Badge>
+            )}
+          </div>
+
+          {escavadorStatus?.lastOutput && (
+            <div className="text-sm text-muted-foreground">
+              Última linha: <code>{escavadorStatus.lastOutput}</code>
+            </div>
+          )}
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div><span className="font-semibold">Último processo conhecido:</span> {escavadorStatus?.lastProcess || '—'}</div>
+            {escavadorStatus?.lastTitle && <div><span className="font-semibold">Título:</span> {escavadorStatus.lastTitle}</div>}
+            {escavadorStatus?.lastLink && (
+              <div>
+                <span className="font-semibold">Link:</span>{' '}
+                <a href={escavadorStatus.lastLink} className="text-blue-600 underline" target="_blank" rel="noreferrer">
+                  {escavadorStatus.lastLink}
+                </a>
+              </div>
+            )}
+            {escavadorStatus?.lastChangeAt && (
+              <div>Última mudança: {new Date(escavadorStatus.lastChangeAt).toLocaleString()}</div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Dialog de Restauração */}
       <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
         <DialogContent className="sm:max-w-[600px]">
@@ -400,7 +563,7 @@ export const SystemSettings: React.FC = () => {
             )}
           </div>
 
-          {selectedBackup && (
+          {selectedBackup && !isRestoring && (
             <div className="space-y-2 pt-4 border-t border-border">
               <label htmlFor="confirmation" className="block text-sm font-medium text-foreground">
                 Para confirmar, digite <span className="font-bold text-destructive">CONFIRMAR</span> no campo abaixo:
@@ -413,6 +576,24 @@ export const SystemSettings: React.FC = () => {
                 placeholder="Digite CONFIRMAR"
                 className="w-full px-3 py-2 border border-border bg-background text-foreground rounded-md focus:ring-2 focus:ring-destructive focus:border-destructive"
                 disabled={isRestoring}
+              />
+            </div>
+          )}
+
+          {/* Multi-Step Progress para Restauração */}
+          {isRestoring && (
+            <div className="pt-4 border-t border-border">
+              <MultiStepProgress steps={restoreSteps} />
+            </div>
+          )}
+
+          {/* Mensagem de erro na restauração */}
+          {backupError && isRestoring && (
+            <div className="pt-4 border-t border-border">
+              <ErrorMessage
+                {...getErrorMessage(backupError)}
+                severity="error"
+                dismissible={false}
               />
             </div>
           )}

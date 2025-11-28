@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { BarChart } from '@/components/ui/BarChart';
 import { PieChart } from '@/components/ui/PieChart';
 import { StatsCard } from '@/components/ui/StatsCard';
-import { getCardData, getAtendimentosPorMes, getStatusDistribuicao, CardData, exportRelatorioPdf, exportRelatorioMensalPdf } from '@/services/estatisticasService';
-import { DollarSign, Users, BarChart as BarChartIcon, PieChart as PieChartIcon, Download, Calendar } from 'lucide-react';
+import { getCardData, getRequisicoesPorMes, getStatusDistribuicao, CardData, exportRelatorioPdf, exportRelatorioMensalPdf, FiltrosEstatisticas } from '@/services/estatisticasService';
+import { FileText, BarChart as BarChartIcon, PieChart as PieChartIcon, Download, Calendar, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
 
@@ -20,7 +20,7 @@ interface PieChartData {
 
 export function RelatoriosPage() {
   const [cardData, setCardData] = useState<CardData | null>(null);
-  const [atendimentosPorMes, setAtendimentosPorMes] = useState<BarChartData[]>([]);
+  const [requisicoesPorMes, setRequisicoesPorMes] = useState<BarChartData[]>([]);
   const [statusDistribuicao, setStatusDistribuicao] = useState<PieChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,40 +29,62 @@ export function RelatoriosPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [exportingMensalPdf, setExportingMensalPdf] = useState(false);
 
+  // Estados para filtros
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [dataInicio, setDataInicio] = useState<string>('');
+  const [dataFim, setDataFim] = useState<string>('');
+  const [filtrosAtivos, setFiltrosAtivos] = useState<FiltrosEstatisticas>({});
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [cards, atendimentos, status] = await Promise.all([
-          getCardData(),
-          getAtendimentosPorMes(),
-          getStatusDistribuicao(),
-        ]);
+    fetchData(filtrosAtivos);
+  }, [filtrosAtivos]);
 
-        setCardData(cards ?? null);
-        // Garantir arrays válidos antes de mapear
-        const atendArr = Array.isArray(atendimentos) ? atendimentos : [];
-        const statusArr = Array.isArray(status) ? status : [];
+  const fetchData = async (filtros: FiltrosEstatisticas) => {
+    try {
+      setLoading(true);
+      const [cards, requisicoes, status] = await Promise.all([
+        getCardData(filtros),
+        getRequisicoesPorMes(filtros),
+        getStatusDistribuicao(filtros),
+      ]);
 
-        setAtendimentosPorMes(atendArr.map((a: any) => ({ name: a.name, total: Number(a.total) || 0 })));
-        setStatusDistribuicao(statusArr.map((s: any) => ({ name: s.name, value: Number(s.value) || 0 })));
-      } catch (err) {
-        setError('Falha ao carregar os dados de estatísticas.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setCardData(cards ?? null);
+      // Garantir arrays válidos antes de mapear
+      const reqArr = Array.isArray(requisicoes) ? requisicoes : [];
+      const statusArr = Array.isArray(status) ? status : [];
 
-    fetchData();
-  }, []);
+      setRequisicoesPorMes(reqArr.map((a: any) => ({ name: a.name, total: Number(a.total) || 0 })));
+      setStatusDistribuicao(statusArr.map((s: any) => ({ name: s.name, value: Number(s.value) || 0 })));
+      setError(null);
+    } catch (err) {
+      setError('Falha ao carregar os dados de estatísticas.');
+      console.error('Erro ao carregar dados de estatísticas', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAplicarFiltros = () => {
+    const novosFiltros: FiltrosEstatisticas = {};
+    if (dataInicio) novosFiltros.dataInicio = dataInicio;
+    if (dataFim) novosFiltros.dataFim = dataFim;
+    setFiltrosAtivos(novosFiltros);
+    setMostrarFiltros(false);
+  };
+
+  const handleLimparFiltros = () => {
+    setDataInicio('');
+    setDataFim('');
+    setFiltrosAtivos({});
+    setMostrarFiltros(false);
+  };
 
   const handleExportPdf = async () => {
     try {
       setExportingPdf(true);
-      await exportRelatorioPdf();
+      await exportRelatorioPdf(filtrosAtivos);
     } catch (err) {
-      console.error('Erro ao exportar PDF:', err);
+      console.error('Erro ao exportar PDF', err);
       setError('Falha ao exportar relatório em PDF.');
     } finally {
       setExportingPdf(false);
@@ -74,7 +96,7 @@ export function RelatoriosPage() {
       setExportingMensalPdf(true);
       await exportRelatorioMensalPdf(selectedYear, selectedMonth);
     } catch (err) {
-      console.error('Erro ao exportar PDF mensal:', err);
+      console.error('Erro ao exportar PDF mensal', err);
       setError('Falha ao exportar relatório mensal em PDF.');
     } finally {
       setExportingMensalPdf(false);
@@ -83,10 +105,6 @@ export function RelatoriosPage() {
 
   if (loading) {
     return <div className="flex justify-center items-center h-64">Carregando...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500 text-center mt-8">{error}</div>;
   }
 
   const currentYear = new Date().getFullYear();
@@ -106,11 +124,24 @@ export function RelatoriosPage() {
     { value: 12, label: 'Dezembro' },
   ];
 
+  const temFiltrosAtivos = Object.keys(filtrosAtivos).length > 0;
+
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Relatórios</h2>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setMostrarFiltros(!mostrarFiltros)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+              temFiltrosAtivos
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            <Filter className="h-4 w-4" />
+            Filtros {temFiltrosAtivos && `(${Object.keys(filtrosAtivos).length})`}
+          </button>
           <button
             onClick={handleExportPdf}
             disabled={exportingPdf}
@@ -121,6 +152,64 @@ export function RelatoriosPage() {
           </button>
         </div>
       </div>
+
+      {/* Painel de Filtros */}
+      {mostrarFiltros && (
+        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Filtros de Período</h3>
+            <button
+              onClick={() => setMostrarFiltros(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Início
+              </label>
+              <input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data Fim
+              </label>
+              <input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button onClick={handleAplicarFiltros} className="flex-1">
+              Aplicar Filtros
+            </Button>
+            <Button
+              onClick={handleLimparFiltros}
+              variant="outline"
+              className="flex-1"
+            >
+              Limpar Filtros
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Exibir erro se houver */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          {error}
+        </div>
+      )}
 
       {/* Seletor de mês/ano para relatório mensal */}
       <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
@@ -159,26 +248,30 @@ export function RelatoriosPage() {
           {exportingMensalPdf ? 'Exportando...' : 'Exportar PDF Mensal'}
         </Button>
       </div>
+
+      {/* Cards de Estatísticas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <StatsCard
           title="Total de Desarquivamentos"
           value={cardData?.totalDesarquivamentos ?? 0}
-          icon={<PieChartIcon className="h-4 w-4 text-muted-foreground" />}
+          icon={<FileText className="h-4 w-4 text-muted-foreground" />}
         />
         <StatsCard
-          title="Atendimentos Pendentes"
-          value={cardData?.atendimentosPendentes ?? 0}
+          title="Requisições Pendentes"
+          value={cardData?.requisicoesPendentes ?? 0}
           icon={<BarChartIcon className="h-4 w-4 text-muted-foreground" />}
         />
         <StatsCard
-          title="Atendimentos (Este Mês)"
-          value={cardData?.atendimentosEsteMes ?? 0}
-          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          title="Requisições (Este Mês)"
+          value={cardData?.requisicoesEsteMes ?? 0}
+          icon={<PieChartIcon className="h-4 w-4 text-muted-foreground" />}
         />
       </div>
+
+      {/* Gráficos */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <div className="col-span-4">
-          <BarChart data={atendimentosPorMes} title="Atendimentos por Mês (Último Ano)" />
+          <BarChart data={requisicoesPorMes} title="Requisições por Mês" />
         </div>
         <div className="col-span-3">
           <PieChart data={statusDistribuicao} title="Distribuição por Status" />

@@ -138,7 +138,8 @@ export class CreateDesarquivamentoUseCase {
         responsavelId: sanitizedRequest.responsavelId,
       });
 
-      desarquivamento.tipoDesarquivamento = sanitizedRequest.tipoDesarquivamento;
+      desarquivamento.tipoDesarquivamento =
+        sanitizedRequest.tipoDesarquivamento;
 
       this.logger.log(
         `[NUGECID] Tipo registrado no domínio: ${desarquivamento.tipoDesarquivamento}`,

@@ -103,20 +103,27 @@ export class PastasService {
     await this.ensureSchema();
     const tags = this.normalizeTags(createPastaDto.tags);
 
-    const pasta = this.pastasRepository.create({
-      ...createPastaDto,
-      id: randomUUID(),
-      tags,
-      imagens: 0,
-      planilhas: 0,
+    // Executar criação dentro de transação
+    const pasta = await this.dataSource.transaction(async (manager) => {
+      const novaPasta = manager.create(Pasta, {
+        ...createPastaDto,
+        id: randomUUID(),
+        tags,
+        imagens: 0,
+        planilhas: 0,
+      });
+
+      const saved = await manager.save(novaPasta);
+
+      // Persistir arquivos (operação de disco + banco)
+      await this.persistArquivosWithManager(manager, saved, files);
+
+      return saved;
     });
-
-    await this.pastasRepository.save(pasta);
-
-    await this.persistArquivos(pasta, files);
 
     const pastaCompleta = await this.findOne(pasta.id);
 
+    // Notificação fora da transação (pode falhar sem comprometer os dados)
     try {
       await this.notificacoesService.notificarPastaCriada(
         usuarioId ?? null,
@@ -124,7 +131,7 @@ export class PastasService {
         pasta.nome,
       );
     } catch (error) {
-      this.logger.warn("Falha ao enviar notifica��o de nova prateleira", {
+      this.logger.warn("Falha ao enviar notificação de nova prateleira", {
         error,
       });
     }
@@ -643,7 +650,7 @@ export class PastasService {
       tipo: PastaArquivoTipo,
     ) => {
       const safeName = file.originalname.replace(/\s+/g, "_");
-      const filename = `${Date.now()}-${Math.round(Math.random() * 1e6)}-${safeName}`;
+      const filename = `${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
       const destino = path.join(pastaDir, filename);
 
       await fs.writeFile(destino, file.buffer);
@@ -676,20 +683,79 @@ export class PastasService {
     }
   }
 
-  private async recalcularContagensArquivos(pastaId: string): Promise<void> {
-    const [imagens, planilhas] = await Promise.all([
-      this.pastaArquivoRepository.count({
-        where: { pastaId, tipo: PastaArquivoTipo.IMAGEM },
-      }),
-      this.pastaArquivoRepository.count({
-        where: { pastaId, tipo: PastaArquivoTipo.PLANILHA },
-      }),
-    ]);
+  // Versão com EntityManager para uso em transações
+  private async persistArquivosWithManager(
+    manager: any,
+    pasta: Pasta,
+    files?: PastaFilesPayload,
+  ): Promise<void> {
+    if (
+      !files ||
+      (!files.imagens?.length &&
+        !files.planilha?.length &&
+        !files.planilhas?.length)
+    ) {
+      return;
+    }
 
-    await this.pastasRepository.update(pastaId, {
-      imagens,
-      planilhas,
-    });
+    await fs.mkdir(UPLOAD_ROOT, { recursive: true });
+    const pastaDir = path.join(UPLOAD_ROOT, pasta.id);
+    await fs.mkdir(pastaDir, { recursive: true });
+
+    const arquivosParaSalvar: PastaArquivo[] = [];
+
+    const salvarArquivo = async (
+      file: Express.Multer.File,
+      tipo: PastaArquivoTipo,
+    ) => {
+      const safeName = file.originalname.replace(/\s+/g, "_");
+      const filename = `${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
+      const destino = path.join(pastaDir, filename);
+
+      await fs.writeFile(destino, file.buffer);
+
+      const relativePath = path.join(pasta.id, filename);
+
+      arquivosParaSalvar.push(
+        manager.create(PastaArquivo, {
+          pastaId: pasta.id,
+          tipo,
+          nomeOriginal: file.originalname,
+          caminho: relativePath.replace(/\\/g, "/"),
+          tamanhoBytes: file.size.toString(),
+        }),
+      );
+    };
+
+    for (const imagem of files.imagens ?? []) {
+      await salvarArquivo(imagem, PastaArquivoTipo.IMAGEM);
+    }
+
+    const planilhaFiles = files.planilha ?? files.planilhas ?? [];
+    for (const planilha of planilhaFiles) {
+      await salvarArquivo(planilha, PastaArquivoTipo.PLANILHA);
+    }
+
+    if (arquivosParaSalvar.length) {
+      await manager.save(arquivosParaSalvar);
+      await this.recalcularContagensArquivosWithManager(manager, pasta.id);
+    }
+  }
+
+  private async recalcularContagensArquivos(pastaId: string): Promise<void> {
+    // Não é mais necessário atualizar os campos imagens/planilhas no banco
+    // pois as contagens são calculadas dinamicamente em mapToResponse()
+    // Mantido como método vazio para compatibilidade com código existente
+  }
+
+  // Versão com EntityManager para uso em transações
+  private async recalcularContagensArquivosWithManager(
+    manager: any,
+    pastaId: string,
+  ): Promise<void> {
+    // Não é mais necessário atualizar os campos imagens/planilhas no banco
+    // pois as contagens são calculadas dinamicamente em mapToResponse()
+    // Mantido como método vazio para compatibilidade com código existente
   }
 
   private async deleteArquivoDoDisco(caminhoRelativo: string): Promise<void> {
@@ -700,12 +766,22 @@ export class PastasService {
   }
 
   private mapToResponse(pasta: Pasta): any {
+    // Calcular contagens reais dos arquivos ao invés de confiar nos campos
+    const arquivos = pasta.arquivos ?? [];
+    const imagens = arquivos.filter(
+      (a) => a.tipo === PastaArquivoTipo.IMAGEM,
+    ).length;
+    const planilhas = arquivos.filter(
+      (a) => a.tipo === PastaArquivoTipo.PLANILHA,
+    ).length;
+
     return {
       ...pasta,
-      arquivos:
-        pasta.arquivos?.map((arquivo) =>
-          this.mapArquivoResponse(pasta, arquivo),
-        ) ?? [],
+      imagens, // Sobrescrever com contagem real
+      planilhas, // Sobrescrever com contagem real
+      arquivos: arquivos.map((arquivo) =>
+        this.mapArquivoResponse(pasta, arquivo),
+      ),
     };
   }
 

@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { NotificationPreferences } from '../entities/notification-preferences.entity';
-import { UpdateNotificationPreferencesDto } from '../dto';
-import { User } from '../../users/entities/user.entity';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { NotificationPreferences } from "../entities/notification-preferences.entity";
+import { UpdateNotificationPreferencesDto } from "../dto";
+import { User } from "../../users/entities/user.entity";
 
 @Injectable()
 export class NotificationPreferencesService {
@@ -17,11 +17,13 @@ export class NotificationPreferencesService {
   /**
    * Obtém ou cria preferências de notificação para um usuário
    */
-  async getOrCreatePreferences(userId: number): Promise<NotificationPreferences> {
+  async getOrCreatePreferences(
+    userId: number,
+  ): Promise<NotificationPreferences> {
     // Verificar se o usuário existe
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('Usuário não encontrado');
+      throw new NotFoundException("Usuário não encontrado");
     }
 
     // Buscar preferências existentes
@@ -122,7 +124,9 @@ export class NotificationPreferencesService {
   /**
    * Remove a push subscription de um usuário
    */
-  async removePushSubscription(userId: number): Promise<NotificationPreferences> {
+  async removePushSubscription(
+    userId: number,
+  ): Promise<NotificationPreferences> {
     return this.updatePushSubscription(userId, null);
   }
 
@@ -132,7 +136,7 @@ export class NotificationPreferencesService {
   async canReceiveNotification(
     userId: number,
     notificationType: string,
-    channel: 'in_app' | 'push' = 'in_app',
+    channel: "in_app" | "push" = "in_app",
   ): Promise<boolean> {
     const preferences = await this.getOrCreatePreferences(userId);
     return preferences.canReceiveNotification(notificationType, channel);

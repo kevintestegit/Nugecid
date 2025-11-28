@@ -167,7 +167,10 @@ export class DesarquivamentoTypeOrmEntity {
     }
 
     // Mapear tipoDesarquivamento para desarquivamentoFisicoDigital (campo obrigatório no banco)
-    entity.desarquivamentoFisicoDigital = domain.tipoDesarquivamento || domain.desarquivamentoFisicoDigital || 'FISICO';
+    entity.desarquivamentoFisicoDigital =
+      domain.tipoDesarquivamento ||
+      domain.desarquivamentoFisicoDigital ||
+      "FISICO";
     entity.tipoDesarquivamento = domain.tipoDesarquivamento;
     entity.status = domain.status.value || domain.status;
     entity.nomeCompleto = domain.nomeCompleto;
@@ -197,7 +200,8 @@ export class DesarquivamentoTypeOrmEntity {
     return {
       id: this.id,
       desarquivamentoFisicoDigital: this.desarquivamentoFisicoDigital,
-      tipoDesarquivamento: this.tipoDesarquivamento || this.desarquivamentoFisicoDigital,
+      tipoDesarquivamento:
+        this.tipoDesarquivamento || this.desarquivamentoFisicoDigital,
       status: this.status,
       nomeCompleto: this.nomeCompleto,
       numeroNicLaudoAuto: this.numeroNicLaudoAuto,

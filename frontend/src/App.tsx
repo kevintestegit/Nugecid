@@ -1,44 +1,49 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import Layout from '@/components/layout/Layout'
 import LoginPage from '@/pages/LoginPage'
-import DashboardPage from '@/pages/DashboardPage'
-import DesarquivamentosPage from '@/pages/DesarquivamentosPage'
-import NovoDesarquivamentoPage from '@/pages/NovoDesarquivamentoPage'
-import DetalhesDesarquivamentoPage from '@/pages/DetalhesDesarquivamentoPage'
-import EditDesarquivamentoPage from '@/pages/EditDesarquivamentoPage'
-import UsuariosPage from '@/pages/usuarios/UsuariosPage'
-import NovoUsuarioPage from '@/pages/usuarios/NovoUsuarioPage'
-import EditarUsuarioPage from '@/pages/usuarios/EditarUsuarioPage'
-import ConfiguracoesPage from '@/pages/ConfiguracoesPage'
-import LixeiraPage from '@/pages/LixeiraPage'
-import TarefasPage from '@/pages/TarefasPage'
-import NovaTarefaPage from '@/pages/tarefas/NovaTarefaPage'
-import DetalheTarefaPage from '@/pages/tarefas/DetalheTarefaPage'
-import ArquivoPage from '@/pages/ArquivoPage'
-import PrateleiraDetailPage from '@/pages/PrateleiraDetailPage'
-import ProjetosPage from '@/pages/ProjetosPage'
-import KanbanPage from '@/pages/KanbanPage'
-import SearchIconTest from '@/components/test/SearchIconTest'
-import CustodiaVestigiosPage from '@/pages/CustodiaVestigiosPage'
-import { RelatoriosPage } from '@/pages/RelatoriosPage'
+import { PageLoading } from '@/components/ui/Loading'
 import { UserRole } from '@/types'
+
+// Lazy load pages for code splitting
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const DesarquivamentosPage = lazy(() => import('@/pages/DesarquivamentosPage'))
+const NovoDesarquivamentoPage = lazy(() => import('@/pages/NovoDesarquivamentoPage'))
+const DetalhesDesarquivamentoPage = lazy(() => import('@/pages/DetalhesDesarquivamentoPage'))
+const EditDesarquivamentoPage = lazy(() => import('@/pages/EditDesarquivamentoPage'))
+const UsuariosPage = lazy(() => import('@/pages/usuarios/UsuariosPage'))
+const NovoUsuarioPage = lazy(() => import('@/pages/usuarios/NovoUsuarioPage'))
+const EditarUsuarioPage = lazy(() => import('@/pages/usuarios/EditarUsuarioPage'))
+const ConfiguracoesPage = lazy(() => import('@/pages/ConfiguracoesPage'))
+const LixeiraPage = lazy(() => import('@/pages/LixeiraPage'))
+const TarefasPage = lazy(() => import('@/pages/TarefasPage'))
+const NovaTarefaPage = lazy(() => import('@/pages/tarefas/NovaTarefaPage'))
+const DetalheTarefaPage = lazy(() => import('@/pages/tarefas/DetalheTarefaPage'))
+const ArquivoPage = lazy(() => import('@/pages/ArquivoPage'))
+const PrateleiraDetailPage = lazy(() => import('@/pages/PrateleiraDetailPage'))
+const ProjetosPage = lazy(() => import('@/pages/ProjetosPage'))
+const KanbanPage = lazy(() => import('@/pages/KanbanPage'))
+const SearchIconTest = lazy(() => import('@/components/test/SearchIconTest'))
+const CustodiaVestigiosPage = lazy(() => import('@/pages/CustodiaVestigiosPage'))
+const BancoVestigiosPage = lazy(() => import('@/pages/BancoVestigiosPage'))
+const RelatoriosPage = lazy(() => import('@/pages/RelatoriosPage').then(module => ({ default: module.RelatoriosPage })))
 
 const App: React.FC = () => {
   return (
-    <Routes>
-        {/* Rota de login */}
-        <Route path="/login" element={<LoginPage />} />
-        
-        {/* Rotas protegidas com layout */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          {/* Dashboard */}
-          <Route index element={<DashboardPage />} />
+    <Suspense fallback={<PageLoading />}>
+      <Routes>
+          {/* Rota de login */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Rotas protegidas com layout */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            {/* Dashboard */}
+            <Route index element={<DashboardPage />} />
           
           {/* Desarquivamentos */}
           <Route path="desarquivamentos" element={<DesarquivamentosPage />} />
@@ -61,6 +66,7 @@ const App: React.FC = () => {
           
           {/* Custódia de Vestígios */}
           <Route path="custodia" element={<CustodiaVestigiosPage />} />
+          <Route path="custodia/banco-vestigios" element={<BancoVestigiosPage />} />
 
           {/* Relatórios */}
           <Route path="relatorios" element={<RelatoriosPage />} />
@@ -93,9 +99,10 @@ const App: React.FC = () => {
           <Route path="test-icons" element={<SearchIconTest />} />
         </Route>
         
-        {/* Redirecionar rotas não encontradas para o dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+          {/* Redirecionar rotas não encontradas para o dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }
 

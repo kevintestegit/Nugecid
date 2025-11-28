@@ -228,9 +228,8 @@ export class NotificacoesController {
     description: "Preferências retornadas com sucesso",
   })
   async getPreferences(@Request() req: any) {
-    const preferences = await this.notificationPreferencesService.getPreferences(
-      req.user.id,
-    );
+    const preferences =
+      await this.notificationPreferencesService.getPreferences(req.user.id);
 
     return {
       success: true,
@@ -248,10 +247,11 @@ export class NotificacoesController {
     @Request() req: any,
     @Body() updateDto: UpdateNotificationPreferencesDto,
   ) {
-    const preferences = await this.notificationPreferencesService.updatePreferences(
-      req.user.id,
-      updateDto,
-    );
+    const preferences =
+      await this.notificationPreferencesService.updatePreferences(
+        req.user.id,
+        updateDto,
+      );
 
     return {
       success: true,
@@ -268,9 +268,8 @@ export class NotificacoesController {
     description: "Preferências resetadas com sucesso",
   })
   async resetPreferences(@Request() req: any) {
-    const preferences = await this.notificationPreferencesService.resetToDefaults(
-      req.user.id,
-    );
+    const preferences =
+      await this.notificationPreferencesService.resetToDefaults(req.user.id);
 
     return {
       success: true,
@@ -288,7 +287,8 @@ export class NotificacoesController {
   })
   async updatePushSubscription(
     @Request() req: any,
-    @Body() subscription: {
+    @Body()
+    subscription: {
       endpoint: string;
       keys: {
         p256dh: string;
@@ -296,10 +296,11 @@ export class NotificacoesController {
       };
     },
   ) {
-    const preferences = await this.notificationPreferencesService.updatePushSubscription(
-      req.user.id,
-      subscription,
-    );
+    const preferences =
+      await this.notificationPreferencesService.updatePushSubscription(
+        req.user.id,
+        subscription,
+      );
 
     return {
       success: true,
@@ -316,9 +317,10 @@ export class NotificacoesController {
     description: "Push subscription removida com sucesso",
   })
   async removePushSubscription(@Request() req: any) {
-    const preferences = await this.notificationPreferencesService.removePushSubscription(
-      req.user.id,
-    );
+    const preferences =
+      await this.notificationPreferencesService.removePushSubscription(
+        req.user.id,
+      );
 
     return {
       success: true,

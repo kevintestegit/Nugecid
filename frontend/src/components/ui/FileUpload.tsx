@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { LinearProgress } from './ProgressBar';
 
 interface FileUploadProps {
   onFileSelect: (file: File) => void;
@@ -8,14 +9,20 @@ interface FileUploadProps {
   error: string | null;
   accept?: string;
   className?: string;
+  uploadProgress?: number; // 0-100, opcional
+  showProgress?: boolean; // Mostrar barra de progresso
+  currentFile?: string; // Nome do arquivo sendo enviado
 }
 
-export const FileUpload: React.FC<FileUploadProps> = ({ 
-  onFileSelect, 
-  isLoading, 
-  error, 
+export const FileUpload: React.FC<FileUploadProps> = ({
+  onFileSelect,
+  isLoading,
+  error,
   accept = '.xlsx,.xls,.csv',
-  className 
+  className,
+  uploadProgress = 0,
+  showProgress = false,
+  currentFile
 }) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -72,9 +79,28 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         )}
       >
         {isLoading ? (
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-            <p className="text-lg text-gray-500 dark:text-gray-400">Processando seu arquivo...</p>
+          <div className="flex flex-col items-center gap-4 w-full px-8">
+            {showProgress && uploadProgress > 0 ? (
+              <>
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                <div className="w-full max-w-md space-y-2">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                    {currentFile ? `Enviando: ${currentFile}` : 'Enviando arquivo...'}
+                  </p>
+                  <LinearProgress
+                    value={uploadProgress}
+                    showLabel={true}
+                    animated={uploadProgress < 100}
+                    variant={uploadProgress === 100 ? 'success' : 'default'}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                <p className="text-lg text-gray-500 dark:text-gray-400">Processando seu arquivo...</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
@@ -97,7 +123,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         />
       </label>
       {error && (
-        <p className="mt-4 text-center text-red-500 dark:text-red-400">{error}</p>
+        <div className="mt-4">
+          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3">
+            <p className="text-sm text-red-700 dark:text-red-300 text-center">{error}</p>
+          </div>
+        </div>
       )}
     </div>
   );

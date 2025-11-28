@@ -116,12 +116,8 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
   }
 
   const handleDeleteClick = (item: Desarquivamento) => {
-    console.log('[DesarquivamentosTable] handleDeleteClick - item:', item)
-    console.log('[DesarquivamentosTable] handleDeleteClick - item.id:', item.id, 'tipo:', typeof item.id)
-    
     // Validação adicional do ID antes de abrir o modal
     if (!item.id || item.id <= 0 || isNaN(item.id)) {
-      console.error('[DesarquivamentosTable] ID inválido detectado:', item.id)
       toast.error('Erro', {
         description: `Não é possível excluir este item. ID inválido: ${item.id}`,
         duration: 5000,
@@ -134,7 +130,6 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
 
   const handleDeleteConfirm = () => {
     if (deleteConfirm.item && onDelete) {
-      console.log('[DesarquivamentosTable] handleDeleteConfirm - item.id:', deleteConfirm.item.id, 'tipo:', typeof deleteConfirm.item.id)
       onDelete(deleteConfirm.item.id)
       setDeleteConfirm({ isOpen: false, item: null })
     }

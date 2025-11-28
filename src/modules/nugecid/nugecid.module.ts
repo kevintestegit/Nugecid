@@ -5,7 +5,10 @@ import * as multer from "multer";
 
 // Controller
 import { NugecidController } from "./nugecid.controller";
-import { AnexosController, AnexosProcessoController } from "./controllers/anexos.controller";
+import {
+  AnexosController,
+  AnexosProcessoController,
+} from "./controllers/anexos.controller";
 
 // Modules
 import { AuthModule } from "../auth/auth.module";

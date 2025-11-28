@@ -68,7 +68,9 @@ export class NugecidImportService {
 
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
-        throw new BadRequestException("O arquivo não contém planilhas válidas.");
+        throw new BadRequestException(
+          "O arquivo não contém planilhas válidas.",
+        );
       }
 
       const worksheet = workbook.Sheets[sheetName];
@@ -104,19 +106,17 @@ export class NugecidImportService {
         this.logger.warn(
           `❌ Validação falhou: ${erros.length} erros encontrados. Nenhum registro foi importado.`,
         );
-        
+
         // Mostrar os primeiros 5 erros no log para debug
         const primeirosErros = erros.slice(0, 5);
         primeirosErros.forEach((erro) => {
-          this.logger.warn(
-            `   Linha ${erro.row}: ${erro.details.message}`,
-          );
+          this.logger.warn(`   Linha ${erro.row}: ${erro.details.message}`);
         });
-        
+
         if (erros.length > 5) {
           this.logger.warn(`   ... e mais ${erros.length - 5} erros`);
         }
-        
+
         return {
           totalRows: data.length - 1,
           successCount: 0,
@@ -126,7 +126,10 @@ export class NugecidImportService {
       }
 
       // FASE 2: IMPORTAÇÃO COM TRANSAÇÃO (tudo ou nada)
-      const result = await this.importarComTransacao(registrosValidos, currentUser);
+      const result = await this.importarComTransacao(
+        registrosValidos,
+        currentUser,
+      );
 
       this.logger.log(
         `✅ Importação concluída: ${result.successCount} registros salvos`,
@@ -164,30 +167,36 @@ export class NugecidImportService {
         // Extrair dados da linha
         // Planilha antiga: Status | Nome | NIC/Laudo | Processo | Tipo Doc | Data Sol | ...
         const statusRaw = this.getCell(row, 0); // Status (Finalizado, etc)
-        const nomeRaw = this.getCell(row, 1);   // Nome Completo
+        const nomeRaw = this.getCell(row, 1); // Nome Completo
         const documentoRaw = this.getCell(row, 2); // NIC/Laudo/Auto
-        const processoRaw = this.getCell(row, 3);  // Nº Processo
-        const tipoDocRaw = this.getCell(row, 4);   // Tipo de Documento
+        const processoRaw = this.getCell(row, 3); // Nº Processo
+        const tipoDocRaw = this.getCell(row, 4); // Tipo de Documento
         const dataSolicitacaoRaw = this.getCell(row, 5); // Data Solicitação
         const dataDesarquivamentoRaw = this.getCell(row, 6); // Data Desarquivamento SAG
         const dataDevolucaoRaw = this.getCell(row, 7); // Data Devolução
-        const setorRaw = this.getCell(row, 8);     // Setor Demandante
-        const servidorRaw = this.getCell(row, 9);  // Servidor Responsável
+        const setorRaw = this.getCell(row, 8); // Setor Demandante
+        const servidorRaw = this.getCell(row, 9); // Servidor Responsável
         const finalidadeRaw = this.getCell(row, 10); // Finalidade
         const prorrogacaoRaw = this.getCell(row, 11); // Solicitação de Prorrogação
 
         // Log detalhado para debug (apenas primeira e última linha para não poluir)
         if (i === 0 || i === rows.length - 1) {
-          this.logger.debug(`🔍 Linha ${rowNumber} dados brutos: status="${statusRaw}", nome="${nomeRaw}", doc="${documentoRaw}", data="${dataSolicitacaoRaw}"`);
+          this.logger.debug(
+            `🔍 Linha ${rowNumber} dados brutos: status="${statusRaw}", nome="${nomeRaw}", doc="${documentoRaw}", data="${dataSolicitacaoRaw}"`,
+          );
         }
 
         // Validar campos obrigatórios VAZIOS
         const camposVazios: string[] = [];
-        if (!nomeRaw || nomeRaw.trim() === "") camposVazios.push("Nome Completo (coluna B)");
-        if (!documentoRaw || documentoRaw.trim() === "") camposVazios.push("Número NIC/Laudo/Auto (coluna C)");
+        if (!nomeRaw || nomeRaw.trim() === "")
+          camposVazios.push("Nome Completo (coluna B)");
+        if (!documentoRaw || documentoRaw.trim() === "")
+          camposVazios.push("Número NIC/Laudo/Auto (coluna C)");
         // numeroProcesso e setorDemandante agora são OPCIONAIS
-        if (!tipoDocRaw || tipoDocRaw.trim() === "") camposVazios.push("Tipo de Documento (coluna E)");
-        if (!dataSolicitacaoRaw || dataSolicitacaoRaw.toString().trim() === "") camposVazios.push("Data Solicitação (coluna F)");
+        if (!tipoDocRaw || tipoDocRaw.trim() === "")
+          camposVazios.push("Tipo de Documento (coluna E)");
+        if (!dataSolicitacaoRaw || dataSolicitacaoRaw.toString().trim() === "")
+          camposVazios.push("Data Solicitação (coluna F)");
 
         if (camposVazios.length > 0) {
           erros.push({
@@ -201,8 +210,8 @@ export class NugecidImportService {
         }
 
         // Processar numeroNicLaudoAuto
-        let documentoLimpo = documentoRaw.trim();
-        
+        const documentoLimpo = documentoRaw.trim();
+
         // Validar tamanho máximo do campo (500 caracteres)
         if (documentoLimpo.length > 500) {
           erros.push({
@@ -214,7 +223,7 @@ export class NugecidImportService {
           });
           continue;
         }
-        
+
         // REMOVIDA a validação de duplicatas - agora permite mesmo BIC/NIC para nomes diferentes
         // Exemplo: João Silva - BIC Nº 146.040 e Maria Santos - BIC Nº 146.040 são permitidos
 
@@ -222,7 +231,9 @@ export class NugecidImportService {
         const tipo = TipoDesarquivamentoEnum.FISICO;
 
         // Normalizar status
-        const status = statusRaw ? this.normalizarStatus(statusRaw) : StatusDesarquivamentoEnum.SOLICITADO;
+        const status = statusRaw
+          ? this.normalizarStatus(statusRaw)
+          : StatusDesarquivamentoEnum.SOLICITADO;
 
         // Converter datas (permitir vazio para campos opcionais)
         const dataSolicitacao = this.converterData(dataSolicitacaoRaw);
@@ -237,8 +248,12 @@ export class NugecidImportService {
           continue;
         }
 
-        const dataDesarquivamento = dataDesarquivamentoRaw ? this.converterData(dataDesarquivamentoRaw) : undefined;
-        const dataDevolucao = dataDevolucaoRaw ? this.converterData(dataDevolucaoRaw) : undefined;
+        const dataDesarquivamento = dataDesarquivamentoRaw
+          ? this.converterData(dataDesarquivamentoRaw)
+          : undefined;
+        const dataDevolucao = dataDevolucaoRaw
+          ? this.converterData(dataDevolucaoRaw)
+          : undefined;
 
         // Criar DTO como objeto plain
         const dtoPlain = {
@@ -247,14 +262,20 @@ export class NugecidImportService {
           status: status,
           nomeCompleto: nomeRaw.trim().substring(0, 255), // MaxLength 255
           numeroNicLaudoAuto: documentoLimpo.substring(0, 500), // MaxLength 500
-          numeroProcesso: processoRaw ? processoRaw.trim().substring(0, 255) : null, // OPCIONAL
+          numeroProcesso: processoRaw
+            ? processoRaw.trim().substring(0, 255)
+            : null, // OPCIONAL
           tipoDocumento: tipoDocRaw.trim().substring(0, 100), // MaxLength 100
           dataSolicitacao: dataSolicitacao,
           dataDesarquivamentoSAG: dataDesarquivamento,
           dataDevolucaoSetor: dataDevolucao,
           setorDemandante: setorRaw ? setorRaw.trim().substring(0, 255) : null, // OPCIONAL
-          servidorResponsavel: servidorRaw ? servidorRaw.trim().substring(0, 255) : "Não informado", // MaxLength 255
-          finalidadeDesarquivamento: finalidadeRaw ? finalidadeRaw.trim().substring(0, 1000) : "Importação de dados históricos", // MaxLength 1000
+          servidorResponsavel: servidorRaw
+            ? servidorRaw.trim().substring(0, 255)
+            : "Não informado", // MaxLength 255
+          finalidadeDesarquivamento: finalidadeRaw
+            ? finalidadeRaw.trim().substring(0, 1000)
+            : "Importação de dados históricos", // MaxLength 1000
           solicitacaoProrrogacao: false,
           urgente: false,
         };
@@ -318,32 +339,34 @@ export class NugecidImportService {
       // Processar SEQUENCIALMENTE para evitar conflito de numero_solicitacao
       for (let i = 0; i < registros.length; i++) {
         const dto = registros[i];
-        
+
         try {
           await this.nugecidService.create(dto, currentUser);
           result.successCount++;
-          
+
           // Log a cada 10 registros
           if ((i + 1) % 10 === 0) {
-            this.logger.log(
-              `📦 Processados: ${i + 1}/${registros.length}`,
-            );
+            this.logger.log(`📦 Processados: ${i + 1}/${registros.length}`);
           }
         } catch (error) {
-          this.logger.error(`Erro ao importar registro ${i + 1}: ${error.message}`);
+          this.logger.error(
+            `Erro ao importar registro ${i + 1}: ${error.message}`,
+          );
           throw error; // Lançar erro para fazer rollback
         }
       }
 
       await queryRunner.commitTransaction();
-      this.logger.log(`✅ Transação confirmada: ${result.successCount} registros salvos`);
+      this.logger.log(
+        `✅ Transação confirmada: ${result.successCount} registros salvos`,
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error(`❌ ROLLBACK: Erro ao salvar registros`, error.stack);
-      
+
       throw new BadRequestException(
         `Erro ao salvar registros no banco de dados: ${error.message}. ` +
-        `Nenhum registro foi importado. Verifique os dados e tente novamente.`
+          `Nenhum registro foi importado. Verifique os dados e tente novamente.`,
       );
     } finally {
       await queryRunner.release();
@@ -430,7 +453,9 @@ export class NugecidImportService {
       const strValue = String(value).trim();
 
       // Formato DD/MM/AAAA ou DD-MM-AAAA
-      const ddmmyyyyMatch = strValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      const ddmmyyyyMatch = strValue.match(
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/,
+      );
       if (ddmmyyyyMatch) {
         const [, day, month, year] = ddmmyyyyMatch;
         const date = new Date(Number(year), Number(month) - 1, Number(day));
@@ -449,10 +474,13 @@ export class NugecidImportService {
       }
 
       // Formato DD/MM/AA (ano com 2 dígitos)
-      const ddmmyyMatch = strValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/);
+      const ddmmyyMatch = strValue.match(
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2})$/,
+      );
       if (ddmmyyMatch) {
         const [, day, month, year] = ddmmyyMatch;
-        const fullYear = Number(year) < 50 ? 2000 + Number(year) : 1900 + Number(year);
+        const fullYear =
+          Number(year) < 50 ? 2000 + Number(year) : 1900 + Number(year);
         const date = new Date(fullYear, Number(month) - 1, Number(day));
         if (!isNaN(date.getTime())) {
           return date.toISOString();

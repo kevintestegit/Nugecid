@@ -2,7 +2,7 @@ import {
   registerDecorator,
   ValidationOptions,
   ValidationArguments,
-} from 'class-validator';
+} from "class-validator";
 
 /**
  * Validator customizado que aceita múltiplos formatos de data:
@@ -13,7 +13,7 @@ import {
 export function IsFlexibleDate(validationOptions?: ValidationOptions) {
   return function (object: Object, propertyName: string) {
     registerDecorator({
-      name: 'isFlexibleDate',
+      name: "isFlexibleDate",
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
@@ -28,18 +28,18 @@ export function IsFlexibleDate(validationOptions?: ValidationOptions) {
             return !isNaN(value.getTime());
           }
 
-          if (typeof value !== 'string') {
+          if (typeof value !== "string") {
             return false;
           }
 
           // Aceita YYYY-MM-DD
           if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-            const date = new Date(value + 'T00:00:00.000Z');
+            const date = new Date(value + "T00:00:00.000Z");
             return !isNaN(date.getTime());
           }
 
           // Aceita ISO 8601
-          if (value.includes('T')) {
+          if (value.includes("T")) {
             const date = new Date(value);
             return !isNaN(date.getTime());
           }

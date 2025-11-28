@@ -42,8 +42,12 @@ export class UpdateUserUseCase {
       }
     }
 
-    // Atualizar senha se fornecida
-    if (dto.senha !== undefined) {
+    // Atualizar senha se fornecida (não vazia)
+    if (
+      dto.senha !== undefined &&
+      dto.senha !== null &&
+      dto.senha.trim() !== ""
+    ) {
       await user.updatePassword(dto.senha);
     }
 

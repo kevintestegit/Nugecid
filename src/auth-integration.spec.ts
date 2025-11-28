@@ -17,6 +17,12 @@ import {
   Auditoria,
   AuditAction,
 } from "./modules/audit/entities/auditoria.entity";
+import {
+  TEST_CREDENTIALS,
+  TEST_TOKENS,
+  TEST_CONFIG,
+  TEST_USERS,
+} from "./common/constants/test.constants";
 
 describe("Auth Integration Tests", () => {
   let app: INestApplication;
@@ -68,10 +74,10 @@ describe("Auth Integration Tests", () => {
     await roleRepository.save(testRole);
 
     // Criar usuário de teste
-    const hashedPassword = await bcrypt.hash("password123", 12);
+    const hashedPassword = await bcrypt.hash(TEST_CREDENTIALS.DEFAULT_PASSWORD, TEST_CONFIG.BCRYPT_ROUNDS);
     testUser = userRepository.create({
-      nome: "Admin",
-      usuario: "admin",
+      nome: TEST_USERS.ADMIN.nome,
+      usuario: TEST_USERS.ADMIN.usuario,
       senha: hashedPassword,
       ativo: true,
       roleId: testRole.id,
@@ -89,8 +95,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "admin",
-          password: "admin123",
+          usuario: TEST_USERS.ADMIN.usuario,
+          password: TEST_CREDENTIALS.ADMIN_PASSWORD,
         })
         .expect(200);
 
@@ -108,8 +114,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "admin",
-          password: "admin123",
+          usuario: TEST_USERS.ADMIN.usuario,
+          password: TEST_CREDENTIALS.ADMIN_PASSWORD,
         })
         .expect(401);
     });
@@ -120,7 +126,7 @@ describe("Auth Integration Tests", () => {
         .set("Accept", "application/json")
         .send({
           usuario: "teste",
-          password: "password123",
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(401);
     });
@@ -130,7 +136,7 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          password: "password123",
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(400);
     });
@@ -150,8 +156,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "admin@itep.rn.gov.br",
-          password: "password123",
+          usuario: TEST_USERS.ADMIN.email,
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(200);
 
@@ -171,8 +177,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "admin@itep.rn.gov.br",
-          password: "wrongpassword",
+          usuario: TEST_USERS.ADMIN.email,
+          password: TEST_CREDENTIALS.INVALID_PASSWORD,
         })
         .expect(401);
 
@@ -191,8 +197,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "admin@itep.rn.gov.br",
-          password: "password123",
+          usuario: TEST_USERS.ADMIN.email,
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(200);
 
@@ -206,7 +212,7 @@ describe("Auth Integration Tests", () => {
     });
 
     it("should reject invalid JWT token", async () => {
-      const invalidToken = "invalid.jwt.token";
+      const invalidToken = TEST_TOKENS.INVALID_JWT_TOKEN;
 
       // Tentar usar um token inválido em uma requisição
       // (Este teste seria mais útil com uma rota protegida específica)
@@ -220,8 +226,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "admin@itep.rn.gov.br",
-          password: "password123",
+          usuario: TEST_USERS.ADMIN.email,
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(200);
 
@@ -245,9 +251,9 @@ describe("Auth Integration Tests", () => {
     it("should reject login for inactive user", async () => {
       // Criar usuário inativo
       const inactiveUser = userRepository.create({
-        nome: "Inactive User",
-        usuario: "inactive",
-        senha: await bcrypt.hash("password123", 12),
+        nome: TEST_USERS.INACTIVE.nome,
+        usuario: TEST_USERS.INACTIVE.usuario,
+        senha: await bcrypt.hash(TEST_CREDENTIALS.DEFAULT_PASSWORD, TEST_CONFIG.BCRYPT_ROUNDS),
         ativo: false,
         roleId: testRole.id,
       });
@@ -257,8 +263,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "inactive@itep.rn.gov.br",
-          password: "password123",
+          usuario: TEST_USERS.INACTIVE.email,
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(401);
     });
@@ -266,9 +272,9 @@ describe("Auth Integration Tests", () => {
     it("should reject login for blocked user", async () => {
       // Criar usuário bloqueado
       const blockedUser = userRepository.create({
-        nome: "Blocked User",
-        usuario: "blocked",
-        senha: await bcrypt.hash("password123", 12),
+        nome: TEST_USERS.BLOCKED.nome,
+        usuario: TEST_USERS.BLOCKED.usuario,
+        senha: await bcrypt.hash(TEST_CREDENTIALS.DEFAULT_PASSWORD, TEST_CONFIG.BCRYPT_ROUNDS),
         ativo: true,
         bloqueadoAte: new Date(Date.now() + 900000), // 15 minutos no futuro
         roleId: testRole.id,
@@ -279,8 +285,8 @@ describe("Auth Integration Tests", () => {
         .post("/auth/login")
         .set("Accept", "application/json")
         .send({
-          usuario: "blocked@itep.rn.gov.br",
-          password: "password123",
+          usuario: TEST_USERS.BLOCKED.email,
+          password: TEST_CREDENTIALS.DEFAULT_PASSWORD,
         })
         .expect(401);
     });

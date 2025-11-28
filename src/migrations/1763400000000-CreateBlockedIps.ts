@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, TableForeignKey } from "typeorm";
+import {
+  MigrationInterface,
+  QueryRunner,
+  Table,
+  TableIndex,
+  TableForeignKey,
+} from "typeorm";
 
 export class CreateBlockedIps1763400000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -67,7 +73,7 @@ export class CreateBlockedIps1763400000000 implements MigrationInterface {
           },
         ],
       }),
-      true
+      true,
     );
 
     // Índice para busca rápida por IP
@@ -76,7 +82,7 @@ export class CreateBlockedIps1763400000000 implements MigrationInterface {
       new TableIndex({
         name: "IDX_BLOCKED_IPS_IP_ADDRESS",
         columnNames: ["ip_address"],
-      })
+      }),
     );
 
     // Índice para busca de IPs ativos
@@ -85,7 +91,7 @@ export class CreateBlockedIps1763400000000 implements MigrationInterface {
       new TableIndex({
         name: "IDX_BLOCKED_IPS_IS_ACTIVE",
         columnNames: ["is_active"],
-      })
+      }),
     );
 
     // Foreign key para o usuário que bloqueou
@@ -96,7 +102,7 @@ export class CreateBlockedIps1763400000000 implements MigrationInterface {
         referencedColumnNames: ["id"],
         referencedTableName: "usuarios",
         onDelete: "SET NULL",
-      })
+      }),
     );
   }
 

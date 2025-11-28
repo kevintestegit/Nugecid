@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan, LessThan, Between } from "typeorm";
 
@@ -221,7 +226,10 @@ export class SecurityService {
   /**
    * Obtém detalhes de acessos de um IP específico
    */
-  async getIpAccessDetails(ipAddress: string, days: number = 30): Promise<Auditoria[]> {
+  async getIpAccessDetails(
+    ipAddress: string,
+    days: number = 30,
+  ): Promise<Auditoria[]> {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
