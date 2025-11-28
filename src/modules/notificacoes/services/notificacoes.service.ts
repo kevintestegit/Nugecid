@@ -367,7 +367,7 @@ export class NotificacoesService {
 
     // Coletar todos os IDs de desarquivamentos e usuários para buscar notificações existentes de uma vez
     const desarquivamentoIds = desarquivamentosPendentes.map((d) => d.id);
-    
+
     // Buscar todas as notificações existentes de uma vez (evita N+1)
     const notificacoesExistentes = desarquivamentoIds.length > 0
       ? await this.notificacaoRepository
@@ -391,6 +391,47 @@ export class NotificacoesService {
       diasPendentes: number;
     }> = [];
 
+    // Buscar tarefas que não foram movimentadas há mais de 5 dias
+    const solicitacoesPendentes = await this.tarefaRepository
+      .createQueryBuilder("tarefa")
+      .leftJoin("tarefa.coluna", "coluna")
+      .where("tarefa.updatedAt < :cincoDiasAtras", { cincoDiasAtras })
+      .andWhere("coluna.nome ILIKE :colunaSolicitada", {
+        colunaSolicitada: "%solicit%",
+      })
+      .getMany();
+
+    // Coletar todos os IDs de usuários que precisam ser validados
+    const usuariosIdsParaValidar = new Set<number>(gestoresIds);
+    for (const desarquivamento of desarquivamentosPendentes) {
+      if (desarquivamento.criadoPorId) {
+        usuariosIdsParaValidar.add(desarquivamento.criadoPorId);
+      }
+      if (desarquivamento.responsavelId) {
+        usuariosIdsParaValidar.add(desarquivamento.responsavelId);
+      }
+    }
+
+    // Adicionar IDs de usuários das tarefas
+    for (const solicitacao of solicitacoesPendentes) {
+      if (solicitacao.responsavelId) {
+        usuariosIdsParaValidar.add(solicitacao.responsavelId);
+      }
+      if (solicitacao.criadorId) {
+        usuariosIdsParaValidar.add(solicitacao.criadorId);
+      }
+    }
+
+    // Buscar todos os usuários válidos de uma vez
+    const usuariosValidos = usuariosIdsParaValidar.size > 0
+      ? await this.userRepository.find({
+          where: { id: Array.from(usuariosIdsParaValidar) as any },
+          select: ["id"],
+        })
+      : [];
+
+    const usuariosValidosSet = new Set(usuariosValidos.map((u) => u.id));
+
     for (const desarquivamento of desarquivamentosPendentes) {
       const diasPendentes = Math.floor(
         (Date.now() - new Date(desarquivamento.dataSolicitacao).getTime()) /
@@ -398,15 +439,15 @@ export class NotificacoesService {
       );
 
       const destinatarios = new Set<number>(gestoresIds);
-      if (desarquivamento.criadoPorId) {
+      if (desarquivamento.criadoPorId && usuariosValidosSet.has(desarquivamento.criadoPorId)) {
         destinatarios.add(desarquivamento.criadoPorId);
       }
-      if (desarquivamento.responsavelId) {
+      if (desarquivamento.responsavelId && usuariosValidosSet.has(desarquivamento.responsavelId)) {
         destinatarios.add(desarquivamento.responsavelId);
       }
 
       for (const usuarioId of destinatarios) {
-        if (!usuarioId) continue;
+        if (!usuarioId || !usuariosValidosSet.has(usuarioId)) continue;
 
         const chave = `${desarquivamento.id}-${usuarioId}`;
         if (!notificacoesExistentesSet.has(chave)) {
@@ -424,16 +465,6 @@ export class NotificacoesService {
       );
       notificacoesCriadas.push(notificacao);
     }
-
-    // Buscar tarefas que não foram movimentadas há mais de 5 dias
-    const solicitacoesPendentes = await this.tarefaRepository
-      .createQueryBuilder("tarefa")
-      .leftJoin("tarefa.coluna", "coluna")
-      .where("tarefa.updatedAt < :cincoDiasAtras", { cincoDiasAtras })
-      .andWhere("coluna.nome ILIKE :colunaSolicitada", {
-        colunaSolicitada: "%solicit%",
-      })
-      .getMany();
 
     // Buscar notificações existentes para tarefas de uma vez
     const tarefaIds = solicitacoesPendentes.map((s) => s.id);
@@ -463,7 +494,8 @@ export class NotificacoesService {
 
       const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;
 
-      if (usuarioId) {
+      // Verificar se o usuário existe antes de criar notificação
+      if (usuarioId && usuariosValidosSet.has(usuarioId)) {
         const notificacao = await this.criarNotificacaoSolicitacaoPendente(
           usuarioId,
           solicitacao.id,
