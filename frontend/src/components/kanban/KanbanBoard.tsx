@@ -67,6 +67,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<string>('');
 
+  // Segurança contra respostas fora do formato esperado
+  const colunasList = Array.isArray(colunas) ? colunas : [];
+  const tarefasList = Array.isArray(tarefas) ? tarefas : [];
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -77,7 +81,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   // Filtrar tarefas baseado na busca e filtros
   const filteredTarefas = useMemo(() => {
-    return tarefas.filter(tarefa => {
+    return tarefasList.filter(tarefa => {
       const matchesSearch = !searchTerm || 
         tarefa.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tarefa.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -86,20 +90,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       
       return matchesSearch && matchesPriority;
     });
-  }, [tarefas, searchTerm, selectedPriority]);
+  }, [tarefasList, searchTerm, selectedPriority]);
 
   // Organizar tarefas por coluna
   const tarefasPorColuna = useMemo(() => {
     const grouped: Record<number, Tarefa[]> = {};
     
-    colunas.forEach(coluna => {
+    colunasList.forEach(coluna => {
       grouped[coluna.id] = filteredTarefas
-        .filter(tarefa => tarefa.coluna_id === coluna.id)
+        .filter(tarefa => {
+          const colunaId = (tarefa as any).coluna_id ?? tarefa.colunaId;
+          return colunaId === coluna.id;
+        })
         .sort((a, b) => a.ordem - b.ordem);
     });
     
     return grouped;
-  }, [colunas, filteredTarefas]);
+  }, [colunasList, filteredTarefas]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id);

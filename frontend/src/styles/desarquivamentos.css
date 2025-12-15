@@ -1,12 +1,18 @@
+/* Tabela Compacta de Desarquivamentos */
+
+/* 
+   Mantendo a lógica original de ocultar colunas secundárias para visualização compacta.
+   Idealmente, isso deveria ser controlado via estado do componente ou classes utilitárias,
+   mas mantemos aqui para compatibilidade visual imediata.
+*/
+
+/* Ocultar colunas 8 a 13 (Datas secundárias, Setor, Responsável, etc.) */
 .compact-desarquivamentos thead tr th:nth-child(8),
 .compact-desarquivamentos thead tr th:nth-child(9),
 .compact-desarquivamentos thead tr th:nth-child(10),
 .compact-desarquivamentos thead tr th:nth-child(11),
 .compact-desarquivamentos thead tr th:nth-child(12),
-.compact-desarquivamentos thead tr th:nth-child(13) {
-  display: none;
-}
-
+.compact-desarquivamentos thead tr th:nth-child(13),
 .compact-desarquivamentos tbody tr td:nth-child(8),
 .compact-desarquivamentos tbody tr td:nth-child(9),
 .compact-desarquivamentos tbody tr td:nth-child(10),
@@ -16,101 +22,71 @@
   display: none;
 }
 
-/* header: keep single line with ellipsis */
+/* Ocultar primeira coluna (Tipo Físico/Digital) se desejar ainda mais espaço, 
+   mas o original ocultava a th:nth-child(1) e td:nth-child(1) também */
+.compact-desarquivamentos thead tr th:nth-child(1),
+.compact-desarquivamentos tbody tr td:nth-child(1) {
+  display: none;
+}
+
+/* Estilização das Células */
 .compact-desarquivamentos th {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 12px;
   line-height: 16px;
-}
-
-/* cells: compact padding and vertical alignment */
-.compact-desarquivamentos th,
-.compact-desarquivamentos td {
+  color: hsl(var(--muted-foreground)); /* Cor moderna adaptável ao tema */
   padding: 10px 12px;
   vertical-align: middle;
 }
 
-/* prevent badge/status wrapping */
+.compact-desarquivamentos td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  font-size: 13px; /* Levemente maior para legibilidade */
+}
+
+/* Prevenir quebra de linha em badges */
 .compact-desarquivamentos td .inline-flex {
   white-space: nowrap;
 }
 
-/* column min-widths for a pleasant layout */
-.compact-desarquivamentos thead tr th:nth-child(1) { min-width: 100px; }
-.compact-desarquivamentos thead tr th:nth-child(2) { min-width: 120px; }
-.compact-desarquivamentos thead tr th:nth-child(3) { min-width: 240px; }
-.compact-desarquivamentos thead tr th:nth-child(4) { min-width: 150px; }
-.compact-desarquivamentos thead tr th:nth-child(5) { min-width: 140px; }
-.compact-desarquivamentos thead tr th:nth-child(6) { min-width: 160px; }
-.compact-desarquivamentos thead tr th:nth-child(7) { min-width: 120px; }
-.compact-desarquivamentos thead tr th:nth-child(8) { min-width: 70px; }
-
-/* Short labels via ::after (avoid editing JSX) */
-.compact-desarquivamentos thead tr th:nth-child(3),
-.compact-desarquivamentos thead tr th:nth-child(4),
-.compact-desarquivamentos thead tr th:nth-child(5),
-.compact-desarquivamentos thead tr th:nth-child(6),
-.compact-desarquivamentos thead tr th:nth-child(7) {
-  position: relative;
-  color: transparent; /* hide original long label */
-}
-.compact-desarquivamentos thead tr th:nth-child(3)::after { content: "Nome"; }
-.compact-desarquivamentos thead tr th:nth-child(4)::after { content: "NIC/Laudo"; }
-.compact-desarquivamentos thead tr th:nth-child(5)::after { content: "Processo"; }
-.compact-desarquivamentos thead tr th:nth-child(6)::after { content: "Documento"; }
-.compact-desarquivamentos thead tr th:nth-child(7)::after { content: "Solicitação"; }
-.compact-desarquivamentos thead tr th:nth-child(3)::after,
-.compact-desarquivamentos thead tr th:nth-child(4)::after,
-.compact-desarquivamentos thead tr th:nth-child(5)::after,
-.compact-desarquivamentos thead tr th:nth-child(6)::after,
-.compact-desarquivamentos thead tr th:nth-child(7)::after {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 16px;
-}
-
-/* Ensure actions column remains visible */
-.compact-desarquivamentos thead tr th:last-child {
-  min-width: 80px;
-}
-.compact-desarquivamentos thead tr th:nth-child(1),
-.compact-desarquivamentos tbody tr td:nth-child(1) {
-  display: none;
-}
+/* Larguras fixas para layout estável */
 .compact-desarquivamentos {
-  table-layout: fixed; /* prevent columns from expanding arbitrarily */
+  table-layout: fixed;
   width: 100%;
 }
 
-/* Set explicit widths for compact columns (consider first column hidden) */
-/* 2: Status, 3: Nome (flex), 4: NIC/Laudo, 5: Processo, 6: Documento, 7: Solicitação, 8: Ações */
+/* Definição de larguras */
+/* 2: Status */
 .compact-desarquivamentos thead tr th:nth-child(2),
 .compact-desarquivamentos tbody tr td:nth-child(2) { width: 130px; }
+
+/* 3: Nome (Expandir se possível, mas fixo aqui) */
+/* .compact-desarquivamentos thead tr th:nth-child(3) { width: 200px; } */
+
+/* 4: NIC/Laudo */
 .compact-desarquivamentos thead tr th:nth-child(4),
-.compact-desarquivamentos tbody tr td:nth-child(4) { width: 110px; }
+.compact-desarquivamentos tbody tr td:nth-child(4) { width: 120px; }
+
+/* 5: Processo */
 .compact-desarquivamentos thead tr th:nth-child(5),
 .compact-desarquivamentos tbody tr td:nth-child(5) { width: 130px; }
+
+/* 6: Documento */
 .compact-desarquivamentos thead tr th:nth-child(6),
 .compact-desarquivamentos tbody tr td:nth-child(6) { width: 150px; }
+
+/* 7: Solicitação */
 .compact-desarquivamentos thead tr th:nth-child(7),
 .compact-desarquivamentos tbody tr td:nth-child(7) { width: 110px; }
-.compact-desarquivamentos thead tr th:last-child,
-.compact-desarquivamentos tbody tr td:last-child { width: 84px; }
 
-/* Prevent status badge from overlapping next column */
+/* Última: Ações */
+.compact-desarquivamentos thead tr th:last-child,
+.compact-desarquivamentos tbody tr td:last-child { width: 60px; }
+
+/* Truncamento inteligente para células de texto longo */
 .compact-desarquivamentos tbody tr td:nth-child(2) {
   overflow: hidden;
-}
-.compact-desarquivamentos tbody tr td:nth-child(2) .inline-flex {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }

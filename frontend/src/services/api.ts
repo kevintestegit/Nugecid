@@ -198,6 +198,17 @@ export class ApiService {
     return response.data
   }
 
+  async exportDesarquivamentos(params?: Record<string, any>): Promise<Blob> {
+    const response: AxiosResponse<Blob> = await this.api.get('/nugecid/export', {
+      params,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    })
+    return response.data
+  }
+
   // Term reports - PDF com cabeçalho/rodapé fixos
   async getTermoDeEntregaPdfFixo(id: number): Promise<Blob> {
     const response: AxiosResponse<Blob> = await this.api.get(`/nugecid/${id}/termo-pdf`, {

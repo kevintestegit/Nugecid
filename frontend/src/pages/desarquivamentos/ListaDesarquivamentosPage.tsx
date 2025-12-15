@@ -23,6 +23,7 @@ interface FilterState {
   tipo: TipoSolicitacao | ''
   dataInicio: string
   dataFim: string
+  instituto: string
   requerente: string
   vencidas: boolean
 }
@@ -47,6 +48,7 @@ const ListaDesarquivamentosPage: React.FC = () => {
     tipo: (searchParams.get('tipo') as TipoSolicitacao) || '',
     dataInicio: searchParams.get('dataInicio') || '',
     dataFim: searchParams.get('dataFim') || '',
+    instituto: searchParams.get('instituto') || '',
     requerente: searchParams.get('requerente') || '',
     vencidas: searchParams.get('vencidas') === 'true'
   })
@@ -71,16 +73,7 @@ const ListaDesarquivamentosPage: React.FC = () => {
     if (filters.status) params.status = filters.status
     if (filters.tipo) params.tipo = filters.tipo
     if (filters.dataInicio) params.dataInicio = filters.dataInicio
-
-    // Adiciona 1 dia à data final para incluir o dia completo
-    if (filters.dataFim) {
-      const endDate = new Date(filters.dataFim + 'T00:00:00')
-      endDate.setDate(endDate.getDate() + 1)
-      const yyyy = endDate.getFullYear()
-      const mm = String(endDate.getMonth() + 1).padStart(2, '0')
-      const dd = String(endDate.getDate()).padStart(2, '0')
-      params.dataFim = `${yyyy}-${mm}-${dd}`
-    }
+    if (filters.dataFim) params.dataFim = filters.dataFim
 
     if (filters.requerente) params.requerente = filters.requerente
     if (filters.vencidas) params.vencidos = 'true'
@@ -138,6 +131,7 @@ const ListaDesarquivamentosPage: React.FC = () => {
       tipo: '',
       dataInicio: '',
       dataFim: '',
+      instituto: '',
       requerente: '',
       vencidas: false
     }

@@ -48,11 +48,19 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isEmpty, setIsEmpty] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
     loadAnnouncements();
   }, []);
+
+  useEffect(() => {
+    if (!loading && (error || isEmpty || announcements.length === 0)) {
+      onClose();
+    }
+  }, [loading, error, isEmpty, announcements.length, onClose]);
 
   // Bloquear scroll da página quando o modal estiver aberto
   useEffect(() => {
@@ -65,15 +73,16 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
   const loadAnnouncements = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await apiService.getActiveAnnouncements();
       if (response.success && response.data && response.data.length > 0) {
         setAnnouncements(response.data);
       } else {
-        onClose();
+        setIsEmpty(true);
       }
     } catch (error) {
       console.error('Erro ao carregar avisos:', error);
-      onClose();
+      setError('Não foi possível carregar avisos agora.');
     } finally {
       setLoading(false);
     }
@@ -99,7 +108,11 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
     }
   };
 
-  if (loading || announcements.length === 0) {
+  if (loading) {
+    return null;
+  }
+
+  if (error || isEmpty || announcements.length === 0) {
     return null;
   }
 

@@ -222,6 +222,28 @@ export class UpdateDesarquivamentoDto {
   urgente?: boolean;
 
   @ApiPropertyOptional({
+    description: "Instituto que solicitou o desarquivamento",
+    example: "Instituto de Criminalística",
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }) => value?.trim() || null)
+  instituto?: string;
+
+  @ApiPropertyOptional({
+    description: "Requerente da solicitação",
+    example: "Delegacia de Crimes Contra o Patrimônio",
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }) => value?.trim() || null)
+  requerente?: string;
+
+  @ApiPropertyOptional({
     description: "Texto detalhado da solicitação de prorrogação",
     example:
       "Prazo de desarquivamento prorrogado em 18/06/25 para atendimento de perícia documentoscópica",

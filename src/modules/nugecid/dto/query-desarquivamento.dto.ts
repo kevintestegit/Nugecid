@@ -200,6 +200,28 @@ export class QueryDesarquivamentoDto {
   urgente?: boolean;
 
   @ApiPropertyOptional({
+    description: "Filtro por instituto",
+    example: "IC",
+    enum: ["IC", "II", "IML"],
+  })
+  @IsOptional()
+  @IsString({ message: "Instituto deve ser uma string" })
+  @IsIn(["IC", "II", "IML"], {
+    message: "Instituto deve ser um valor válido: IC, II, IML",
+  })
+  @Transform(({ value }) => value?.trim())
+  instituto?: string;
+
+  @ApiPropertyOptional({
+    description: "Filtro por requerente",
+    example: "1ª Delegacia de Polícia Civil Natal/RN",
+  })
+  @IsOptional()
+  @IsString({ message: "Requerente deve ser uma string" })
+  @Transform(({ value }) => value?.trim())
+  requerente?: string;
+
+  @ApiPropertyOptional({
     description: "Filtrar apenas solicitações vencidas",
     example: false,
     type: "boolean",

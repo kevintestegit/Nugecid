@@ -150,13 +150,6 @@ const Layout: React.FC = () => {
 
   const filteredNavigation = navigation.filter(item => {
     if (!item.adminOnly) return true
-    
-    // Para o item de usuários, permitir apenas admin
-    if (item.name === 'Usuários') {
-      return user?.role?.name === 'admin'
-    }
-    
-    // Para outros itens adminOnly, apenas admin
     return user?.role?.name === 'admin'
   })
 
@@ -190,10 +183,9 @@ const Layout: React.FC = () => {
                     <button
                       onClick={() => setCustodiaExpanded(!isExpanded)}
                       className={cn(
-                        'group flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                        item.current
+item.current
                           ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          : 'text-foreground hover:bg-muted hover:text-foreground'
                       )}
                     >
                       <div className="flex items-center">
@@ -218,7 +210,7 @@ const Layout: React.FC = () => {
                                 'group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                                 subItem.current
                                   ? 'bg-primary text-primary-foreground shadow-sm'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  : 'text-foreground hover:bg-muted hover:text-foreground'
                               )}
                               onClick={() => setSidebarOpen(false)}
                             >
@@ -242,7 +234,7 @@ const Layout: React.FC = () => {
                     'group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     item.current
                       ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      : 'text-foreground hover:bg-muted hover:text-foreground'
                   )}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -293,7 +285,7 @@ const Layout: React.FC = () => {
             {showSettings && (
               <Link
                 to="/configuracoes"
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Settings className="h-4 w-4" />
                 <span>Configurações</span>
@@ -303,7 +295,7 @@ const Layout: React.FC = () => {
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted hover:text-destructive"
             >
               <LogOut className="h-4 w-4" />
               <span>Sair</span>
@@ -376,7 +368,7 @@ const Layout: React.FC = () => {
                         sidebarCollapsed ? 'justify-center' : 'justify-between',
                         item.current
                           ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          : 'text-foreground hover:bg-muted hover:text-foreground'
                       )}
                       title={sidebarCollapsed ? item.name : undefined}
                     >
@@ -409,7 +401,7 @@ const Layout: React.FC = () => {
                                 'group flex items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                                 subItem.current
                                   ? 'bg-primary text-primary-foreground shadow-sm'
-                                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                  : 'text-foreground hover:bg-muted hover:text-foreground'
                               )}
                             >
                               <SubIcon className="mr-3 h-4 w-4 flex-shrink-0" />
@@ -433,7 +425,7 @@ const Layout: React.FC = () => {
                     sidebarCollapsed ? 'justify-center' : '',
                     item.current
                       ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      : 'text-foreground hover:bg-muted hover:text-foreground'
                   )}
                   title={sidebarCollapsed ? item.name : undefined}
                 >
@@ -503,7 +495,7 @@ const Layout: React.FC = () => {
               <Link
                 to="/configuracoes"
                 className={cn(
-                  'mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                  'mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-muted hover:text-foreground',
                   sidebarCollapsed ? 'justify-center' : 'justify-start'
                 )}
                 title={sidebarCollapsed ? 'Configurações' : undefined}
@@ -517,7 +509,7 @@ const Layout: React.FC = () => {
               size="sm"
               onClick={handleLogout}
               className={cn(
-                'mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-destructive',
+                'mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-muted hover:text-destructive',
                 sidebarCollapsed ? 'justify-center' : 'justify-start'
               )}
               title={sidebarCollapsed ? 'Sair' : undefined}

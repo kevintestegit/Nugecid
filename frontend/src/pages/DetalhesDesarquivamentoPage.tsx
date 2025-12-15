@@ -38,6 +38,7 @@ import { toast } from 'sonner'
 import { ImagePreviewModal } from '@/components/desarquivamentos/ImagePreviewModal'
 import { AnexosSection } from '@/components/desarquivamentos/AnexosSection'
 import { HistoricoTimeline } from '@/components/desarquivamentos/HistoricoTimeline'
+import { getInstitutoLabel } from '@/constants/institutos'
 
 const DetalhesDesarquivamentoPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -575,6 +576,18 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               <p className="text-sm text-gray-600">Tipo de Documento</p>
               <p className="text-gray-900">
                 {desarquivamento.tipoDocumento}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Instituto</p>
+              <p className="text-gray-900">
+                {getInstitutoLabel(desarquivamento.instituto)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Requerente</p>
+              <p className="text-gray-900">
+                {desarquivamento.requerente || '-'}
               </p>
             </div>
             <div>

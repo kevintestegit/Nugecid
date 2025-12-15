@@ -107,6 +107,12 @@ export class DesarquivamentoTypeOrmEntity {
   @Column({ name: "urgente", type: "boolean", nullable: true, default: false })
   urgente?: boolean;
 
+  @Column({ name: "instituto", length: 255, nullable: true })
+  instituto?: string;
+
+  @Column({ name: "requerente", length: 255, nullable: true })
+  requerente?: string;
+
   @Column({ name: "created_by", nullable: false })
   criadoPorId: number;
 
@@ -187,6 +193,8 @@ export class DesarquivamentoTypeOrmEntity {
     entity.solicitacaoProrrogacaoTexto = domain.solicitacaoProrrogacaoTexto;
     entity.dadosAdicionais = domain.dadosAdicionais;
     entity.urgente = domain.urgente;
+    entity.instituto = domain.instituto;
+    entity.requerente = domain.requerente;
     entity.criadoPorId = domain.criadoPorId;
     entity.responsavelId = domain.responsavelId;
     entity.createdAt = domain.createdAt;
@@ -217,6 +225,8 @@ export class DesarquivamentoTypeOrmEntity {
       solicitacaoProrrogacaoTexto: this.solicitacaoProrrogacaoTexto,
       dadosAdicionais: this.dadosAdicionais,
       urgente: this.urgente,
+      instituto: this.instituto,
+      requerente: this.requerente,
       criadoPorId: this.criadoPorId,
       responsavelId: this.responsavelId,
       createdAt: this.createdAt,

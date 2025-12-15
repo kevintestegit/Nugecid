@@ -19,6 +19,6 @@ export class MoveTarefaDto {
   @IsOptional()
   @Transform(({ value }) => (value ? parseInt(value) : undefined))
   @IsInt({ message: "A ordem deve ser um número inteiro" })
-  @Min(1, { message: "A ordem deve ser maior que 0" })
+  @Min(0, { message: "A ordem deve ser maior ou igual a 0" })
   ordem?: number;
 }

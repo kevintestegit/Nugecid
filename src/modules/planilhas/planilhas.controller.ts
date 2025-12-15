@@ -16,6 +16,8 @@ import { Response } from "express";
 import * as multer from "multer";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { RoleType } from "../users/enums/role-type.enum";
 import { PlanilhasService } from "./planilhas.service";
 
 @Controller("planilhas")
@@ -34,6 +36,7 @@ export class PlanilhasController {
   }
 
   @Post()
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor("planilha", {
@@ -61,6 +64,7 @@ export class PlanilhasController {
   }
 
   @Delete(":id")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param("id") id: string) {
     await this.planilhasService.remove(id);

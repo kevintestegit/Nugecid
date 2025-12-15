@@ -12,6 +12,7 @@ export interface CardData {
   requisicoesPendentes: number;
   requisicoesEsteMes: number;
   recentes: any[];
+  pendentesAtrasados?: number;
 }
 
 export interface ChartData {
@@ -32,6 +33,7 @@ export class EstatisticasService {
   async getCardData(filtros?: {
     dataInicio?: Date;
     dataFim?: Date;
+    userId?: number;
   }): Promise<CardData> {
     try {
       const now = new Date();
@@ -48,6 +50,14 @@ export class EstatisticasService {
 
       // Query builder para total com filtros opcionais
       let totalQuery = this.desarquivamentoRepo.createQueryBuilder("d");
+      
+      // Filtro por usuário (para usuários comuns, mostrar apenas os próprios registros)
+      if (filtros?.userId) {
+        totalQuery = totalQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+      
       if (filtros?.dataInicio || filtros?.dataFim) {
         if (filtros.dataInicio) {
           totalQuery = totalQuery.andWhere("d.dataSolicitacao >= :dataInicio", {
@@ -62,30 +72,70 @@ export class EstatisticasService {
       }
 
       // Query para requisições do mês atual usando dataSolicitacao
-      const esteMesQuery = this.desarquivamentoRepo
+      let esteMesQuery = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .where("d.dataSolicitacao >= :start", { start: startOfMonth })
         .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth });
+      
+      // Filtro por usuário para requisições do mês
+      if (filtros?.userId) {
+        esteMesQuery = esteMesQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
 
-      const [total, pendentes, esteMes, recentes] = await Promise.all([
+      // Query para pendentes com filtro de usuário
+      let pendentesQuery = this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .where("d.status = :status", { status: StatusDesarquivamentoEnum.SOLICITADO });
+      
+      if (filtros?.userId) {
+        pendentesQuery = pendentesQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+
+      // Pendentes há mais de 5 dias (atenção necessária)
+      const cincoDiasAtras = new Date();
+      cincoDiasAtras.setHours(0, 0, 0, 0); // início do dia local (UTC-3)
+      cincoDiasAtras.setDate(cincoDiasAtras.getDate() - 5);
+      let pendentesAtrasadosQuery = this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .where("d.status = :status", { status: StatusDesarquivamentoEnum.SOLICITADO })
+        .andWhere("d.dataSolicitacao <= :limite", { limite: cincoDiasAtras });
+
+      if (filtros?.userId) {
+        pendentesAtrasadosQuery = pendentesAtrasadosQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+
+      // Query para recentes com filtro de usuário
+      let recentesQuery = this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .leftJoinAndSelect("d.criadoPor", "criadoPor")
+        .leftJoinAndSelect("d.responsavel", "responsavel")
+        .orderBy("d.dataSolicitacao", "DESC")
+        .take(10);
+      
+      if (filtros?.userId) {
+        recentesQuery = recentesQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+
+      const [total, pendentes, pendentesAtrasados, esteMes, recentes] = await Promise.all([
         totalQuery.getCount(),
-        this.desarquivamentoRepo.count({
-          where: { status: StatusDesarquivamentoEnum.SOLICITADO },
-        }),
+        pendentesQuery.getCount(),
+        pendentesAtrasadosQuery.getCount(),
         esteMesQuery.getCount(),
-        // Buscar últimas 10 atividades recentes por data de solicitação
-        this.desarquivamentoRepo
-          .createQueryBuilder("d")
-          .leftJoinAndSelect("d.criadoPor", "criadoPor")
-          .leftJoinAndSelect("d.responsavel", "responsavel")
-          .orderBy("d.dataSolicitacao", "DESC")
-          .take(10)
-          .getMany(),
+        recentesQuery.getMany(),
       ]);
 
       return {
         totalDesarquivamentos: total,
         requisicoesPendentes: pendentes,
+        pendentesAtrasados,
         requisicoesEsteMes: esteMes,
         recentes: recentes.map((item) => ({
           id: item.id,
@@ -132,6 +182,7 @@ export class EstatisticasService {
   async getRequisicoesPorMes(filtros?: {
     dataInicio?: Date;
     dataFim?: Date;
+    userId?: number;
   }): Promise<ChartData[]> {
     try {
       const now = new Date();
@@ -139,12 +190,19 @@ export class EstatisticasService {
       const end = filtros?.dataFim || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
       // Buscar todos os desarquivamentos no período usando dataSolicitacao
-      const desarquivamentos = await this.desarquivamentoRepo
+      let query = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .select("d.dataSolicitacao", "dataSolicitacao")
         .where("d.dataSolicitacao >= :start", { start })
-        .andWhere("d.dataSolicitacao <= :end", { end })
-        .getRawMany();
+        .andWhere("d.dataSolicitacao <= :end", { end });
+
+      if (filtros?.userId) {
+        query = query.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+
+      const desarquivamentos = await query.getRawMany();
 
       // Agrupar por mês usando JavaScript (agnóstico de banco)
       const contagemPorMes = new Map<string, number>();
@@ -190,12 +248,19 @@ export class EstatisticasService {
   async getStatusDistribuicao(filtros?: {
     dataInicio?: Date;
     dataFim?: Date;
+    userId?: number;
   }): Promise<ChartData[]> {
     try {
       let query = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .select("d.status", "status")
         .addSelect("COUNT(d.id)", "total");
+
+      if (filtros?.userId) {
+        query = query.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
 
       // Aplicar filtros de data se fornecidos
       if (filtros?.dataInicio) {
@@ -238,6 +303,7 @@ export class EstatisticasService {
   async generateRelatorioPdf(filtros?: {
     dataInicio?: Date;
     dataFim?: Date;
+    userId?: number;
   }): Promise<Buffer> {
     try {
       const [cardData, requisicoesPorMes, statusDistribuicao] =
@@ -581,6 +647,7 @@ export class EstatisticasService {
     ano: number,
     mes: number,
     paginacao?: { pagina?: number; limite?: number },
+    userId?: number,
   ): Promise<Buffer> {
     try {
       // Calcular início e fim do mês
@@ -593,14 +660,21 @@ export class EstatisticasService {
       const skip = (pagina - 1) * limite;
 
       // Buscar total de registros
-      const total = await this.desarquivamentoRepo
+      let totalQuery = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .where("d.dataSolicitacao >= :start", { start: startOfMonth })
-        .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth })
-        .getCount();
+        .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth });
+
+      if (userId) {
+        totalQuery = totalQuery.andWhere("d.criadoPorId = :userId", {
+          userId,
+        });
+      }
+
+      const total = await totalQuery.getCount();
 
       // Buscar desarquivamentos do mês com informações do solicitante usando dataSolicitacao
-      const desarquivamentos = await this.desarquivamentoRepo
+      let query = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .leftJoinAndSelect("d.criadoPor", "criadoPor")
         .leftJoinAndSelect("d.responsavel", "responsavel")
@@ -608,8 +682,13 @@ export class EstatisticasService {
         .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth })
         .orderBy("d.dataSolicitacao", "ASC")
         .skip(skip)
-        .take(limite)
-        .getMany();
+        .take(limite);
+
+      if (userId) {
+        query = query.andWhere("d.criadoPorId = :userId", { userId });
+      }
+
+      const desarquivamentos = await query.getMany();
 
       // Agrupar por solicitante
       const solicitantesMap = new Map<string, any[]>();

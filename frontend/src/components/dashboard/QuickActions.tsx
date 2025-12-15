@@ -24,10 +24,18 @@ interface QuickAction {
   bgColor: string
   hoverColor: string
   requiredRoles?: string[]
+  featureFlagKey?: 'relatorios' | 'exportar' | 'usuarios' | 'configuracoes'
 }
 
 const QuickActions: React.FC = () => {
   const { user } = useAuth()
+
+  const featureFlags = {
+    relatorios: import.meta.env.VITE_FEATURE_RELATORIOS !== 'false',
+    exportar: import.meta.env.VITE_FEATURE_EXPORTAR !== 'false',
+    usuarios: import.meta.env.VITE_FEATURE_USUARIOS !== 'false',
+    configuracoes: import.meta.env.VITE_FEATURE_CONFIGURACOES !== 'false',
+  }
 
   const actions: QuickAction[] = [
     {
@@ -57,6 +65,7 @@ const QuickActions: React.FC = () => {
       bgColor: 'bg-purple-50',
       hoverColor: 'hover:bg-purple-100',
       requiredRoles: ['admin', 'coordenador'],
+      featureFlagKey: 'relatorios',
     },
     {
       title: 'Exportar Dados',
@@ -67,6 +76,7 @@ const QuickActions: React.FC = () => {
       bgColor: 'bg-orange-50',
       hoverColor: 'hover:bg-orange-100',
       requiredRoles: ['admin', 'coordenador'],
+      featureFlagKey: 'exportar',
     },
     {
       title: 'Gerenciar Usuários',
@@ -77,6 +87,7 @@ const QuickActions: React.FC = () => {
       bgColor: 'bg-red-50',
       hoverColor: 'hover:bg-red-100',
       requiredRoles: ['admin'],
+      featureFlagKey: 'usuarios',
     },
     {
       title: 'Configurações',
@@ -87,10 +98,14 @@ const QuickActions: React.FC = () => {
       bgColor: 'bg-gray-50',
       hoverColor: 'hover:bg-gray-100',
       requiredRoles: ['admin'],
+      featureFlagKey: 'configuracoes',
     },
   ]
 
   const filteredActions = actions.filter(action => {
+    if (action.featureFlagKey && featureFlags[action.featureFlagKey] === false) {
+      return false
+    }
     if (!action.requiredRoles) return true
     return action.requiredRoles.includes(user?.role || '')
   })

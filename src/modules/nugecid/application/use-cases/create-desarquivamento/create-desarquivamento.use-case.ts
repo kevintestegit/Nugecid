@@ -27,6 +27,8 @@ export interface CreateDesarquivamentoRequest {
   finalidadeDesarquivamento: string;
   solicitacaoProrrogacao: boolean;
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
   criadoPorId: number;
   responsavelId?: number;
   // Legacy properties for validation compatibility
@@ -39,7 +41,6 @@ export interface CreateDesarquivamentoRequest {
   finalidade?: string;
   observacoes?: string;
   localizacaoFisica?: string;
-  requerente?: string;
 }
 
 export interface CreateDesarquivamentoResponse {
@@ -134,6 +135,8 @@ export class CreateDesarquivamentoUseCase {
         finalidadeDesarquivamento: sanitizedRequest.finalidadeDesarquivamento,
         solicitacaoProrrogacao: sanitizedRequest.solicitacaoProrrogacao,
         urgente: sanitizedRequest.urgente,
+        instituto: sanitizedRequest.instituto,
+        requerente: sanitizedRequest.requerente,
         criadoPorId: sanitizedRequest.criadoPorId,
         responsavelId: sanitizedRequest.responsavelId,
       });

@@ -103,6 +103,8 @@ export interface Desarquivamento {
   justificativa?: string;
   dadosAdicionais?: string;
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
   quantidadeItens?: number;
   criadoPorId: number;
   responsavelId?: number;
@@ -146,6 +148,8 @@ export interface CreateDesarquivamentoDto {
   solicitacaoProrrogacaoTexto?: string;
   dadosAdicionais?: string;
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
 }
 
 export interface UpdateDesarquivamentoDto
@@ -166,6 +170,7 @@ export interface QueryDesarquivamentoDto {
   dataInicio?: string;
   dataFim?: string;
   urgente?: boolean;
+  instituto?: string;
   vencidos?: boolean;
   sortBy?: string;
   sortOrder?: 'ASC' | 'DESC';
@@ -248,6 +253,7 @@ export interface UsersQueryParams {
   search?: string;
   role?: UserRole;
   active?: boolean;
+  includeDeleted?: boolean;
 }
 
 export interface CreateUserDto {

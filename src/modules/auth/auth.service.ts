@@ -3,7 +3,9 @@ import {
   UnauthorizedException,
   BadRequestException,
   Logger,
+  OnModuleInit,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
@@ -41,9 +43,13 @@ export interface LoginV2Response {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
   private onlineUsers = new Map<number, { lastActivity: Date }>();
+  private accessTokenExpiresIn: string;
+  private refreshTokenExpiresIn: string;
+  private refreshTokenSecret: string;
+  private accessTokenSecret: string;
 
   constructor(
     @InjectRepository(User)
@@ -53,7 +59,30 @@ export class AuthService {
     @InjectRepository(Auditoria)
     private readonly auditoriaRepository: Repository<Auditoria>,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
+
+  onModuleInit(): void {
+    // Cache secrets/expirações para evitar lookups repetidos
+    this.accessTokenExpiresIn =
+      this.configService.get<string>("auth.jwt.expiresIn") ||
+      this.configService.get<string>("JWT_EXPIRES_IN", "50m");
+
+    this.refreshTokenExpiresIn =
+      this.configService.get<string>("auth.jwt.refreshExpiresIn") ||
+      this.configService.get<string>("JWT_REFRESH_EXPIRES_IN", "7d");
+
+    this.refreshTokenSecret =
+      this.configService.get<string>("auth.jwt.refreshSecret") ||
+      this.configService.get<string>("JWT_REFRESH_SECRET");
+
+    this.accessTokenSecret =
+      this.configService.get<string>("auth.jwt.secret") ||
+      this.configService.get<string>(
+        "JWT_SECRET",
+        "sgc-itep-secret-key-change-in-production",
+      );
+  }
 
   /**
    * Valida as credenciais do usuário
@@ -161,8 +190,10 @@ export class AuthService {
       role: user.role?.name || "user",
     };
 
-    // Força expiração de 50 minutos
-    const accessToken = this.jwtService.sign(payload, { expiresIn: "50m" });
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.accessTokenExpiresIn || "50m",
+      secret: this.accessTokenSecret,
+    });
 
     // Gera refresh token com expiração maior
     const refreshPayload = {
@@ -171,7 +202,8 @@ export class AuthService {
       type: "refresh",
     };
     const refreshToken = this.jwtService.sign(refreshPayload, {
-      expiresIn: "7d",
+      expiresIn: this.refreshTokenExpiresIn || "7d",
+      secret: this.refreshTokenSecret || this.accessTokenSecret,
     });
 
     // Salva auditoria de login bem-sucedido
@@ -218,8 +250,10 @@ export class AuthService {
       role: user.role?.name || "user",
     };
 
-    // Força expiração de 50 minutos para API v2
-    const accessToken = this.jwtService.sign(payload, { expiresIn: "50m" });
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.accessTokenExpiresIn || "50m",
+      secret: this.accessTokenSecret,
+    });
 
     // Salva auditoria de login bem-sucedido
     await this.saveLoginAudit(user.id, ipAddress, userAgent, true);
@@ -248,7 +282,9 @@ export class AuthService {
   ): Promise<{ accessToken: string; expiresIn: string }> {
     try {
       // Verifica se o refresh token é válido
-      const decoded = this.jwtService.verify(refreshToken) as any;
+      const decoded = this.jwtService.verify(refreshToken, {
+        secret: this.refreshTokenSecret || this.accessTokenSecret,
+      }) as any;
 
       if (decoded.type !== "refresh") {
         throw new UnauthorizedException("Invalid refresh token type");
@@ -271,16 +307,24 @@ export class AuthService {
         role: user.role?.name || "user",
       };
 
-      const accessToken = this.jwtService.sign(payload, { expiresIn: "50m" });
+      const accessToken = this.jwtService.sign(payload, {
+        expiresIn: this.accessTokenExpiresIn || "50m",
+        secret: this.accessTokenSecret,
+      });
 
       this.logger.log(`Token renovado para usuário: ${user.usuario}`);
 
       return {
         accessToken,
-        expiresIn: "50m",
+        expiresIn: this.accessTokenExpiresIn || "50m",
       };
     } catch (error) {
-      this.logger.warn(`Falha ao renovar token: ${error.message}`);
+      this.logger.warn(
+        `Falha ao renovar token: ${error.name || "Error"} - ${error.message}`,
+      );
+      if (error?.message?.includes("expired")) {
+        throw new UnauthorizedException("Refresh token expirado");
+      }
       throw new UnauthorizedException("Token de refresh inválido ou expirado");
     }
   }

@@ -43,6 +43,16 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizeTarefa = useCallback((t: any): Tarefa => {
+    return {
+      ...t,
+      coluna_id: t.coluna_id ?? t.colunaId,
+      colunaId: t.colunaId ?? t.coluna_id,
+      responsavelId: t.responsavelId ?? t.responsavel_id,
+      criadorId: t.criadorId ?? t.criador_id,
+    } as Tarefa;
+  }, []);
+
   // Carregar dados iniciais
   const loadData = useCallback(async () => {
     try {
@@ -56,8 +66,9 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       ]);
 
       setProjeto(projetoData);
-      setColunas(colunasData);
-      setTarefas(tarefasData);
+      setColunas(Array.isArray(colunasData) ? colunasData : []);
+      const tarefasArray = Array.isArray(tarefasData) ? tarefasData : [];
+      setTarefas(tarefasArray.map(normalizeTarefa));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar dados';
       setError(message);
@@ -161,7 +172,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
         ordem: tarefasNaColuna.length,
         criado_por_id: user.id,
       });
-      setTarefas(prev => [...prev, newTarefa]);
+      setTarefas(prev => [...prev, normalizeTarefa(newTarefa)]);
       toast.success('Tarefa criada com sucesso!');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao criar tarefa';
@@ -185,7 +196,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
 
     try {
       const updatedTarefa = await kanbanService.updateTarefa(id, data);
-      setTarefas(prev => prev.map(tarefa => tarefa.id === id ? updatedTarefa : tarefa));
+      setTarefas(prev => prev.map(tarefa => tarefa.id === id ? normalizeTarefa(updatedTarefa) : tarefa));
       toast.success('Tarefa atualizada com sucesso!');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao atualizar tarefa';

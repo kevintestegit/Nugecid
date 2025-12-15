@@ -17,6 +17,8 @@ import { cn } from '@/utils/cn'
 import { StatusDesarquivamento, TipoSolicitacao } from '@/types'
 import { getStatusLabel, getTipoLabel } from '@/utils/format'
 import { format, parseISO, isValid } from 'date-fns'
+import { INSTITUTOS, getInstitutoLabel } from '@/constants/institutos'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
 
 interface FilterState {
   search: string
@@ -24,6 +26,7 @@ interface FilterState {
   tipo: TipoSolicitacao | ''
   dataInicio: string
   dataFim: string
+  instituto: string
   requerente: string
   vencidas: boolean
 }
@@ -100,6 +103,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     if (filters.tipo) count++
     if (filters.dataInicio) count++
     if (filters.dataFim) count++
+    if (filters.instituto) count++
     if (filters.requerente) count++
     if (filters.vencidas) count++
     return count
@@ -156,7 +160,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filtros Básicos - Sempre Visíveis */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="space-y-2">
             <Label htmlFor="search">Buscar</Label>
             <SearchInput
@@ -202,6 +206,23 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="instituto">Instituto</Label>
+            <select
+              id="instituto"
+              value={filters.instituto}
+              onChange={(e) => handleFilterChange('instituto', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Todos os institutos</option>
+              {INSTITUTOS.map((instituto) => (
+                <option key={instituto.value} value={instituto.value}>
+                  {instituto.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -217,7 +238,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         {/* Filtros Avançados - Expansíveis */}
         {isExpanded && (
           <div className="pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="requerente">Requerente</Label>
                 <Input
@@ -268,6 +289,15 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   <X 
                     className="h-3 w-3 cursor-pointer" 
                     onClick={() => handleFilterChange('tipo', '')}
+                  />
+                </Badge>
+              )}
+              {filters.instituto && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  Instituto: {getInstitutoLabel(filters.instituto)}
+                  <X 
+                    className="h-3 w-3 cursor-pointer" 
+                    onClick={() => handleFilterChange('instituto', '')}
                   />
                 </Badge>
               )}

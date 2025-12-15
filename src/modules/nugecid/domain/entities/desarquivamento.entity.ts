@@ -22,6 +22,8 @@ export interface DesarquivamentoDomainProps {
   finalidadeDesarquivamento: string;
   solicitacaoProrrogacao: boolean;
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
   criadoPorId: number;
   responsavelId?: number;
   createdAt: Date;
@@ -47,6 +49,8 @@ export class DesarquivamentoDomain {
     private readonly _finalidadeDesarquivamento: string,
     private readonly _solicitacaoProrrogacao: boolean,
     private readonly _urgente: boolean | undefined,
+    private readonly _instituto: string | undefined,
+    private readonly _requerente: string | undefined,
     private readonly _criadoPorId: number,
     private _responsavelId: number | undefined,
     private readonly _createdAt: Date,
@@ -56,14 +60,14 @@ export class DesarquivamentoDomain {
     this.validate();
   }
 
-  // Factory method para criar nova instÃ¢ncia
+  // Factory method para criar nova instância
   static create(
     props: Omit<DesarquivamentoDomainProps, "id" | "createdAt" | "updatedAt">,
   ): DesarquivamentoDomain {
     const now = new Date();
 
     return new DesarquivamentoDomain(
-      undefined, // ID serÃ¡ gerado pelo repositÃ³rio
+      undefined, // ID será gerado pelo repositório
       props.numeroSolicitacao,
       props.tipoDesarquivamento,
       props.status || StatusDesarquivamento.createSolicitado(),
@@ -79,6 +83,8 @@ export class DesarquivamentoDomain {
       props.finalidadeDesarquivamento,
       props.solicitacaoProrrogacao,
       props.urgente,
+      props.instituto,
+      props.requerente,
       props.criadoPorId,
       props.responsavelId,
       now,
@@ -106,6 +112,8 @@ export class DesarquivamentoDomain {
       props.finalidadeDesarquivamento,
       props.solicitacaoProrrogacao,
       props.urgente,
+      props.instituto,
+      props.requerente,
       props.criadoPorId,
       props.responsavelId,
       props.createdAt,
@@ -181,6 +189,14 @@ export class DesarquivamentoDomain {
 
   get urgente(): boolean | undefined {
     return this._urgente;
+  }
+
+  get instituto(): string | undefined {
+    return this._instituto;
+  }
+
+  get requerente(): string | undefined {
+    return this._requerente;
   }
 
   get criadoPorId(): number {
@@ -518,7 +534,7 @@ export class DesarquivamentoDomain {
     return this._deletedAt !== undefined;
   }
 
-  // Converte para objeto simples (para serializaÃ§Ã£o)
+  // Converte para objeto simples (para serialização)
   toPlainObject(): any {
     return {
       id: this._id?.value,
@@ -536,6 +552,8 @@ export class DesarquivamentoDomain {
       finalidadeDesarquivamento: this._finalidadeDesarquivamento,
       solicitacaoProrrogacao: this._solicitacaoProrrogacao,
       urgente: this._urgente,
+      instituto: this._instituto,
+      requerente: this._requerente,
       criadoPorId: this._criadoPorId,
       responsavelId: this._responsavelId,
       createdAt: this._createdAt,

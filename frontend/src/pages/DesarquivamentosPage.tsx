@@ -48,6 +48,8 @@ import { StatusDesarquivamento, TipoSolicitacao, TipoDesarquivamento, CreateDesa
 import { formatDate, getStatusLabel, getTipoLabel, getTipoDesarquivamentoLabel } from '@/utils/format'
 import { toast } from 'sonner'
 import { Pagination } from '@/components/ui/Pagination'
+import { INSTITUTOS, getInstitutoLabel } from '@/constants/institutos'
+import { REQUERENTES, getRequerenteLabel } from '@/constants/requerentes'
 import { TableLoading } from '@/components/ui/Loading'
 import { ImportModal } from '@/components/desarquivamentos/ImportModal'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui'
@@ -65,6 +67,8 @@ const DesarquivamentosPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [tipoFilter, setTipoFilter] = useState<string>('all')
   const [tipoDesarquivamentoFilter, setTipoDesarquivamentoFilter] = useState<string>('all')
+  const [institutoFilter, setInstitutoFilter] = useState<string>('all')
+  const [requerenteFilter, setRequerenteFilter] = useState<string>('all')
   const [dateRange, setDateRange] = useState<DateRange>({ startDate: null, endDate: null })
   const [currentPage, setCurrentPage] = useState(1)
   // Exibir todos em uma única página (até 100 itens)
@@ -131,10 +135,12 @@ const DesarquivamentosPage: React.FC = () => {
         tipoDesarquivamentoFilter !== 'all'
           ? (tipoDesarquivamentoFilter as TipoDesarquivamento)
           : undefined,
+      instituto: institutoFilter !== 'all' ? institutoFilter : undefined,
+      requerente: requerenteFilter !== 'all' ? requerenteFilter : undefined,
       startDate: toYMD(dateRange.startDate, false),
       endDate: toYMD(dateRange.endDate, true),
     }
-  }, [currentPage, pageSize, searchTerm, statusFilter, tipoFilter, tipoDesarquivamentoFilter, dateRange])
+  }, [currentPage, pageSize, searchTerm, statusFilter, tipoFilter, tipoDesarquivamentoFilter, institutoFilter, requerenteFilter, dateRange])
 
   const { data, isLoading, error, refetch } = useDesarquivamentos(queryParams)
   const deleteDesarquivamento = useDeleteDesarquivamento()
@@ -293,7 +299,7 @@ const DesarquivamentosPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">
             Erro ao carregar dados
           </h3>
@@ -441,9 +447,38 @@ const DesarquivamentosPage: React.FC = () => {
                   <SelectItem value={TipoDesarquivamento.DIGITAL}>
                     {getTipoDesarquivamentoLabel(TipoDesarquivamento.DIGITAL)}
                   </SelectItem>
-                  <SelectItem value={TipoDesarquivamento.NAO_LOCALIZADO}>
-                    {getTipoDesarquivamentoLabel(TipoDesarquivamento.NAO_LOCALIZADO)}
-                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="instituto" className="text-sm font-medium">Instituto</label>
+              <Select value={institutoFilter} onValueChange={setInstitutoFilter}>
+                <SelectTrigger id="instituto" name="instituto">
+                  <SelectValue placeholder="Todos os institutos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os institutos</SelectItem>
+                  {INSTITUTOS.map((instituto) => (
+                    <SelectItem key={instituto.value} value={instituto.value}>
+                      {instituto.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="requerente" className="text-sm font-medium">Requerente</label>
+              <Select value={requerenteFilter} onValueChange={setRequerenteFilter}>
+                <SelectTrigger id="requerente" name="requerente">
+                  <SelectValue placeholder="Todos os requerentes" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="all">Todos os requerentes</SelectItem>
+                  {REQUERENTES.map((requerente) => (
+                    <SelectItem key={requerente.value} value={requerente.value}>
+                      {requerente.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -470,19 +505,19 @@ const DesarquivamentosPage: React.FC = () => {
                 <Table className="compact-desarquivamentos" containerClassName="overflow-y-auto overflow-x-hidden">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Desarquivamento Físico/Digital</TableHead>
+                      <TableHead>Físico/Digital</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Nome completo</TableHead>
-                      <TableHead>Nº DO NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA</TableHead>
-                      <TableHead>Nº Processo</TableHead>
-                      <TableHead>Tipo de Documento</TableHead>
-                      <TableHead>Data de Solicitação</TableHead>
-                      <TableHead>Data do Desarquivamento - SAG</TableHead>
-                      <TableHead>Data da Devolução Pelo Setor</TableHead>
-                      <TableHead>Setor Demandante</TableHead>
-                      <TableHead>SERVIDOR DO ITEP RESPONSÁVEL (MATRÍCULA)</TableHead>
-                      <TableHead>Finalidade do Desarquivamento</TableHead>
-                      <TableHead>Solicitação de Prorrogação de Prazo de Desarquivamento</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>NIC/Laudo</TableHead>
+                      <TableHead>Processo</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Solicitação</TableHead>
+                      <TableHead>Desarquivamento</TableHead>
+                      <TableHead>Devolução</TableHead>
+                      <TableHead>Setor</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>Finalidade</TableHead>
+                      <TableHead>Prorrogação</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>

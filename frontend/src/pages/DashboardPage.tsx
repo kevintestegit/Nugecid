@@ -132,10 +132,16 @@ const DashboardPage: React.FC = () => {
             key="stats"
             data={{
               total: stats?.data?.totalDesarquivamentos || 0,
-              pendentes: stats?.data.atendimentosPendentes || 0,
+              pendentes: (
+                stats?.data.pendentesAtrasados ??
+                stats?.data.requisicoesPendentes ??
+                stats?.data.atendimentosPendentes ??
+                0
+              ),
               urgentes: stats?.data?.urgentes || 0,
               porTipo: stats?.data?.porTipo || {},
               porStatus: stats?.data?.porStatus || {},
+              porInstituto: stats?.data?.porInstituto || {},
               recentes: stats?.data.recentes || [],
               totalMesAnterior: stats?.data?.totalMesAnterior,
               pendentesMesAnterior: stats?.data?.pendentesMesAnterior,

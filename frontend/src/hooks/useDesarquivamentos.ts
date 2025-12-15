@@ -29,6 +29,8 @@ export const useDesarquivamentos = (
     tipoDesarquivamento?: string | string[]
     dataInicio?: string
     dataFim?: string
+    startDate?: string
+    endDate?: string
   } = {}
 ): UseQueryResult<PaginatedResponse<Desarquivamento>> => {
   // A API suporta até 100 por página; usar 100 para listar tudo

@@ -6,6 +6,7 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   JoinColumn,
 } from "typeorm";
 
@@ -93,6 +94,7 @@ export class Tarefa {
   /**
    * Campo lógico: não há coluna deleted_at em tarefas.
    */
+  @DeleteDateColumn({ name: "deleted_at" })
   deletedAt?: Date;
 
   // Relacionamentos (lado inverso)

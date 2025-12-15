@@ -33,8 +33,8 @@ interface Projeto {
   nome: string;
   descricao?: string;
   cor?: string;
-  data_criacao: string;
-  data_atualizacao: string;
+  data_criacao?: string;
+  data_atualizacao?: string;
   ativo: boolean;
   favorito?: boolean;
   total_tarefas?: number;
@@ -82,10 +82,17 @@ const ProjetosPage: React.FC = () => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
       const response = await kanbanService.getProjetos();
+      const projetos = (Array.isArray(response) ? response : (response as any)?.data || []) as any[];
+      const normalized = projetos.map((p) => ({
+        ...p,
+        data_criacao: p.data_criacao || p.created_at || p.createdAt || null,
+        data_atualizacao: p.data_atualizacao || p.updated_at || p.updatedAt || null,
+        ativo: p.ativo !== undefined ? p.ativo : true,
+      }));
 
       setState(prev => ({
         ...prev,
-        projetos: Array.isArray(response) ? response : (response as any)?.data || [],
+        projetos: normalized,
         loading: false
       }));
     } catch (error: any) {
@@ -258,7 +265,10 @@ const ProjetosPage: React.FC = () => {
 
   // Formatação de data
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    if (!dateString) return 'Sem data';
+    const parsed = new Date(dateString);
+    if (isNaN(parsed.getTime())) return 'Sem data';
+    return parsed.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
