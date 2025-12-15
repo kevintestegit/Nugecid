@@ -90,6 +90,8 @@ export class DesarquivamentoMapper {
     entity.finalidadeDesarquivamento = domain.finalidadeDesarquivamento;
     entity.solicitacaoProrrogacao = domain.solicitacaoProrrogacao;
     entity.urgente = domain.urgente;
+    entity.instituto = domain.instituto;
+    entity.requerente = domain.requerente;
     entity.criadoPorId = domain.criadoPorId;
     entity.responsavelId = domain.responsavelId;
 
@@ -145,6 +147,8 @@ export class DesarquivamentoMapper {
       finalidadeDesarquivamento: entity.finalidadeDesarquivamento,
       solicitacaoProrrogacao: entity.solicitacaoProrrogacao,
       urgente: entity.urgente,
+      instituto: entity.instituto,
+      requerente: entity.requerente,
       criadoPorId: entity.criadoPorId,
       responsavelId: entity.responsavelId,
       createdAt: entity.createdAt,
@@ -216,6 +220,8 @@ export class DesarquivamentoMapper {
       finalidadeDesarquivamento: domain.finalidadeDesarquivamento,
       solicitacaoProrrogacao: domain.solicitacaoProrrogacao,
       urgente: domain.urgente,
+      instituto: domain.instituto,
+      requerente: domain.requerente,
       criadoPorId: domain.criadoPorId,
       responsavelId: domain.responsavelId,
       createdAt: domain.createdAt,

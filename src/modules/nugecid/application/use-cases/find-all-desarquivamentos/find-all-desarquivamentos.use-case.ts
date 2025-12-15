@@ -23,6 +23,7 @@ export interface FindAllDesarquivamentosRequest {
     criadoPorId?: number;
     responsavelId?: number;
     urgente?: boolean;
+    instituto?: string;
     dataInicio?: Date;
     dataFim?: Date;
     incluirExcluidos?: boolean;
@@ -49,6 +50,8 @@ export interface FindAllDesarquivamentosResponse {
     finalidadeDesarquivamento: string;
     solicitacaoProrrogacao: boolean;
     urgente?: boolean;
+    instituto?: string;
+    requerente?: string;
     criadoPorId: number;
     responsavelId?: number;
     createdAt: Date;
@@ -240,10 +243,11 @@ export class FindAllDesarquivamentosUseCase {
       return filters;
     }
 
-    // Usuários com role NUGECID_VIEWER/OPERATOR podem ver todos os registros
+    // Usuários com role NUGECID_VIEWER/OPERATOR/COORDENADOR podem ver todos os registros
     if (
       upperCaseUserRoles.includes("NUGECID_VIEWER") ||
-      upperCaseUserRoles.includes("NUGECID_OPERATOR")
+      upperCaseUserRoles.includes("NUGECID_OPERATOR") ||
+      upperCaseUserRoles.includes("COORDENADOR")
     ) {
       return filters;
     }
@@ -282,6 +286,8 @@ export class FindAllDesarquivamentosUseCase {
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: desarquivamento.solicitacaoProrrogacao,
       urgente: desarquivamento.urgente,
+      instituto: desarquivamento.instituto,
+      requerente: desarquivamento.requerente,
       criadoPorId: desarquivamento.criadoPorId,
       responsavelId: desarquivamento.responsavelId,
       createdAt: desarquivamento.createdAt,

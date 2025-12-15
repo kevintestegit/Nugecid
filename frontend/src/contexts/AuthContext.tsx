@@ -220,12 +220,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (resource === 'projetos' || resource === 'tarefas') {
         return ['create', 'read', 'update', 'delete'].includes(action)
       }
+      if (resource === 'arquivos') {
+        return ['create', 'read', 'update', 'delete'].includes(action)
+      }
     }
 
     // Usuário comum tem permissões limitadas
     if (user.role?.name === 'usuario') {
       // Pode apenas visualizar desarquivamentos
       if (resource === 'desarquivamentos') {
+        return action === 'read'
+      }
+      if (resource === 'arquivos') {
         return action === 'read'
       }
       // Pode visualizar projetos e tarefas, criar/editar suas próprias tarefas

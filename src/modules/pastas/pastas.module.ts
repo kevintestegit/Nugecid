@@ -5,11 +5,13 @@ import { PastasController } from "./pastas.controller";
 import { Pasta } from "./entities/pasta.entity";
 import { PastaArquivo } from "./entities/pasta-arquivo.entity";
 import { NotificacoesModule } from "../notificacoes/notificacoes.module";
+import { AuthModule } from "../auth/auth.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Pasta, PastaArquivo]),
     NotificacoesModule,
+    AuthModule,
   ],
   controllers: [PastasController],
   providers: [PastasService],

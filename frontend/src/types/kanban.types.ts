@@ -42,6 +42,7 @@ export interface Projeto {
   dataFim?: string;
   status: string;
   progresso: number;
+  membros?: MembroProjeto[];
 }
 
 export interface Usuario {
@@ -123,6 +124,16 @@ export interface WipStatus {
   count: number;
   limit: number | null;
   exceeded: boolean;
+}
+
+export type PapelMembro = 'admin' | 'editor' | 'viewer';
+
+export interface MembroProjeto {
+  id: number;
+  projetoId: number;
+  usuarioId: number;
+  papel: PapelMembro;
+  usuario?: Usuario;
 }
 
 // Helpers para calcular status de prazo

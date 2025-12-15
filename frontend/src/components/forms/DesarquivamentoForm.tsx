@@ -1,5 +1,5 @@
 import React from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
@@ -8,10 +8,15 @@ import { Label } from '@/components/ui/Label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ButtonLoading } from '@/components/ui/Loading'
-import { AlertCircle, FileText, User, Briefcase, Calendar, Hash } from 'lucide-react'
-import { TipoDesarquivamento, CreateDesarquivamentoDto, TipoSolicitacao, StatusDesarquivamento } from '@/types'
-import { getTipoDesarquivamentoLabel, getTipoSolicitacaoLabel, getStatusLabel } from '@/utils/format'
+import { FileText } from 'lucide-react'
+import { TipoDesarquivamento, CreateDesarquivamentoDto } from '@/types'
+import { getTipoDesarquivamentoLabel } from '@/utils/format'
 import { Checkbox } from '../ui/Checkbox'
+import { DatePicker } from '@/components/ui/DatePicker'
+import { Textarea } from '@/components/ui/Textarea'
+import { Combobox } from '@/components/ui/Combobox'
+import { INSTITUTOS } from '@/constants/institutos'
+import { REQUERENTES } from '@/constants/requerentes'
 
 const desarquivamentoSchema = z.object({
   tipoDesarquivamento: z.nativeEnum(TipoDesarquivamento, {
@@ -30,15 +35,12 @@ const desarquivamentoSchema = z.object({
     .string()
     .min(3, 'O tipo de documento é obrigatório')
     .max(100, 'O tipo de documento deve ter no máximo 100 caracteres'),
-  dataSolicitacao: z
-    .string()
-    .min(1, 'A data de solicitação é obrigatória')
-    .refine((date) => {
-      const parsedDate = new Date(date);
-      return !isNaN(parsedDate.getTime());
-    }, 'Formato de data inválido'),
-  dataDesarquivamentoSAG: z.string().optional(),
-  dataDevolucaoSetor: z.string().optional(),
+  dataSolicitacao: z.date({
+    required_error: "A data de solicitação é obrigatória",
+    invalid_type_error: "Data inválida",
+  }),
+  dataDesarquivamentoSAG: z.date().optional().nullable(),
+  dataDevolucaoSetor: z.date().optional().nullable(),
   setorDemandante: z
     .string()
     .min(2, 'O setor demandante é obrigatório')
@@ -55,6 +57,8 @@ const desarquivamentoSchema = z.object({
   solicitacaoProrrogacaoTexto: z.string().optional(),
   dadosAdicionais: z.string().optional(),
   urgente: z.boolean().optional(),
+  instituto: z.string().max(255, 'O instituto deve ter no máximo 255 caracteres').optional(),
+  requerente: z.string().max(255, 'O requerente deve ter no máximo 255 caracteres').optional(),
 })
 
 type DesarquivamentoFormData = z.infer<typeof desarquivamentoSchema>
@@ -63,7 +67,7 @@ interface DesarquivamentoFormProps {
   onSubmit: (data: CreateDesarquivamentoDto) => Promise<void>
   isLoading?: boolean
   isEdit?: boolean
-  initialData?: any // Simplificado para o exemplo
+  initialData?: any
 }
 
 const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
@@ -72,42 +76,46 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
   isEdit = false,
   initialData,
 }) => {
+  // Converte strings de data do initialData para objetos Date, se necessário
+  const defaultValues = React.useMemo(() => {
+    const data = initialData || {}
+    return {
+      ...data,
+      tipoDesarquivamento: data.tipoDesarquivamento || undefined, // Evita string vazia
+      dataSolicitacao: data.dataSolicitacao ? new Date(data.dataSolicitacao) : new Date(),
+      dataDesarquivamentoSAG: data.dataDesarquivamentoSAG ? new Date(data.dataDesarquivamentoSAG) : undefined,
+      dataDevolucaoSetor: data.dataDevolucaoSetor ? new Date(data.dataDevolucaoSetor) : undefined,
+      solicitacaoProrrogacao: data.solicitacaoProrrogacao || false,
+      solicitacaoProrrogacaoTexto: data.solicitacaoProrrogacaoTexto || '',
+      dadosAdicionais: data.dadosAdicionais || '',
+      urgente: data.urgente || false,
+      instituto: data.instituto || '',
+      requerente: data.requerente || '',
+    }
+  }, [initialData])
+
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    control,
     formState: { errors },
   } = useForm<DesarquivamentoFormData>({
     resolver: zodResolver(desarquivamentoSchema),
-    defaultValues: initialData || {
-      solicitacaoProrrogacao: false,
-      solicitacaoProrrogacaoTexto: '',
-      dadosAdicionais: '',
-      urgente: false,
-      dataSolicitacao: new Date().toISOString().split('T')[0],
-    },
+    defaultValues,
   })
 
-  const normalizeDate = (value?: string) => {
-    if (!value) return undefined
-    const trimmed = value.trim()
-    if (!trimmed) return undefined
-    const parsed = new Date(`${trimmed}T00:00:00`)
-    if (Number.isNaN(parsed.getTime())) return undefined
-    return parsed.toISOString()
-  }
   const onFormSubmit = async (data: DesarquivamentoFormData) => {
-    // Garantir que as datas estejam no formato correto (YYYY-MM-DD) quando preenchidas
-    const dataSolicitacaoISO = normalizeDate(data.dataSolicitacao)
+    // Converter datas para ISO string antes de enviar
     const formattedData = {
       ...data,
       numeroNicLaudoAuto: data.numeroNicLaudoAuto || '',
-      dataSolicitacao: dataSolicitacaoISO ?? data.dataSolicitacao,
-      dataDesarquivamentoSAG: normalizeDate(data.dataDesarquivamentoSAG) ?? undefined,
-      dataDevolucaoSetor: normalizeDate(data.dataDevolucaoSetor) ?? undefined,
+      dataSolicitacao: data.dataSolicitacao.toISOString(),
+      dataDesarquivamentoSAG: data.dataDesarquivamentoSAG?.toISOString(),
+      dataDevolucaoSetor: data.dataDevolucaoSetor?.toISOString(),
     }
-    await onSubmit(formattedData as CreateDesarquivamentoDto)
+    await onSubmit(formattedData as unknown as CreateDesarquivamentoDto)
   }
 
   return (
@@ -125,25 +133,29 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="tipoDesarquivamento">Desarquivamento Físico/Digital *</Label>
-            <Select
-              value={watch('tipoDesarquivamento')}
-              onValueChange={(value) => setValue('tipoDesarquivamento', value as TipoDesarquivamento)}
-            >
-              <SelectTrigger className={errors.tipoDesarquivamento ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Selecione o tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(TipoDesarquivamento).map((tipo) => (
-                  <SelectItem key={tipo} value={tipo}>
-                    {getTipoDesarquivamentoLabel(tipo)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.tipoDesarquivamento && <p className="text-sm text-red-600">{errors.tipoDesarquivamento.message}</p>}
+            <Controller
+              control={control}
+              name="tipoDesarquivamento"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
+                  <SelectTrigger className={errors.tipoDesarquivamento ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(TipoDesarquivamento).map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>
+                        {getTipoDesarquivamentoLabel(tipo)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.tipoDesarquivamento && <p className="text-sm text-destructive">{errors.tipoDesarquivamento.message}</p>}
           </div>
-
-
 
           <div className="space-y-2">
             <Label htmlFor="nomeCompleto">Nome Completo *</Label>
@@ -151,9 +163,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               id="nomeCompleto"
               placeholder="Nome completo"
               {...register('nomeCompleto')}
-              className={errors.nomeCompleto ? 'border-red-500' : ''}
+              className={errors.nomeCompleto ? 'border-destructive' : ''}
             />
-            {errors.nomeCompleto && <p className="text-sm text-red-600">{errors.nomeCompleto.message}</p>}
+            {errors.nomeCompleto && <p className="text-sm text-destructive">{errors.nomeCompleto.message}</p>}
           </div>
 
           <div className="space-y-2">
@@ -171,9 +183,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               id="numeroProcesso"
               placeholder="Ex: 5000123-45.2025.8.20.0001"
               {...register('numeroProcesso')}
-              className={errors.numeroProcesso ? 'border-red-500' : ''}
+              className={errors.numeroProcesso ? 'border-destructive' : ''}
             />
-            {errors.numeroProcesso && <p className="text-sm text-red-600">{errors.numeroProcesso.message}</p>}
+            {errors.numeroProcesso && <p className="text-sm text-destructive">{errors.numeroProcesso.message}</p>}
           </div>
 
           <div className="space-y-2">
@@ -182,37 +194,51 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               id="tipoDocumento"
               placeholder="Ex: Laudo Pericial, Inquérito Policial"
               {...register('tipoDocumento')}
-              className={errors.tipoDocumento ? 'border-red-500' : ''}
+              className={errors.tipoDocumento ? 'border-destructive' : ''}
             />
-            {errors.tipoDocumento && <p className="text-sm text-red-600">{errors.tipoDocumento.message}</p>}
+            {errors.tipoDocumento && <p className="text-sm text-destructive">{errors.tipoDocumento.message}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="dataSolicitacao">Data de Solicitação *</Label>
-            <Input
-              id="dataSolicitacao"
-              type="date"
-              {...register('dataSolicitacao')}
-              className={errors.dataSolicitacao ? 'border-red-500' : ''}
+            <Controller
+              control={control}
+              name="dataSolicitacao"
+              render={({ field }) => (
+                <DatePicker
+                  date={field.value}
+                  setDate={field.onChange}
+                />
+              )}
             />
-            {errors.dataSolicitacao && <p className="text-sm text-red-600">{errors.dataSolicitacao.message}</p>}
+            {errors.dataSolicitacao && <p className="text-sm text-destructive">{errors.dataSolicitacao.message}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="dataDesarquivamentoSAG">Data do Desarquivamento - SAG</Label>
-            <Input
-              id="dataDesarquivamentoSAG"
-              type="date"
-              {...register('dataDesarquivamentoSAG')}
+            <Controller
+              control={control}
+              name="dataDesarquivamentoSAG"
+              render={({ field }) => (
+                <DatePicker
+                  date={field.value || undefined}
+                  setDate={field.onChange}
+                />
+              )}
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="dataDevolucaoSetor">Data da Devolução pelo Setor</Label>
-            <Input
-              id="dataDevolucaoSetor"
-              type="date"
-              {...register('dataDevolucaoSetor')}
+            <Controller
+              control={control}
+              name="dataDevolucaoSetor"
+              render={({ field }) => (
+                <DatePicker
+                  date={field.value || undefined}
+                  setDate={field.onChange}
+                />
+              )}
             />
           </div>
         </CardContent>
@@ -224,14 +250,60 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
+            <Label htmlFor="instituto">Instituto</Label>
+            <Controller
+              control={control}
+              name="instituto"
+              render={({ field }) => (
+                <Select
+                  value={field.value || ''}
+                  onValueChange={field.onChange}
+                >
+                  <SelectTrigger className={errors.instituto ? 'border-destructive' : ''}>
+                    <SelectValue placeholder="Selecione o instituto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INSTITUTOS.map((instituto) => (
+                      <SelectItem key={instituto.value} value={instituto.value}>
+                        {instituto.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.instituto && <p className="text-sm text-destructive">{errors.instituto.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="requerente">Requerente</Label>
+            <Controller
+              name="requerente"
+              control={control}
+              render={({ field }) => (
+                <Combobox
+                  options={REQUERENTES}
+                  value={field.value || ''}
+                  onValueChange={field.onChange}
+                  placeholder="Selecione o requerente"
+                  searchPlaceholder="Buscar requerente..."
+                  emptyMessage="Nenhum requerente encontrado."
+                  className={errors.requerente ? 'border-destructive' : ''}
+                />
+              )}
+            />
+            {errors.requerente && <p className="text-sm text-destructive">{errors.requerente.message}</p>}
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="setorDemandante">Setor Demandante *</Label>
             <Input
               id="setorDemandante"
               placeholder="Nome do setor"
               {...register('setorDemandante')}
-              className={errors.setorDemandante ? 'border-red-500' : ''}
+              className={errors.setorDemandante ? 'border-destructive' : ''}
             />
-            {errors.setorDemandante && <p className="text-sm text-red-600">{errors.setorDemandante.message}</p>}
+            {errors.setorDemandante && <p className="text-sm text-destructive">{errors.setorDemandante.message}</p>}
           </div>
 
           <div className="space-y-2">
@@ -240,9 +312,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               id="servidorResponsavel"
               placeholder="Matrícula do servidor"
               {...register('servidorResponsavel')}
-              className={errors.servidorResponsavel ? 'border-red-500' : ''}
+              className={errors.servidorResponsavel ? 'border-destructive' : ''}
             />
-            {errors.servidorResponsavel && <p className="text-sm text-red-600">{errors.servidorResponsavel.message}</p>}
+            {errors.servidorResponsavel && <p className="text-sm text-destructive">{errors.servidorResponsavel.message}</p>}
           </div>
         </CardContent>
       </Card>
@@ -254,20 +326,26 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="finalidadeDesarquivamento">Finalidade do Desarquivamento *</Label>
-            <textarea
+            <Textarea
               id="finalidadeDesarquivamento"
               placeholder="Descreva o motivo da solicitação..."
               {...register('finalidadeDesarquivamento')}
-              className={`min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none ${errors.finalidadeDesarquivamento ? 'border-red-500' : ''}`}
+              className={errors.finalidadeDesarquivamento ? 'border-destructive' : ''}
               rows={4}
             />
-            {errors.finalidadeDesarquivamento && <p className="text-sm text-red-600">{errors.finalidadeDesarquivamento.message}</p>}
+            {errors.finalidadeDesarquivamento && <p className="text-sm text-destructive">{errors.finalidadeDesarquivamento.message}</p>}
           </div>
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="solicitacaoProrrogacao"
-              checked={watch('solicitacaoProrrogacao')}
-              onCheckedChange={(checked) => setValue('solicitacaoProrrogacao', !!checked)}
+            <Controller
+              control={control}
+              name="solicitacaoProrrogacao"
+              render={({ field }) => (
+                <Checkbox
+                  id="solicitacaoProrrogacao"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="solicitacaoProrrogacao">Solicitação de Prorrogação de Prazo de Desarquivamento</Label>
           </div>
@@ -275,11 +353,10 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
           {watch('solicitacaoProrrogacao') && (
             <div className="space-y-2">
               <Label htmlFor="solicitacaoProrrogacaoTexto">Texto da Solicitação de Prorrogação</Label>
-              <textarea
+              <Textarea
                 id="solicitacaoProrrogacaoTexto"
                 placeholder="Descreva os detalhes da solicitação de prorrogação..."
                 {...register('solicitacaoProrrogacaoTexto')}
-                className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
                 rows={3}
               />
             </div>
@@ -287,20 +364,25 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
 
           <div className="space-y-2">
             <Label htmlFor="dadosAdicionais">Dados Adicionais</Label>
-            <textarea
+            <Textarea
               id="dadosAdicionais"
               placeholder="Informações complementares (filiação, naturalidade, etc.)..."
               {...register('dadosAdicionais')}
-              className="min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
               rows={3}
             />
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="urgente"
-              checked={watch('urgente')}
-              onCheckedChange={(checked) => setValue('urgente', !!checked)}
+            <Controller
+              control={control}
+              name="urgente"
+              render={({ field }) => (
+                <Checkbox
+                  id="urgente"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="urgente">Solicitação Urgente</Label>
           </div>

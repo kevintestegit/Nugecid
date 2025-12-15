@@ -25,6 +25,11 @@ export interface GetDashboardStatsResponse {
     naoLocalizado: number;
   };
   porMes: Record<string, number>;
+  porInstituto: {
+    IC: number;
+    II: number;
+    IML: number;
+  };
   taxaConclusao: number;
   tempoMedioAtendimento: number;
   registrosVencendoEm7Dias: number;
@@ -108,6 +113,11 @@ export class GetDashboardStatsUseCase {
         naoLocalizado: stats.porTipo["NAO_LOCALIZADO"] || 0,
       },
       porMes: stats.porMes,
+      porInstituto: {
+        IC: stats.porInstituto?.["IC"] || 0,
+        II: stats.porInstituto?.["II"] || 0,
+        IML: stats.porInstituto?.["IML"] || 0,
+      },
       taxaConclusao: stats.taxaConclusao,
       tempoMedioAtendimento: stats.tempoMedioAtendimento,
       registrosVencendoEm7Dias: stats.registrosVencendoEm7Dias,

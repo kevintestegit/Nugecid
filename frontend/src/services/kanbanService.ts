@@ -62,25 +62,19 @@ interface MoveColumnDto {
   ordem: number;
 }
 
+type PapelMembro = 'admin' | 'editor' | 'viewer';
+
 interface ProjetoMembro {
   id: number;
-  usuario_id: number;
-  papel: 'admin' | 'membro' | 'visualizador';
-  usuario: {
+  projetoId?: number;
+  usuarioId: number;
+  papel: PapelMembro;
+  usuario?: {
     id: number;
-    nome: string;
-    email: string;
-    avatar?: string;
+    nome?: string;
+    usuario?: string;
+    avatarUrl?: string | null;
   };
-}
-
-interface AddMembroDto {
-  usuario_id: number;
-  papel: 'admin' | 'membro' | 'visualizador';
-}
-
-interface UpdateMembroDto {
-  papel: 'admin' | 'membro' | 'visualizador';
 }
 
 interface Comentario {
@@ -143,6 +137,14 @@ class KanbanService {
     return response.data;
   }
 
+  async searchUsuariosParaProjeto(projetoId: number, search?: string) {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await api.get(`/projetos/${projetoId}/membros/lookup${qs}`);
+    return response.data as { id: number; nome?: string; usuario?: string; avatarUrl?: string | null }[];
+  }
+
   async addProjetoMembro(projetoId: number, data: AddMembroDto): Promise<ProjetoMembro> {
     const response = await api.post(`/projetos/${projetoId}/membros`, data);
     return response.data;
@@ -159,7 +161,10 @@ class KanbanService {
 
   // Colunas
   async getColunas(projetoId: number): Promise<Coluna[]> {
-    const response = await api.get(`/projetos/${projetoId}/colunas`);
+    // Backend expõe GET /colunas?projetoId=...
+    const response = await api.get(`/colunas`, {
+      params: { projetoId },
+    });
     return response.data;
   }
 
@@ -204,7 +209,11 @@ class KanbanService {
     }
     
     const response = await api.get(url);
-    return response.data;
+    const payload = response.data;
+    // API pode retornar { data, meta }; normalizar para array
+    if (payload && Array.isArray(payload.data)) return payload.data as Tarefa[];
+    if (Array.isArray(payload)) return payload as Tarefa[];
+    return [];
   }
 
   async getTarefa(id: number): Promise<Tarefa> {
@@ -227,7 +236,8 @@ class KanbanService {
   }
 
   async moveTarefa(id: number, colunaId: number, ordem: number): Promise<void> {
-    await api.patch(`/tarefas/${id}/move`, { coluna_id: colunaId, ordem });
+    // API espera ordem 0-based (aceita >=0); front usa 0-based também
+    await api.patch(`/tarefas/${id}/mover`, { colunaId: colunaId, ordem });
   }
 
   async reorderTarefas(colunaId: number, tarefaIds: number[]): Promise<void> {
@@ -317,4 +327,6 @@ export type {
   Comentario,
   CreateComentarioDto,
   UpdateComentarioDto,
+  MembroProjeto,
+  PapelMembro,
 };

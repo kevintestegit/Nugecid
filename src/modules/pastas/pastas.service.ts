@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { Injectable, NotFoundException, Logger, ForbiddenException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { randomUUID } from "crypto";
@@ -58,6 +58,12 @@ export class PastasService {
 
   private schemaReady: Promise<void> | null = null;
 
+  private ensureOwnership(pasta: Pasta, userId?: number) {
+    if (userId && pasta.criadoPorId && pasta.criadoPorId !== userId) {
+      throw new ForbiddenException("Acesso negado a esta pasta");
+    }
+  }
+
   private async ensureSchema(): Promise<void> {
     if (!this.schemaReady) {
       this.schemaReady = this.createSchemaIfNeeded();
@@ -111,6 +117,7 @@ export class PastasService {
         tags,
         imagens: 0,
         planilhas: 0,
+        criadoPorId: usuarioId || null,
       });
 
       const saved = await manager.save(novaPasta);
@@ -139,16 +146,37 @@ export class PastasService {
     return pastaCompleta;
   }
 
-  async findAll(): Promise<any[]> {
+  async findAll(userId?: number): Promise<any[]> {
     await this.ensureSchema();
-    const pastas = await this.pastasRepository.find({
-      relations: ["arquivos"],
-      order: { dataCriacao: "DESC" },
-    });
-    return pastas.map((pasta) => this.mapToResponse(pasta));
+
+    // Consulta leve: não carregar arquivos, apenas contar por tipo
+    let queryBuilder = this.pastasRepository
+      .createQueryBuilder("pasta")
+      .orderBy("pasta.dataCriacao", "DESC")
+      .loadRelationCountAndMap(
+        "pasta.imagens",
+        "pasta.arquivos",
+        "arquivosImagem",
+        (qb) => qb.where("arquivosImagem.tipo = :img", { img: PastaArquivoTipo.IMAGEM }),
+      )
+      .loadRelationCountAndMap(
+        "pasta.planilhas",
+        "pasta.arquivos",
+        "arquivosPlanilha",
+        (qb) => qb.where("arquivosPlanilha.tipo = :planilha", { planilha: PastaArquivoTipo.PLANILHA }),
+      );
+
+    // Filtrar por usuário se não for admin/coordenador
+    if (userId) {
+      queryBuilder = queryBuilder.andWhere("pasta.criadoPorId = :userId", { userId });
+    }
+
+    const pastas = await queryBuilder.getMany();
+    // Não precisamos mapear arquivos aqui; apenas retornamos contagens e metadados básicos
+    return pastas;
   }
 
-  async findOne(id: string): Promise<any> {
+  async findOne(id: string, userId?: number): Promise<any> {
     await this.ensureSchema();
     const pasta = await this.pastasRepository.findOne({
       where: { id },
@@ -157,21 +185,24 @@ export class PastasService {
     if (!pasta) {
       throw new NotFoundException("Pasta nao encontrada");
     }
+    this.ensureOwnership(pasta, userId);
     return this.mapToResponse(pasta);
   }
 
-  async update(id: string, updatePastaDto: UpdatePastaDto): Promise<any> {
+  async update(id: string, updatePastaDto: UpdatePastaDto, userId?: number): Promise<any> {
     await this.ensureSchema();
+    await this.findOne(id, userId); // valida acesso
     const payload: Partial<Pasta> = { ...updatePastaDto };
     if (updatePastaDto.tags !== undefined) {
       payload.tags = this.normalizeTags(updatePastaDto.tags);
     }
     await this.pastasRepository.update(id, payload);
-    return this.findOne(id);
+    return this.findOne(id, userId);
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string, userId?: number): Promise<void> {
     await this.ensureSchema();
+    await this.findOne(id, userId); // valida acesso
     const arquivos = await this.pastaArquivoRepository.find({
       where: { pastaId: id },
     });
@@ -184,18 +215,22 @@ export class PastasService {
     await this.pastasRepository.delete(id);
   }
 
-  async adicionarArquivos(id: string, files?: PastaFilesPayload): Promise<any> {
+  async adicionarArquivos(id: string, files?: PastaFilesPayload, userId?: number): Promise<any> {
     await this.ensureSchema();
-    const pasta = await this.pastasRepository.findOneBy({ id });
+    const pasta = await this.pastasRepository.findOne({
+      where: { id },
+      relations: ["arquivos"],
+    });
     if (!pasta) {
       throw new NotFoundException("Pasta nao encontrada");
     }
+    this.ensureOwnership(pasta, userId);
 
     await this.persistArquivos(pasta, files);
-    return this.findOne(id);
+    return this.findOne(id, userId);
   }
 
-  async listarArquivos(pastaId: string): Promise<any[]> {
+  async listarArquivos(pastaId: string, userId?: number): Promise<any[]> {
     await this.ensureSchema();
     const pasta = await this.pastasRepository.findOne({
       where: { id: pastaId },
@@ -204,6 +239,7 @@ export class PastasService {
     if (!pasta) {
       throw new NotFoundException("Pasta nao encontrada");
     }
+    this.ensureOwnership(pasta, userId);
     return (
       pasta.arquivos?.map((arquivo) =>
         this.mapArquivoResponse(pasta, arquivo),
@@ -211,7 +247,7 @@ export class PastasService {
     );
   }
 
-  async listarItens(pastaId: string): Promise<{
+  async listarItens(pastaId: string, userId?: number): Promise<{
     pasta: any;
     totalItens: number;
     planilhas: ParsedPlanilha[];
@@ -225,6 +261,7 @@ export class PastasService {
     if (!pasta) {
       throw new NotFoundException("Pasta nao encontrada");
     }
+    this.ensureOwnership(pasta, userId);
 
     const planilhas = await this.carregarPlanilhas(pasta);
     const totalItens = planilhas.reduce(
@@ -242,6 +279,7 @@ export class PastasService {
   async buscarItens(
     query?: string,
     limit = 50,
+    userId?: number,
   ): Promise<{
     query: string;
     total: number;
@@ -258,9 +296,16 @@ export class PastasService {
       };
     }
 
-    const pastas = await this.pastasRepository.find({
-      relations: ["arquivos"],
-    });
+    let queryBuilder = this.pastasRepository
+      .createQueryBuilder("pasta")
+      .leftJoinAndSelect("pasta.arquivos", "arquivos");
+    
+    // Filtrar por usuário se não for admin/coordenador
+    if (userId) {
+      queryBuilder = queryBuilder.andWhere("pasta.criadoPorId = :userId", { userId });
+    }
+    
+    const pastas = await queryBuilder.getMany();
 
     const itens: PastaItemRow[] = [];
 
@@ -298,15 +343,23 @@ export class PastasService {
   async obterArquivo(
     pastaId: string,
     arquivoId: string,
+    userId?: number,
   ): Promise<{
     caminhoAbsoluto: string;
     nome: string;
     tipo: PastaArquivoTipo;
   }> {
     await this.ensureSchema();
-    const arquivo = await this.pastaArquivoRepository.findOne({
-      where: { id: arquivoId, pastaId },
+    const pasta = await this.pastasRepository.findOne({
+      where: { id: pastaId },
+      relations: ["arquivos"],
     });
+    if (!pasta) {
+      throw new NotFoundException("Pasta nao encontrada");
+    }
+    this.ensureOwnership(pasta, userId);
+
+    const arquivo = pasta.arquivos?.find((a) => a.id === arquivoId);
     if (!arquivo) {
       throw new NotFoundException("Arquivo nao encontrado");
     }
@@ -319,11 +372,18 @@ export class PastasService {
     };
   }
 
-  async removerArquivo(pastaId: string, arquivoId: string): Promise<any> {
+  async removerArquivo(pastaId: string, arquivoId: string, userId?: number): Promise<any> {
     await this.ensureSchema();
-    const arquivo = await this.pastaArquivoRepository.findOne({
-      where: { id: arquivoId, pastaId },
+    const pasta = await this.pastasRepository.findOne({
+      where: { id: pastaId },
+      relations: ["arquivos"],
     });
+    if (!pasta) {
+      throw new NotFoundException("Pasta nao encontrada");
+    }
+    this.ensureOwnership(pasta, userId);
+
+    const arquivo = pasta.arquivos?.find((a) => a.id === arquivoId);
     if (!arquivo) {
       throw new NotFoundException("Arquivo nao encontrado");
     }
@@ -333,7 +393,7 @@ export class PastasService {
 
     await this.recalcularContagensArquivos(pastaId);
 
-    return this.findOne(pastaId);
+    return this.findOne(pastaId, userId);
   }
 
   private async carregarPlanilhas(pasta: Pasta): Promise<ParsedPlanilha[]> {

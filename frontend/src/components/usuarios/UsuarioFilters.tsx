@@ -25,20 +25,29 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
 
   const handleActiveChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
-    onParamsChange({ 
-      active: value === '' ? undefined : value === 'true' 
-    })
+    if (value === 'deleted') {
+      onParamsChange({ 
+        active: undefined,
+        includeDeleted: true 
+      })
+    } else {
+      onParamsChange({ 
+        active: value === '' ? undefined : value === 'true',
+        includeDeleted: undefined
+      })
+    }
   }
 
   const handleClearFilters = () => {
     onParamsChange({
       search: undefined,
       role: undefined,
-      active: true // Manter apenas usuários ativos por padrão
+      active: true, // Manter apenas usuários ativos por padrão
+      includeDeleted: undefined
     })
   }
 
-  const hasActiveFilters = params.search || params.role || params.active === false
+  const hasActiveFilters = params.search || params.role || params.active === false || params.includeDeleted
 
   return (
     <div className="space-y-4">
@@ -96,13 +105,14 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
             </label>
             <select
               id="active"
-              value={params.active === undefined ? '' : params.active.toString()}
+              value={params.includeDeleted ? 'deleted' : (params.active === undefined ? '' : params.active.toString())}
               onChange={handleActiveChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             >
               <option value="">Todos os status</option>
               <option value="true">Ativos</option>
               <option value="false">Inativos</option>
+              <option value="deleted">Incluir deletados</option>
             </select>
           </div>
         )}
@@ -143,6 +153,18 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
               <button
                 onClick={() => onParamsChange({ active: true })}
                 className="hover:bg-red-200 rounded-full p-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+          
+          {params.includeDeleted && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+              Incluindo deletados
+              <button
+                onClick={() => onParamsChange({ includeDeleted: undefined, active: true })}
+                className="hover:bg-gray-200 rounded-full p-0.5"
               >
                 <X className="h-3 w-3" />
               </button>

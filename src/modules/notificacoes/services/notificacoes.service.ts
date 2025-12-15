@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan } from "typeorm";
+import { Repository, LessThan, In } from "typeorm";
 import {
   Notificacao,
   TipoNotificacao,
@@ -425,7 +425,7 @@ export class NotificacoesService {
     // Buscar todos os usuários válidos de uma vez
     const usuariosValidos = usuariosIdsParaValidar.size > 0
       ? await this.userRepository.find({
-          where: { id: Array.from(usuariosIdsParaValidar) as any },
+          where: { id: In(Array.from(usuariosIdsParaValidar)) },
           select: ["id"],
         })
       : [];

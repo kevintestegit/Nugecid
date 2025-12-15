@@ -19,6 +19,7 @@ interface DashboardStatsData {
   urgentes: number;
   porTipo: Record<string, number>;
   porStatus: Record<string, number>;
+  porInstituto?: Record<string, number>;
   recentes: any[];
   // Dados do mês anterior para comparação
   totalMesAnterior?: number;
@@ -178,6 +179,46 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
             </CardContent>
           </Card>
         </Link>
+      )}
+
+      {/* Gráfico por Instituto */}
+      {data.porInstituto && Object.keys(data.porInstituto).length > 0 && (
+        <Card className="md:col-span-2 lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold">Desarquivamentos por Instituto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {Object.entries(data.porInstituto).map(([instituto, count]) => {
+                const total = Object.values(data.porInstituto || {}).reduce((a, b) => a + b, 0)
+                const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+                const instituteName = instituto === 'IC' ? 'Instituto de Criminalística' :
+                                     instituto === 'II' ? 'Instituto de Identificação' :
+                                     instituto === 'IML' ? 'Instituto de Medicina Legal' : instituto
+                
+                return (
+                  <div key={instituto} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">{instituteName}</span>
+                      <span className="text-muted-foreground">{count} ({percentage}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className={cn(
+                          "h-2.5 rounded-full transition-all",
+                          instituto === 'IC' ? "bg-blue-600" :
+                          instituto === 'II' ? "bg-green-600" :
+                          instituto === 'IML' ? "bg-purple-600" : "bg-gray-600"
+                        )}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

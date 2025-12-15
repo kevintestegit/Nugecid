@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
@@ -90,6 +91,7 @@ const formatDate = (value?: string): string => {
 
 const ArquivoPage: React.FC = () => {
   const navigate = useNavigate();
+  const { checkPermission } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('todos');
@@ -99,6 +101,18 @@ const ArquivoPage: React.FC = () => {
   );
   const [deletePastaId, setDeletePastaId] = useState<string | null>(null);
   const [deletePlanilhaItem, setDeletePlanilhaItem] = useState<{ id: string; nome: string } | null>(null);
+  const canManageArquivos =
+    checkPermission('create', 'arquivos') ||
+    checkPermission('update', 'arquivos') ||
+    checkPermission('delete', 'arquivos');
+
+  const ensureManagePermission = () => {
+    if (canManageArquivos) {
+      return true;
+    }
+    toast.error('Você não tem permissão para alterar arquivos ou planilhas.');
+    return false;
+  };
 
   const planilhaInputRef = useRef<HTMLInputElement | null>(null);
   const {
@@ -210,12 +224,13 @@ const ArquivoPage: React.FC = () => {
   }, [planilhaGeral]);
 
   const handleAddPasta = async (novaPasta: CreatePastaInput) => {
+    if (!ensureManagePermission()) return;
     await createPasta(novaPasta);
     setShowUploadModal(false);
   };
 
   const handleUpdatePasta = async (values: { nome: string; descricao: string; tags: string[] }) => {
-    if (!editingPasta) return;
+    if (!editingPasta || !ensureManagePermission()) return;
     try {
       await updatePasta({
         id: editingPasta.id,
@@ -231,11 +246,12 @@ const ArquivoPage: React.FC = () => {
   };
 
   const handleDelete = (pastaId: string) => {
+    if (!ensureManagePermission()) return;
     setDeletePastaId(pastaId);
   };
 
   const handleConfirmDeletePasta = async () => {
-    if (!deletePastaId) return;
+    if (!deletePastaId || !ensureManagePermission()) return;
 
     try {
       await deletePasta(deletePastaId);
@@ -249,6 +265,7 @@ const ArquivoPage: React.FC = () => {
   };
 
   const handleSelectPlanilha = () => {
+    if (!ensureManagePermission()) return;
     planilhaInputRef.current?.click();
   };
 
@@ -257,6 +274,10 @@ const ArquivoPage: React.FC = () => {
   ) => {
     const file = event.target.files?.[0];
     if (!file) {
+      return;
+    }
+    if (!ensureManagePermission()) {
+      event.target.value = '';
       return;
     }
 
@@ -272,12 +293,12 @@ const ArquivoPage: React.FC = () => {
   };
 
   const handleDeletePlanilha = (planilhaId: string, planilhaNome: string) => {
-    if (!planilhaId) return;
+    if (!planilhaId || !ensureManagePermission()) return;
     setDeletePlanilhaItem({ id: planilhaId, nome: planilhaNome });
   };
 
   const handleConfirmDeletePlanilha = async () => {
-    if (!deletePlanilhaItem) return;
+    if (!deletePlanilhaItem || !ensureManagePermission()) return;
 
     try {
       await deletePlanilha(deletePlanilhaItem.id);
@@ -334,7 +355,16 @@ const ArquivoPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => setShowUploadModal(true)}
+              onClick={() => {
+                if (!ensureManagePermission()) return;
+                setShowUploadModal(true);
+              }}
+              disabled={!canManageArquivos}
+              title={
+                canManageArquivos
+                  ? undefined
+                  : 'Apenas administradores ou coordenadores podem criar pastas'
+              }
               className="flex items-center gap-2 text-sm"
             >
               <Plus className="h-4 w-4" />
@@ -486,41 +516,43 @@ const ArquivoPage: React.FC = () => {
                         {pasta.descricao}
                       </CardDescription>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        asChild
-                        onClick={event => event.stopPropagation()}
-                      >
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        onClick={event => event.stopPropagation()}
-                      >
-                        <DropdownMenuItem
-                          onClick={event => {
-                            event.stopPropagation();
-                            setEditingPasta(pasta);
-                            setShowEditModal(true);
-                          }}
+                    {canManageArquivos && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          asChild
+                          onClick={event => event.stopPropagation()}
                         >
-                          <Edit className="mr-2 h-4 w-4" />
-                          <span>Editar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={event => {
-                            event.stopPropagation();
-                            handleDelete(pasta.id);
-                          }}
-                          className="text-red-500"
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          onClick={event => event.stopPropagation()}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Excluir</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <DropdownMenuItem
+                            onClick={event => {
+                              event.stopPropagation();
+                              setEditingPasta(pasta);
+                              setShowEditModal(true);
+                            }}
+                          >
+                            <Edit className="mr-2 h-4 w-4" />
+                            <span>Editar</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={event => {
+                              event.stopPropagation();
+                              handleDelete(pasta.id);
+                            }}
+                            className="text-red-500"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            <span>Excluir</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
@@ -656,7 +688,12 @@ const ArquivoPage: React.FC = () => {
               </p>
               <Button
                 onClick={handleSelectPlanilha}
-                disabled={isUploadingPlanilha}
+                disabled={!canManageArquivos || isUploadingPlanilha}
+                title={
+                  canManageArquivos
+                    ? undefined
+                    : 'Apenas administradores ou coordenadores podem enviar planilhas'
+                }
                 className="px-6"
               >
                 {isUploadingPlanilha ? (
@@ -872,16 +909,23 @@ const ArquivoPage: React.FC = () => {
                         >
                           <Download className="h-4 w-4" />
                         </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeletePlanilha(planilha.id)}
-                          disabled={isDeletingPlanilha}
-                          aria-label="Remover planilha"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {canManageArquivos && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              handleDeletePlanilha(
+                                planilha.id,
+                                planilha.nomeOriginal || 'Planilha',
+                              )
+                            }
+                            disabled={isDeletingPlanilha}
+                            aria-label="Remover planilha"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -897,13 +941,13 @@ const ArquivoPage: React.FC = () => {
       )}
 
       <NovaPastaModal
-        isOpen={showUploadModal}
+        isOpen={canManageArquivos && showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onAddPasta={handleAddPasta}
       />
 
       <EditarPastaModal
-        isOpen={showEditModal && Boolean(editingPasta)}
+        isOpen={canManageArquivos && showEditModal && Boolean(editingPasta)}
         pasta={editingPasta}
         onClose={() => {
           setShowEditModal(false);
@@ -915,7 +959,7 @@ const ArquivoPage: React.FC = () => {
 
       {/* Enhanced Confirm Dialogs */}
       <EnhancedConfirmDialog
-        isOpen={deletePastaId !== null}
+        isOpen={canManageArquivos && deletePastaId !== null}
         onClose={() => setDeletePastaId(null)}
         onConfirm={handleConfirmDeletePasta}
         title="Excluir pasta"
@@ -931,7 +975,7 @@ const ArquivoPage: React.FC = () => {
       />
 
       <EnhancedConfirmDialog
-        isOpen={deletePlanilhaItem !== null}
+        isOpen={canManageArquivos && deletePlanilhaItem !== null}
         onClose={() => setDeletePlanilhaItem(null)}
         onConfirm={handleConfirmDeletePlanilha}
         title="Remover planilha"

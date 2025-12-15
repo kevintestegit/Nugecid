@@ -15,6 +15,8 @@ import { Checkbox } from '@/components/ui/Checkbox'
 import { Calendar } from '@/components/ui/Calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
 import { CreateDesarquivamentoDto, UpdateDesarquivamentoDto, TipoDesarquivamento, StatusDesarquivamento } from '@/types'
+import { INSTITUTOS } from '@/constants/institutos'
+import { REQUERENTES } from '@/constants/requerentes'
 
 // Schema de validação
 const desarquivamentoSchema = z.object({
@@ -35,7 +37,9 @@ const desarquivamentoSchema = z.object({
   solicitacaoProrrogacao: z.boolean().default(false),
   solicitacaoProrrogacaoTexto: z.string().optional(),
   dadosAdicionais: z.string().optional(),
-  urgente: z.boolean().optional()
+  urgente: z.boolean().optional(),
+  instituto: z.string().max(255, 'O instituto deve ter no máximo 255 caracteres').optional(),
+  requerente: z.string().max(255, 'O requerente deve ter no máximo 255 caracteres').optional()
 })
 
 type FormData = z.infer<typeof desarquivamentoSchema>
@@ -83,7 +87,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       solicitacaoProrrogacao: initialData?.solicitacaoProrrogacao || false,
       solicitacaoProrrogacaoTexto: initialData?.solicitacaoProrrogacaoTexto || '',
       dadosAdicionais: initialData?.dadosAdicionais || '',
-      urgente: initialData?.urgente || false
+      urgente: initialData?.urgente || false,
+      instituto: initialData?.instituto || '',
+      requerente: initialData?.requerente || ''
     }
   })
 
@@ -317,6 +323,53 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
           />
           {errors.servidorResponsavel && (
             <p className="text-sm text-red-600">{errors.servidorResponsavel.message}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Instituto e Requerente */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="instituto">Instituto</Label>
+          <Select
+            value={watchedValues.instituto || ''}
+            onValueChange={(value) => setValue('instituto', value)}
+          >
+            <SelectTrigger className={cn(errors.instituto && 'border-red-500')}>
+              <SelectValue placeholder="Selecione o instituto" />
+            </SelectTrigger>
+            <SelectContent>
+              {INSTITUTOS.map((instituto) => (
+                <SelectItem key={instituto.value} value={instituto.value}>
+                  {instituto.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.instituto && (
+            <p className="text-sm text-red-600">{errors.instituto.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="requerente">Requerente</Label>
+          <Select
+            value={watch('requerente') || ''}
+            onValueChange={(value) => setValue('requerente', value)}
+          >
+            <SelectTrigger id="requerente" className={cn(errors.requerente && 'border-red-500')}>
+              <SelectValue placeholder="Selecione o requerente" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              {REQUERENTES.map((requerente) => (
+                <SelectItem key={requerente.value} value={requerente.value}>
+                  {requerente.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {errors.requerente && (
+            <p className="text-sm text-red-600">{errors.requerente.message}</p>
           )}
         </div>
       </div>

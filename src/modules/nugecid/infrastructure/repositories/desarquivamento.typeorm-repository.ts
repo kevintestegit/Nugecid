@@ -59,11 +59,15 @@ export class DesarquivamentoTypeOrmRepository
     console.log("[Repository] update - Entity antes do save:", {
       id: entity.id,
       dataDevolucaoSetor: entity.dataDevolucaoSetor,
+      instituto: entity.instituto,
+      requerente: entity.requerente,
     });
     const savedEntity = await this.repository.save(entity);
     console.log("[Repository] update - Entity após o save:", {
       id: savedEntity.id,
       dataDevolucaoSetor: savedEntity.dataDevolucaoSetor,
+      instituto: savedEntity.instituto,
+      requerente: savedEntity.requerente,
     });
     return this.mapper.toDomain(savedEntity);
   }
@@ -355,6 +359,13 @@ export class DesarquivamentoTypeOrmRepository
       .orderBy("TO_CHAR(d.createdAt, 'YYYY-MM')")
       .getRawMany();
 
+    const porInstitutoPromise = createFilteredQuery()
+      .select("d.instituto", "instituto")
+      .addSelect("COUNT(d.id)", "count")
+      .where("d.instituto IS NOT NULL")
+      .groupBy("d.instituto")
+      .getRawMany();
+
     let eficienciaPorResponsavelPromise: Promise<any[]> = Promise.resolve([]);
     if (userRoles?.includes("ADMIN")) {
       eficienciaPorResponsavelPromise = this.repository
@@ -378,11 +389,12 @@ export class DesarquivamentoTypeOrmRepository
     }
 
     // Await all promises
-    const [stats, porTipo, porMes, eficienciaPorResponsavel] =
+    const [stats, porTipo, porMes, porInstituto, eficienciaPorResponsavel] =
       await Promise.all([
         statsPromise,
         porTipoPromise,
         porMesPromise,
+        porInstitutoPromise,
         eficienciaPorResponsavelPromise,
       ]);
 
@@ -409,6 +421,10 @@ export class DesarquivamentoTypeOrmRepository
       ),
       porMes: porMes.reduce(
         (acc, item) => ({ ...acc, [item.mes]: Number(item.count) }),
+        {},
+      ),
+      porInstituto: porInstituto.reduce(
+        (acc, item) => ({ ...acc, [item.instituto]: Number(item.count) }),
         {},
       ),
       taxaConclusao: Math.round(taxaConclusao * 100) / 100,
@@ -514,10 +530,15 @@ export class DesarquivamentoTypeOrmRepository
       criadoPorId,
       responsavelId,
       urgente,
+      instituto,
+      requerente,
       dataInicio,
       dataFim,
       incluirExcluidos,
     } = filters;
+
+    // Debug log para filtros de data
+    this.logger.log(`[applyFilters] dataInicio=${dataInicio}, dataFim=${dataFim}, tipo dataInicio=${typeof dataInicio}, tipo dataFim=${typeof dataFim}`);
 
     // Filtro por status (suporta múltiplos)
     if (Array.isArray(statusList) && statusList.length > 0) {
@@ -544,11 +565,50 @@ export class DesarquivamentoTypeOrmRepository
     if (responsavelId)
       qb.andWhere("d.responsavelId = :responsavelId", { responsavelId });
     if (urgente !== undefined) qb.andWhere("d.urgente = :urgente", { urgente });
-    if (dataInicio && dataFim)
-      qb.andWhere("d.createdAt BETWEEN :dataInicio AND :dataFim", {
-        dataInicio,
-        dataFim,
-      });
+    if (instituto) qb.andWhere("d.instituto = :instituto", { instituto });
+    if (requerente) qb.andWhere("d.requerente = :requerente", { requerente });
+    if (dataInicio || dataFim) {
+      const formatDate = (value: Date | string): string => {
+        if (typeof value === "string") {
+          // Evita shift de fuso ao recriar Date; assume formato YYYY-MM-DD
+          const parts = value.split("-");
+          if (parts.length === 3) {
+            return `${parts[0]}-${parts[1]}-${parts[2]}`;
+          }
+          const parsed = new Date(value);
+          return parsed.toISOString().slice(0, 10);
+        }
+        const yyyy = value.getFullYear();
+        const mm = String(value.getMonth() + 1).padStart(2, "0");
+        const dd = String(value.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+      };
+
+      const startDateStr = dataInicio ? formatDate(dataInicio) : undefined;
+      const endDateStr = dataFim ? formatDate(dataFim) : undefined;
+
+      this.logger.log(`[applyFilters] Aplicando filtro de datas: startDateStr=${startDateStr}, endDateStr=${endDateStr}`);
+
+      // O frontend já adiciona 1 dia ao endDate, então usamos < endDate diretamente
+      if (startDateStr && endDateStr) {
+        qb.andWhere(
+          "d.dataSolicitacao >= CAST(:dataInicio AS TIMESTAMP) AND d.dataSolicitacao < CAST(:dataFim AS TIMESTAMP)",
+          { 
+            dataInicio: `${startDateStr} 00:00:00`, 
+            dataFim: `${endDateStr} 00:00:00`
+          },
+        );
+        this.logger.log(`[applyFilters] Query: dataSolicitacao >= '${startDateStr} 00:00:00' AND < '${endDateStr} 00:00:00'`);
+      } else if (startDateStr) {
+        qb.andWhere("d.dataSolicitacao >= CAST(:dataInicio AS TIMESTAMP)", {
+          dataInicio: `${startDateStr} 00:00:00`,
+        });
+      } else if (endDateStr) {
+        qb.andWhere("d.dataSolicitacao < CAST(:dataFim AS TIMESTAMP)", {
+          dataFim: `${endDateStr} 00:00:00`,
+        });
+      }
+    }
 
     if (search) {
       qb.andWhere(
@@ -558,6 +618,24 @@ export class DesarquivamentoTypeOrmRepository
               search: `%${search}%`,
             })
             .orWhere("d.numeroNicLaudoAuto ILIKE :search", {
+              search: `%${search}%`,
+            })
+            .orWhere("d.tipoDocumento ILIKE :search", {
+              search: `%${search}%`,
+            })
+            .orWhere("d.setorDemandante ILIKE :search", {
+              search: `%${search}%`,
+            })
+            .orWhere("d.servidorResponsavel ILIKE :search", {
+              search: `%${search}%`,
+            })
+            .orWhere("d.finalidadeDesarquivamento ILIKE :search", {
+              search: `%${search}%`,
+            })
+            .orWhere("d.instituto ILIKE :search", {
+              search: `%${search}%`,
+            })
+            .orWhere("d.requerente ILIKE :search", {
               search: `%${search}%`,
             });
         }),

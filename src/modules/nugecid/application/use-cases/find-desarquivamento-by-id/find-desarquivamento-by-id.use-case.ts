@@ -40,6 +40,8 @@ export interface FindDesarquivamentoByIdResponse {
   finalidade?: string; // For compatibility
   observacoes?: string; // Legacy field
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
   localizacaoFisica?: string; // Legacy field
   criadoPorId: number;
   responsavelId?: number;
@@ -159,6 +161,8 @@ export class FindDesarquivamentoByIdUseCase {
       finalidade: desarquivamento.finalidadeDesarquivamento, // For compatibility
       observacoes: undefined, // Legacy field, not applicable
       urgente: desarquivamento.urgente,
+      instituto: desarquivamento.instituto,
+      requerente: desarquivamento.requerente,
       localizacaoFisica: undefined, // Legacy field, not applicable
       criadoPorId: desarquivamento.criadoPorId,
       responsavelId: desarquivamento.responsavelId,

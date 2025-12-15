@@ -24,6 +24,7 @@ import {
 } from "./services";
 import {
   ProjetosController,
+  ProjetoMembrosController,
   ColunasController,
   TarefasController,
   ComentariosController,
@@ -49,6 +50,7 @@ import {
   ],
   controllers: [
     ProjetosController,
+    ProjetoMembrosController,
     ColunasController,
     TarefasController,
     ComentariosController,

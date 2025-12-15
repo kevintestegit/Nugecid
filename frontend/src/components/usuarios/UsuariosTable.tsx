@@ -136,7 +136,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+              <tr key={user.id} className={`hover:bg-gray-50 transition-colors ${user.deletedAt ? 'opacity-60' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
@@ -166,13 +166,19 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    user.ativo 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {user.ativo ? 'Ativo' : 'Inativo'}
-                  </span>
+                  {user.deletedAt ? (
+                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                      Deletado
+                    </span>
+                  ) : (
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.ativo 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {user.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(user.createdAt).toLocaleDateString('pt-BR')}
@@ -180,7 +186,11 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                 {canManageUsers && (
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
-                      {user.ativo ? (
+                      {user.deletedAt ? (
+                        <span className="text-xs text-gray-500 italic">
+                          Deletado em {new Date(user.deletedAt).toLocaleDateString('pt-BR')}
+                        </span>
+                      ) : user.ativo ? (
                         <>
                           <button
                             onClick={() => setSelectedUserId(user.id)}

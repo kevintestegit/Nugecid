@@ -78,6 +78,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
   }
 
   const systemData = data || defaultData
+  const isMock = !data
 
   const getStatusIcon = (status: SystemStatus['status']) => {
     switch (status) {
@@ -152,10 +153,17 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Server className="h-5 w-5" />
-          Informações do Sistema
-        </CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            Informações do Sistema
+          </CardTitle>
+          {isMock && (
+            <Badge variant="outline" className="text-[11px]">
+              Dados de demonstração
+            </Badge>
+          )}
+        </div>
         <CardDescription>
           Status e estatísticas do sistema SGC-ITEP v{systemData.version}
         </CardDescription>

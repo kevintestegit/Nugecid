@@ -4,9 +4,16 @@ import { Desarquivamento } from '@/types';
 
 export interface DashboardStatsData {
   totalDesarquivamentos: number;
-  atendimentosPendentes: number;
+  atendimentosPendentes?: number;
+  requisicoesPendentes?: number;
+  pendentesAtrasados?: number;
   atendimentosEsteMes: number;
   recentes: Desarquivamento[];
+  urgentes?: number;
+  porTipo?: Record<string, number>;
+  porStatus?: Record<string, number>;
+  totalMesAnterior?: number;
+  pendentesMesAnterior?: number;
 }
 
 export interface DashboardStatsResponse {
@@ -26,7 +33,7 @@ export function useDashboardStats() {
       const response = await api.get('/estatisticas/cards');
       return response.data;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutos
+    staleTime: 30000, // 30s para reduzir refetch agressivo mantendo frescor
     retry: 2,
   });
 }

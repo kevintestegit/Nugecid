@@ -52,6 +52,8 @@ const EditDesarquivamentoPage: React.FC = () => {
       servidorResponsavel: desarquivamento.servidorResponsavel,
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: !!desarquivamento.solicitacaoProrrogacao,
+      instituto: desarquivamento.instituto || '',
+      requerente: desarquivamento.requerente || '',
     }
   }, [desarquivamento])
 
@@ -80,6 +82,8 @@ const EditDesarquivamentoPage: React.FC = () => {
       servidorResponsavel: rest.servidorResponsavel.trim(),
       finalidadeDesarquivamento: rest.finalidadeDesarquivamento.trim(),
       solicitacaoProrrogacao: rest.solicitacaoProrrogacao,
+      instituto: rest.instituto?.trim() || undefined,
+      requerente: rest.requerente?.trim() || undefined,
     }
 
     if (numeroNicLaudoAuto && numeroNicLaudoAuto.trim()) {

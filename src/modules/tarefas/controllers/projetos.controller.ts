@@ -10,6 +10,7 @@ import {
   Request,
   ParseIntPipe,
   HttpStatus,
+  Query,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -17,6 +18,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { ProjetosService } from "../services";

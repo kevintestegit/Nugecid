@@ -30,6 +30,8 @@ export interface UpdateDesarquivamentoRequest {
   finalidadeDesarquivamento?: string;
   solicitacaoProrrogacao?: boolean;
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
   userId: number;
   userRoles: string[];
 }
@@ -61,6 +63,8 @@ export interface UpdateDesarquivamentoResponse {
   finalidade?: string;
   observacoes?: string;
   urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
   localizacaoFisica?: string;
   criadoPorId: number;
   responsavelId?: number;
@@ -83,12 +87,17 @@ export class UpdateDesarquivamentoUseCase {
     this.logger.log(
       `[NUGECID] Iniciando atualização de desarquivamento ID: ${request.id} por usuário ${request.userId}`,
     );
+    this.logger.log(
+      `[NUGECID] Campos instituto/requerente: instituto=${request.instituto}, requerente=${request.requerente}`,
+    );
     this.logger.debug(
       `[NUGECID] Campos a serem atualizados: ${JSON.stringify({
         status: request.status,
         responsavelId: request.responsavelId,
         dataDesarquivamentoSAG: request.dataDesarquivamentoSAG,
         dataDevolucaoSetor: request.dataDevolucaoSetor,
+        instituto: request.instituto,
+        requerente: request.requerente,
       })}`,
     );
 
@@ -243,6 +252,14 @@ export class UpdateDesarquivamentoUseCase {
 
     if (request.urgente !== undefined) {
       (desarquivamento as any)._urgente = request.urgente;
+    }
+
+    if (request.instituto !== undefined) {
+      (desarquivamento as any)._instituto = request.instituto;
+    }
+
+    if (request.requerente !== undefined) {
+      (desarquivamento as any)._requerente = request.requerente;
     }
 
     // Atribuir responsável
@@ -407,6 +424,8 @@ export class UpdateDesarquivamentoUseCase {
       finalidade: desarquivamento.finalidadeDesarquivamento, // Mapping for compatibility
       observacoes: undefined, // Not applicable in new structure
       urgente: desarquivamento.urgente,
+      instituto: desarquivamento.instituto,
+      requerente: desarquivamento.requerente,
       localizacaoFisica: undefined, // Not applicable in new structure
       criadoPorId: desarquivamento.criadoPorId,
       responsavelId: desarquivamento.responsavelId,

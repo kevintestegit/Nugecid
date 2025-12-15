@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { KanbanBoard, Projeto, Coluna, Tarefa } from '../components/kanban';
+import { KanbanBoard, Projeto, Coluna, Tarefa, TaskDetailModal, ProjectMembersModal } from '../components/kanban';
 import { useKanban } from '../hooks/useKanban';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -19,7 +19,6 @@ const CreateColumnModal = ({ isOpen, onClose, projectId, onSuccess }: any) => nu
 const EditColumnModal = ({ isOpen, onClose, column, onSuccess }: any) => null;
 const CreateTaskModal = ({ isOpen, onClose, columnId, onSuccess }: any) => null;
 const EditTaskModal = ({ isOpen, onClose, task, onSuccess }: any) => null;
-const TaskDetailModal = ({ isOpen, onClose, task }: any) => null;
 const ProjectSettingsModal = ({ isOpen, onClose, project, onSuccess }: any) => null;
 
 interface KanbanPageProps {
@@ -45,6 +44,7 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
     editTask: false,
     taskDetail: false,
     projectSettings: false,
+    projectMembers: false,
   });
   
   // Estados para dados selecionados
@@ -136,6 +136,7 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
   };
 
   const handleTaskClick = (tarefa: Tarefa) => {
+    setSelectedTask(tarefa);
     openModal('taskDetail', tarefa);
   };
 
@@ -184,6 +185,10 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
 
   const handleProjectSettings = () => {
     openModal('projectSettings');
+  };
+
+  const handleProjectMembers = () => {
+    openModal('projectMembers');
   };
 
   // Loading state
@@ -282,7 +287,7 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
             
             <div className="h-6 w-px bg-gray-300 mx-2" />
             
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2" onClick={handleProjectMembers}>
               <Users className="w-4 h-4" />
               Membros
             </Button>
@@ -368,9 +373,21 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
       />
       
       <TaskDetailModal
-        isOpen={modals.taskDetail}
-        onClose={() => closeModal('taskDetail')}
+        open={modals.taskDetail}
+        onClose={() => {
+          closeModal('taskDetail');
+          setSelectedTask(null);
+        }}
         task={selectedTask}
+        onRefresh={kanban.refresh}
+      />
+      
+      <ProjectMembersModal
+        open={modals.projectMembers}
+        onClose={() => closeModal('projectMembers')}
+        projetoId={projectId!}
+        initialMembers={kanban.projeto?.membros}
+        onChanged={kanban.refresh}
       />
       
       <ProjectSettingsModal

@@ -97,7 +97,7 @@ export class CreateVestigiosTable1763392915129 implements MigrationInterface {
           },
           {
             name: "criado_por_id",
-            type: "uuid",
+            type: "integer",
             isNullable: true,
           },
           {
@@ -120,19 +120,19 @@ export class CreateVestigiosTable1763392915129 implements MigrationInterface {
       new TableForeignKey({
         columnNames: ["criado_por_id"],
         referencedColumnNames: ["id"],
-        referencedTableName: "users",
+        referencedTableName: "usuarios",
         onDelete: "SET NULL",
       }),
     );
 
     await queryRunner.query(`
-            CREATE INDEX idx_vestigios_codigo_scv ON vestigios(codigo_scv);
-            CREATE INDEX idx_vestigios_numero_vestigio ON vestigios(numero_vestigio);
-            CREATE INDEX idx_vestigios_numero_caso ON vestigios(numero_caso);
-            CREATE INDEX idx_vestigios_status ON vestigios(status);
-            CREATE INDEX idx_vestigios_categoria ON vestigios(categoria);
-            CREATE INDEX idx_vestigios_delegacia ON vestigios(delegacia);
-            CREATE INDEX idx_vestigios_mes_referencia ON vestigios(mes_referencia);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_codigo_scv ON vestigios(codigo_scv);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_numero_vestigio ON vestigios(numero_vestigio);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_numero_caso ON vestigios(numero_caso);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_status ON vestigios(status);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_categoria ON vestigios(categoria);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_delegacia ON vestigios(delegacia);
+            CREATE INDEX IF NOT EXISTS idx_vestigios_mes_referencia ON vestigios(mes_referencia);
         `);
   }
 

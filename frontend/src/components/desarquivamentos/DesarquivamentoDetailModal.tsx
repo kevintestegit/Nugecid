@@ -908,6 +908,14 @@ export const DesarquivamentoDetailModal: React.FC<
                     label="Servidor Responsável"
                     value={item.servidorResponsavel}
                   />
+                  <DetailRow
+                    label="Instituto"
+                    value={item.instituto}
+                  />
+                  <DetailRow
+                    label="Requerente"
+                    value={item.requerente}
+                  />
                 </div>
               </div>
 

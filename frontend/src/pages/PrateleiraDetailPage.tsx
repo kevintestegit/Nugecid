@@ -25,6 +25,7 @@ import {
   usePastas,
   UploadArquivosInput,
 } from '@/hooks/usePastas';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { ImagePreviewModal, PreviewAttachment } from '@/components/desarquivamentos/ImagePreviewModal';
 import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
@@ -33,10 +34,22 @@ const PrateleiraDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const pastaId = id ?? '';
+  const { checkPermission } = useAuth();
+  const canManageArquivos =
+    checkPermission('create', 'arquivos') ||
+    checkPermission('update', 'arquivos') ||
+    checkPermission('delete', 'arquivos');
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [selectedPlanilhas, setSelectedPlanilhas] = useState<File[]>([]);
   const [previewImageId, setPreviewImageId] = useState<string | null>(null);
   const [deleteArquivoItem, setDeleteArquivoItem] = useState<{ id: string; nome: string } | null>(null);
+  const ensureManagePermission = () => {
+    if (canManageArquivos) {
+      return true;
+    }
+    toast.error('Você não tem permissão para alterar arquivos desta prateleira.');
+    return false;
+  };
 
   const { data, isLoading, error, refetch } = usePastaDetalhes(pastaId);
   const { uploadArquivos, isUploadingArquivos, deleteArquivo, isDeletingArquivo } = usePastas();
@@ -88,16 +101,25 @@ const PrateleiraDetailPage: React.FC = () => {
   };
 
   const handleImagemChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!ensureManagePermission()) {
+      event.target.value = '';
+      return;
+    }
     const files = Array.from(event.target.files ?? []);
     setSelectedImages(files);
   };
 
   const handlePlanilhaChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!ensureManagePermission()) {
+      event.target.value = '';
+      return;
+    }
     const files = Array.from(event.target.files ?? []);
     setSelectedPlanilhas(files);
   };
 
   const handleUpload = async (payload: UploadArquivosInput) => {
+    if (!ensureManagePermission()) return;
     try {
       await uploadArquivos(payload);
       toast.success('Arquivos enviados com sucesso!');
@@ -114,6 +136,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
   const handleUploadImagens = () => {
     if (!selectedImages.length || !pastaId) return;
+    if (!ensureManagePermission()) return;
     handleUpload({
       pastaId,
       imagens: selectedImages,
@@ -123,11 +146,13 @@ const PrateleiraDetailPage: React.FC = () => {
 
   const handleDeleteArquivo = (arquivoId: string, arquivoNome: string) => {
     if (!pastaId || !arquivoId) return;
+    if (!ensureManagePermission()) return;
     setDeleteArquivoItem({ id: arquivoId, nome: arquivoNome });
   };
 
   const handleConfirmDeleteArquivo = async () => {
     if (!deleteArquivoItem || !pastaId) return;
+    if (!ensureManagePermission()) return;
     try {
       await deleteArquivo({ pastaId, arquivoId: deleteArquivoItem.id });
       if (previewImageId === deleteArquivoItem.id) {
@@ -145,6 +170,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
   const handleUploadPlanilhas = () => {
     if (!selectedPlanilhas.length || !pastaId) return;
+    if (!ensureManagePermission()) return;
     handleUpload({
       pastaId,
       planilhas: selectedPlanilhas,
@@ -254,14 +280,23 @@ const PrateleiraDetailPage: React.FC = () => {
                 onClick={() =>
                   document.getElementById('upload-imagens-input')?.click()
                 }
-                disabled={isUploadingArquivos}
+                disabled={!canManageArquivos || isUploadingArquivos}
+                title={
+                  canManageArquivos
+                    ? undefined
+                    : 'Apenas administradores ou coordenadores podem enviar imagens'
+                }
               >
                 <ImageIcon className="h-4 w-4 mr-2" />
                 Selecionar imagens
               </Button>
               <Button
                 onClick={handleUploadImagens}
-                disabled={isUploadingArquivos || selectedImages.length === 0}
+                disabled={
+                  !canManageArquivos ||
+                  isUploadingArquivos ||
+                  selectedImages.length === 0
+                }
               >
                 {isUploadingArquivos ? (
                   <>
@@ -281,6 +316,7 @@ const PrateleiraDetailPage: React.FC = () => {
                 accept="image/*"
                 multiple
                 className="hidden"
+                disabled={!canManageArquivos}
                 onChange={handleImagemChange}
               />
             </div>
@@ -336,18 +372,20 @@ const PrateleiraDetailPage: React.FC = () => {
                       >
                         <ImageIcon className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="h-8 w-8"
-                        onClick={event => {
-                          event.stopPropagation();
-                          handleDeleteArquivo(imagem.id, imagem.nomeOriginal);
-                        }}
-                        disabled={isDeletingArquivo}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canManageArquivos && (
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="h-8 w-8"
+                          onClick={event => {
+                            event.stopPropagation();
+                            handleDeleteArquivo(imagem.id, imagem.nomeOriginal);
+                          }}
+                          disabled={isDeletingArquivo}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                     <div className="relative z-10 mt-auto w-full bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 text-xs text-primary-foreground">
                       <p className="font-medium truncate">
@@ -383,14 +421,23 @@ const PrateleiraDetailPage: React.FC = () => {
                 onClick={() =>
                   document.getElementById('upload-planilhas-input')?.click()
                 }
-                disabled={isUploadingArquivos}
+                disabled={!canManageArquivos || isUploadingArquivos}
+                title={
+                  canManageArquivos
+                    ? undefined
+                    : 'Apenas administradores ou coordenadores podem enviar planilhas'
+                }
               >
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Selecionar planilhas
               </Button>
               <Button
                 onClick={handleUploadPlanilhas}
-                disabled={isUploadingArquivos || selectedPlanilhas.length === 0}
+                disabled={
+                  !canManageArquivos ||
+                  isUploadingArquivos ||
+                  selectedPlanilhas.length === 0
+                }
               >
                 {isUploadingArquivos ? (
                   <>
@@ -409,6 +456,7 @@ const PrateleiraDetailPage: React.FC = () => {
                 type="file"
                 accept=".xls,.xlsx,.csv,.ods,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 className="hidden"
+                disabled={!canManageArquivos}
                 onChange={handlePlanilhaChange}
               />
             </div>
@@ -456,15 +504,19 @@ const PrateleiraDetailPage: React.FC = () => {
                       >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="h-8 w-8"
-                        onClick={() => handleDeleteArquivo(planilha.id, planilha.nomeOriginal)}
-                        disabled={isDeletingArquivo}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canManageArquivos && (
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          className="h-8 w-8"
+                          onClick={() =>
+                            handleDeleteArquivo(planilha.id, planilha.nomeOriginal)
+                          }
+                          disabled={isDeletingArquivo}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -594,7 +646,7 @@ const PrateleiraDetailPage: React.FC = () => {
       />
 
       <EnhancedConfirmDialog
-        isOpen={deleteArquivoItem !== null}
+        isOpen={canManageArquivos && deleteArquivoItem !== null}
         onClose={() => setDeleteArquivoItem(null)}
         onConfirm={handleConfirmDeleteArquivo}
         title="Excluir anexo"

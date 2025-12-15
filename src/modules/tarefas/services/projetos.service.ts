@@ -28,6 +28,14 @@ export class ProjetosService {
     private readonly userRepository: Repository<User>,
   ) {}
 
+  private async isGlobalAdmin(userId: number): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ["role"],
+    });
+    return user?.role?.name?.toLowerCase() === "admin";
+  }
+
   async create(
     createProjetoDto: CreateProjetoDto,
     criadorId: number,
@@ -83,11 +91,14 @@ export class ProjetosService {
       throw new NotFoundException("Projeto não encontrado");
     }
 
-    // Verificar se o usuário tem acesso ao projeto
+    // Verificar se o usuário tem acesso ao projeto (ou é admin global)
     if (!projeto.canUserView(userId)) {
-      throw new ForbiddenException(
-        "Você não tem permissão para acessar este projeto",
-      );
+      const isAdmin = await this.isGlobalAdmin(userId);
+      if (!isAdmin) {
+        throw new ForbiddenException(
+          "Você não tem permissão para acessar este projeto",
+        );
+      }
     }
 
     return projeto;
@@ -131,10 +142,12 @@ export class ProjetosService {
   ): Promise<MembroProjeto> {
     const projeto = await this.findOne(projetoId, userId);
 
-    // Verificar se o usuário pode gerenciar membros
+    // Verificar se o usuário pode gerenciar membros (owner, admin do projeto ou admin global)
     const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
+    const isAdminGlobal = await this.isGlobalAdmin(userId);
     if (
       !projeto.isOwner(userId) &&
+      !isAdminGlobal &&
       (!userMember || !userMember.canManageMembers())
     ) {
       throw new ForbiddenException(
@@ -179,8 +192,10 @@ export class ProjetosService {
 
     // Verificar se o usuário pode gerenciar membros
     const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
+    const isAdminGlobal = await this.isGlobalAdmin(userId);
     if (
       !projeto.isOwner(userId) &&
+      !isAdminGlobal &&
       (!userMember || !userMember.canManageMembers())
     ) {
       throw new ForbiddenException(
@@ -222,8 +237,10 @@ export class ProjetosService {
 
     // Verificar se o usuário pode gerenciar membros
     const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
+    const isAdminGlobal = await this.isGlobalAdmin(userId);
     if (
       !projeto.isOwner(userId) &&
+      !isAdminGlobal &&
       (!userMember || !userMember.canManageMembers())
     ) {
       throw new ForbiddenException(
@@ -240,6 +257,25 @@ export class ProjetosService {
     }
 
     await this.membroProjetoRepository.remove(membro);
+  }
+
+  async listarMembros(
+    projetoId: number,
+    userId: number,
+  ): Promise<MembroProjeto[]> {
+    const projeto = await this.findOne(projetoId, userId);
+    if (!projeto.canUserView(userId)) {
+      const isAdmin = await this.isGlobalAdmin(userId);
+      if (!isAdmin) {
+        throw new ForbiddenException("Você não tem permissão para acessar este projeto");
+      }
+    }
+
+    return this.membroProjetoRepository.find({
+      where: { projetoId },
+      relations: ["usuario"],
+      order: { createdAt: "DESC" },
+    });
   }
 
   private async createDefaultColumns(projetoId: number): Promise<void> {
@@ -285,5 +321,43 @@ export class ProjetosService {
     }
 
     return stats;
+  }
+
+  async buscarUsuariosParaProjeto(
+    projetoId: number,
+    userId: number,
+    search?: string,
+  ): Promise<Pick<User, "id" | "nome" | "usuario" | "avatarUrl">[]> {
+    const projeto = await this.findOne(projetoId, userId);
+
+    // Apenas owner, admin do projeto ou admin global pode convidar/buscar usuários
+    const userMember = projeto.membros?.find((m) => m.usuarioId === userId);
+    const isAdminGlobal = await this.isGlobalAdmin(userId);
+    if (
+      !projeto.isOwner(userId) &&
+      !isAdminGlobal &&
+      (!userMember || !userMember.canManageMembers())
+    ) {
+      throw new ForbiddenException("Você não tem permissão para adicionar membros");
+    }
+
+    const query = this.userRepository
+      .createQueryBuilder("user")
+      .select(["user.id", "user.nome", "user.usuario", "user.avatarUrl"])
+      .where("user.deletedAt IS NULL");
+
+    if (search) {
+      query.andWhere("(user.nome ILIKE :s OR user.usuario ILIKE :s)", {
+        s: `%${search}%`,
+      });
+    }
+
+    // Evitar retornar usuários já membros
+    if (projeto.membros?.length) {
+      const memberIds = projeto.membros.map((m) => m.usuarioId);
+      query.andWhere("user.id NOT IN (:...ids)", { ids: memberIds });
+    }
+
+    return query.orderBy("user.nome", "ASC").limit(10).getMany();
   }
 }

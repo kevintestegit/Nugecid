@@ -21,6 +21,8 @@ export interface FindAllOptions {
     criadoPorId?: number;
     responsavelId?: number;
     urgente?: boolean;
+    instituto?: string;
+    requerente?: string;
     dataInicio?: Date;
     dataFim?: Date;
     incluirExcluidos?: boolean;
@@ -46,6 +48,7 @@ export interface DashboardStats {
   urgentes: number;
   porTipo: Record<string, number>;
   porMes: Record<string, number>;
+  porInstituto?: Record<string, number>;
   taxaConclusao: number;
   tempoMedioAtendimento: number;
   registrosVencendoEm7Dias: number;

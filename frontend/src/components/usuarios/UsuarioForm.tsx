@@ -181,19 +181,13 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             id="nome"
             type="text"
             value={formData.nome}
-            onChange={(e) => handleInputChange('nome', e.target.value)}
+            onChange={(value) => handleInputChange('nome', value)}
             placeholder="Digite o nome completo"
             disabled={isLoading}
-            error={errors.nome}
-            showValidation={true}
-            validationRules={[
+            required
+            rules={[
               {
-                type: 'required',
-                message: 'Nome é obrigatório'
-              },
-              {
-                type: 'minLength',
-                value: 2,
+                validate: (v: string) => v.length >= 2,
                 message: 'Nome deve ter pelo menos 2 caracteres'
               }
             ]}
@@ -210,28 +204,21 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             id="usuario"
             type="text"
             value={formData.usuario}
-            onChange={(e) => handleInputChange('usuario', e.target.value)}
+            onChange={(value) => handleInputChange('usuario', value)}
             placeholder="Digite o nome de usuário"
             disabled={isLoading}
-            error={errors.usuario}
-            showValidation={true}
-            validationRules={[
+            required
+            rules={[
               {
-                type: 'required',
-                message: 'Usuário é obrigatório'
-              },
-              {
-                type: 'minLength',
-                value: 3,
+                validate: (v: string) => v.length >= 3,
                 message: 'Usuário deve ter pelo menos 3 caracteres'
               },
               {
-                type: 'maxLength',
-                value: 50,
+                validate: (v: string) => v.length <= 50,
                 message: 'Usuário deve ter no máximo 50 caracteres'
               },
               {
-                type: 'alphanumeric',
+                validate: (v: string) => /^[a-zA-Z0-9._-]+$/.test(v),
                 message: 'Usuário deve conter apenas letras, números, pontos, hífens e underscores'
               }
             ]}
@@ -248,24 +235,17 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             id="matricula"
             type="text"
             value={formData.matricula}
-            onChange={(e) => handleInputChange('matricula', e.target.value)}
+            onChange={(value) => handleInputChange('matricula', value)}
             placeholder="Informe a matrícula"
             disabled={isLoading}
-            error={errors.matricula}
-            showValidation={true}
-            validationRules={[
+            required
+            rules={[
               {
-                type: 'required',
-                message: 'Matrícula é obrigatória'
-              },
-              {
-                type: 'minLength',
-                value: 3,
+                validate: (v: string) => v.length >= 3,
                 message: 'Matrícula deve ter pelo menos 3 caracteres'
               },
               {
-                type: 'maxLength',
-                value: 50,
+                validate: (v: string) => v.length <= 50,
                 message: 'Matrícula deve ter no máximo 50 caracteres'
               }
             ]}
@@ -282,32 +262,19 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             id="senha"
             type="password"
             value={formData.senha}
-            onChange={(e) => handleInputChange('senha', e.target.value)}
+            onChange={(value) => handleInputChange('senha', value)}
             placeholder={mode === 'create' ? 'Digite a senha' : 'Nova senha (opcional)'}
             disabled={isLoading}
-            error={errors.senha}
-            showValidation={true}
-            showPasswordToggle={true}
-            validationRules={
-              mode === 'create'
+            required={mode === 'create'}
+            rules={
+              mode === 'create' || formData.senha
                 ? [
                     {
-                      type: 'required',
-                      message: 'Senha é obrigatória'
-                    },
-                    {
-                      type: 'minLength',
-                      value: 6,
+                      validate: (v: string) => v.length >= 6,
                       message: 'Senha deve ter pelo menos 6 caracteres'
                     }
                   ]
-                : formData.senha ? [
-                    {
-                      type: 'minLength',
-                      value: 6,
-                      message: 'Senha deve ter pelo menos 6 caracteres'
-                    }
-                  ] : []
+                : []
             }
           />
         </div>
@@ -322,32 +289,19 @@ const UsuarioForm: React.FC<UsuarioFormProps> = ({
             id="confirmSenha"
             type="password"
             value={formData.confirmSenha}
-            onChange={(e) => handleInputChange('confirmSenha', e.target.value)}
+            onChange={(value) => handleInputChange('confirmSenha', value)}
             placeholder="Confirme a senha"
             disabled={isLoading}
-            error={errors.confirmSenha}
-            showValidation={true}
-            showPasswordToggle={true}
-            validationRules={
-              mode === 'create'
+            required={mode === 'create'}
+            rules={
+              mode === 'create' || formData.senha
                 ? [
                     {
-                      type: 'required',
-                      message: 'Confirmação de senha é obrigatória'
-                    },
-                    {
-                      type: 'match',
-                      value: formData.senha,
+                      validate: (v: string) => v === formData.senha,
                       message: 'Senhas não coincidem'
                     }
                   ]
-                : formData.senha ? [
-                    {
-                      type: 'match',
-                      value: formData.senha,
-                      message: 'Senhas não coincidem'
-                    }
-                  ] : []
+                : []
             }
           />
         </div>

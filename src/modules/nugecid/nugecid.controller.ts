@@ -526,6 +526,9 @@ export class NugecidController {
     @Query() queryDto: QueryDesarquivamentoDto,
     @CurrentUser() currentUser: User,
   ) {
+    // Debug: Log dos parâmetros de data recebidos
+    this.logger.log(`[findAll] Query params recebidos: startDate=${(queryDto as any).startDate}, endDate=${(queryDto as any).endDate}, dataInicio=${(queryDto as any).dataInicio}, dataFim=${(queryDto as any).dataFim}`);
+    
     // Mapear Query DTO -> filtros esperados pelo use case/repositório
     const filters = {
       search: queryDto.search,
@@ -540,18 +543,17 @@ export class NugecidController {
       criadoPorId: (queryDto as any).usuarioId,
       responsavelId: (queryDto as any).responsavelId,
       urgente: (queryDto as any).urgente,
-      dataInicio: (queryDto as any).startDate
-        ? new Date((queryDto as any).startDate as any)
-        : (queryDto as any).dataInicio
-          ? new Date((queryDto as any).dataInicio as any)
-          : undefined,
-      dataFim: (queryDto as any).endDate
-        ? new Date((queryDto as any).endDate as any)
-        : (queryDto as any).dataFim
-          ? new Date((queryDto as any).dataFim as any)
-          : undefined,
+      instituto: queryDto.instituto,
+      requerente: queryDto.requerente,
+      dataInicio:
+        (queryDto as any).startDate || (queryDto as any).dataInicio || undefined,
+      dataFim:
+        (queryDto as any).endDate || (queryDto as any).dataFim || undefined,
       incluirExcluidos: (queryDto as any).incluirExcluidos || false,
     };
+
+    // Debug: Log dos filtros montados
+    this.logger.log(`[findAll] Filtros montados: dataInicio=${filters.dataInicio}, dataFim=${filters.dataFim}`);
 
     const result = await this.findAllDesarquivamentosUseCase.execute({
       page: queryDto.page,

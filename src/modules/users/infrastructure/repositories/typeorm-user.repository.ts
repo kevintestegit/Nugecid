@@ -38,6 +38,7 @@ export class TypeOrmUserRepository implements IUserRepository {
     const entity = await this.userRepository.findOne({
       where: { usuario: usuario.value },
       relations: ["role"],
+      withDeleted: true,
     });
 
     return entity ? UserMapper.toDomain(entity) : null;
@@ -47,6 +48,11 @@ export class TypeOrmUserRepository implements IUserRepository {
     const queryBuilder = this.userRepository
       .createQueryBuilder("user")
       .leftJoinAndSelect("user.role", "role");
+
+    // Se includeDeleted for true, incluir registros soft-deleted
+    if (filters?.includeDeleted) {
+      queryBuilder.withDeleted();
+    }
 
     if (filters) {
       if (filters.nome) {
@@ -70,16 +76,7 @@ export class TypeOrmUserRepository implements IUserRepository {
           roleId: filters.roleId,
         });
       }
-
-      // Usuários inativos podem incluir soft-deleted apenas se includeDeleted for true
-      if (!filters.includeDeleted) {
-        queryBuilder.andWhere("user.deletedAt IS NULL");
-      }
-    } else {
-      queryBuilder.andWhere("user.deletedAt IS NULL");
     }
-
-    // Debug: Log da query gerada para verificar se está correta
 
     const entities = await queryBuilder.getMany();
     return UserMapper.toDomainArray(entities);
@@ -98,6 +95,11 @@ export class TypeOrmUserRepository implements IUserRepository {
       .createQueryBuilder("user")
       .leftJoinAndSelect("user.role", "role");
 
+    // Se includeDeleted for true, incluir registros soft-deleted
+    if (filters?.includeDeleted) {
+      queryBuilder.withDeleted();
+    }
+
     if (filters) {
       if (filters.nome) {
         queryBuilder.andWhere("user.nome ILIKE :nome", {
@@ -120,13 +122,6 @@ export class TypeOrmUserRepository implements IUserRepository {
           roleId: filters.roleId,
         });
       }
-
-      // Usuários inativos podem incluir soft-deleted apenas se includeDeleted for true
-      if (!filters.includeDeleted) {
-        queryBuilder.andWhere("user.deletedAt IS NULL");
-      }
-    } else {
-      queryBuilder.andWhere("user.deletedAt IS NULL");
     }
 
     // Debug: Query gerada para paginação
