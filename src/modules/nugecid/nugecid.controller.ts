@@ -104,6 +104,7 @@ export class NugecidController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    console.log('[Controller] create - dadosAdicionais recebido:', createDesarquivamentoDto.dadosAdicionais);
     const result = await this.createDesarquivamentoUseCase.execute({
       ...createDesarquivamentoDto,
       criadoPorId: currentUser.id,
@@ -934,6 +935,7 @@ export class NugecidController {
     @Body() updateDesarquivamentoDto: UpdateDesarquivamentoDto,
     @CurrentUser() currentUser: User,
   ) {
+    console.log('[Controller] update - dadosAdicionais recebido:', updateDesarquivamentoDto.dadosAdicionais);
     try {
       const result = await this.updateDesarquivamentoUseCase.execute({
         id,

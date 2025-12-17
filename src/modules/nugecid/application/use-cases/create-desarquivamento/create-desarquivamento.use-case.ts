@@ -24,9 +24,12 @@ export interface CreateDesarquivamentoRequest {
   dataDevolucaoSetor?: string;
   setorDemandante?: string; // OPCIONAL
   servidorResponsavel: string;
-  finalidadeDesarquivamento: string;
+  finalidadeDesarquivamento?: string;
   solicitacaoProrrogacao: boolean;
+  solicitacaoProrrogacaoTexto?: string;
+  dadosAdicionais?: string;
   urgente?: boolean;
+  numeroOficio?: string;
   instituto?: string;
   requerente?: string;
   criadoPorId: number;
@@ -95,12 +98,16 @@ export class CreateDesarquivamentoUseCase {
     this.logger.log(
       `[NUGECID] Iniciando criação de desarquivamento para usuário ${sanitizedRequest.criadoPorId}`,
     );
+    this.logger.log(
+      `[NUGECID] dadosAdicionais recebido: ${sanitizedRequest.dadosAdicionais || 'VAZIO'}`,
+    );
     this.logger.debug(
       `[NUGECID] Dados recebidos: ${JSON.stringify({
         tipoDesarquivamento: sanitizedRequest.tipoDesarquivamento,
         nomeCompleto: sanitizedRequest.nomeCompleto,
         numeroProcesso: sanitizedRequest.numeroProcesso,
         urgente: sanitizedRequest.urgente,
+        dadosAdicionais: sanitizedRequest.dadosAdicionais,
       })}`,
     );
 
@@ -132,9 +139,12 @@ export class CreateDesarquivamentoUseCase {
           : undefined,
         setorDemandante: sanitizedRequest.setorDemandante,
         servidorResponsavel: sanitizedRequest.servidorResponsavel,
-        finalidadeDesarquivamento: sanitizedRequest.finalidadeDesarquivamento,
+        finalidadeDesarquivamento: sanitizedRequest.finalidadeDesarquivamento ?? "",
         solicitacaoProrrogacao: sanitizedRequest.solicitacaoProrrogacao,
+        solicitacaoProrrogacaoTexto: sanitizedRequest.solicitacaoProrrogacaoTexto,
+        dadosAdicionais: sanitizedRequest.dadosAdicionais,
         urgente: sanitizedRequest.urgente,
+        numeroOficio: sanitizedRequest.numeroOficio,
         instituto: sanitizedRequest.instituto,
         requerente: sanitizedRequest.requerente,
         criadoPorId: sanitizedRequest.criadoPorId,

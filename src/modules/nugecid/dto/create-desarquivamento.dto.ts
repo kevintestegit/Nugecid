@@ -202,11 +202,11 @@ export class CreateDesarquivamentoDto {
     description: "Finalidade e justificativa para o desarquivamento",
     example: "Para instrução em processo judicial.",
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: "Finalidade é obrigatória" })
   @MaxLength(1000)
-  @Transform(({ value }) => value?.trim())
-  finalidadeDesarquivamento: string;
+  @Transform(({ value }) => value?.trim() || null)
+  finalidadeDesarquivamento?: string;
 
   @ApiProperty({
     description: "Indica se há uma solicitação de prorrogação de prazo",
@@ -223,6 +223,16 @@ export class CreateDesarquivamentoDto {
   @IsOptional()
   @IsBoolean()
   urgente?: boolean = false;
+
+  @ApiPropertyOptional({
+    description: "Número do ofício",
+    example: "OFÍCIO Nº 123/2025",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }) => value?.trim() || null)
+  numeroOficio?: string;
 
   @ApiPropertyOptional({
     description: "Instituto que solicitou o desarquivamento",

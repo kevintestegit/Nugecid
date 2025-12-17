@@ -29,7 +29,10 @@ export interface UpdateDesarquivamentoRequest {
   servidorResponsavel?: string;
   finalidadeDesarquivamento?: string;
   solicitacaoProrrogacao?: boolean;
+  solicitacaoProrrogacaoTexto?: string;
+  dadosAdicionais?: string;
   urgente?: boolean;
+  numeroOficio?: string;
   instituto?: string;
   requerente?: string;
   userId: number;
@@ -57,12 +60,15 @@ export interface UpdateDesarquivamentoResponse {
   servidorResponsavel: string;
   finalidadeDesarquivamento: string;
   solicitacaoProrrogacao: boolean;
+  solicitacaoProrrogacaoTexto?: string;
+  dadosAdicionais?: string;
   prazoAtendimento?: Date;
   dataAtendimento?: Date;
   resultadoAtendimento?: string;
   finalidade?: string;
   observacoes?: string;
   urgente?: boolean;
+  numeroOficio?: string;
   instituto?: string;
   requerente?: string;
   localizacaoFisica?: string;
@@ -88,6 +94,9 @@ export class UpdateDesarquivamentoUseCase {
       `[NUGECID] Iniciando atualização de desarquivamento ID: ${request.id} por usuário ${request.userId}`,
     );
     this.logger.log(
+      `[NUGECID] dadosAdicionais recebido no use case: ${request.dadosAdicionais || 'VAZIO'}`,
+    );
+    this.logger.log(
       `[NUGECID] Campos instituto/requerente: instituto=${request.instituto}, requerente=${request.requerente}`,
     );
     this.logger.debug(
@@ -98,6 +107,8 @@ export class UpdateDesarquivamentoUseCase {
         dataDevolucaoSetor: request.dataDevolucaoSetor,
         instituto: request.instituto,
         requerente: request.requerente,
+        numeroOficio: request.numeroOficio,
+        dadosAdicionais: request.dadosAdicionais,
       })}`,
     );
 
@@ -250,6 +261,17 @@ export class UpdateDesarquivamentoUseCase {
         request.solicitacaoProrrogacao;
     }
 
+    if (request.solicitacaoProrrogacaoTexto !== undefined) {
+      (desarquivamento as any)._solicitacaoProrrogacaoTexto =
+        request.solicitacaoProrrogacaoTexto;
+    }
+
+    if (request.dadosAdicionais !== undefined) {
+      console.log("[UseCase] Aplicando dadosAdicionais:", request.dadosAdicionais);
+      (desarquivamento as any)._dadosAdicionais = request.dadosAdicionais;
+      console.log("[UseCase] Após aplicar, domínio tem:", (desarquivamento as any)._dadosAdicionais);
+    }
+
     if (request.urgente !== undefined) {
       (desarquivamento as any)._urgente = request.urgente;
     }
@@ -260,6 +282,10 @@ export class UpdateDesarquivamentoUseCase {
 
     if (request.requerente !== undefined) {
       (desarquivamento as any)._requerente = request.requerente;
+    }
+
+    if (request.numeroOficio !== undefined) {
+      (desarquivamento as any)._numeroOficio = request.numeroOficio;
     }
 
     // Atribuir responsável
@@ -418,12 +444,15 @@ export class UpdateDesarquivamentoUseCase {
       servidorResponsavel: desarquivamento.servidorResponsavel,
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: desarquivamento.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: desarquivamento.solicitacaoProrrogacaoTexto,
+      dadosAdicionais: desarquivamento.dadosAdicionais,
       prazoAtendimento: undefined, // Not applicable in new structure
       dataAtendimento: desarquivamento.dataDesarquivamentoSAG, // Mapping for compatibility
       resultadoAtendimento: undefined, // Not applicable in new structure
       finalidade: desarquivamento.finalidadeDesarquivamento, // Mapping for compatibility
       observacoes: undefined, // Not applicable in new structure
       urgente: desarquivamento.urgente,
+      numeroOficio: desarquivamento.numeroOficio,
       instituto: desarquivamento.instituto,
       requerente: desarquivamento.requerente,
       localizacaoFisica: undefined, // Not applicable in new structure

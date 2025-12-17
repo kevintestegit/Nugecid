@@ -21,9 +21,12 @@ export interface DesarquivamentoDomainProps {
   servidorResponsavel: string;
   finalidadeDesarquivamento: string;
   solicitacaoProrrogacao: boolean;
+  solicitacaoProrrogacaoTexto?: string;
+  dadosAdicionais?: string;
   urgente?: boolean;
   instituto?: string;
   requerente?: string;
+  numeroOficio?: string;
   criadoPorId: number;
   responsavelId?: number;
   createdAt: Date;
@@ -48,9 +51,12 @@ export class DesarquivamentoDomain {
     private readonly _servidorResponsavel: string,
     private readonly _finalidadeDesarquivamento: string,
     private readonly _solicitacaoProrrogacao: boolean,
+    private readonly _solicitacaoProrrogacaoTexto: string | undefined,
+    private readonly _dadosAdicionais: string | undefined,
     private readonly _urgente: boolean | undefined,
     private readonly _instituto: string | undefined,
     private readonly _requerente: string | undefined,
+    private readonly _numeroOficio: string | undefined,
     private readonly _criadoPorId: number,
     private _responsavelId: number | undefined,
     private readonly _createdAt: Date,
@@ -82,9 +88,12 @@ export class DesarquivamentoDomain {
       props.servidorResponsavel,
       props.finalidadeDesarquivamento,
       props.solicitacaoProrrogacao,
+      props.solicitacaoProrrogacaoTexto,
+      props.dadosAdicionais,
       props.urgente,
       props.instituto,
       props.requerente,
+      props.numeroOficio,
       props.criadoPorId,
       props.responsavelId,
       now,
@@ -111,9 +120,12 @@ export class DesarquivamentoDomain {
       props.servidorResponsavel,
       props.finalidadeDesarquivamento,
       props.solicitacaoProrrogacao,
+      props.solicitacaoProrrogacaoTexto,
+      props.dadosAdicionais,
       props.urgente,
       props.instituto,
       props.requerente,
+      props.numeroOficio,
       props.criadoPorId,
       props.responsavelId,
       props.createdAt,
@@ -187,6 +199,14 @@ export class DesarquivamentoDomain {
     return this._solicitacaoProrrogacao;
   }
 
+  get solicitacaoProrrogacaoTexto(): string | undefined {
+    return this._solicitacaoProrrogacaoTexto;
+  }
+
+  get dadosAdicionais(): string | undefined {
+    return this._dadosAdicionais;
+  }
+
   get urgente(): boolean | undefined {
     return this._urgente;
   }
@@ -197,6 +217,10 @@ export class DesarquivamentoDomain {
 
   get requerente(): string | undefined {
     return this._requerente;
+  }
+
+  get numeroOficio(): string | undefined {
+    return this._numeroOficio;
   }
 
   get criadoPorId(): number {
@@ -251,12 +275,7 @@ export class DesarquivamentoDomain {
       throw new Error("Servidor responsÃ¡vel Ã© obrigatÃ³rio");
     }
 
-    if (
-      !this._finalidadeDesarquivamento ||
-      this._finalidadeDesarquivamento.trim().length === 0
-    ) {
-      throw new Error("Finalidade do desarquivamento Ã© obrigatÃ³ria");
-    }
+    // finalidadeDesarquivamento agora é OPCIONAL - removida validação
 
     if (this._criadoPorId <= 0) {
       throw new Error("ID do usuÃ¡rio criador deve ser vÃ¡lido");
@@ -551,9 +570,12 @@ export class DesarquivamentoDomain {
       servidorResponsavel: this._servidorResponsavel,
       finalidadeDesarquivamento: this._finalidadeDesarquivamento,
       solicitacaoProrrogacao: this._solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: this._solicitacaoProrrogacaoTexto,
+      dadosAdicionais: this._dadosAdicionais,
       urgente: this._urgente,
       instituto: this._instituto,
       requerente: this._requerente,
+      numeroOficio: this._numeroOficio,
       criadoPorId: this._criadoPorId,
       responsavelId: this._responsavelId,
       createdAt: this._createdAt,

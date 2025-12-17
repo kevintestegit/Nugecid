@@ -35,6 +35,7 @@ import { toast } from 'sonner';
 import { printRearquivamento } from './print-templates';
 import brasaorn from '@/components/img/Brasão-RN.png';
 import brasaoitep from '@/components/img/Brasão-ITEP.png';
+import { getInstitutoLabel } from '@/constants/institutos';
 interface DesarquivamentoDetailModalProps {
   id: number;
   onClose: () => void;
@@ -859,65 +860,72 @@ export const DesarquivamentoDetailModal: React.FC<
                 )}
               </div>
 
-              {/* Informações do Documento */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+	              {/* Informações do Documento */}
+	              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
                   <FileText className="h-5 w-5 text-gray-600" />
                   <h4 className="text-base font-semibold text-gray-900">
                     Informações do Documento
                   </h4>
                 </div>
-                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                  <DetailRow label="Nome Completo" value={item.nomeCompleto} />
-                  <DetailRow
-                    label="Nº NIC/Laudo/Auto/IT"
-                    value={
-                      item.numeroNicLaudoAuto?.startsWith('MISSING-')
-                        ? 'N/A'
-                        : item.numeroNicLaudoAuto
-                    }
-                  />
-                  <DetailRow label="Nº Processo" value={item.numeroProcesso} copyable />
-                  <DetailRow
-                    label="Tipo de Documento"
-                    value={item.tipoDocumento}
-                  />
+	                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+	                  <DetailRow label="Nome Completo" value={item.nomeCompleto} />
+	                  <DetailRow
+	                    label="Nº NIC/Laudo/Auto/IT"
+	                    value={
+	                      item.numeroNicLaudoAuto?.startsWith('MISSING-')
+	                        ? 'N/A'
+	                        : item.numeroNicLaudoAuto
+	                    }
+	                  />
+	                  <DetailRow label="Nº Processo" value={item.numeroProcesso} copyable />
+	                  <DetailRow
+	                    label="Tipo de Documento"
+	                    value={item.tipoDocumento}
+	                  />
                   {(item as any).quantidadeItens && (
                     <DetailRow 
                       label="Quantidade de Itens" 
                       value={(item as any).quantidadeItens} 
                     />
                   )}
+                  <div className="md:col-span-2">
+                    <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Descrição da Solicitação</div>
+                    <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
+                      {item.dadosAdicionais || '-'}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Setor e Responsável */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+	              {/* Setor e Responsável */}
+	              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
                   <User className="h-5 w-5 text-gray-600" />
                   <h4 className="text-base font-semibold text-gray-900">
                     Setor e Responsável
                   </h4>
                 </div>
-                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                  <DetailRow
-                    label="Setor Demandante"
-                    value={item.setorDemandante}
-                  />
-                  <DetailRow
-                    label="Servidor Responsável"
-                    value={item.servidorResponsavel}
-                  />
-                  <DetailRow
-                    label="Instituto"
-                    value={item.instituto}
-                  />
-                  <DetailRow
-                    label="Requerente"
-                    value={item.requerente}
-                  />
-                </div>
-              </div>
+	                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+	                  <DetailRow
+	                    label="Setor Demandante"
+	                    value={item.setorDemandante}
+	                  />
+	                  <DetailRow
+	                    label="Servidor Responsável"
+	                    value={item.servidorResponsavel}
+	                  />
+	                  <DetailRow
+	                    label="Instituto"
+	                    value={getInstitutoLabel(item.instituto)}
+	                  />
+	                  <DetailRow
+	                    label="Requerente"
+	                    value={item.requerente}
+	                  />
+	                  <DetailRow label="Nº do Ofício" value={item.numeroOficio} copyable />
+	                </div>
+	              </div>
 
               {/* Justificativa e Prazos */}
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1017,23 +1025,6 @@ export const DesarquivamentoDetailModal: React.FC<
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-              )}
-
-              {/* Dados Adicionais */}
-              {(item as any).dadosAdicionais && (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-gray-600" />
-                    <h4 className="text-base font-semibold text-gray-900">
-                      Informações Adicionais
-                    </h4>
-                  </div>
-                  <div className="p-5">
-                    <div className="text-sm text-gray-900 whitespace-pre-wrap break-words bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      {(item as any).dadosAdicionais}
-                    </div>
                   </div>
                 </div>
               )}

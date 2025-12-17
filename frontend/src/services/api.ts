@@ -248,6 +248,7 @@ export class ApiService {
     // Importar normalização dinamicamente para evitar circular dependency
     const { normalizeDesarquivamentoData } = await import('@/utils/normalization')
     const normalizedData = normalizeDesarquivamentoData(data)
+    console.log('[API] createDesarquivamento - dadosAdicionais:', normalizedData.dadosAdicionais)
     const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.post('/nugecid', normalizedData)
     return response.data
   }
@@ -256,6 +257,7 @@ export class ApiService {
     // Importar normalização dinamicamente
     const { normalizeDesarquivamentoData } = await import('@/utils/normalization')
     const normalizedData = normalizeDesarquivamentoData(data)
+    console.log('[API] updateDesarquivamento - dadosAdicionais:', normalizedData.dadosAdicionais)
     
     const response: AxiosResponse<ApiResponse<Desarquivamento>> = await this.api.patch(`/nugecid/${id}`, normalizedData)
     return response.data

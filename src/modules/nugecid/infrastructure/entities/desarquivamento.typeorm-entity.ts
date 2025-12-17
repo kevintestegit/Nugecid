@@ -88,8 +88,8 @@ export class DesarquivamentoTypeOrmEntity {
   @Column({ name: "servidor_responsavel", length: 255, nullable: false })
   servidorResponsavel: string;
 
-  @Column({ name: "finalidade_desarquivamento", type: "text", nullable: false })
-  finalidadeDesarquivamento: string;
+  @Column({ name: "finalidade_desarquivamento", type: "text", nullable: true })
+  finalidadeDesarquivamento?: string | null;
 
   @Column({ name: "solicitacao_prorrogacao", type: "boolean", default: false })
   solicitacaoProrrogacao: boolean;
@@ -103,6 +103,9 @@ export class DesarquivamentoTypeOrmEntity {
 
   @Column({ name: "dados_adicionais", type: "text", nullable: true })
   dadosAdicionais?: string;
+
+  @Column({ name: "numero_oficio", length: 255, nullable: true })
+  numeroOficio?: string;
 
   @Column({ name: "urgente", type: "boolean", nullable: true, default: false })
   urgente?: boolean;
@@ -192,6 +195,7 @@ export class DesarquivamentoTypeOrmEntity {
     entity.solicitacaoProrrogacao = domain.solicitacaoProrrogacao;
     entity.solicitacaoProrrogacaoTexto = domain.solicitacaoProrrogacaoTexto;
     entity.dadosAdicionais = domain.dadosAdicionais;
+    entity.numeroOficio = domain.numeroOficio;
     entity.urgente = domain.urgente;
     entity.instituto = domain.instituto;
     entity.requerente = domain.requerente;
@@ -224,6 +228,7 @@ export class DesarquivamentoTypeOrmEntity {
       solicitacaoProrrogacao: this.solicitacaoProrrogacao,
       solicitacaoProrrogacaoTexto: this.solicitacaoProrrogacaoTexto,
       dadosAdicionais: this.dadosAdicionais,
+      numeroOficio: this.numeroOficio,
       urgente: this.urgente,
       instituto: this.instituto,
       requerente: this.requerente,

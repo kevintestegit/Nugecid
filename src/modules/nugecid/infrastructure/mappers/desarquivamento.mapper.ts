@@ -87,11 +87,14 @@ export class DesarquivamentoMapper {
     entity.dataDevolucaoSetor = dataDevolucao;
     entity.setorDemandante = domain.setorDemandante;
     entity.servidorResponsavel = domain.servidorResponsavel;
-    entity.finalidadeDesarquivamento = domain.finalidadeDesarquivamento;
+    entity.finalidadeDesarquivamento = domain.finalidadeDesarquivamento ?? "";
     entity.solicitacaoProrrogacao = domain.solicitacaoProrrogacao;
+    entity.solicitacaoProrrogacaoTexto = domain.solicitacaoProrrogacaoTexto;
+    entity.dadosAdicionais = domain.dadosAdicionais;
     entity.urgente = domain.urgente;
     entity.instituto = domain.instituto;
     entity.requerente = domain.requerente;
+    entity.numeroOficio = domain.numeroOficio;
     entity.criadoPorId = domain.criadoPorId;
     entity.responsavelId = domain.responsavelId;
 
@@ -144,11 +147,14 @@ export class DesarquivamentoMapper {
       dataDevolucaoSetor: entity.dataDevolucaoSetor,
       setorDemandante: entity.setorDemandante,
       servidorResponsavel: entity.servidorResponsavel,
-      finalidadeDesarquivamento: entity.finalidadeDesarquivamento,
+      finalidadeDesarquivamento: entity.finalidadeDesarquivamento ?? "",
       solicitacaoProrrogacao: entity.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: entity.solicitacaoProrrogacaoTexto,
+      dadosAdicionais: entity.dadosAdicionais,
       urgente: entity.urgente,
       instituto: entity.instituto,
       requerente: entity.requerente,
+      numeroOficio: entity.numeroOficio,
       criadoPorId: entity.criadoPorId,
       responsavelId: entity.responsavelId,
       createdAt: entity.createdAt,
@@ -219,9 +225,12 @@ export class DesarquivamentoMapper {
       servidorResponsavel: domain.servidorResponsavel,
       finalidadeDesarquivamento: domain.finalidadeDesarquivamento,
       solicitacaoProrrogacao: domain.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: domain.solicitacaoProrrogacaoTexto,
+      dadosAdicionais: domain.dadosAdicionais,
       urgente: domain.urgente,
       instituto: domain.instituto,
       requerente: domain.requerente,
+      numeroOficio: domain.numeroOficio,
       criadoPorId: domain.criadoPorId,
       responsavelId: domain.responsavelId,
       createdAt: domain.createdAt,
