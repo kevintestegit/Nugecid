@@ -93,7 +93,7 @@ interface Comentario {
 
 interface CreateComentarioDto {
   conteudo: string;
-  tarefa_id: number;
+  tarefaId: number;
 }
 
 interface UpdateComentarioDto {
@@ -260,7 +260,7 @@ class KanbanService {
 
   // Comentários
   async getComentarios(tarefaId: number): Promise<Comentario[]> {
-    const response = await api.get(`/tarefas/${tarefaId}/comentarios`);
+    const response = await api.get(`/comentarios`, { params: { tarefaId } });
     return response.data;
   }
 

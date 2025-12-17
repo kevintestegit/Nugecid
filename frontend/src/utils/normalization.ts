@@ -137,6 +137,10 @@ export function normalizeDesarquivamentoData(data: any): any {
     normalized.tipoDocumento = truncateString(data.tipoDocumento, 100);
   }
 
+  if (data.numeroOficio) {
+    normalized.numeroOficio = truncateString(data.numeroOficio, 255);
+  }
+
   if (data.setorDemandante) {
     normalized.setorDemandante = truncateString(data.setorDemandante, 255);
   }

@@ -566,6 +566,33 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 )}
               </div>
             </div>
+
+            <div>
+              <p className="text-sm text-gray-600">Nº do Ofício</p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="font-mono text-lg font-medium break-all">{desarquivamento.numeroOficio || 'N/A'}</p>
+                {desarquivamento.numeroOficio && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyToClipboard(desarquivamento.numeroOficio, 'numeroOficio')}
+                      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                      title="Copiar número do ofício"
+                      aria-label="Copiar número do ofício"
+                    >
+                      {copiedField === 'numeroOficio' ? (
+                        <Check className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </button>
+                    {copiedField === 'numeroOficio' && (
+                      <span className="text-xs text-emerald-600">Copiado</span>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
             <div>
               <p className="text-sm text-gray-600">Tipo de Desarquivamento</p>
               <Badge variant="outline" className="mt-1">
@@ -725,7 +752,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
           {desarquivamento.dadosAdicionais && (
             <div className="pt-2 border-t border-gray-200">
-              <p className="text-sm text-gray-600 font-medium mb-2">Dados Adicionais</p>
+              <p className="text-sm text-gray-600 font-medium mb-2">Descrição da Solicitação</p>
               <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
                 {desarquivamento.dadosAdicionais}
               </p>

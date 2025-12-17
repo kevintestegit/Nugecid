@@ -46,7 +46,7 @@ export class DesarquivamentoTypeOrmRepository
     }
 
     this.logger.log(
-      `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | desarquivamento_fisico_digital=${entity.desarquivamentoFisicoDigital}`,
+      `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | dadosAdicionais=${entity.dadosAdicionais || 'VAZIO'}`,
     );
     const savedEntity = await this.repository.save(entity);
     return this.mapper.toDomain(savedEntity);
@@ -55,19 +55,20 @@ export class DesarquivamentoTypeOrmRepository
   async update(
     desarquivamento: DesarquivamentoDomain,
   ): Promise<DesarquivamentoDomain> {
+    console.log("[Repository] update - Domain antes do mapper:", {
+      dadosAdicionais: desarquivamento.dadosAdicionais,
+      solicitacaoProrrogacaoTexto: desarquivamento.solicitacaoProrrogacaoTexto,
+    });
     const entity = this.mapper.toTypeOrm(desarquivamento);
-    console.log("[Repository] update - Entity antes do save:", {
+    console.log("[Repository] update - Entity após mapper:", {
       id: entity.id,
-      dataDevolucaoSetor: entity.dataDevolucaoSetor,
-      instituto: entity.instituto,
-      requerente: entity.requerente,
+      dadosAdicionais: entity.dadosAdicionais,
+      solicitacaoProrrogacaoTexto: entity.solicitacaoProrrogacaoTexto,
     });
     const savedEntity = await this.repository.save(entity);
-    console.log("[Repository] update - Entity após o save:", {
+    console.log("[Repository] update - Entity após save:", {
       id: savedEntity.id,
-      dataDevolucaoSetor: savedEntity.dataDevolucaoSetor,
-      instituto: savedEntity.instituto,
-      requerente: savedEntity.requerente,
+      dadosAdicionais: savedEntity.dadosAdicionais,
     });
     return this.mapper.toDomain(savedEntity);
   }

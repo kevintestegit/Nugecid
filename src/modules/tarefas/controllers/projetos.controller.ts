@@ -159,6 +159,33 @@ export class ProjetosController {
     return this.projetosService.remove(id, req.user.id);
   }
 
+  @Get(":id/membros")
+  @ApiOperation({ summary: "Listar membros do projeto" })
+  @ApiParam({ name: "id", description: "ID do projeto", type: "number" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Lista de membros retornada com sucesso",
+    type: [MembroProjeto],
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: "Projeto não encontrado",
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: "Acesso negado ao projeto",
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: "Token de acesso inválido",
+  })
+  async getMembros(
+    @Param("id", ParseIntPipe) id: number,
+    @Request() req: any,
+  ): Promise<MembroProjeto[]> {
+    return this.projetosService.listarMembros(id, req.user.id);
+  }
+
   @Post(":id/membros")
   @ApiOperation({ summary: "Adicionar membro ao projeto" })
   @ApiParam({ name: "id", description: "ID do projeto", type: "number" })

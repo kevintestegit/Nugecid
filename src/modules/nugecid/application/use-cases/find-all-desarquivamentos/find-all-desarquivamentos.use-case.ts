@@ -50,6 +50,7 @@ export interface FindAllDesarquivamentosResponse {
     finalidadeDesarquivamento: string;
     solicitacaoProrrogacao: boolean;
     urgente?: boolean;
+    numeroOficio?: string;
     instituto?: string;
     requerente?: string;
     criadoPorId: number;
@@ -286,6 +287,7 @@ export class FindAllDesarquivamentosUseCase {
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: desarquivamento.solicitacaoProrrogacao,
       urgente: desarquivamento.urgente,
+      numeroOficio: desarquivamento.numeroOficio,
       instituto: desarquivamento.instituto,
       requerente: desarquivamento.requerente,
       criadoPorId: desarquivamento.criadoPorId,

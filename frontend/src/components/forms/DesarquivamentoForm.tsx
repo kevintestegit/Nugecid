@@ -49,14 +49,12 @@ const desarquivamentoSchema = z.object({
     .string()
     .min(3, 'O servidor responsável é obrigatório')
     .max(255, 'O servidor responsável deve ter no máximo 255 caracteres'),
-  finalidadeDesarquivamento: z
-    .string()
-    .min(10, 'A finalidade deve ter pelo menos 10 caracteres')
-    .max(1000, 'A finalidade deve ter no máximo 1000 caracteres'),
+  finalidadeDesarquivamento: z.string().max(1000, 'A finalidade deve ter no máximo 1000 caracteres').optional(),
   solicitacaoProrrogacao: z.boolean().default(false),
   solicitacaoProrrogacaoTexto: z.string().optional(),
   dadosAdicionais: z.string().optional(),
   urgente: z.boolean().optional(),
+  numeroOficio: z.string().max(255, 'O número do ofício deve ter no máximo 255 caracteres').optional(),
   instituto: z.string().max(255, 'O instituto deve ter no máximo 255 caracteres').optional(),
   requerente: z.string().max(255, 'O requerente deve ter no máximo 255 caracteres').optional(),
 })
@@ -89,6 +87,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       solicitacaoProrrogacaoTexto: data.solicitacaoProrrogacaoTexto || '',
       dadosAdicionais: data.dadosAdicionais || '',
       urgente: data.urgente || false,
+      numeroOficio: data.numeroOficio || '',
       instituto: data.instituto || '',
       requerente: data.requerente || '',
     }
@@ -107,6 +106,12 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
   })
 
   const onFormSubmit = async (data: DesarquivamentoFormData) => {
+    // Debug: log dados do formulário
+    console.log('[DesarquivamentoForm] Dados do formulário:', {
+      dadosAdicionais: data.dadosAdicionais,
+      solicitacaoProrrogacaoTexto: data.solicitacaoProrrogacaoTexto,
+      numeroOficio: data.numeroOficio,
+    })
     // Converter datas para ISO string antes de enviar
     const formattedData = {
       ...data,
@@ -115,6 +120,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       dataDesarquivamentoSAG: data.dataDesarquivamentoSAG?.toISOString(),
       dataDevolucaoSetor: data.dataDevolucaoSetor?.toISOString(),
     }
+    console.log('[DesarquivamentoForm] Dados formatados para envio:', {
+      dadosAdicionais: formattedData.dadosAdicionais,
+    })
     await onSubmit(formattedData as unknown as CreateDesarquivamentoDto)
   }
 
@@ -158,10 +166,10 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="nomeCompleto">Nome Completo *</Label>
+            <Label htmlFor="nomeCompleto">Nome completo/Vestígio</Label>
             <Input
               id="nomeCompleto"
-              placeholder="Nome completo"
+              placeholder="Nome completo/Vestígio"
               {...register('nomeCompleto')}
               className={errors.nomeCompleto ? 'border-destructive' : ''}
             />
@@ -241,6 +249,16 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               )}
             />
           </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="dadosAdicionais">Descrição da Solicitação</Label>
+            <Textarea
+              id="dadosAdicionais"
+              placeholder="Informações complementares sobre a solicitação..."
+              {...register('dadosAdicionais')}
+              rows={3}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -249,6 +267,17 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
           <CardTitle>Informações Adicionais</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="numeroOficio">Nº do Ofício</Label>
+            <Input
+              id="numeroOficio"
+              placeholder="Ex: OFÍCIO Nº 123/2025"
+              {...register('numeroOficio')}
+              className={errors.numeroOficio ? 'border-destructive' : ''}
+            />
+            {errors.numeroOficio && <p className="text-sm text-destructive">{errors.numeroOficio.message}</p>}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="instituto">Instituto</Label>
             <Controller
@@ -316,6 +345,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
             />
             {errors.servidorResponsavel && <p className="text-sm text-destructive">{errors.servidorResponsavel.message}</p>}
           </div>
+
         </CardContent>
       </Card>
 
@@ -325,7 +355,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="finalidadeDesarquivamento">Finalidade do Desarquivamento *</Label>
+            <Label htmlFor="finalidadeDesarquivamento">Finalidade do Desarquivamento</Label>
             <Textarea
               id="finalidadeDesarquivamento"
               placeholder="Descreva o motivo da solicitação..."
@@ -333,7 +363,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               className={errors.finalidadeDesarquivamento ? 'border-destructive' : ''}
               rows={4}
             />
-            {errors.finalidadeDesarquivamento && <p className="text-sm text-destructive">{errors.finalidadeDesarquivamento.message}</p>}
+            {errors.finalidadeDesarquivamento && (
+              <p className="text-sm text-destructive">{errors.finalidadeDesarquivamento.message}</p>
+            )}
           </div>
           <div className="flex items-center space-x-2">
             <Controller
@@ -361,16 +393,6 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
               />
             </div>
           )}
-
-          <div className="space-y-2">
-            <Label htmlFor="dadosAdicionais">Dados Adicionais</Label>
-            <Textarea
-              id="dadosAdicionais"
-              placeholder="Informações complementares (filiação, naturalidade, etc.)..."
-              {...register('dadosAdicionais')}
-              rows={3}
-            />
-          </div>
 
           <div className="flex items-center space-x-2">
             <Controller

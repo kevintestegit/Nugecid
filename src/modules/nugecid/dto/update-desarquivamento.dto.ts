@@ -191,11 +191,9 @@ export class UpdateDesarquivamentoDto {
   @ApiPropertyOptional({
     description: "Finalidade e justificativa para o desarquivamento",
     example: "Para instrução em processo judicial.",
-    minLength: 10,
   })
   @IsOptional()
   @IsString()
-  @MinLength(10)
   @Transform(({ value }) => value?.trim())
   finalidadeDesarquivamento?: string;
 
@@ -220,6 +218,17 @@ export class UpdateDesarquivamentoDto {
     return Boolean(value);
   })
   urgente?: boolean;
+
+  @ApiPropertyOptional({
+    description: "Número do ofício",
+    example: "OFÍCIO Nº 123/2025",
+    maxLength: 255,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Transform(({ value }) => value?.trim() || null)
+  numeroOficio?: string;
 
   @ApiPropertyOptional({
     description: "Instituto que solicitou o desarquivamento",

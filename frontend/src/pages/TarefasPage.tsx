@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KanbanBoard, Coluna as KanbanColuna, Tarefa as KanbanTarefa, Projeto as KanbanProjeto } from '@/components/kanban'
+import { KanbanBoard, Coluna as KanbanColuna, Tarefa as KanbanTarefa, Projeto as KanbanProjeto, TaskDetailModal } from '@/components/kanban'
 import {
   Card,
   CardContent,
@@ -24,6 +24,7 @@ import tarefasService from '@/services/tarefasService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
 import { SkeletonKanbanCard, Skeleton } from '@/components/ui/Skeleton'
+import type { Coluna as KanbanDomainColumn, Tarefa as KanbanDomainTask, Usuario as KanbanDomainUser } from '@/types/kanban.types'
 
 interface ApiResponse<T> {
   success: boolean
@@ -147,6 +148,51 @@ const mapTasks = (data: TarefaResponse[] | undefined): BoardTask[] => {
   return result
 }
 
+const buildDomainUser = (responsavel: BoardTask['responsavel'] | undefined): KanbanDomainUser | undefined => {
+  if (!responsavel) return undefined
+  return {
+    id: responsavel.id,
+    nome: responsavel.nome,
+    usuario: responsavel.nome,
+    avatar: responsavel.avatar,
+  }
+}
+
+const buildDomainColumn = (coluna: KanbanColuna | undefined, projetoId: number): KanbanDomainColumn | undefined => {
+  if (!coluna) return undefined
+  return {
+    id: coluna.id,
+    nome: coluna.nome,
+    cor: coluna.cor ?? '#3B82F6',
+    ordem: coluna.ordem,
+    ativa: true,
+    projetoId,
+  }
+}
+
+const buildDomainTask = (tarefa: BoardTask, projetoId: number, coluna?: KanbanColuna): KanbanDomainTask => {
+  const now = new Date().toISOString()
+  const colunaId = tarefa.colunaId ?? tarefa.coluna_id ?? 0
+
+  return {
+    id: tarefa.id,
+    titulo: tarefa.titulo,
+    descricao: tarefa.descricao,
+    projetoId,
+    colunaId,
+    criadorId: 0,
+    responsavelId: tarefa.responsavel?.id,
+    prazo: tarefa.prazo,
+    prioridade: tarefa.prioridade,
+    ordem: tarefa.ordem,
+    tags: tarefa.tags,
+    createdAt: now,
+    updatedAt: now,
+    responsavel: buildDomainUser(tarefa.responsavel),
+    coluna: buildDomainColumn(coluna, projetoId),
+  }
+}
+
 const TarefasPage: React.FC = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -163,6 +209,8 @@ const TarefasPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [deleteColumn, setDeleteColumn] = useState<{ id: number; nome: string } | null>(null)
   const [deleteTask, setDeleteTask] = useState<{ id: number; titulo: string } | null>(null)
+  const [detailTask, setDetailTask] = useState<KanbanDomainTask | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   const loadProjects = useCallback(async () => {
     setLoadingProjects(true)
@@ -468,9 +516,18 @@ const TarefasPage: React.FC = () => {
     [navigate, selectedProjectId]
   )
 
-  const handleTaskClick = useCallback((tarefa: KanbanTarefa) => {
-    navigate(`/tarefas/${tarefa.id}`)
-  }, [navigate])
+  const handleTaskClick = useCallback(
+    (tarefa: KanbanTarefa) => {
+      if (!selectedProjectId) return
+      const boardTask = tarefa as BoardTask
+      const columnId = boardTask.colunaId ?? boardTask.coluna_id
+      const coluna = columns.find(item => item.id === columnId)
+
+      setDetailTask(buildDomainTask(boardTask, selectedProjectId, coluna))
+      setIsDetailOpen(true)
+    },
+    [columns, selectedProjectId]
+  )
 
   const handleTaskEdit = useCallback((tarefa: KanbanTarefa) => {
     navigate(`/tarefas/${tarefa.id}`)
@@ -711,11 +768,26 @@ const TarefasPage: React.FC = () => {
           'Todos os dados da tarefa serão perdidos'
         ]}
       />
+
+      <TaskDetailModal
+        open={isDetailOpen}
+        task={detailTask}
+        onClose={() => {
+          setIsDetailOpen(false)
+          setDetailTask(null)
+        }}
+        onRefresh={async () => {
+          if (selectedProjectId) {
+            await loadBoardData(selectedProjectId)
+          }
+        }}
+        onOpenTask={(taskId) => navigate(`/tarefas/${taskId}`)}
+        openTaskLabel="Abrir página"
+      />
     </div>
   )
 }
 
 export default TarefasPage
-
 
 

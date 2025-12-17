@@ -52,6 +52,9 @@ const EditDesarquivamentoPage: React.FC = () => {
       servidorResponsavel: desarquivamento.servidorResponsavel,
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: !!desarquivamento.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: desarquivamento.solicitacaoProrrogacaoTexto || '',
+      dadosAdicionais: desarquivamento.dadosAdicionais || '',
+      numeroOficio: desarquivamento.numeroOficio || '',
       instituto: desarquivamento.instituto || '',
       requerente: desarquivamento.requerente || '',
     }
@@ -67,6 +70,8 @@ const EditDesarquivamentoPage: React.FC = () => {
       ...rest
     } = data
 
+    console.log('[EditDesarquivamentoPage] rest contém:', { dadosAdicionais: rest.dadosAdicionais, numeroOficio: rest.numeroOficio })
+
     if (!dataSolicitacao) {
       toast.error('Data da solicita\u00e7\u00e3o inv\u00e1lida.')
       return
@@ -80,11 +85,16 @@ const EditDesarquivamentoPage: React.FC = () => {
       dataSolicitacao,
       setorDemandante: rest.setorDemandante.trim(),
       servidorResponsavel: rest.servidorResponsavel.trim(),
-      finalidadeDesarquivamento: rest.finalidadeDesarquivamento.trim(),
+      finalidadeDesarquivamento: rest.finalidadeDesarquivamento?.trim() || undefined,
       solicitacaoProrrogacao: rest.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: rest.solicitacaoProrrogacaoTexto?.trim() || undefined,
+      dadosAdicionais: rest.dadosAdicionais?.trim() || undefined,
+      numeroOficio: rest.numeroOficio?.trim() || undefined,
       instituto: rest.instituto?.trim() || undefined,
       requerente: rest.requerente?.trim() || undefined,
     }
+
+    console.log('[EditDesarquivamentoPage] payload antes de normalizar:', { dadosAdicionais: payload.dadosAdicionais })
 
     if (numeroNicLaudoAuto && numeroNicLaudoAuto.trim()) {
       payload.numeroNicLaudoAuto = numeroNicLaudoAuto.trim()

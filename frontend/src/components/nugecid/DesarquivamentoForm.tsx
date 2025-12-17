@@ -33,11 +33,12 @@ const desarquivamentoSchema = z.object({
   dataDevolucaoSetor: z.string().optional(),
   setorDemandante: z.string().min(1, 'Setor demandante é obrigatório'),
   servidorResponsavel: z.string().min(1, 'Servidor responsável é obrigatório'),
-  finalidadeDesarquivamento: z.string().min(1, 'Finalidade do desarquivamento é obrigatória'),
+  finalidadeDesarquivamento: z.string().optional(),
   solicitacaoProrrogacao: z.boolean().default(false),
   solicitacaoProrrogacaoTexto: z.string().optional(),
   dadosAdicionais: z.string().optional(),
   urgente: z.boolean().optional(),
+  numeroOficio: z.string().max(255, 'O número do ofício deve ter no máximo 255 caracteres').optional(),
   instituto: z.string().max(255, 'O instituto deve ter no máximo 255 caracteres').optional(),
   requerente: z.string().max(255, 'O requerente deve ter no máximo 255 caracteres').optional()
 })
@@ -88,6 +89,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       solicitacaoProrrogacaoTexto: initialData?.solicitacaoProrrogacaoTexto || '',
       dadosAdicionais: initialData?.dadosAdicionais || '',
       urgente: initialData?.urgente || false,
+      numeroOficio: initialData?.numeroOficio || '',
       instituto: initialData?.instituto || '',
       requerente: initialData?.requerente || ''
     }
@@ -330,6 +332,19 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       {/* Instituto e Requerente */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
+          <Label htmlFor="numeroOficio">Nº do Ofício</Label>
+          <Input
+            id="numeroOficio"
+            {...register('numeroOficio')}
+            placeholder="Ex: OFÍCIO Nº 123/2025"
+            className={cn(errors.numeroOficio && 'border-red-500')}
+          />
+          {errors.numeroOficio && (
+            <p className="text-sm text-red-600">{errors.numeroOficio.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="instituto">Instituto</Label>
           <Select
             value={watchedValues.instituto || ''}
@@ -376,7 +391,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
 
       {/* Finalidade */}
       <div className="space-y-2">
-        <Label htmlFor="finalidadeDesarquivamento">Finalidade do Desarquivamento *</Label>
+        <Label htmlFor="finalidadeDesarquivamento">Finalidade do Desarquivamento</Label>
         <Textarea
           id="finalidadeDesarquivamento"
           {...register('finalidadeDesarquivamento')}
