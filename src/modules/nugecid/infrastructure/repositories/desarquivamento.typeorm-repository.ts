@@ -638,6 +638,9 @@ export class DesarquivamentoTypeOrmRepository
             })
             .orWhere("d.requerente ILIKE :search", {
               search: `%${search}%`,
+            })
+            .orWhere("d.numeroOficio ILIKE :search", {
+              search: `%${search}%`,
             });
         }),
       );

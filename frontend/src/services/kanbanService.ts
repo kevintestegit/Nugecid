@@ -1,6 +1,20 @@
 import { api } from './api';
 import { Projeto, Coluna, Tarefa } from '../components/kanban';
 
+type ApiEnvelope<T> = { data: T; success?: boolean };
+
+const unwrapData = <T>(payload: unknown): T => {
+  if (payload && typeof payload === 'object' && 'data' in (payload as Record<string, unknown>)) {
+    return (payload as ApiEnvelope<T>).data;
+  }
+  return payload as T;
+};
+
+const unwrapArrayData = <T>(payload: unknown): T[] => {
+  const data = unwrapData<unknown>(payload);
+  return Array.isArray(data) ? (data as T[]) : [];
+};
+
 // Interfaces para DTOs
 interface CreateProjetoDto {
   nome: string;
@@ -104,12 +118,12 @@ class KanbanService {
   // Projetos
   async getProjetos(): Promise<Projeto[]> {
     const response = await api.get('/projetos');
-    return response.data;
+    return unwrapArrayData<Projeto>(response.data);
   }
 
   async getProjeto(id: number): Promise<Projeto> {
     const response = await api.get(`/projetos/${id}`);
-    return response.data;
+    return unwrapData<Projeto>(response.data);
   }
 
   async createProjeto(data: CreateProjetoDto): Promise<Projeto> {
@@ -134,7 +148,7 @@ class KanbanService {
   // Membros do projeto
   async getProjetoMembros(projetoId: number): Promise<ProjetoMembro[]> {
     const response = await api.get(`/projetos/${projetoId}/membros`);
-    return response.data;
+    return unwrapArrayData<ProjetoMembro>(response.data);
   }
 
   async searchUsuariosParaProjeto(projetoId: number, search?: string) {
@@ -142,17 +156,19 @@ class KanbanService {
     if (search) params.append('search', search);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const response = await api.get(`/projetos/${projetoId}/membros/lookup${qs}`);
-    return response.data as { id: number; nome?: string; usuario?: string; avatarUrl?: string | null }[];
+    return unwrapArrayData<{ id: number; nome?: string; usuario?: string; avatarUrl?: string | null }>(
+      response.data,
+    );
   }
 
   async addProjetoMembro(projetoId: number, data: AddMembroDto): Promise<ProjetoMembro> {
     const response = await api.post(`/projetos/${projetoId}/membros`, data);
-    return response.data;
+    return unwrapData<ProjetoMembro>(response.data);
   }
 
   async updateProjetoMembro(projetoId: number, membroId: number, data: UpdateMembroDto): Promise<ProjetoMembro> {
     const response = await api.patch(`/projetos/${projetoId}/membros/${membroId}`, data);
-    return response.data;
+    return unwrapData<ProjetoMembro>(response.data);
   }
 
   async removeProjetoMembro(projetoId: number, membroId: number): Promise<void> {
@@ -165,12 +181,12 @@ class KanbanService {
     const response = await api.get(`/colunas`, {
       params: { projetoId },
     });
-    return response.data;
+    return unwrapArrayData<Coluna>(response.data);
   }
 
   async getColuna(id: number): Promise<Coluna> {
     const response = await api.get(`/colunas/${id}`);
-    return response.data;
+    return unwrapData<Coluna>(response.data);
   }
 
   async createColuna(data: CreateColunaDto): Promise<Coluna> {

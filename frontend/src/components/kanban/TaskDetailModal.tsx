@@ -53,6 +53,8 @@ interface TaskDetailModalProps {
   onRefresh?: () => Promise<void> | void
   onOpenTask?: (taskId: number) => void
   openTaskLabel?: string
+  canStartTask?: boolean
+  onStartTask?: (task: Tarefa) => void
 }
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
@@ -61,6 +63,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onClose,
   onRefresh,
   onOpenTask,
+  canStartTask = false,
+  onStartTask,
 }) => {
   const [comments, setComments] = useState<NormalizedComment[]>([])
   const [history, setHistory] = useState<NormalizedHistorico[]>([])
@@ -243,6 +247,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
            </div>
            
            <div className="flex items-center gap-2">
+              {task && canStartTask && onStartTask && (
+                <Button
+                  size="sm"
+                  onClick={() => onStartTask(task)}
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Iniciar
+                </Button>
+              )}
               {onOpenTask && (
                 <Button variant="ghost" size="icon" onClick={() => onOpenTask(task.id)} title="Abrir página da tarefa">
                    <MoreHorizontal className="w-5 h-5 text-gray-400" />
