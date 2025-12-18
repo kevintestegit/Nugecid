@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { KanbanBoard, Projeto, Coluna, Tarefa, TaskDetailModal, ProjectMembersModal } from '../components/kanban';
 import { useKanban } from '../hooks/useKanban';
@@ -58,6 +58,71 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
 
   // Hook do Kanban
   const kanban = useKanban({ projetoId: projectId! });
+
+  const normalizeText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim()
+
+  const todoColumnId = useMemo(() => {
+    const colunas = Array.isArray(kanban.colunas) ? kanban.colunas : []
+    const todo = colunas.find((coluna) => {
+      const name = normalizeText(coluna.nome ?? '')
+      return name === 'a fazer' || name === 'afazer' || name.startsWith('a fazer ')
+    })
+    return todo?.id ?? null
+  }, [kanban.colunas])
+
+  const progressColumnId = useMemo(() => {
+    const colunas = Array.isArray(kanban.colunas) ? kanban.colunas : []
+    const progress = colunas.find((coluna) => {
+      const name = normalizeText(coluna.nome ?? '')
+      return (
+        name === 'em progresso' ||
+        name === 'progresso' ||
+        name.startsWith('em progresso ') ||
+        name.includes('progresso')
+      )
+    })
+    return progress?.id ?? null
+  }, [kanban.colunas])
+
+  const canStartSelectedTask = useMemo(() => {
+    if (!selectedTask) return false
+    if (!todoColumnId || !progressColumnId) return false
+    const taskColunaId =
+      (selectedTask as unknown as { coluna_id?: number }).coluna_id ?? selectedTask.colunaId
+    return taskColunaId === todoColumnId
+  }, [selectedTask, todoColumnId, progressColumnId])
+
+  const handleStartTask = async (task: Tarefa) => {
+    if (!progressColumnId) {
+      toast.error('Coluna "Em Progresso" não encontrada')
+      return
+    }
+
+    const sourceColunaId = (task as unknown as { coluna_id?: number }).coluna_id ?? task.colunaId
+    if (!sourceColunaId) return
+
+    const newOrder = kanban.tarefas.filter((t) => {
+      const colunaId = (t as unknown as { coluna_id?: number }).coluna_id ?? t.colunaId
+      return colunaId === progressColumnId
+    }).length
+
+    await handleMoveTask(task.id, sourceColunaId, progressColumnId, newOrder)
+    setSelectedTask((prev) =>
+      prev
+        ? ({
+            ...prev,
+            colunaId: progressColumnId,
+            coluna_id: progressColumnId,
+          } as Tarefa)
+        : prev,
+    )
+    toast.success('Tarefa iniciada')
+  }
 
   // Verificar se projectId é válido
   useEffect(() => {
@@ -240,95 +305,25 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {/* Header da página */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/projetos')}
-              className="gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Projetos
-            </Button>
-            
-            <div className="h-6 w-px bg-gray-300" />
-            
-            <div className="flex items-center gap-3">
-              {kanban.projeto.cor && (
-                <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: kanban.projeto.cor }}
-                />
-              )}
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">
-                  {kanban.projeto.nome}
-                </h1>
-                {kanban.projeto.descricao && (
-                  <p className="text-sm text-gray-600">
-                    {kanban.projeto.descricao}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">
-              {kanban.tarefas.length} tarefa(s)
-            </Badge>
-            <Badge variant="outline">
-              {kanban.colunas.length} coluna(s)
-            </Badge>
-            
-            <div className="h-6 w-px bg-gray-300 mx-2" />
-            
-            <Button variant="ghost" size="sm" className="gap-2" onClick={handleProjectMembers}>
-              <Users className="w-4 h-4" />
-              Membros
-            </Button>
-            
-            <Button variant="ghost" size="sm" className="gap-2">
-              <BarChart3 className="w-4 h-4" />
-              Relatórios
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleProjectSettings}
-              className="gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              Configurações
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-hidden">
-        <KanbanBoard
-          projeto={kanban.projeto}
-          colunas={kanban.colunas}
-          tarefas={kanban.tarefas}
-          onMoveTask={handleMoveTask}
-          onReorderTasks={handleReorderTasks}
-          onAddColumn={handleAddColumn}
-          onEditColumn={handleEditColumn}
-          onDeleteColumn={handleDeleteColumn}
-          onAddTask={handleAddTask}
-          onTaskClick={handleTaskClick}
-          onTaskEdit={handleTaskEdit}
-          onTaskDelete={handleTaskDelete}
-          onProjectSettings={handleProjectSettings}
-          loading={kanban.loading}
-        />
-      </div>
+    <div className="h-[calc(100vh-4rem)] bg-white dark:bg-gray-900">
+      <KanbanBoard
+        projeto={kanban.projeto}
+        colunas={kanban.colunas}
+        tarefas={kanban.tarefas}
+        onMoveTask={handleMoveTask}
+        onReorderTasks={handleReorderTasks}
+        onAddColumn={handleAddColumn}
+        onEditColumn={handleEditColumn}
+        onDeleteColumn={handleDeleteColumn}
+        onAddTask={handleAddTask}
+        onTaskClick={handleTaskClick}
+        onTaskEdit={handleTaskEdit}
+        onTaskDelete={handleTaskDelete}
+        onProjectSettings={handleProjectSettings}
+        onProjectMembers={handleProjectMembers}
+        onProjectReports={() => toast.info('Funcionalidade de relatórios em desenvolvimento')}
+        loading={kanban.loading}
+      />
 
       {/* Modais - serão implementados posteriormente */}
       <CreateProjectModal
@@ -380,6 +375,8 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
         }}
         task={selectedTask}
         onRefresh={kanban.refresh}
+        canStartTask={canStartSelectedTask}
+        onStartTask={handleStartTask}
       />
       
       <ProjectMembersModal

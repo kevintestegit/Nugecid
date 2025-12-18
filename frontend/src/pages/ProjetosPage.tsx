@@ -2,25 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { Loading } from '../components/ui/Loading';
-import { SkeletonCard } from '../components/ui/Skeleton';
 import { Alert } from '../components/ui/Alert';
 import { Input } from '../components/ui/Input';
 import { Label } from '../components/ui/Label';
 import { Textarea } from '../components/ui/Textarea';
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/AlertDialog';
 import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
+import { ProjectCard } from '../components/kanban/ProjectCard';
+import { SkeletonCard } from '../components/ui/Skeleton';
 import {
   Plus,
-  Calendar,
-  Users,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Archive,
   Star,
+  Archive,
   Filter,
   Loader2
 } from 'lucide-react';
@@ -72,7 +65,6 @@ const ProjetosPage: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [deleteProject, setDeleteProject] = useState<Projeto | null>(null);
   const [archiveProject, setArchiveProject] = useState<Projeto | null>(null);
 
@@ -108,20 +100,6 @@ const ProjetosPage: React.FC = () => {
   useEffect(() => {
     loadProjetos();
   }, []);
-
-  // Fechar menu ao clicar fora
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (openMenuId !== null) {
-        setOpenMenuId(null);
-      }
-    };
-
-    if (openMenuId !== null) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [openMenuId]);
 
   // Filtrar projetos
   const filteredProjetos = state.projetos.filter(projeto => {
@@ -263,25 +241,6 @@ const ProjetosPage: React.FC = () => {
     navigate(`/kanban/${projeto.id}`);
   };
 
-  // Formatação de data
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Sem data';
-    const parsed = new Date(dateString);
-    if (isNaN(parsed.getTime())) return 'Sem data';
-    return parsed.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  // Obter cor de progresso
-  const getProgressColor = (progresso: number) => {
-    if (progresso >= 80) return 'bg-green-500';
-    if (progresso >= 50) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
-
   if (state.loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -315,13 +274,13 @@ const ProjetosPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Projetos</h1>
-          <p className="text-gray-600 mt-1">
-            Gerencie seus projetos Kanban
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Projetos</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            Gerencie seus projetos Kanban e acompanhe o progresso
           </p>
         </div>
         
@@ -332,8 +291,8 @@ const ProjetosPage: React.FC = () => {
       </div>
 
       {/* Filtros e Busca */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="flex-1">
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex-1 max-w-lg">
           <SearchInput
             placeholder="Buscar projetos..."
             value={state.searchTerm}
@@ -341,7 +300,7 @@ const ProjetosPage: React.FC = () => {
           />
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
           <Button
             variant={state.filterStatus === 'todos' ? 'default' : 'outline'}
             size="sm"
@@ -377,20 +336,20 @@ const ProjetosPage: React.FC = () => {
 
       {/* Lista de Projetos */}
       {filteredProjetos.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-gray-400 mb-4">
-            <Filter className="w-12 h-12 mx-auto" />
+        <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
+          <div className="text-gray-400 mb-4 inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700">
+            <Filter className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
             {state.searchTerm || state.filterStatus !== 'todos' 
               ? 'Nenhum projeto encontrado' 
-              : 'Nenhum projeto criado'
+              : 'Comece sua jornada'
             }
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
             {state.searchTerm || state.filterStatus !== 'todos'
-              ? 'Tente ajustar os filtros ou termo de busca'
-              : 'Crie seu primeiro projeto para começar'
+              ? 'Não encontramos projetos com os filtros atuais. Tente buscar por outro termo.'
+              : 'Crie seu primeiro projeto para organizar tarefas e colaborar com sua equipe.'
             }
           </p>
           {(!state.searchTerm && state.filterStatus === 'todos') && (
@@ -403,151 +362,28 @@ const ProjetosPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjetos.map((projeto) => (
-            <Card key={projeto.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-              <div className="p-6">
-                {/* Header do Card */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    {projeto.cor && (
-                      <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: projeto.cor }}
-                      />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h3 
-                        className="font-semibold text-gray-900 truncate cursor-pointer hover:text-blue-600"
-                        onClick={() => handleOpenProject(projeto)}
-                      >
-                        {projeto.nome}
-                      </h3>
-                      {projeto.descricao && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {projeto.descricao}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-1 ml-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleToggleFavorite(projeto)}
-                      className={`p-1 ${projeto.favorito ? 'text-yellow-500' : 'text-gray-400'}`}
-                    >
-                      <Star className="w-4 h-4" fill={projeto.favorito ? 'currentColor' : 'none'} />
-                    </Button>
-                    
-                    <div className="relative">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="p-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === projeto.id ? null : projeto.id);
-                        }}
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-
-                      {/* Menu dropdown */}
-                      {openMenuId === projeto.id && (
-                        <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-50 min-w-[160px]">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuId(null);
-                              handleEditProject(projeto);
-                            }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                          >
-                            <Edit className="w-4 h-4" />
-                            Editar
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuId(null);
-                              handleArchiveProject(projeto);
-                            }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                          >
-                            <Archive className="w-4 h-4" />
-                            {projeto.ativo ? 'Arquivar' : 'Desarquivar'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuId(null);
-                              handleDeleteProject(projeto);
-                            }}
-                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            Excluir
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Estatísticas */}
-                <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {formatDate(projeto.data_criacao)}
-                  </div>
-                  {projeto.total_membros !== undefined && (
-                    <div className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {projeto.total_membros}
-                    </div>
-                  )}
-                </div>
-
-                {/* Progresso */}
-                {projeto.progresso !== undefined && (
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-gray-600">Progresso</span>
-                      <span className="font-medium">{projeto.progresso}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all ${getProgressColor(projeto.progresso)}`}
-                        style={{ width: `${projeto.progresso}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={projeto.ativo ? 'default' : 'secondary'}>
-                      {projeto.ativo ? 'Ativo' : 'Arquivado'}
-                    </Badge>
-                    {projeto.total_tarefas !== undefined && (
-                      <Badge variant="outline">
-                        {projeto.total_tarefas} tarefa(s)
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <Button
-                    size="sm"
-                    onClick={() => handleOpenProject(projeto)}
-                    className="gap-2"
-                  >
-                    Abrir
-                  </Button>
-                </div>
-              </div>
-            </Card>
+            <ProjectCard
+              key={projeto.id}
+              projeto={projeto}
+              onClick={() => handleOpenProject(projeto)}
+              onEdit={() => handleEditProject(projeto)}
+              onDelete={() => handleDeleteProject(projeto)}
+              onArchive={() => handleArchiveProject(projeto)}
+              onToggleFavorite={() => handleToggleFavorite(projeto)}
+              onMembers={() => toast.info('Acesse o quadro do projeto para gerenciar membros')}
+            />
           ))}
+          
+          {/* Card para criar novo projeto (opcional, visualmente agradável) */}
+          <button 
+             onClick={handleCreateProject}
+             className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all text-gray-500 dark:text-gray-400 group min-h-[250px]"
+          >
+             <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 flex items-center justify-center mb-4 transition-colors">
+               <Plus className="w-6 h-6 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+             </div>
+             <span className="font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Criar Novo Projeto</span>
+          </button>
         </div>
       )}
 

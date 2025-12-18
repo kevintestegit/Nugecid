@@ -159,6 +159,34 @@ export class ProjetosController {
     return this.projetosService.remove(id, req.user.id);
   }
 
+  @Get(":id/membros/lookup")
+  @ApiOperation({ summary: "Buscar usuários para adicionar ao projeto" })
+  @ApiParam({ name: "id", description: "ID do projeto", type: "number" })
+  @ApiQuery({ name: "search", required: false, type: String })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Lista de usuários retornada com sucesso",
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: "Sem permissão para buscar usuários",
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: "Token de acesso inválido",
+  })
+  async lookup(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("search") search: string,
+    @Request() req: any,
+  ): Promise<any[]> {
+    return this.projetosService.buscarUsuariosParaProjeto(
+      id,
+      req.user.id,
+      search,
+    );
+  }
+
   @Get(":id/membros")
   @ApiOperation({ summary: "Listar membros do projeto" })
   @ApiParam({ name: "id", description: "ID do projeto", type: "number" })

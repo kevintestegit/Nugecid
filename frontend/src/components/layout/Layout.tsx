@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import NotificationBell from '@/components/ui/NotificationBell'
 import { GlobalSearch } from '@/components/layout/GlobalSearch'
 import { NugecidLogo } from '@/components/ui/NugecidLogo'
+import { preloadByPath } from '@/routes/lazyPages'
 import {
   Home,
   FileText,
@@ -48,21 +49,66 @@ const Layout: React.FC = () => {
   }, [sidebarCollapsed])
 
   useEffect(() => {
-    const html = document.documentElement
-    const previousBodyOverflow = document.body.style.overflow
-    const previousHtmlOverflow = html.style.overflow
+    setSidebarOpen(false)
 
-    document.body.style.overflow = 'auto'
-    document.body.style.removeProperty('position')
+    if (location.pathname.startsWith('/custodia')) {
+      setCustodiaExpanded(true)
+    }
+
+    const html = document.documentElement
+    const body = document.body
+
+    const isScrollLocked =
+      body.hasAttribute('data-scroll-locked') ||
+      html.hasAttribute('data-scroll-locked') ||
+      body.style.overflow === 'hidden' ||
+      html.style.overflowY === 'hidden'
+
+    if (!isScrollLocked) return
+
+    const previousBodyOverflow = body.style.overflow
+    const previousBodyPosition = body.style.position
+    const previousHtmlOverflowY = html.style.overflowY
+
+    body.style.overflow = 'auto'
+    body.style.removeProperty('position')
     html.style.overflowY = 'auto'
-    document.body.removeAttribute('data-scroll-locked')
+    body.removeAttribute('data-scroll-locked')
     html.removeAttribute('data-scroll-locked')
 
     return () => {
-      document.body.style.overflow = previousBodyOverflow
-      html.style.overflow = previousHtmlOverflow
+      body.style.overflow = previousBodyOverflow
+      if (previousBodyPosition) body.style.position = previousBodyPosition
+      else body.style.removeProperty('position')
+      html.style.overflowY = previousHtmlOverflowY
     }
   }, [location.pathname])
+
+  useEffect(() => {
+    const preload = () => {
+      void preloadByPath['/desarquivamentos']?.()
+      void preloadByPath['/tarefas']?.()
+      void preloadByPath['/projetos']?.()
+      void preloadByPath['/arquivo']?.()
+    }
+
+    const win = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
+
+    if (win.requestIdleCallback) {
+      const handle = win.requestIdleCallback(preload, { timeout: 2000 })
+      return () => win.cancelIdleCallback?.(handle)
+    }
+
+    const timeoutId = window.setTimeout(preload, 500)
+    return () => window.clearTimeout(timeoutId)
+  }, [])
+
+  const preloadHref = (href: string) => {
+    void preloadByPath[href]?.()
+  }
 
   const userInitial = user?.nome?.charAt(0)?.toUpperCase() ?? '?'
   const userAvatar = user?.avatarUrl
@@ -212,6 +258,8 @@ item.current
                                   ? 'bg-primary text-primary-foreground shadow-sm'
                                   : 'text-foreground hover:bg-muted hover:text-foreground'
                               )}
+                              onMouseEnter={() => preloadHref(subItem.href)}
+                              onFocus={() => preloadHref(subItem.href)}
                               onClick={() => setSidebarOpen(false)}
                             >
                               <SubIcon className="mr-3 h-4 w-4 flex-shrink-0" />
@@ -236,6 +284,8 @@ item.current
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-foreground hover:bg-muted hover:text-foreground'
                   )}
+                  onMouseEnter={() => preloadHref(item.href)}
+                  onFocus={() => preloadHref(item.href)}
                   onClick={() => setSidebarOpen(false)}
                 >
                   <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
@@ -361,7 +411,7 @@ item.current
                 
                 return (
                   <div key={item.name}>
-                    <button
+                      <button
                       onClick={() => setCustodiaExpanded(!isExpanded)}
                       className={cn(
                         'group flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors',
@@ -371,6 +421,8 @@ item.current
                           : 'text-foreground hover:bg-muted hover:text-foreground'
                       )}
                       title={sidebarCollapsed ? item.name : undefined}
+                      onMouseEnter={() => preloadHref(item.href)}
+                      onFocus={() => preloadHref(item.href)}
                     >
                       <div className="flex items-center">
                         <Icon
@@ -403,6 +455,8 @@ item.current
                                   ? 'bg-primary text-primary-foreground shadow-sm'
                                   : 'text-foreground hover:bg-muted hover:text-foreground'
                               )}
+                              onMouseEnter={() => preloadHref(subItem.href)}
+                              onFocus={() => preloadHref(subItem.href)}
                             >
                               <SubIcon className="mr-3 h-4 w-4 flex-shrink-0" />
                               <span>{subItem.name}</span>
@@ -428,6 +482,8 @@ item.current
                       : 'text-foreground hover:bg-muted hover:text-foreground'
                   )}
                   title={sidebarCollapsed ? item.name : undefined}
+                  onMouseEnter={() => preloadHref(item.href)}
+                  onFocus={() => preloadHref(item.href)}
                 >
                   <Icon
                     className={cn(

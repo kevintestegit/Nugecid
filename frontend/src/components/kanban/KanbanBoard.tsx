@@ -14,12 +14,13 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { KanbanColumn, Coluna } from './KanbanColumn';
 import { KanbanCard, Tarefa } from './KanbanCard';
 import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
-import { Plus, Filter, Settings } from 'lucide-react';
-import { SearchInput } from '@/components/ui/SearchInput';
-import { Input } from '../ui/Input';
-import { Badge } from '../ui/Badge';
+import { Plus, Settings, Search, LayoutGrid, SlidersHorizontal, ChevronDown, Users, Calendar } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { AvatarGroup } from './Avatar';
+import { Usuario } from '../../types/kanban.types';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 export interface Projeto {
   id: number;
@@ -28,6 +29,7 @@ export interface Projeto {
   cor?: string;
   data_criacao: string;
   data_atualizacao: string;
+  membros?: { usuario?: Usuario }[];
 }
 
 interface KanbanBoardProps {
@@ -44,6 +46,8 @@ interface KanbanBoardProps {
   onTaskEdit?: (tarefa: Tarefa) => void;
   onTaskDelete?: (tarefaId: number) => void;
   onProjectSettings?: () => void;
+  onProjectMembers?: () => void;
+  onProjectReports?: () => void;
   loading?: boolean;
 }
 
@@ -61,6 +65,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onTaskEdit,
   onTaskDelete,
   onProjectSettings,
+  onProjectMembers,
+  onProjectReports,
   loading = false,
 }) => {
   const [activeId, setActiveId] = useState<string | number | null>(null);
@@ -70,6 +76,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   // Segurança contra respostas fora do formato esperado
   const colunasList = Array.isArray(colunas) ? colunas : [];
   const tarefasList = Array.isArray(tarefas) ? tarefas : [];
+  const sortedColunas = useMemo(
+    () => colunasList.slice().sort((a, b) => a.ordem - b.ordem),
+    [colunasList],
+  )
+
+  const colunasById = useMemo(() => {
+    const entries = sortedColunas.map((coluna) => [coluna.id, coluna] as const)
+    return Object.fromEntries(entries) as Record<number, Coluna>
+  }, [sortedColunas])
+
+  const normalizeText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim()
+
+  const isTodoColumn = (coluna: Coluna | undefined) => {
+    const name = normalizeText(coluna?.nome ?? '')
+    return name === 'a fazer' || name === 'afazer' || name.startsWith('a fazer ')
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -108,8 +135,31 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     return grouped;
   }, [colunasList, filteredTarefas]);
 
+  // Extrair usuários dos membros para o AvatarGroup
+  const projectUsers = useMemo(() => {
+    return projeto.membros
+      ?.map(m => m.usuario)
+      .filter((u): u is Usuario => !!u) || [];
+  }, [projeto.membros]);
+
+  // Helper para formatar data com segurança
+  const safeDate = (date: string | Date | undefined, formatStr: string) => {
+    if (!date) return 'Data indisponível';
+    try {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      if (isNaN(dateObj.getTime())) return 'Data inválida';
+      return format(dateObj, formatStr, { locale: ptBR });
+    } catch (error) {
+      return 'Erro na data';
+    }
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -122,13 +172,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     
     if (activeId === overId) return;
     
-    // Permitir que o @dnd-kit detecte quando estamos sobre outra coluna
-    // Isso habilita a animação visual de movimento entre colunas
     const isActiveTask = active.data.current?.type === 'tarefa';
     const isOverColumn = over.data.current?.type === 'coluna';
     
     if (isActiveTask && isOverColumn) {
-      // Apenas para permitir a animação, não fazemos nada aqui
       return;
     }
   };
@@ -137,49 +184,33 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const { active, over } = event;
     setActiveId(null);
 
-    console.log('🎯 handleDragEnd:', { 
-      activeId: active.id, 
-      overId: over?.id,
-      activeType: active.data.current?.type,
-      overType: over?.data.current?.type,
-      activeData: active.data.current,
-      overData: over?.data.current
-    })
-
-    if (!over) {
-      console.log('❌ Sem destino (over é null)')
-      return;
-    }
+    if (!over) return;
 
     const activeId = active.id;
     const overId = over.id;
 
-    if (activeId === overId) {
-      console.log('❌ Mesma origem e destino')
-      return;
-    }
+    if (activeId === overId) return;
 
     const isActiveTask = active.data.current?.type === 'tarefa';
     const isOverTask = over.data.current?.type === 'tarefa';
     const isOverColumn = over.data.current?.type === 'coluna';
 
-    console.log('📋 Tipos detectados:', { isActiveTask, isOverTask, isOverColumn })
-
-    // PRIORIDADE 1: Mover para coluna vazia (soltou diretamente na coluna)
+    // PRIORIDADE 1: Mover para coluna vazia
     if (isActiveTask && isOverColumn) {
       const activeTask = active.data.current.tarefa as Tarefa;
       const overColumn = over.data.current.coluna as Coluna;
-      
-      console.log('🔀 Movendo para coluna:', {
-        taskId: activeTask.id,
-        taskTitle: activeTask.titulo,
-        from: activeTask.coluna_id,
-        to: overColumn.id,
-        columnName: overColumn.nome
-      })
-      
+      const sourceColunaId =
+        (activeTask as unknown as { coluna_id?: number }).coluna_id ?? (activeTask as any).colunaId
+
+      const sourceColumn =
+        colunasById[sourceColunaId]
+      if (isTodoColumn(sourceColumn) && !isTodoColumn(overColumn)) {
+        toast.message('Para iniciar uma tarefa, abra e clique em "Iniciar".')
+        return
+      }
+
       const overColumnTasks = tarefasPorColuna[overColumn.id] || [];
-      onMoveTask?.(activeTask.id, activeTask.coluna_id, overColumn.id, overColumnTasks.length);
+      onMoveTask?.(activeTask.id, sourceColunaId, overColumn.id, overColumnTasks.length);
       return;
     }
 
@@ -187,35 +218,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (isActiveTask && isOverTask) {
       const activeTask = active.data.current.tarefa as Tarefa;
       const overTask = over.data.current.tarefa as Tarefa;
+      const activeColunaId =
+        (activeTask as unknown as { coluna_id?: number }).coluna_id ?? (activeTask as any).colunaId
+      const overColunaId =
+        (overTask as unknown as { coluna_id?: number }).coluna_id ?? (overTask as any).colunaId
 
-      console.log('📦 Interação entre tarefas:', {
-        activeTaskId: activeTask.id,
-        activeTaskTitle: activeTask.titulo,
-        activeColumn: activeTask.coluna_id,
-        overTaskId: overTask.id,
-        overTaskTitle: overTask.titulo,
-        overColumn: overTask.coluna_id
-      })
-
-      if (activeTask.coluna_id === overTask.coluna_id) {
+      if (activeColunaId === overColunaId) {
         // Reordenar na mesma coluna
-        console.log('🔃 Reordenando na mesma coluna')
-        const columnTasks = tarefasPorColuna[activeTask.coluna_id];
+        const columnTasks = tarefasPorColuna[activeColunaId];
         const oldIndex = columnTasks.findIndex(t => t.id === activeTask.id);
         const newIndex = columnTasks.findIndex(t => t.id === overTask.id);
         
         const reorderedTasks = arrayMove(columnTasks, oldIndex, newIndex);
-        onReorderTasks?.(activeTask.coluna_id, reorderedTasks.map(t => t.id), activeTask.id);
+        onReorderTasks?.(activeColunaId, reorderedTasks.map(t => t.id), activeTask.id);
       } else {
         // Mover para coluna diferente
-        console.log('🔄 Movendo entre colunas diferentes')
-        const overColumnTasks = tarefasPorColuna[overTask.coluna_id];
+        const sourceColumn =
+          colunasById[activeColunaId]
+        const targetColumn =
+          colunasById[overColunaId]
+        if (isTodoColumn(sourceColumn) && !isTodoColumn(targetColumn)) {
+          toast.message('Para iniciar uma tarefa, abra e clique em "Iniciar".')
+          return
+        }
+
+        const overColumnTasks = tarefasPorColuna[overColunaId];
         const overIndex = overColumnTasks.findIndex(t => t.id === overTask.id);
-        onMoveTask?.(activeTask.id, activeTask.coluna_id, overTask.coluna_id, overIndex);
+        onMoveTask?.(activeTask.id, activeColunaId, overColunaId, overIndex);
       }
     }
-    
-    console.log('⚠️ Nenhuma ação executada - tipos não reconhecidos')
   };
 
   const activeTarefa = activeId ? tarefas.find(t => t.id === activeId) : null;
@@ -232,95 +263,105 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header do projeto */}
-      <Card className="p-4 mb-6 bg-white border-gray-200">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            {projeto.cor && (
-              <div
-                className="w-4 h-4 rounded-full"
-                style={{ backgroundColor: projeto.cor }}
-              />
-            )}
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{projeto.nome}</h1>
-              {projeto.descricao && (
-                <p className="text-gray-600 mt-1">{projeto.descricao}</p>
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+      {/* New Header Design */}
+      <header className="flex-shrink-0 pt-6 px-8 pb-4 bg-white dark:bg-gray-900 z-20 border-b border-gray-100 dark:border-gray-800">
+        <div className="flex items-center text-sm text-gray-500 mb-4">
+          <span className="hover:text-gray-800 dark:hover:text-gray-200 cursor-pointer">Projetos</span>
+          <span className="mx-2">/</span>
+          <span className="text-gray-900 dark:text-white font-medium">{projeto.nome}</span>
+        </div>
+
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-6 mb-2">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">{projeto.nome}</h1>
+              {projeto.cor && (
+                <div 
+                  className="w-4 h-4 rounded-full shadow-sm"
+                  style={{ backgroundColor: projeto.cor }}
+                />
               )}
             </div>
+            
+            <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm leading-relaxed">
+              {projeto.descricao || "Gerencie o fluxo de trabalho e atividades deste projeto."}
+            </p>
+            
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400" title="Data de criação">
+                <Calendar size={16} />
+                <span>Criado em {safeDate(projeto.data_criacao, "d 'de' MMMM, yyyy")}</span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <span className="text-gray-500 dark:text-gray-400">Membros:</span>
+                <AvatarGroup usuarios={projectUsers} size="sm" max={5} />
+              </div>
+            </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-sm">
-              {tarefas.length} tarefa(s)
-            </Badge>
-            <Badge variant="outline" className="text-sm">
-              {colunas.length} coluna(s)
-            </Badge>
-            {onProjectSettings && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onProjectSettings}
-                className="gap-2"
+          
+          <div className="flex items-center gap-3 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0">
+            <div className="relative w-64 hidden xl:block">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                <Search size={18} />
+              </span>
+              <input 
+                className="w-full py-1.5 pl-9 pr-4 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-1 focus:ring-gray-300 placeholder-gray-400 transition-shadow outline-none" 
+                placeholder="Buscar no quadro..." 
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            
+            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700 mx-1 hidden lg:block"></div>
+            
+            {onProjectMembers && (
+              <button 
+                onClick={onProjectMembers}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all whitespace-nowrap"
               >
-                <Settings className="w-4 h-4" />
-                Configurações
-              </Button>
+                <Users size={16} />
+                <span className="hidden sm:inline">Gerenciar Membros</span>
+              </button>
+            )}
+
+            {onProjectReports && (
+              <button 
+                onClick={onProjectReports}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all whitespace-nowrap"
+              >
+                <LayoutGrid size={16} />
+                <span className="hidden sm:inline">Dashboard</span>
+              </button>
+            )}
+
+            {onProjectSettings && (
+              <button 
+                onClick={onProjectSettings}
+                className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-700 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                title="Configurações do Projeto"
+              >
+                <Settings size={18} />
+              </button>
             )}
           </div>
         </div>
+      </header>
 
-        {/* Filtros e busca */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1 max-w-md">
-            <SearchInput
-              placeholder="Buscar tarefas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Todas as prioridades</option>
-            <option value="baixa">Baixa</option>
-            <option value="media">Média</option>
-            <option value="alta">Alta</option>
-            <option value="critica">Crítica</option>
-          </select>
-
-          {onAddColumn && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onAddColumn}
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Nova Coluna
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Board com colunas */}
-      <div className="flex-1 overflow-x-auto">
+      {/* Board Area */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-gray-50 dark:bg-gray-900/50">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
         >
-          <div className="flex gap-6 p-4 min-h-full">
-            {colunas
-              .sort((a, b) => a.ordem - b.ordem)
-              .map((coluna) => (
+          <div className="flex h-full space-x-6">
+            {sortedColunas.map((coluna) => (
                 <KanbanColumn
                   key={coluna.id}
                   coluna={coluna}
@@ -333,27 +374,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   onTaskDelete={onTaskDelete}
                 />
               ))}
-
-            {/* Placeholder para adicionar nova coluna */}
-            {onAddColumn && (
-              <div className="min-w-80 max-w-80">
-                <Card className="p-4 border-2 border-dashed border-gray-300 bg-gray-50 hover:border-gray-400 transition-colors">
-                  <Button
-                    variant="ghost"
-                    className="w-full h-32 flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-gray-700"
-                    onClick={onAddColumn}
-                  >
-                    <Plus className="w-8 h-8" />
-                    <span>Adicionar Coluna</span>
-                  </Button>
-                </Card>
-              </div>
-            )}
           </div>
 
           <DragOverlay>
             {activeTarefa && (
-              <div className="rotate-3 opacity-90">
+              <div className="rotate-3 opacity-90 cursor-grabbing">
                 <KanbanCard tarefa={activeTarefa} />
               </div>
             )}

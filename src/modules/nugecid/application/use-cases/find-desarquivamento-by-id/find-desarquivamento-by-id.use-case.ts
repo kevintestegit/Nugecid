@@ -33,6 +33,8 @@ export interface FindDesarquivamentoByIdResponse {
   servidorResponsavel: string;
   finalidadeDesarquivamento: string;
   solicitacaoProrrogacao: boolean;
+  solicitacaoProrrogacaoTexto?: string;
+  dadosAdicionais?: string;
   dataFato?: Date; // Legacy field
   prazoAtendimento?: Date; // Legacy field
   dataAtendimento?: Date; // For compatibility
@@ -156,6 +158,8 @@ export class FindDesarquivamentoByIdUseCase {
       servidorResponsavel: desarquivamento.servidorResponsavel,
       finalidadeDesarquivamento: desarquivamento.finalidadeDesarquivamento,
       solicitacaoProrrogacao: desarquivamento.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: desarquivamento.solicitacaoProrrogacaoTexto,
+      dadosAdicionais: desarquivamento.dadosAdicionais,
       prazoAtendimento: undefined, // Legacy field, not applicable
       dataAtendimento: desarquivamento.dataDesarquivamentoSAG, // For compatibility
       resultadoAtendimento: undefined, // Legacy field, not applicable

@@ -50,7 +50,6 @@ import {
   ],
   controllers: [
     ProjetosController,
-    ProjetoMembrosController,
     ColunasController,
     TarefasController,
     ComentariosController,
