@@ -7,7 +7,7 @@
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, QueryFailedError, DataSource } from "typeorm";
+import { Repository, QueryFailedError, DataSource, In } from "typeorm";
 import { NotificacoesService } from "../../notificacoes/services";
 import {
   Tarefa,
@@ -69,42 +69,29 @@ export class TarefasService {
       );
     }
 
-    // Verificar se a coluna existe e pertence ao projeto
-    const coluna = await this.colunaRepository.findOne({
-      where: {
-        id: createTarefaDto.colunaId,
-        projetoId: createTarefaDto.projetoId,
-      },
-    });
+    // Verificar se a coluna existe e pertence ao projeto (obrigatório apenas se não for subtarefa)
+    if (createTarefaDto.colunaId) {
+      const coluna = await this.colunaRepository.findOne({
+        where: {
+          id: createTarefaDto.colunaId,
+          projetoId: createTarefaDto.projetoId,
+        },
+      });
 
-    if (!coluna) {
-      throw new NotFoundException(
-        "Coluna não encontrada ou não pertence ao projeto",
+      if (!coluna) {
+        throw new NotFoundException(
+          "Coluna não encontrada ou não pertence ao projeto",
+        );
+      }
+    } else if (!createTarefaDto.parentId) {
+      // Se não tem coluna e não é subtarefa, é inválido
+      throw new BadRequestException(
+        "Tarefa deve ter uma coluna ou ser uma subtarefa",
       );
     }
 
-    // Verificar se o responsável existe e é membro do projeto (se especificado)
-    if (createTarefaDto.responsavelId) {
-      const responsavel = await this.userRepository.findOne({
-        where: { id: createTarefaDto.responsavelId },
-      });
-
-      if (!responsavel) {
-        throw new NotFoundException("Responsável não encontrado");
-      }
-
-      const isMember =
-        projeto.criadorId === createTarefaDto.responsavelId ||
-        projeto.membros?.some(
-          (m) => m.usuarioId === createTarefaDto.responsavelId,
-        );
-
-      if (!isMember) {
-        throw new BadRequestException(
-          "O responsável deve ser membro do projeto",
-        );
-      }
-    }
+    const responsavelIds = this.normalizeResponsavelIds(createTarefaDto);
+    const responsaveis = await this.resolveResponsaveis(responsavelIds, projeto);
 
     // Executar criação dentro de transação
     const savedTarefa = await this.dataSource.transaction(async (manager) => {
@@ -125,9 +112,12 @@ export class TarefasService {
         );
       }
 
+      const { responsavelId, responsavelIds: _, ...payload } = createTarefaDto;
       const tarefa = manager.create(Tarefa, {
-        ...createTarefaDto,
+        ...payload,
         criadorId,
+        responsavelId: responsaveis[0]?.id ?? null,
+        responsaveis,
       });
 
       const saved = await manager.save(tarefa);
@@ -147,8 +137,8 @@ export class TarefasService {
     });
 
     // Notificação fora da transação (pode falhar sem comprometer os dados)
-    await this.notificarAtribuicaoTarefa(
-      createTarefaDto.responsavelId,
+    await this.notificarAtribuicoesTarefa(
+      responsaveis.map((usuario) => usuario.id),
       criadorId,
       savedTarefa.id,
     );
@@ -175,7 +165,7 @@ export class TarefasService {
 
     return this.tarefaRepository.find({
       where: { projetoId },
-      relations: ["coluna", "responsavel", "criador"],
+      relations: ["coluna", "responsavel", "responsaveis", "criador"],
       order: { colunaId: "ASC", ordem: "ASC" },
     });
   }
@@ -223,8 +213,10 @@ export class TarefasService {
       .createQueryBuilder("tarefa")
       .leftJoinAndSelect("tarefa.coluna", "coluna")
       .leftJoinAndSelect("tarefa.responsavel", "responsavel")
+      .leftJoinAndSelect("tarefa.responsaveis", "responsaveis")
       .leftJoinAndSelect("tarefa.criador", "criador")
-      .leftJoinAndSelect("tarefa.projeto", "projeto");
+      .leftJoinAndSelect("tarefa.projeto", "projeto")
+      .distinct(true);
 
     // Aplicar filtros
     if (queryDto.projeto_id) {
@@ -240,9 +232,10 @@ export class TarefasService {
     }
 
     if (queryDto.responsavelId) {
-      queryBuilder.andWhere("tarefa.responsavelId = :responsavelId", {
-        responsavelId: queryDto.responsavelId,
-      });
+      queryBuilder.andWhere(
+        "(tarefa.responsavelId = :responsavelId OR responsaveis.id = :responsavelId)",
+        { responsavelId: queryDto.responsavelId },
+      );
     }
 
     if (queryDto.prioridade) {
@@ -387,8 +380,12 @@ export class TarefasService {
           "projeto.membros",
           "coluna",
           "responsavel",
+          "responsaveis",
           "criador",
           "anexos",
+          "subtarefas",
+          "subtarefas.responsavel",
+          "subtarefas.coluna",
         ],
       }),
       this.comentarioRepository.find({
@@ -433,41 +430,39 @@ export class TarefasService {
     }
 
     let novoResponsavelId: number | null = null;
+    const shouldUpdateResponsaveis =
+      "responsavelIds" in updateTarefaDto || "responsavelId" in updateTarefaDto;
 
-    if (
-      updateTarefaDto.responsavelId &&
-      updateTarefaDto.responsavelId !== tarefa.responsavelId
-    ) {
-      const responsavel = await this.userRepository.findOne({
-        where: { id: updateTarefaDto.responsavelId },
-      });
-
-      if (!responsavel) {
-        throw new NotFoundException("Responsavel nao encontrado");
-      }
-
-      const isMember =
-        tarefa.projeto.criadorId === updateTarefaDto.responsavelId ||
-        tarefa.projeto.membros?.some(
-          (m) => m.usuarioId === updateTarefaDto.responsavelId,
-        );
-
-      if (!isMember) {
-        throw new BadRequestException(
-          "O responsavel deve ser membro do projeto",
-        );
-      }
-
-      novoResponsavelId = updateTarefaDto.responsavelId;
-
-      await this.createHistoryEntry(
-        id,
-        userId,
-        "atribuicao",
-        "responsavel",
-        tarefa.responsavel?.nome || null,
-        responsavel.nome,
+    let novosResponsaveis: User[] | null = null;
+    if (shouldUpdateResponsaveis) {
+      const responsavelIds = this.normalizeResponsavelIds(updateTarefaDto);
+      novosResponsaveis = await this.resolveResponsaveis(
+        responsavelIds,
+        tarefa.projeto,
       );
+      novoResponsavelId = novosResponsaveis[0]?.id ?? null;
+
+      const responsaveisAtuais =
+        tarefa.responsaveis?.length
+          ? tarefa.responsaveis
+          : tarefa.responsavel
+            ? [tarefa.responsavel]
+            : [];
+      const nomesAtuais =
+        responsaveisAtuais.map((usuario) => usuario.nome).join(", ") || null;
+      const nomesNovos =
+        novosResponsaveis.map((usuario) => usuario.nome).join(", ") || null;
+
+      if (nomesAtuais !== nomesNovos) {
+        await this.createHistoryEntry(
+          id,
+          userId,
+          "atribuicao",
+          "responsaveis",
+          nomesAtuais,
+          nomesNovos,
+        );
+      }
     }
 
     const changes: string[] = [];
@@ -491,7 +486,12 @@ export class TarefasService {
       changes.push("Prazo alterado");
     }
 
-    Object.assign(tarefa, updateTarefaDto);
+    const { responsavelId, responsavelIds: _, ...payload } = updateTarefaDto;
+    Object.assign(tarefa, payload);
+    if (shouldUpdateResponsaveis && novosResponsaveis) {
+      tarefa.responsaveis = novosResponsaveis;
+      tarefa.responsavelId = novoResponsavelId;
+    }
     const savedTarefa = await this.tarefaRepository.save(tarefa);
 
     if (changes.length > 0) {
@@ -505,9 +505,9 @@ export class TarefasService {
       );
     }
 
-    if (novoResponsavelId) {
-      await this.notificarAtribuicaoTarefa(
-        novoResponsavelId,
+    if (novosResponsaveis && novosResponsaveis.length > 0) {
+      await this.notificarAtribuicoesTarefa(
+        novosResponsaveis.map((usuario) => usuario.id),
         userId,
         savedTarefa.id,
       );
@@ -725,6 +725,64 @@ export class TarefasService {
       });
     }
   }
+
+  private async notificarAtribuicoesTarefa(
+    responsavelIds: number[],
+    autorId: number,
+    tarefaId: number,
+  ): Promise<void> {
+    const uniqueIds = Array.from(new Set(responsavelIds)).filter(Boolean);
+    await Promise.all(
+      uniqueIds.map((responsavelId) =>
+        this.notificarAtribuicaoTarefa(responsavelId, autorId, tarefaId),
+      ),
+    );
+  }
+
+  private normalizeResponsavelIds(dto: {
+    responsavelId?: number;
+    responsavelIds?: number[];
+  }): number[] {
+    const ids = Array.isArray(dto.responsavelIds) ? dto.responsavelIds : [];
+    if (dto.responsavelId) {
+      ids.push(dto.responsavelId);
+    }
+    return Array.from(new Set(ids.filter((id) => !!id)));
+  }
+
+  private async resolveResponsaveis(
+    responsavelIds: number[],
+    projeto: Projeto,
+  ): Promise<User[]> {
+    if (!responsavelIds.length) {
+      return [];
+    }
+
+    const responsaveis = await this.userRepository.find({
+      where: { id: In(responsavelIds) },
+    });
+
+    if (responsaveis.length !== responsavelIds.length) {
+      throw new NotFoundException("Responsável não encontrado");
+    }
+
+    const allowedIds = new Set<number>([
+      projeto.criadorId,
+      ...(projeto.membros?.map((m) => m.usuarioId) ?? []),
+    ]);
+
+    const invalidUser = responsaveis.find(
+      (usuario) => !allowedIds.has(usuario.id),
+    );
+
+    if (invalidUser) {
+      throw new BadRequestException(
+        "Os responsáveis devem ser membros do projeto",
+      );
+    }
+
+    return responsaveis;
+  }
   private async reorderTasks(
     colunaId: number,
     targetOrder: number,
@@ -915,6 +973,7 @@ export class TarefasService {
       .createQueryBuilder("tarefa")
       .leftJoinAndSelect("tarefa.coluna", "coluna")
       .leftJoinAndSelect("tarefa.responsavel", "responsavel")
+      .leftJoinAndSelect("tarefa.responsaveis", "responsaveis")
       .where("tarefa.projetoId = :projetoId", { projetoId })
       .andWhere("tarefa.prazo < :hoje", { hoje })
       .andWhere("coluna.nome != :concluido", { concluido: "ConcluÃ­do" })
@@ -995,7 +1054,11 @@ export class TarefasService {
       .leftJoinAndSelect("tarefa.coluna", "coluna")
       .leftJoinAndSelect("tarefa.projeto", "projeto")
       .leftJoinAndSelect("tarefa.criador", "criador")
-      .where("tarefa.responsavelId = :userId", { userId });
+      .leftJoinAndSelect("tarefa.responsaveis", "responsaveis")
+      .where("(tarefa.responsavelId = :userId OR responsaveis.id = :userId)", {
+        userId,
+      })
+      .distinct(true);
 
     if (queryDto?.prioridade) {
       queryBuilder.andWhere("tarefa.prioridade = :prioridade", {
@@ -1040,6 +1103,7 @@ export class TarefasService {
       descricao: tarefaOriginal.descricao,
       prioridade: tarefaOriginal.prioridade,
       tags: tarefaOriginal.tags,
+      responsavelIds: tarefaOriginal.responsaveis?.map((usuario) => usuario.id),
     };
 
     return this.create(createDto, userId);

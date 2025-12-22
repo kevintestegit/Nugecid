@@ -147,7 +147,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Desabilitar para permitir propriedades adicionais
       transform: true,
       transformOptions: { enableImplicitConversion: true },
       disableErrorMessages: false, // Sempre mostrar erros para debug

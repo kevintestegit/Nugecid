@@ -33,7 +33,7 @@ const desarquivamentoSchema = z.object({
   dataDevolucaoSetor: z.string().optional(),
   setorDemandante: z.string().min(1, 'Setor demandante é obrigatório'),
   servidorResponsavel: z.string().min(1, 'Servidor responsável é obrigatório'),
-  finalidadeDesarquivamento: z.string().optional(),
+  finalidadeDesarquivamento: z.string().max(2000, 'A finalidade deve ter no máximo 2000 caracteres').optional(),
   solicitacaoProrrogacao: z.boolean().default(false),
   solicitacaoProrrogacaoTexto: z.string().optional(),
   dadosAdicionais: z.string().optional(),

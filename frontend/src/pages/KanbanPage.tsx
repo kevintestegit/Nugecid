@@ -26,14 +26,14 @@ interface KanbanPageProps {
   projectId?: number;
 }
 
-const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => {
-  const { id } = useParams<{ id: string }>();
+interface KanbanPageContentProps {
+  projectId: number;
+}
+
+const KanbanPageContent: React.FC<KanbanPageContentProps> = ({ projectId }) => {
   const navigate = useNavigate();
   const { user, checkPermission } = useAuth();
-  
-  // Usar projectId do prop ou da URL
-  const projectId = propProjectId || (id ? parseInt(id, 10) : null);
-  
+
   // Estados dos modais
   const [modals, setModals] = useState({
     createProject: false,
@@ -57,7 +57,7 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
   const [deleteTask, setDeleteTask] = useState<{ id: number; titulo: string } | null>(null);
 
   // Hook do Kanban
-  const kanban = useKanban({ projetoId: projectId! });
+  const kanban = useKanban({ projetoId: projectId });
 
   const normalizeText = (value: string) =>
     value
@@ -124,14 +124,6 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
     toast.success('Tarefa iniciada')
   }
 
-  // Verificar se projectId é válido
-  useEffect(() => {
-    if (!projectId) {
-      toast.error('ID do projeto não encontrado');
-      navigate('/projetos');
-    }
-  }, [projectId, navigate]);
-
   // Handlers dos modais
   const openModal = (modalName: keyof typeof modals, data?: any) => {
     if (modalName === 'editColumn' && data) setSelectedColumn(data);
@@ -159,9 +151,9 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
     }
   };
 
-  const handleReorderTasks = async (colunaId: number, tarefaIds: number[]) => {
+  const handleReorderTasks = async (colunaId: number, tarefaIds: number[], movedTaskId?: number) => {
     try {
-      await kanban.reorderTarefas(colunaId, tarefaIds);
+      await kanban.reorderTarefas(colunaId, tarefaIds, movedTaskId);
     } catch (error) {
       console.error('Erro ao reordenar tarefas:', error);
     }
@@ -428,6 +420,34 @@ const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => 
       />
     </div>
   );
+};
+
+const KanbanPage: React.FC<KanbanPageProps> = ({ projectId: propProjectId }) => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+
+  const parsedParam = id ? Number(id) : null;
+  const resolvedId = propProjectId ?? parsedParam;
+  const isValidId = typeof resolvedId === 'number' && Number.isFinite(resolvedId) && resolvedId > 0;
+
+  if (!isValidId) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Alert>
+          <h3 className="font-semibold">Projeto inválido</h3>
+          <p>O ID do projeto não foi encontrado ou é inválido.</p>
+          <div className="mt-4">
+            <Button variant="outline" onClick={() => navigate('/projetos')}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar aos Projetos
+            </Button>
+          </div>
+        </Alert>
+      </div>
+    );
+  }
+
+  return <KanbanPageContent projectId={resolvedId} />;
 };
 
 export default KanbanPage;

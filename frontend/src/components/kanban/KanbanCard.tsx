@@ -4,7 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { MessageCircle, Paperclip, MoreHorizontal, Flag, Calendar } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Tarefa } from '../../types/kanban.types';
-import { Avatar } from './Avatar';
+import { Avatar, AvatarGroup } from './Avatar';
 import { PrazoBadge } from './PrazoBadge';
 import { TagList } from './TagBadge';
 import { getPrioridadeCor } from '../../utils/kanbanHelpers';
@@ -16,9 +16,10 @@ interface KanbanCardProps {
   onClick?: (tarefa: Tarefa) => void;
   onEdit?: (tarefa: Tarefa) => void;
   onDelete?: (tarefaId: number) => void;
+  density?: 'comfortable' | 'compact';
 }
 
-export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit, onDelete }) => {
+export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit, onDelete, density = 'comfortable' }) => {
   const {
     attributes,
     listeners,
@@ -42,17 +43,21 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
 
   const comentariosCount = tarefa.comentarios?.length || 0;
   const anexosCount = tarefa.anexos?.length || 0;
+  const responsaveis = tarefa.responsaveis?.length
+    ? tarefa.responsaveis
+    : tarefa.responsavel
+      ? [tarefa.responsavel]
+      : [];
   
-  // Mapear prioridade para cores estilo mockup
   const getPriorityStyles = (prioridade: string) => {
     switch (prioridade.toLowerCase()) {
       case 'alta':
       case 'critica':
-        return 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50';
+        return 'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50';
       case 'media':
-        return 'bg-yellow-50 text-yellow-600 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-900/50';
+        return 'bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-900/50';
       case 'baixa':
-        return 'bg-purple-50 text-purple-600 border-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-900/50';
+        return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
       default:
         return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
@@ -71,7 +76,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
     >
       <div
         className={cn(
-          'bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer relative',
+          'bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50/70 dark:hover:bg-gray-900/80 transition-colors cursor-pointer relative',
+          density === 'compact' ? 'p-3' : 'p-4',
           isDragging ? 'rotate-2' : ''
         )}
         onClick={() => onClick?.(tarefa)}
@@ -80,14 +86,15 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
         <div className="flex justify-between items-start mb-2">
           <div className="flex gap-2">
             <span className={cn(
-              "px-2 py-0.5 rounded text-[10px] font-bold uppercase border",
+              'rounded text-[10px] font-semibold uppercase border',
+              density === 'compact' ? 'px-1.5 py-0.5' : 'px-2 py-0.5',
               getPriorityStyles(tarefa.prioridade)
             )}>
               {tarefa.prioridade}
             </span>
           </div>
           <button 
-            className="text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+            className="text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
             onClick={(e) => {
               e.stopPropagation();
               onEdit?.(tarefa);
@@ -111,22 +118,27 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
 
         {/* Description */}
         {tarefa.descricao && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">
+          <p className={cn(
+            'text-xs text-gray-600 dark:text-gray-400 line-clamp-2',
+            density === 'compact' ? 'mb-3' : 'mb-4'
+          )}>
             {tarefa.descricao}
           </p>
         )}
 
         {/* Footer: Users & Stats */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-50 dark:border-gray-700/50">
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-800">
           {/* Users/Avatar */}
           <div className="flex -space-x-2">
-            {tarefa.responsavel && (
-              <div className="border-2 border-white dark:border-gray-800 rounded-full">
-                <Avatar usuario={tarefa.responsavel} size="xs" />
-              </div>
+            {responsaveis.length > 1 ? (
+              <AvatarGroup usuarios={responsaveis} size="xs" max={3} />
+            ) : (
+              responsaveis[0] && (
+                <div className="border-2 border-white dark:border-gray-900 rounded-full">
+                  <Avatar usuario={responsaveis[0]} size="xs" />
+                </div>
+              )
             )}
-            {/* Placeholder for other members if we had them */}
-            {/* <div className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-800 bg-gray-100 flex items-center justify-center text-[10px] text-gray-600">+2</div> */}
           </div>
 
           {/* Stats/Icons */}

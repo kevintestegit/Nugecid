@@ -61,10 +61,11 @@
 /* Definição de larguras */
 /* 2: Status */
 .compact-desarquivamentos thead tr th:nth-child(2),
-.compact-desarquivamentos tbody tr td:nth-child(2) { width: 130px; }
+.compact-desarquivamentos tbody tr td:nth-child(2) { width: 140.1px; }
 
 /* 3: Nome (Expandir se possível, mas fixo aqui) */
-/* .compact-desarquivamentos thead tr th:nth-child(3) { width: 200px; } */
+.compact-desarquivamentos thead tr th:nth-child(3),
+.compact-desarquivamentos tbody tr td:nth-child(3) { width: 200px; }
 
 /* 4: NIC/Laudo */
 .compact-desarquivamentos thead tr th:nth-child(4),
@@ -76,11 +77,11 @@
 
 /* 6: Documento */
 .compact-desarquivamentos thead tr th:nth-child(6),
-.compact-desarquivamentos tbody tr td:nth-child(6) { width: 150px; }
+.compact-desarquivamentos tbody tr td:nth-child(6) { width: 110px; }
 
 /* 7: Solicitação */
 .compact-desarquivamentos thead tr th:nth-child(7),
-.compact-desarquivamentos tbody tr td:nth-child(7) { width: 110px; }
+.compact-desarquivamentos tbody tr td:nth-child(7) { width: 80px; }
 
 /* Última: Ações */
 .compact-desarquivamentos thead tr th:last-child,

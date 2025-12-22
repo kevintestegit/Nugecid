@@ -144,6 +144,7 @@ const DashboardPage: React.FC = () => {
               porInstituto: stats?.data?.porInstituto || {},
               recentes: stats?.data.recentes || [],
               totalMesAnterior: stats?.data?.totalMesAnterior,
+              totalEsteMes: stats?.data?.requisicoesEsteMes,
               pendentesMesAnterior: stats?.data?.pendentesMesAnterior,
             }}
             isLoading={isLoading}
@@ -210,8 +211,16 @@ const DashboardPage: React.FC = () => {
                 {onlineUsers.slice(0, 5).map((onlineUser) => (
                   <div key={onlineUser.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors duration-200">
                     <div className="relative">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                        <User className="h-5 w-5 text-primary" />
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center overflow-hidden">
+                        {onlineUser.avatarUrl || onlineUser.avatar ? (
+                          <img
+                            src={onlineUser.avatarUrl ?? onlineUser.avatar ?? undefined}
+                            alt={onlineUser.nome}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-5 w-5 text-primary" />
+                        )}
                       </div>
                       <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -298,9 +307,18 @@ const DashboardPage: React.FC = () => {
         />
       )}
 
-      {/* Dynamic Dashboard Cards Grid - Uniform 2-column layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {visibleCards.map((card) => renderCard(card.type))}
+      {/* Dynamic Dashboard Cards Grid - 60/40 split on desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="space-y-6 md:col-span-3">
+          {visibleCards
+            .filter((card) => !['quick-actions', 'calendar', 'online-users'].includes(card.type))
+            .map((card) => renderCard(card.type))}
+        </div>
+        <div className="space-y-6 md:col-span-2">
+          {visibleCards
+            .filter((card) => ['quick-actions', 'calendar', 'online-users'].includes(card.type))
+            .map((card) => renderCard(card.type))}
+        </div>
       </div>
 
       {/* System Announcements Modal */}

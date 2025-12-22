@@ -23,6 +23,7 @@ import {
   arquivoPage,
   prateleiraDetailPage,
   projetosPage,
+  projetoDetailPage,
   kanbanPage,
   searchIconTestPage,
   custodiaVestigiosPage,
@@ -63,6 +64,7 @@ const App: React.FC = () => {
           
           {/* Projetos Kanban */}
           <Route path="projetos" element={<projetosPage.Component />} />
+          <Route path="projetos/:id" element={<projetoDetailPage.Component />} />
           <Route path="kanban/:id" element={<kanbanPage.Component />} />
           
           {/* Custódia de Vestígios */}

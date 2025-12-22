@@ -577,7 +577,7 @@ const DesarquivamentosPage: React.FC = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className="block max-w-[260px] truncate" title={item.nomeCompleto || ''}>{item.nomeCompleto || '-'}</span>
+                            <span className="block max-w-[200px] truncate" title={item.nomeCompleto || ''}>{item.nomeCompleto || '-'}</span>
                           </TableCell>
                           <TableCell>
                             <span className="block max-w-[160px] truncate font-mono" title={item.numeroNicLaudoAuto || ''}>{item.numeroNicLaudoAuto || '-'}</span>

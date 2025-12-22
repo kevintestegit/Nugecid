@@ -36,6 +36,10 @@ export interface TermoDesarquivamentoOptions {
 export class NugecidPdfService {
   private readonly logger = new Logger(NugecidPdfService.name);
   private readonly pdfPrinter: any;
+  private readonly printableStatuses = [
+    "DESARQUIVADO",
+    "REARQUIVAMENTO_SOLICITADO",
+  ];
 
   constructor(
     @InjectRepository(DesarquivamentoTypeOrmEntity)
@@ -83,7 +87,7 @@ export class NugecidPdfService {
 
     if (!somenteDesarquivados.length) {
       throw new BadRequestException(
-        "Nao ha itens com status DESARQUIVADO para este processo.",
+        "Nao ha itens com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO para este processo.",
       );
     }
 
@@ -437,7 +441,7 @@ export class NugecidPdfService {
 
     if (!documentosHtml.length) {
       throw new BadRequestException(
-        "Nao ha itens com status DESARQUIVADO para gerar termos no lote informado.",
+        "Nao ha itens com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO para gerar termos no lote informado.",
       );
     }
 
@@ -487,7 +491,7 @@ ${sections}
     base: DesarquivamentoTypeOrmEntity,
   ): Promise<DesarquivamentoTypeOrmEntity[]> {
     if (!base.numeroProcesso) {
-      return base.status?.toUpperCase().trim() === "DESARQUIVADO" ? [base] : [];
+      return this.isPrintableStatus(base.status) ? [base] : [];
     }
 
     const numeroProcessoNormalizado = (base.numeroProcesso || "").trim();
@@ -497,16 +501,16 @@ ${sections}
       .where("TRIM(d.numeroProcesso) = :numeroProcesso", {
         numeroProcesso: numeroProcessoNormalizado,
       })
-      .andWhere("TRIM(UPPER(d.status::text)) = :status", {
-        status: "DESARQUIVADO",
+      .andWhere("TRIM(UPPER(d.status::text)) IN (:...statuses)", {
+        statuses: this.printableStatuses,
       })
       .orderBy("d.numeroSolicitacao", "ASC")
       .addOrderBy("d.createdAt", "ASC")
       .addOrderBy("d.id", "ASC");
 
     const results = await query.getMany();
-    const filtered = results.filter(
-      (item) => item.status?.toUpperCase().trim() === "DESARQUIVADO",
+    const filtered = results.filter((item) =>
+      this.isPrintableStatus(item.status),
     );
 
     const byId = new Map<number, DesarquivamentoTypeOrmEntity>();
@@ -516,7 +520,7 @@ ${sections}
 
     if (
       base.id &&
-      base.status?.toUpperCase().trim() === "DESARQUIVADO" &&
+      this.isPrintableStatus(base.status) &&
       !byId.has(base.id)
     ) {
       byId.set(base.id, base);
@@ -546,15 +550,22 @@ ${sections}
   private filterDesarquivados(
     itens: DesarquivamentoTypeOrmEntity[],
   ): DesarquivamentoTypeOrmEntity[] {
-    const filtrados = itens.filter(
-      (item) => item.status?.toUpperCase().trim() === "DESARQUIVADO",
+    const filtrados = itens.filter((item) =>
+      this.isPrintableStatus(item.status),
     );
     if (itens.length && filtrados.length !== itens.length) {
       this.logger.debug(
-        `Filtrados ${itens.length - filtrados.length} item(ns) que não estavam com status DESARQUIVADO.`,
+        `Filtrados ${
+          itens.length - filtrados.length
+        } item(ns) que não estavam com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO.`,
       );
     }
     return filtrados;
+  }
+
+  private isPrintableStatus(status?: string | null): boolean {
+    const normalized = String(status ?? "").trim().toUpperCase();
+    return this.printableStatuses.includes(normalized);
   }
 
   private extractTagContent(html: string, tagName: string): string {

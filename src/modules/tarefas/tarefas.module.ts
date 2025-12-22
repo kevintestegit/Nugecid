@@ -21,6 +21,7 @@ import {
   TarefasService,
   ComentariosService,
   TarefasFiltrosService,
+  ChecklistsService,
 } from "./services";
 import {
   ProjetosController,
@@ -28,6 +29,7 @@ import {
   ColunasController,
   TarefasController,
   ComentariosController,
+  ChecklistsController,
 } from "./controllers";
 
 @Module({
@@ -53,6 +55,7 @@ import {
     ColunasController,
     TarefasController,
     ComentariosController,
+    ChecklistsController,
   ],
   providers: [
     ProjetosService,
@@ -60,6 +63,7 @@ import {
     TarefasService,
     ComentariosService,
     TarefasFiltrosService,
+    ChecklistsService,
   ],
   exports: [
     ProjetosService,
@@ -67,6 +71,7 @@ import {
     TarefasService,
     ComentariosService,
     TarefasFiltrosService,
+    ChecklistsService,
   ],
 })
 export class TarefasModule {}

@@ -2,7 +2,6 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Avatar, AvatarFallback } from '@/components/ui/Avatar'
 import { 
   Clock, 
   Eye, 
@@ -35,18 +34,6 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities, isLoading =
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
-  }
-
-  const getInitials = (name: string) => {
-    if (!name || typeof name !== 'string') {
-      return 'NN'
-    }
-    return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .substring(0, 2)
-      .toUpperCase()
   }
 
   const isExpired = (prazoVencimento: string) => {
@@ -133,14 +120,13 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ activities, isLoading =
           {activities.map((activity) => (
             <div 
               key={activity.id} 
-              className="flex items-center space-x-4 p-3 rounded-lg border border-gray-100 hover:border-gray-200 hover:bg-gray-50 transition-colors"
+              className={cn(
+                "flex items-center space-x-4 p-3 rounded-lg border transition-colors",
+                activity.urgente
+                  ? "border-rose-200 bg-rose-50/50 hover:border-rose-300 hover:bg-rose-50"
+                  : "border-gray-100 hover:border-gray-200 hover:bg-gray-50"
+              )}
             >
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-blue-100 text-blue-700 text-sm font-medium">
-                  {getInitials(activity.nomeCompleto)}
-                </AvatarFallback>
-              </Avatar>
-
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <p className="text-sm font-medium text-gray-900 truncate">

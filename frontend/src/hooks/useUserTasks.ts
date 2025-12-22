@@ -9,6 +9,18 @@ export interface UserTask {
   prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
   prazo: string;
   createdAt: string;
+  responsavel?: {
+    id: number;
+    nome: string;
+    avatar?: string;
+    avatarUrl?: string | null;
+  };
+  responsaveis?: {
+    id: number;
+    nome: string;
+    avatar?: string;
+    avatarUrl?: string | null;
+  }[];
   projeto?: {
     id: number;
     nome: string;

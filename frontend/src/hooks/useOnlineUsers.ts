@@ -7,6 +7,8 @@ export interface OnlineUser {
   usuario: string;
   role: string;
   lastActivity: string;
+  avatarUrl?: string | null;
+  avatar?: string | null;
 }
 
 export const QUERY_KEYS = {

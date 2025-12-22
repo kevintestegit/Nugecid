@@ -5,6 +5,8 @@ import { Input } from '@/components/ui'
 import { Label } from '@/components/ui'
 import { Textarea } from '@/components/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover'
+import { Checkbox } from '@/components/ui/Checkbox'
 import { Save, Loader2 } from 'lucide-react'
 import { CreateTarefaDto, UpdateTarefaDto, Tarefa, PrioridadeTarefa, User } from '@/types'
 import { toast } from 'sonner'
@@ -23,7 +25,7 @@ interface FormState {
   titulo: string
   descricao: string
   prioridade: PrioridadeTarefa
-  responsavelId: string
+  responsavelIds: string[]
   projetoId: string
   colunaId: string
   prazo: string
@@ -51,7 +53,7 @@ const emptyState: FormState = {
   titulo: '',
   descricao: '',
   prioridade: PrioridadeTarefa.MEDIA,
-  responsavelId: '',
+  responsavelIds: [],
   projetoId: '',
   colunaId: '',
   prazo: '',
@@ -81,6 +83,7 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
 }) => {
   const [formData, setFormData] = useState<FormState>(emptyState)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [responsavelSearch, setResponsavelSearch] = useState('')
   const isEditing = Boolean(tarefa)
 
   const updateFormData = useCallback(
@@ -102,7 +105,11 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
         titulo: tarefa.titulo ?? '',
         descricao: tarefa.descricao ?? '',
         prioridade: tarefa.prioridade ?? PrioridadeTarefa.MEDIA,
-        responsavelId: tarefa.responsavelId ? tarefa.responsavelId.toString() : '',
+        responsavelIds: tarefa.responsaveis?.length
+          ? tarefa.responsaveis.map((usuario) => usuario.id.toString())
+          : tarefa.responsavelId
+            ? [tarefa.responsavelId.toString()]
+            : [],
         projetoId: tarefa.projetoId ? tarefa.projetoId.toString() : '',
         colunaId: tarefa.colunaId ? tarefa.colunaId.toString() : '',
         prazo: tarefa.prazo ? new Date(tarefa.prazo).toISOString().split('T')[0] : '',
@@ -152,6 +159,33 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
     }
   }
 
+  const handleToggleResponsavel = (value: string) => {
+    updateFormData(prev => {
+      const exists = prev.responsavelIds.includes(value)
+      const responsavelIds = exists
+        ? prev.responsavelIds.filter((id) => id !== value)
+        : [...prev.responsavelIds, value]
+      return { ...prev, responsavelIds }
+    })
+    if (errors.responsavelIds) {
+      setErrors(prev => ({ ...prev, responsavelIds: '' }))
+    }
+  }
+
+  const selectedResponsaveis = useMemo(
+    () => usuarios.filter((usuario) => formData.responsavelIds.includes(usuario.id.toString())),
+    [formData.responsavelIds, usuarios]
+  )
+
+  const filteredUsuarios = useMemo(() => {
+    if (!responsavelSearch.trim()) return usuarios
+    const term = responsavelSearch.toLowerCase()
+    return usuarios.filter((usuario) =>
+      usuario.nome.toLowerCase().includes(term) ||
+      usuario.usuario?.toLowerCase().includes(term)
+    )
+  }, [responsavelSearch, usuarios])
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -159,9 +193,8 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
       newErrors.titulo = 'Título é obrigatório'
     }
 
-    const responsavelId = Number(formData.responsavelId)
-    if (!formData.responsavelId || Number.isNaN(responsavelId) || responsavelId <= 0) {
-      newErrors.responsavelId = 'Selecione um responsável válido'
+    if (!formData.responsavelIds.length) {
+      newErrors.responsavelIds = 'Selecione ao menos um responsável'
     }
 
     if (!isEditing) {
@@ -189,7 +222,9 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
     }
 
     try {
-      const responsavelId = Number(formData.responsavelId)
+      const responsavelIds = formData.responsavelIds
+        .map((value) => Number(value))
+        .filter((value) => !Number.isNaN(value) && value > 0)
       const prazoIso = formData.prazo ? new Date(formData.prazo).toISOString() : undefined
       const descricao = formData.descricao.trim() || undefined
       const prioridade = formData.prioridade
@@ -200,7 +235,8 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
           titulo: formData.titulo.trim(),
           descricao,
           prioridade,
-          responsavelId,
+          responsavelId: responsavelIds[0],
+          responsavelIds,
           colunaId,
           prazo: prazoIso,
         })
@@ -214,7 +250,8 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
           titulo: formData.titulo.trim(),
           descricao,
           prioridade,
-          responsavelId,
+          responsavelId: responsavelIds[0],
+          responsavelIds,
           projetoId,
           colunaId,
           prazo: prazoIso,
@@ -287,23 +324,53 @@ const TarefaForm: React.FC<TarefaFormProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="responsavelId">Responsável *</Label>
-              <Select
-                value={formData.responsavelId}
-                onValueChange={(value) => handleInputChange('responsavelId', value)}
-              >
-                <SelectTrigger className={errors.responsavelId ? 'border-red-500' : ''}>
-                  <SelectValue placeholder={usuarios.length ? 'Selecione o responsável' : 'Nenhum usuário disponível'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {usuarios.map((usuario) => (
-                    <SelectItem key={usuario.id} value={usuario.id.toString()}>
-                      {usuario.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.responsavelId && <p className="text-sm text-red-600">{errors.responsavelId}</p>}
+              <Label htmlFor="responsavelIds">Responsáveis *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={errors.responsavelIds ? 'border-red-500 w-full justify-between' : 'w-full justify-between'}
+                  >
+                    {selectedResponsaveis.length
+                      ? selectedResponsaveis.map((usuario) => usuario.nome).join(', ')
+                      : usuarios.length
+                        ? 'Selecione responsáveis'
+                        : 'Nenhum usuário disponível'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="start">
+                  <div className="p-3 border-b">
+                    <Input
+                      placeholder="Buscar responsável..."
+                      value={responsavelSearch}
+                      onChange={(event) => setResponsavelSearch(event.target.value)}
+                    />
+                  </div>
+                  <div className="max-h-56 overflow-y-auto p-2 space-y-1">
+                    {filteredUsuarios.length === 0 ? (
+                      <p className="text-sm text-gray-500 px-2 py-4">Nenhum usuário encontrado</p>
+                    ) : (
+                      filteredUsuarios.map((usuario) => {
+                        const value = usuario.id.toString()
+                        const checked = formData.responsavelIds.includes(value)
+                        return (
+                          <button
+                            type="button"
+                            key={usuario.id}
+                            onClick={() => handleToggleResponsavel(value)}
+                            className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-gray-50"
+                          >
+                            <Checkbox checked={checked} />
+                            <span className="text-gray-700">{usuario.nome}</span>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {errors.responsavelIds && <p className="text-sm text-red-600">{errors.responsavelIds}</p>}
             </div>
 
             <div className="space-y-2">

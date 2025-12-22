@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { kanbanService } from '../services/kanbanService';
+import tarefasService from '@/services/tarefasService';
+import type { CreateTarefaDto, UpdateTarefaDto } from '../services/kanbanService';
 import { Projeto, Coluna, Tarefa } from '../components/kanban';
 
 interface UseKanbanProps {
@@ -29,32 +31,93 @@ interface UseKanbanReturn {
   updateTarefa: (id: number, data: Partial<Tarefa>) => Promise<void>;
   deleteTarefa: (id: number) => Promise<void>;
   moveTarefa: (tarefaId: number, sourceColunaId: number, targetColunaId: number, newOrder: number) => Promise<void>;
-  reorderTarefas: (colunaId: number, tarefaIds: number[]) => Promise<void>;
+  reorderTarefas: (colunaId: number, tarefaIds: number[], movedTaskId?: number) => Promise<void>;
   
   // Utilitários
   refresh: () => Promise<void>;
 }
 
 export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, checkPermission } = useAuth();
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [colunas, setColunas] = useState<Coluna[]>([]);
   const [tarefas, setTarefas] = useState<Tarefa[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const normalizeTarefa = useCallback((t: any): Tarefa => {
+  type LegacyColuna = Partial<Coluna> & {
+    projetoId?: number;
+    projeto_id?: number;
+    limite_wip?: number;
+    wipLimit?: number;
+  };
+
+  type LegacyTarefa = Partial<Tarefa> & {
+    coluna_id?: number;
+    projeto_id?: number;
+    responsavel_id?: number;
+    criador_id?: number;
+    created_at?: string;
+    updated_at?: string;
+    responsaveis?: Tarefa['responsaveis'];
+  };
+
+  const normalizePriority = (value?: string): Tarefa['prioridade'] => {
+    if (!value) return 'media';
+    const normalized = value.toLowerCase();
+    if (normalized === 'baixa' || normalized === 'media' || normalized === 'alta' || normalized === 'critica') {
+      return normalized;
+    }
+    return 'media';
+  };
+
+  const normalizeColuna = useCallback((coluna: LegacyColuna): Coluna => {
     return {
-      ...t,
-      coluna_id: t.coluna_id ?? t.colunaId,
-      colunaId: t.colunaId ?? t.coluna_id,
-      responsavelId: t.responsavelId ?? t.responsavel_id,
-      criadorId: t.criadorId ?? t.criador_id,
-    } as Tarefa;
-  }, []);
+      id: coluna.id ?? 0,
+      nome: coluna.nome ?? '',
+      cor: coluna.cor,
+      ordem: coluna.ordem ?? 1,
+      projeto_id: coluna.projeto_id ?? coluna.projetoId ?? projetoId,
+      limite_wip: coluna.limite_wip ?? coluna.wipLimit,
+    };
+  }, [projetoId]);
+
+  const normalizeTarefa = useCallback((t: LegacyTarefa): Tarefa => {
+    const responsaveis = t.responsaveis ?? (t.responsavel ? [t.responsavel] : []);
+    return {
+      id: t.id ?? 0,
+      titulo: t.titulo ?? '',
+      descricao: t.descricao ?? '',
+      projetoId: t.projetoId ?? t.projeto_id ?? projetoId,
+      colunaId: t.colunaId ?? t.coluna_id ?? 0,
+      criadorId: t.criadorId ?? t.criador_id ?? 0,
+      responsavelId: t.responsavelId ?? t.responsavel_id ?? undefined,
+      prazo: t.prazo ?? undefined,
+      prioridade: normalizePriority(t.prioridade),
+      ordem: t.ordem ?? 1,
+      tags: t.tags ?? [],
+      createdAt: t.createdAt ?? t.created_at ?? new Date().toISOString(),
+      updatedAt: t.updatedAt ?? t.updated_at ?? new Date().toISOString(),
+      responsavel: t.responsavel,
+      responsaveis,
+      coluna: t.coluna,
+      projeto: t.projeto,
+      comentarios: t.comentarios,
+      anexos: t.anexos,
+      checklists: t.checklists,
+    };
+  }, [projetoId]);
 
   // Carregar dados iniciais
   const loadData = useCallback(async () => {
+    if (!isAuthenticated) {
+      setProjeto(null);
+      setColunas([]);
+      setTarefas([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -66,7 +129,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       ]);
 
       setProjeto(projetoData);
-      setColunas(Array.isArray(colunasData) ? colunasData : []);
+      setColunas(Array.isArray(colunasData) ? colunasData.map(normalizeColuna) : []);
       const tarefasArray = Array.isArray(tarefasData) ? tarefasData : [];
       setTarefas(tarefasArray.map(normalizeTarefa));
     } catch (err) {
@@ -76,7 +139,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
     } finally {
       setLoading(false);
     }
-  }, [projetoId]);
+  }, [isAuthenticated, projetoId, normalizeColuna, normalizeTarefa]);
 
   useEffect(() => {
     loadData();
@@ -98,31 +161,40 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
   // Colunas
   const createColuna = useCallback(async (data: Omit<Coluna, 'id' | 'projeto_id' | 'ordem'>) => {
     try {
-      const newColuna = await kanbanService.createColuna({
-        ...data,
-        projeto_id: projetoId,
-        ordem: colunas.length,
-      });
-      setColunas(prev => [...prev, newColuna]);
+      const payload = {
+        nome: data.nome,
+        cor: data.cor,
+        wipLimit: data.limite_wip,
+        projetoId,
+        ordem: colunas.length + 1,
+      };
+      const newColuna = await kanbanService.createColuna(payload);
+      setColunas(prev => [...prev, normalizeColuna(newColuna)]);
       toast.success('Coluna criada com sucesso!');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao criar coluna';
       toast.error(message);
       throw err;
     }
-  }, [projetoId, colunas.length]);
+  }, [colunas.length, normalizeColuna, projetoId]);
 
   const updateColuna = useCallback(async (id: number, data: Partial<Coluna>) => {
     try {
-      const updatedColuna = await kanbanService.updateColuna(id, data);
-      setColunas(prev => prev.map(col => col.id === id ? updatedColuna : col));
+      const payload = {
+        nome: data.nome,
+        cor: data.cor,
+        wipLimit: data.limite_wip,
+        ordem: data.ordem,
+      };
+      const updatedColuna = await kanbanService.updateColuna(id, payload);
+      setColunas(prev => prev.map(col => col.id === id ? normalizeColuna(updatedColuna) : col));
       toast.success('Coluna atualizada com sucesso!');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao atualizar coluna';
       toast.error(message);
       throw err;
     }
-  }, []);
+  }, [normalizeColuna]);
 
   const deleteColuna = useCallback(async (id: number) => {
     try {
@@ -164,14 +236,25 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       toast.error('Usuário não autenticado');
       throw new Error('Usuário não autenticado');
     }
+    if (!checkPermission('create', 'tarefas')) {
+      toast.error('Você não tem permissão para criar tarefas');
+      throw new Error('Sem permissão para criar tarefas');
+    }
 
     try {
-      const tarefasNaColuna = tarefas.filter(t => t.coluna_id === data.coluna_id);
-      const newTarefa = await kanbanService.createTarefa({
-        ...data,
-        ordem: tarefasNaColuna.length,
-        criado_por_id: user.id,
-      });
+      const tarefasNaColuna = tarefas.filter(t => t.colunaId === data.colunaId);
+      const payload: CreateTarefaDto = {
+        projetoId: data.projetoId,
+        colunaId: data.colunaId,
+        titulo: data.titulo,
+        descricao: data.descricao,
+        responsavelId: data.responsavelId,
+        prazo: data.prazo,
+        prioridade: data.prioridade,
+        tags: data.tags,
+        ordem: tarefasNaColuna.length + 1,
+      };
+      const newTarefa = await kanbanService.createTarefa(payload);
       setTarefas(prev => [...prev, normalizeTarefa(newTarefa)]);
       toast.success('Tarefa criada com sucesso!');
     } catch (err) {
@@ -179,23 +262,37 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       toast.error(message);
       throw err;
     }
-  }, [tarefas, isAuthenticated, user]);
+  }, [checkPermission, isAuthenticated, normalizeTarefa, tarefas, user]);
 
   const updateTarefa = useCallback(async (id: number, data: Partial<Tarefa>) => {
     if (!isAuthenticated || !user) {
       toast.error('Você precisa estar logado para atualizar tarefas');
       return;
     }
+    if (!checkPermission('update', 'tarefas')) {
+      toast.error('Você não tem permissão para atualizar tarefas');
+      return;
+    }
 
     // Verificar se o usuário tem permissão para atualizar tarefas
     const tarefa = tarefas.find(t => t.id === id);
-    if (tarefa && user.role?.name === 'usuario' && tarefa.criado_por_id !== user.id) {
+    if (tarefa && user.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
       toast.error('Você só pode atualizar suas próprias tarefas');
       return;
     }
 
     try {
-      const updatedTarefa = await kanbanService.updateTarefa(id, data);
+      const payload: UpdateTarefaDto = {
+        titulo: data.titulo,
+        descricao: data.descricao,
+        prioridade: data.prioridade,
+        prazo: data.prazo,
+        tags: data.tags,
+        responsavelId: data.responsavelId,
+        colunaId: data.colunaId,
+        ordem: data.ordem,
+      };
+      const updatedTarefa = await kanbanService.updateTarefa(id, payload);
       setTarefas(prev => prev.map(tarefa => tarefa.id === id ? normalizeTarefa(updatedTarefa) : tarefa));
       toast.success('Tarefa atualizada com sucesso!');
     } catch (err) {
@@ -203,17 +300,21 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       toast.error(message);
       throw err;
     }
-  }, [isAuthenticated, user, tarefas]);
+  }, [checkPermission, isAuthenticated, normalizeTarefa, tarefas, user]);
 
   const deleteTarefa = useCallback(async (id: number) => {
     if (!isAuthenticated || !user) {
       toast.error('Você precisa estar logado para excluir tarefas');
       return;
     }
+    if (!checkPermission('delete', 'tarefas')) {
+      toast.error('Você não tem permissão para excluir tarefas');
+      return;
+    }
 
     // Verificar se o usuário tem permissão para excluir tarefas
     const tarefa = tarefas.find(t => t.id === id);
-    if (tarefa && user.role?.name === 'usuario' && tarefa.criado_por_id !== user.id) {
+    if (tarefa && user.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
       toast.error('Você só pode excluir suas próprias tarefas');
       return;
     }
@@ -227,35 +328,54 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       toast.error(message);
       throw err;
     }
-  }, [isAuthenticated, user, tarefas]);
+  }, [checkPermission, isAuthenticated, tarefas, user]);
 
   const moveTarefa = useCallback(async (
     tarefaId: number,
-    sourceColunaId: number,
+    _sourceColunaId: number,
     targetColunaId: number,
     newOrder: number
   ) => {
+    if (!isAuthenticated || !user) {
+      toast.error('Você precisa estar logado para mover tarefas');
+      return;
+    }
+    if (!checkPermission('update', 'tarefas')) {
+      toast.error('Você não tem permissão para mover tarefas');
+      return;
+    }
+
+    const tarefa = tarefas.find(item => item.id === tarefaId);
+    if (tarefa && user.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
+      toast.error('Você só pode mover suas próprias tarefas');
+      return;
+    }
+
     try {
-      await kanbanService.moveTarefa(tarefaId, targetColunaId, newOrder);
+      const nextOrder = newOrder + 1;
+      await tarefasService.moveTarefa(tarefaId, {
+        colunaId: targetColunaId,
+        ordem: nextOrder,
+      });
       
       // Atualizar estado local
       setTarefas(prev => {
         const updated = prev.map(tarefa => {
           if (tarefa.id === tarefaId) {
-            return { ...tarefa, coluna_id: targetColunaId, ordem: newOrder };
+            return { ...tarefa, colunaId: targetColunaId, ordem: nextOrder };
           }
           return tarefa;
         });
         
         // Reordenar tarefas na coluna de destino
         const targetTasks = updated
-          .filter(t => t.coluna_id === targetColunaId)
+          .filter(t => t.colunaId === targetColunaId)
           .sort((a, b) => a.ordem - b.ordem);
         
         return updated.map(tarefa => {
-          if (tarefa.coluna_id === targetColunaId) {
+          if (tarefa.colunaId === targetColunaId) {
             const index = targetTasks.findIndex(t => t.id === tarefa.id);
-            return { ...tarefa, ordem: index };
+            return { ...tarefa, ordem: index + 1 };
           }
           return tarefa;
         });
@@ -269,17 +389,42 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       await loadData();
       throw err;
     }
-  }, [loadData]);
+  }, [checkPermission, isAuthenticated, loadData, tarefas, user]);
 
-  const reorderTarefas = useCallback(async (colunaId: number, tarefaIds: number[]) => {
+  const reorderTarefas = useCallback(async (colunaId: number, tarefaIds: number[], movedTaskId?: number) => {
+    if (movedTaskId === undefined) {
+      return;
+    }
+
     try {
-      await kanbanService.reorderTarefas(colunaId, tarefaIds);
-      
+      if (!isAuthenticated || !user) {
+        toast.error('Você precisa estar logado para reordenar tarefas');
+        return;
+      }
+      if (!checkPermission('update', 'tarefas')) {
+        toast.error('Você não tem permissão para reordenar tarefas');
+        return;
+      }
+
+      const tarefa = tarefas.find(item => item.id === movedTaskId);
+      if (tarefa && user.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
+        toast.error('Você só pode reordenar suas próprias tarefas');
+        return;
+      }
+
+      const newOrderIndex = tarefaIds.findIndex(id => id === movedTaskId);
+      if (newOrderIndex === -1) return;
+
+      await tarefasService.moveTarefa(movedTaskId, {
+        colunaId,
+        ordem: newOrderIndex + 1,
+      });
+
       // Atualizar ordem local
       setTarefas(prev => prev.map(tarefa => {
-        if (tarefa.coluna_id === colunaId) {
-          const newOrder = tarefaIds.indexOf(tarefa.id);
-          return { ...tarefa, ordem: newOrder };
+        if (tarefa.colunaId === colunaId) {
+          const orderIndex = tarefaIds.indexOf(tarefa.id);
+          return { ...tarefa, ordem: orderIndex + 1 };
         }
         return tarefa;
       }));
@@ -290,34 +435,40 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
       await loadData();
       throw err;
     }
-  }, [loadData]);
+  }, [checkPermission, isAuthenticated, loadData, tarefas, user]);
 
   const updateTarefaStatus = useCallback(async (tarefaId: number, novoStatus: string) => {
     if (!isAuthenticated || !user) {
       toast.error('Você precisa estar logado para atualizar tarefas');
       return;
     }
+    if (!checkPermission('update', 'tarefas')) {
+      toast.error('Você não tem permissão para atualizar tarefas');
+      return;
+    }
 
     // Verificar se o usuário tem permissão para atualizar tarefas
     const tarefa = tarefas.find(t => t.id === tarefaId);
-    if (tarefa && user.role?.name === 'usuario' && tarefa.criado_por_id !== user.id) {
+    if (tarefa && user.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
       toast.error('Você só pode atualizar suas próprias tarefas');
       return;
     }
 
     try {
-      const tarefaAtualizada = await kanbanService.updateTarefa(tarefaId, { status: novoStatus });
+      const tarefaAtualizada = await kanbanService.updateTarefa(tarefaId, { estado: novoStatus });
       
       setTarefas(prev => prev.map(tarefa => 
-        tarefa.id === tarefaId ? tarefaAtualizada : tarefa
+        tarefa.id === tarefaId ? normalizeTarefa(tarefaAtualizada) : tarefa
       ));
       
       toast.success('Status da tarefa atualizado!');
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Erro ao atualizar status da tarefa';
-      toast.error(message);
+    } catch (error) {
+      const message = error && typeof error === 'object'
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
+      toast.error(message ?? 'Erro ao atualizar status da tarefa');
     }
-  }, [isAuthenticated, user, tarefas]);
+  }, [checkPermission, isAuthenticated, user, tarefas, normalizeTarefa]);
 
   const refresh = useCallback(async () => {
     await loadData();

@@ -29,6 +29,11 @@ export class SystemSettingsService {
         logLevel: "info",
         maintenanceMode: false,
         cacheEnabled: true,
+        sessionTimeout: 30,
+        passwordExpiry: 90,
+        maxLoginAttempts: 5,
+        twoFactorAuth: false,
+        requireStrongPassword: true,
       });
       settings = await this.systemSettingsRepository.save(settings);
       this.logger.log("Configurações do sistema criadas com valores padrão");
@@ -45,13 +50,18 @@ export class SystemSettingsService {
   ): Promise<SystemSettings> {
     const settings = await this.getSettings();
 
+    this.logger.log(`Valores recebidos para atualização: ${JSON.stringify(updateDto)}`);
+    this.logger.log(`Configurações antes: ${JSON.stringify(settings)}`);
+
     // Atualiza apenas os campos fornecidos
     Object.assign(settings, updateDto);
+
+    this.logger.log(`Configurações depois de assign: ${JSON.stringify(settings)}`);
 
     const updatedSettings = await this.systemSettingsRepository.save(settings);
 
     this.logger.log("Configurações do sistema atualizadas");
-    this.logger.debug("Novas configurações:", updatedSettings);
+    this.logger.log(`Configurações salvas: ${JSON.stringify(updatedSettings)}`);
 
     return updatedSettings;
   }
@@ -67,6 +77,11 @@ export class SystemSettingsService {
     settings.logLevel = "info";
     settings.maintenanceMode = false;
     settings.cacheEnabled = true;
+    settings.sessionTimeout = 30;
+    settings.passwordExpiry = 90;
+    settings.maxLoginAttempts = 5;
+    settings.twoFactorAuth = false;
+    settings.requireStrongPassword = true;
 
     const resetSettings = await this.systemSettingsRepository.save(settings);
 

@@ -514,6 +514,7 @@ export class AuthService implements OnModuleInit {
       id: number;
       nome: string;
       usuario: string;
+      avatarUrl?: string | null;
       role: string;
       lastActivity: Date;
     }[]
@@ -534,13 +535,14 @@ export class AuthService implements OnModuleInit {
     const users = await this.userRepository.find({
       where: { id: In(onlineUserIds) },
       relations: ["role"],
-      select: ["id", "nome", "usuario"],
+      select: ["id", "nome", "usuario", "avatarUrl"],
     });
 
     const result = users.map((user) => ({
       id: user.id,
       nome: user.nome,
       usuario: user.usuario,
+      avatarUrl: user.avatarUrl ?? null,
       role: user.role?.name || "user",
       lastActivity: this.onlineUsers.get(user.id)?.lastActivity || new Date(),
     }));
@@ -553,10 +555,8 @@ export class AuthService implements OnModuleInit {
    * Atualiza a atividade do usuário
    */
   async updateUserActivity(userId: number): Promise<void> {
-    if (this.onlineUsers.has(userId)) {
-      this.onlineUsers.set(userId, { lastActivity: new Date() });
-      this.logger.debug(`Atividade atualizada para usuário ${userId}`);
-    }
+    this.onlineUsers.set(userId, { lastActivity: new Date() });
+    this.logger.debug(`Atividade atualizada para usuário ${userId}`);
   }
 
   /**

@@ -658,6 +658,37 @@ export class ApiService {
     }
   }
 
+  // Blocked users endpoints
+  async listBlockedUsers(): Promise<ApiResponse<{
+    id: number
+    usuario: string
+    nome: string
+    bloqueadoAte: string
+    tentativasLogin: number
+  }[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get('/security/blocked-users')
+      return response.data
+    } catch (error: any) {
+      console.error(' listBlockedUsers error:', error?.message || error)
+      throw error
+    }
+  }
+
+  async unblockUser(userId: number): Promise<ApiResponse<{
+    id: number
+    usuario: string
+    nome: string
+  }>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.api.delete(`/security/blocked-users/${userId}`)
+      return response.data
+    } catch (error: any) {
+      console.error(' unblockUser error:', error?.message || error)
+      throw error
+    }
+  }
+
   async deletePastaArquivo(pastaId: string, arquivoId: string): Promise<void> {
     try {
       await this.api.delete(`/pastas/${pastaId}/arquivos/${arquivoId}`)

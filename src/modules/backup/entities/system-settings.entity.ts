@@ -31,6 +31,22 @@ export class SystemSettings {
   @Column({ name: "cache_enabled", type: "boolean", default: true })
   cacheEnabled: boolean;
 
+  // Security settings
+  @Column({ name: "session_timeout", type: "integer", default: 30 })
+  sessionTimeout: number;
+
+  @Column({ name: "password_expiry", type: "integer", default: 90 })
+  passwordExpiry: number;
+
+  @Column({ name: "max_login_attempts", type: "integer", default: 5 })
+  maxLoginAttempts: number;
+
+  @Column({ name: "two_factor_auth", type: "boolean", default: false })
+  twoFactorAuth: boolean;
+
+  @Column({ name: "require_strong_password", type: "boolean", default: true })
+  requireStrongPassword: boolean;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 

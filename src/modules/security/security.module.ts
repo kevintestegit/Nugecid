@@ -6,11 +6,12 @@ import { SecurityController } from "./security.controller";
 import { IpBlockerGuard } from "./guards/ip-blocker.guard";
 import { BlockedIp } from "./entities/blocked-ip.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { User } from "../users/entities/user.entity";
 import { AuthModule } from "../auth/auth.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BlockedIp, Auditoria]),
+    TypeOrmModule.forFeature([BlockedIp, Auditoria, User]),
     forwardRef(() => AuthModule),
   ],
   controllers: [SecurityController],

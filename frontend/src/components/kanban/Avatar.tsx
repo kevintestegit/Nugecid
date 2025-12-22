@@ -35,6 +35,7 @@ export const Avatar: React.FC<AvatarProps> = ({
 
   const avatarColor = getAvatarColor(usuario.nome);
   const initials = getInitials(usuario.nome);
+  const avatarSrc = usuario.avatarUrl ?? usuario.avatar;
 
   return (
     <div 
@@ -42,9 +43,9 @@ export const Avatar: React.FC<AvatarProps> = ({
       style={{ backgroundColor: avatarColor }}
       title={showTooltip ? usuario.nome : undefined}
     >
-      {usuario.avatar ? (
+      {avatarSrc ? (
         <img 
-          src={usuario.avatar} 
+          src={avatarSrc} 
           alt={usuario.nome}
           className="w-full h-full rounded-full object-cover"
         />

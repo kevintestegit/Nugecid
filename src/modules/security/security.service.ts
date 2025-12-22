@@ -5,10 +5,11 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, LessThan, Between } from "typeorm";
+import { Repository, MoreThan, LessThan, Between, Not, IsNull } from "typeorm";
 
 import { BlockedIp } from "./entities/blocked-ip.entity";
 import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
+import { User } from "../users/entities/user.entity";
 
 export interface IpAccessStats {
   ipAddress: string;
@@ -29,6 +30,14 @@ export interface BlockIpDto {
   blockedBy: number;
 }
 
+export interface BlockedUserInfo {
+  id: number;
+  usuario: string;
+  nome: string;
+  bloqueadoAte: Date;
+  tentativasLogin: number;
+}
+
 @Injectable()
 export class SecurityService {
   private readonly logger = new Logger(SecurityService.name);
@@ -38,6 +47,8 @@ export class SecurityService {
     private readonly blockedIpRepository: Repository<BlockedIp>,
     @InjectRepository(Auditoria)
     private readonly auditoriaRepository: Repository<Auditoria>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   /**
@@ -310,5 +321,54 @@ export class SecurityService {
     }
 
     return blockedIps;
+  }
+
+  /**
+   * Lista usuários bloqueados (bloqueadoAte > now)
+   */
+  async listBlockedUsers(): Promise<BlockedUserInfo[]> {
+    const now = new Date();
+    
+    const users = await this.userRepository.find({
+      where: {
+        bloqueadoAte: MoreThan(now),
+      },
+      select: ["id", "usuario", "nome", "bloqueadoAte", "tentativasLogin"],
+      order: { bloqueadoAte: "DESC" },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      usuario: user.usuario,
+      nome: user.nome,
+      bloqueadoAte: user.bloqueadoAte,
+      tentativasLogin: user.tentativasLogin,
+    }));
+  }
+
+  /**
+   * Desbloqueia um usuário
+   */
+  async unblockUser(userId: number): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`Usuário com ID ${userId} não encontrado`);
+    }
+
+    if (!user.bloqueadoAte || user.bloqueadoAte <= new Date()) {
+      throw new BadRequestException(`Usuário ${user.usuario} não está bloqueado`);
+    }
+
+    user.bloqueadoAte = null;
+    user.tentativasLogin = 0;
+    
+    const updated = await this.userRepository.save(user);
+
+    this.logger.log(`Usuário ${user.usuario} (ID: ${userId}) desbloqueado`);
+
+    return updated;
   }
 }

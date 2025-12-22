@@ -21,6 +21,7 @@ import EditUserModal from './EditUserModal'
 import { NoResultsFound } from '@/components/ui/EmptyState'
 import { TableLoading } from '@/components/ui/Loading'
 import { SkeletonTable } from '@/components/ui/Skeleton'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui'
 
 interface UsuariosTableProps {
   users: UserType[]
@@ -140,9 +141,19 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
-                      <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-                        <User className="h-5 w-5 text-gray-600" />
-                      </div>
+                      <Avatar className="h-10 w-10">
+                        {user.avatarUrl || user.avatar ? (
+                          <AvatarImage
+                            src={user.avatarUrl ?? user.avatar ?? undefined}
+                            alt={user.nome}
+                            className="object-cover"
+                          />
+                        ) : (
+                          <AvatarFallback className="bg-gray-200 text-gray-600">
+                            <User className="h-5 w-5 text-gray-600" />
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900">

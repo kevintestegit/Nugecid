@@ -49,7 +49,7 @@ const desarquivamentoSchema = z.object({
     .string()
     .min(3, 'O servidor responsável é obrigatório')
     .max(255, 'O servidor responsável deve ter no máximo 255 caracteres'),
-  finalidadeDesarquivamento: z.string().max(1000, 'A finalidade deve ter no máximo 1000 caracteres').optional(),
+  finalidadeDesarquivamento: z.string().max(2000, 'A finalidade deve ter no máximo 2000 caracteres').optional(),
   solicitacaoProrrogacao: z.boolean().default(false),
   solicitacaoProrrogacaoTexto: z.string().optional(),
   dadosAdicionais: z.string().optional(),
@@ -177,7 +177,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="numeroNicLaudoAuto">Nº DO NIC/LAUDO/AUTO/INFORMAÇÃO TÉCNICA</Label>
+            <Label htmlFor="numeroNicLaudoAuto">Nº DO CIN/NIC/LAUDO/INFORMAÇÃO TÉCNICA</Label>
             <Input
               id="numeroNicLaudoAuto"
               placeholder="Opcional"

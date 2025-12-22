@@ -48,6 +48,10 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   const { data: response, isLoading, error } = useDesarquivamento(id);
   const desarquivamento = response?.data;
   const isIdValid = id ? !isNaN(parseInt(id, 10)) : false;
+  const canGerarTermo = [
+    StatusDesarquivamento.DESARQUIVADO,
+    StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO,
+  ].includes(desarquivamento?.status as StatusDesarquivamento);
 
   const downloadPdfMutation = useDownloadTermoPdf()
   const downloadDocxMutation = useDownloadTermoDocx()
@@ -184,8 +188,8 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       return;
     }
 
-    if (desarquivamento?.status !== StatusDesarquivamento.DESARQUIVADO) {
-      toast.error('Somente solicitacoes com status DESARQUIVADO podem gerar termos.');
+    if (!canGerarTermo) {
+      toast.error('Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.');
       return;
     }
 
@@ -425,8 +429,6 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   // Removido prazoVencimento pois não existe na entidade
   const isPrazoVencido = false;
 
-  const canGerarTermo = desarquivamento?.status === StatusDesarquivamento.DESARQUIVADO;
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -463,7 +465,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handleDownloadTermo('pdf')}
-                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO podem gerar termos.' : undefined}
+                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.' : undefined}
                 disabled={downloadPdfMutation.isPending || !canGerarTermo}
               >
                 <FileText className="h-4 w-4 mr-2" />
@@ -473,7 +475,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => handleDownloadTermo('docx')}
-                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO podem gerar termos.' : undefined}
+                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.' : undefined}
                 disabled={downloadDocxMutation.isPending || !canGerarTermo}
               >
                 <FileText className="h-4 w-4 mr-2" />

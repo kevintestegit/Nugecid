@@ -24,3 +24,8 @@ export { UpdateComentarioDto } from "./update-comentario.dto";
 // Membro Projeto DTOs
 export { AddMembroProjetoDto } from "./add-membro-projeto.dto";
 export { UpdateMembroProjetoDto } from "./update-membro-projeto.dto";
+
+// Checklist DTOs
+export { CreateChecklistDto } from "./create-checklist.dto";
+export { CreateItemChecklistDto } from "./create-item-checklist.dto";
+export { UpdateItemChecklistDto } from "./update-item-checklist.dto";
