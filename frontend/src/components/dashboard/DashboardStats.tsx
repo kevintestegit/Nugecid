@@ -24,6 +24,7 @@ interface DashboardStatsData {
   // Dados do mês anterior para comparação
   totalMesAnterior?: number;
   pendentesMesAnterior?: number;
+  totalEsteMes?: number; // Adicionado para calcular tendência de fluxo
 }
 
 interface DashboardStatsProps {
@@ -33,7 +34,14 @@ interface DashboardStatsProps {
 
 const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false }) => {
   const calcularTendencia = (atual: number, anterior?: number) => {
-    if (!anterior || anterior === 0) return { porcentagem: 0, tipo: 'neutro' as const }
+    // Se não tem anterior (undefined/null), trata como neutro
+    if (anterior === undefined || anterior === null) return { porcentagem: 0, tipo: 'neutro' as const }
+    
+    // Caso especial: Anterior era 0
+    if (anterior === 0) {
+      if (atual > 0) return { porcentagem: 100, tipo: 'alta' as const } // De 0 para algo é infinito, usamos 100% simbólico
+      return { porcentagem: 0, tipo: 'neutro' as const } // 0 para 0
+    }
     
     const diferenca = atual - anterior
     const porcentagem = Math.round((diferenca / anterior) * 100)
@@ -43,7 +51,11 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
     return { porcentagem, tipo: 'neutro' as const }
   }
 
-  const tendenciaTotal = calcularTendencia(data?.total || 0, data?.totalMesAnterior)
+  // Se tivermos o dado deste mês (fluxo), usamos ele para comparar com o fluxo do mês passado.
+  // Se não, usamos o total acumulado (que gera distorção se comparado com fluxo mensal).
+  const valorParaCompararTotal = data.totalEsteMes !== undefined ? data.totalEsteMes : data.total;
+  
+  const tendenciaTotal = calcularTendencia(valorParaCompararTotal, data?.totalMesAnterior)
   const tendenciaPendentes = calcularTendencia(data?.pendentes || 0, data?.pendentesMesAnterior)
 
   const urgentesCount = data?.urgentes || 0
@@ -119,27 +131,25 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
                     <Icon className={cn("h-5 w-5", stat.color)} />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-end justify-between">
-                    <div className="text-3xl font-bold text-foreground">
-                      {(stat.value ?? 0).toLocaleString()}
-                    </div>
-                    
-                    {/* Indicador de tendência */}
-                    {stat.tendencia.porcentagem !== 0 && (
-                      <div className={cn(
-                        "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full",
-                        stat.tendencia.tipo === 'alta' && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
-                        stat.tendencia.tipo === 'baixa' && "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400",
-                        stat.tendencia.tipo === 'neutro' && "bg-gray-100 text-gray-700 dark:bg-gray-950/30 dark:text-gray-400"
-                      )}>
-                        <TrendIcon className="h-3 w-3" />
-                        <span>{Math.abs(stat.tendencia.porcentagem)}%</span>
-                      </div>
-                    )}
+                <CardContent className="flex flex-col items-center justify-center text-center pt-0">
+                  <div className="text-4xl font-bold text-foreground mb-2">
+                    {(stat.value ?? 0).toLocaleString()}
                   </div>
                   
-                  <p className="text-xs text-muted-foreground mt-2">
+                  {/* Indicador de tendência */}
+                  {stat.tendencia.porcentagem !== 0 && (
+                    <div className={cn(
+                      "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full",
+                      stat.tendencia.tipo === 'alta' && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+                      stat.tendencia.tipo === 'baixa' && "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400",
+                      stat.tendencia.tipo === 'neutro' && "bg-gray-100 text-gray-700 dark:bg-gray-950/30 dark:text-gray-400"
+                    )}>
+                      <TrendIcon className="h-3 w-3" />
+                      <span>{Math.abs(stat.tendencia.porcentagem)}%</span>
+                    </div>
+                  )}
+                  
+                  <p className="text-sm text-muted-foreground mt-2">
                     {stat.tendencia.tipo === 'alta' && `↗️ ${stat.tendencia.porcentagem}% em relação ao mês anterior`}
                     {stat.tendencia.tipo === 'baixa' && `↘️ ${stat.tendencia.porcentagem}% em relação ao mês anterior`}
                     {stat.tendencia.tipo === 'neutro' && '→ Sem mudanças significativas'}

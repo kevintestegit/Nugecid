@@ -13,6 +13,8 @@ export interface CardData {
   requisicoesEsteMes: number;
   recentes: any[];
   pendentesAtrasados?: number;
+  totalMesAnterior?: number;
+  pendentesMesAnterior?: number;
 }
 
 export interface ChartData {
@@ -124,12 +126,50 @@ export class EstatisticasService {
         });
       }
 
-      const [total, pendentes, pendentesAtrasados, esteMes, recentes] = await Promise.all([
+      // Cálculo do Mês Anterior
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+
+      // Total Mês Anterior
+      let totalMesAnteriorQuery = this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .where("d.dataSolicitacao >= :start", { start: startOfLastMonth })
+        .andWhere("d.dataSolicitacao <= :end", { end: endOfLastMonth });
+      
+      if (filtros?.userId) {
+        totalMesAnteriorQuery = totalMesAnteriorQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+
+      // Pendentes Mês Anterior (considerando status SOLICITADO e dataSolicitacao no mês passado)
+      // Nota: Isso conta quantas solicitações feitas no mês passado ainda estão pendentes hoje, 
+      // ou quantas ESTAVAM pendentes no final do mês passado? 
+      // Para tendência estatística simples, vamos comparar o volume de solicitações do mês passado vs este mês (total)
+      // E para pendentes, talvez seja melhor comparar o "backlog" gerado naquele mês.
+      // Mas para manter simples e comparável com "pendentes atuais", vamos contar quantas solicitações do mês passado foram feitas
+      // que ainda estão pendentes (ou seja, backlog gerado no mês anterior).
+      
+      let pendentesMesAnteriorQuery = this.desarquivamentoRepo
+        .createQueryBuilder("d")
+        .where("d.status = :status", { status: StatusDesarquivamentoEnum.SOLICITADO })
+        .andWhere("d.dataSolicitacao >= :start", { start: startOfLastMonth })
+        .andWhere("d.dataSolicitacao <= :end", { end: endOfLastMonth });
+
+      if (filtros?.userId) {
+        pendentesMesAnteriorQuery = pendentesMesAnteriorQuery.andWhere("d.criadoPorId = :userId", {
+          userId: filtros.userId,
+        });
+      }
+
+      const [total, pendentes, pendentesAtrasados, esteMes, recentes, totalMesAnterior, pendentesMesAnterior] = await Promise.all([
         totalQuery.getCount(),
         pendentesQuery.getCount(),
         pendentesAtrasadosQuery.getCount(),
         esteMesQuery.getCount(),
         recentesQuery.getMany(),
+        totalMesAnteriorQuery.getCount(),
+        pendentesMesAnteriorQuery.getCount()
       ]);
 
       return {
@@ -137,6 +177,19 @@ export class EstatisticasService {
         requisicoesPendentes: pendentes,
         pendentesAtrasados,
         requisicoesEsteMes: esteMes,
+        // Adicionando dados para comparação de tendência
+        // Para o "total", o frontend compara "total" (que é ALL TIME) com "totalMesAnterior".
+        // Isso geraria uma tendência estranha. O ideal seria comparar "requisicoesEsteMes" com "totalMesAnterior".
+        // O frontend usa: tendenciaTotal = calcularTendencia(data?.total || 0, data?.totalMesAnterior)
+        // Se mudarmos o frontend para usar requisicoesEsteMes vs totalMesAnterior seria mais "Tendência de Volume Mensal".
+        // Mas vamos enviar os dados conforme solicitado.
+        // Se o frontend compara Total Geral vs Total Mes Anterior, ele vai dizer que subiu muito (errado).
+        // Vamos enviar totalMesAnterior como sendo o "Total Geral até o mês passado" para a comparação fazer sentido?
+        // Não, "totalMesAnterior" geralmente implica "Volume do mês anterior".
+        // O frontend provavelmente quer comparar o volume de criação.
+        // Vamos manter o cálculo do volume do mês anterior aqui.
+        totalMesAnterior, 
+        pendentesMesAnterior,
         recentes: recentes.map((item) => ({
           id: item.id,
           nomeCompleto: item.nomeCompleto,

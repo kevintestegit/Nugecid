@@ -20,8 +20,10 @@ import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { Textarea } from '../ui/Textarea'
 import { PrioridadeBadge } from './PrioridadeBadge'
-import { Avatar } from './Avatar'
-import { kanbanService } from '../../services/kanbanService'
+import { Avatar, AvatarGroup } from './Avatar'
+import { ChecklistSection } from './ChecklistSection'
+import { SubtasksSection } from './SubtasksSection'
+import { kanbanService, Comentario as ComentarioApi } from '../../services/kanbanService'
 import { Tarefa, Usuario } from '../../types/kanban.types'
 
 type NormalizedComment = {
@@ -33,6 +35,7 @@ type NormalizedComment = {
     nome?: string
     usuario?: string
     avatar?: string | null
+    avatarUrl?: string | null
   }
 }
 
@@ -79,11 +82,43 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const colunaNome = task?.coluna?.nome
 
-  const responsavel = task?.responsavel
+  const responsaveis = task?.responsaveis?.length
+    ? task.responsaveis
+    : task?.responsavel
+      ? [task.responsavel]
+      : []
   const criadorId = (() => {
     type LegacyCreator = { criador_id?: number }
     return task?.criadorId ?? (task as unknown as LegacyCreator | null)?.criador_id
   })()
+
+  type CommentApi = ComentarioApi & {
+    data_criacao?: string
+    created_at?: string
+    createdAt?: string
+    usuario?: ComentarioApi['usuario']
+    autor?: ComentarioApi['usuario']
+    user?: ComentarioApi['usuario']
+  }
+
+  type HistoricoApi = {
+    id: number
+    acao: string
+    campo_alterado?: string
+    campoAlterado?: string
+    valor_anterior?: string | null
+    valorAnterior?: string | null
+    valor_novo?: string | null
+    valorNovo?: string | null
+    data_acao?: string
+    createdAt?: string
+    usuarioId?: number
+    usuario_id?: number
+  }
+
+  const getCommentAuthor = (comment: CommentApi): NormalizedComment['usuario'] => {
+    return comment.usuario ?? comment.autor ?? comment.user
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -96,24 +131,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         ])
 
         const normalizedComments: NormalizedComment[] = (comentariosApi || []).map(
-          (c: any) => ({
-            id: c.id,
-            conteudo: c.conteudo,
-            createdAt: c.data_criacao || c.created_at || c.createdAt,
-            usuario: c.usuario || c.autor || c.user,
+          (comment: CommentApi) => ({
+            id: comment.id,
+            conteudo: comment.conteudo,
+            createdAt: comment.data_criacao || comment.created_at || comment.createdAt || new Date().toISOString(),
+            usuario: getCommentAuthor(comment),
           }),
         )
         setComments(normalizedComments)
 
         const normalizedHistorico: NormalizedHistorico[] = (historicoApi || []).map(
-          (h: any) => ({
-            id: h.id,
-            acao: h.acao,
-            campo: h.campo_alterado || h.campoAlterado,
-            de: h.valor_anterior || h.valorAnterior,
-            para: h.valor_novo || h.valorNovo,
-            createdAt: h.data_acao || h.createdAt,
-            usuarioId: h.usuarioId || h.usuario_id,
+          (historyItem: HistoricoApi) => ({
+            id: historyItem.id,
+            acao: historyItem.acao,
+            campo: historyItem.campo_alterado || historyItem.campoAlterado,
+            de: historyItem.valor_anterior || historyItem.valorAnterior,
+            para: historyItem.valor_novo || historyItem.valorNovo,
+            createdAt: historyItem.data_acao || historyItem.createdAt,
+            usuarioId: historyItem.usuarioId || historyItem.usuario_id,
           }),
         )
         setHistory(normalizedHistorico)
@@ -152,14 +187,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         tarefaId: task.id,
       })
 
-      // Fix: Handle 'autor' from API response if 'usuario' is missing
-      // Type assertion needed because API return type might differ slightly at runtime
-      const autor = novo.usuario || (novo as any).autor
+      const autor = (novo as CommentApi).usuario ?? (novo as CommentApi).autor
 
       const normalized: NormalizedComment = {
         id: novo.id,
         conteudo: novo.conteudo,
-        createdAt: novo.createdAt || (novo as any).data_criacao || new Date().toISOString(),
+        createdAt: (novo as CommentApi).data_criacao || (novo as CommentApi).createdAt || new Date().toISOString(),
         usuario: autor,
       }
       setComments((prev) => [normalized, ...prev])
@@ -284,6 +317,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                        {task.descricao || <span className="text-gray-400 italic">Nenhuma descrição fornecida.</span>}
                     </div>
                  </div>
+
+                 {/* Checklist */}
+                 <ChecklistSection taskId={task.id} />
+
+                 {/* Subtasks */}
+                 <SubtasksSection 
+                    parentTask={task} 
+                    onRefresh={onRefresh || (() => {})} 
+                    onOpenTask={(id) => onOpenTask?.(id)} 
+                 />
 
                  <hr className="border-gray-100" />
 
@@ -420,14 +463,23 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                        <div className="space-y-1.5">
                           <label className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
-                             <UserIcon className="w-3.5 h-3.5" /> Responsável
+                             <UserIcon className="w-3.5 h-3.5" /> Responsáveis
                           </label>
-                          <div className="flex items-center gap-2 group cursor-pointer">
-                             <Avatar usuario={responsavel} size="xs" />
-                             <span className="text-sm text-gray-700 truncate group-hover:text-blue-600 transition-colors">
-                                {responsavel?.nome || 'Não atribuído'}
-                             </span>
-                          </div>
+                          {responsaveis.length > 1 ? (
+                             <div className="flex items-center gap-2">
+                                <AvatarGroup usuarios={responsaveis} size="xs" max={4} />
+                                <span className="text-sm text-gray-700 truncate">
+                                   {responsaveis.map((usuario) => usuario.nome).join(', ')}
+                                </span>
+                             </div>
+                          ) : (
+                             <div className="flex items-center gap-2 group cursor-pointer">
+                                <Avatar usuario={responsaveis[0]} size="xs" />
+                                <span className="text-sm text-gray-700 truncate group-hover:text-blue-600 transition-colors">
+                                   {responsaveis[0]?.nome || 'Não atribuído'}
+                                </span>
+                             </div>
+                          )}
                        </div>
 
                        <div className="space-y-1.5">

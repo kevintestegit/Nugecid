@@ -213,50 +213,59 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
               />
               {suggestions.length > 0 && (
                 <div className="border rounded-lg divide-y max-h-48 overflow-y-auto bg-white">
-                  {suggestions.map((sugestao) => (
-                    <div
-                      key={sugestao.id}
-                      className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Avatar usuario={{ ...sugestao, avatarUrl: sugestao.avatarUrl } as any} size="sm" />
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">
-                            {sugestao.nome || sugestao.usuario || `#${sugestao.id}`}
-                          </span>
-                          {sugestao.usuario && (
-                            <span className="text-xs text-gray-500">@{sugestao.usuario}</span>
-                          )}
+                  {suggestions.map((sugestao) => {
+                    const suggestionUser = {
+                      id: sugestao.id,
+                      nome: sugestao.nome ?? sugestao.usuario ?? `#${sugestao.id}`,
+                      usuario: sugestao.usuario ?? sugestao.nome ?? '',
+                      avatarUrl: sugestao.avatarUrl ?? null,
+                    }
+
+                    return (
+                      <div
+                        key={sugestao.id}
+                        className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Avatar usuario={suggestionUser} size="sm" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">
+                              {sugestao.nome || sugestao.usuario || `#${sugestao.id}`}
+                            </span>
+                            {sugestao.usuario && (
+                              <span className="text-xs text-gray-500">@{sugestao.usuario}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            defaultValue="editor"
+                            onValueChange={(papel) =>
+                              handleAdd(sugestao, papel as PapelMembro)
+                            }
+                            disabled={saving}
+                          >
+                            <SelectTrigger className="w-28">
+                              <SelectValue placeholder="Papel" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="editor">Editor</SelectItem>
+                              <SelectItem value="viewer">Viewer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleAdd(sugestao, 'editor')}
+                            disabled={saving}
+                          >
+                            <UserPlus className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Select
-                          defaultValue="editor"
-                          onValueChange={(papel) =>
-                            handleAdd(sugestao, papel as PapelMembro)
-                          }
-                          disabled={saving}
-                        >
-                          <SelectTrigger className="w-28">
-                            <SelectValue placeholder="Papel" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="editor">Editor</SelectItem>
-                            <SelectItem value="viewer">Viewer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleAdd(sugestao, 'editor')}
-                          disabled={saving}
-                        >
-                          <UserPlus className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

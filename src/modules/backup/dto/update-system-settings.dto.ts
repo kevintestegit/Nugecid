@@ -1,4 +1,12 @@
-import { IsBoolean, IsString, IsOptional, IsIn } from "class-validator";
+import {
+  IsBoolean,
+  IsString,
+  IsOptional,
+  IsIn,
+  IsNumber,
+  Min,
+  Max,
+} from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UpdateSystemSettingsDto {
@@ -34,4 +42,48 @@ export class UpdateSystemSettingsDto {
   @IsOptional()
   @IsBoolean()
   cacheEnabled?: boolean;
+
+  // Security settings
+  @ApiPropertyOptional({
+    description: "Tempo limite da sessão em minutos",
+    minimum: 5,
+    maximum: 480,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(5)
+  @Max(480)
+  sessionTimeout?: number;
+
+  @ApiPropertyOptional({
+    description: "Expiração de senha em dias",
+    minimum: 30,
+    maximum: 365,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(30)
+  @Max(365)
+  passwordExpiry?: number;
+
+  @ApiPropertyOptional({
+    description: "Número máximo de tentativas de login",
+    minimum: 3,
+    maximum: 10,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(3)
+  @Max(10)
+  maxLoginAttempts?: number;
+
+  @ApiPropertyOptional({ description: "Ativar autenticação de dois fatores" })
+  @IsOptional()
+  @IsBoolean()
+  twoFactorAuth?: boolean;
+
+  @ApiPropertyOptional({ description: "Exigir senha forte" })
+  @IsOptional()
+  @IsBoolean()
+  requireStrongPassword?: boolean;
 }

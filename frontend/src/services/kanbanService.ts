@@ -1,5 +1,5 @@
 import { api } from './api';
-import { Projeto, Coluna, Tarefa } from '../components/kanban';
+import { Projeto, Coluna, Tarefa, Checklist, ItemChecklist } from '../types/kanban.types';
 
 type ApiEnvelope<T> = { data: T; success?: boolean };
 
@@ -19,25 +19,28 @@ const unwrapArrayData = <T>(payload: unknown): T[] => {
 interface CreateProjetoDto {
   nome: string;
   descricao?: string;
+  cor?: string;
 }
 
 interface UpdateProjetoDto {
   nome?: string;
   descricao?: string;
+  cor?: string;
+  ativo?: boolean;
 }
 
 interface CreateColunaDto {
   nome: string;
   cor?: string;
-  limite_wip?: number;
-  projeto_id: number;
+  wipLimit?: number;
+  projetoId: number;
   ordem: number;
 }
 
 interface UpdateColunaDto {
   nome?: string;
   cor?: string;
-  limite_wip?: number;
+  wipLimit?: number;
   ordem?: number;
 }
 
@@ -47,9 +50,12 @@ interface CreateTarefaDto {
   prioridade: 'baixa' | 'media' | 'alta' | 'critica';
   prazo?: string;
   tags?: string[];
-  responsavel_id?: number;
-  coluna_id: number;
+  responsavelId?: number;
+  responsavelIds?: number[];
+  projetoId: number;
+  colunaId: number;
   ordem: number;
+  parentId?: number;
 }
 
 interface UpdateTarefaDto {
@@ -58,13 +64,15 @@ interface UpdateTarefaDto {
   prioridade?: 'baixa' | 'media' | 'alta' | 'critica';
   prazo?: string;
   tags?: string[];
-  responsavel_id?: number;
-  coluna_id?: number;
+  responsavelId?: number;
+  responsavelIds?: number[];
+  colunaId?: number;
   ordem?: number;
+  estado?: string;
 }
 
 interface MoveTarefaDto {
-  coluna_id: number;
+  colunaId: number;
   ordem: number;
 }
 
@@ -102,6 +110,7 @@ interface Comentario {
     id: number;
     nome: string;
     avatar?: string;
+    avatarUrl?: string | null;
   };
 }
 
@@ -128,12 +137,12 @@ class KanbanService {
 
   async createProjeto(data: CreateProjetoDto): Promise<Projeto> {
     const response = await api.post('/projetos', data);
-    return response.data;
+    return unwrapData<Projeto>(response.data);
   }
 
   async updateProjeto(id: number, data: UpdateProjetoDto): Promise<Projeto> {
     const response = await api.patch(`/projetos/${id}`, data);
-    return response.data;
+    return unwrapData<Projeto>(response.data);
   }
 
   async deleteProjeto(id: number): Promise<void> {
@@ -142,7 +151,7 @@ class KanbanService {
 
   async getProjetoStats(id: number): Promise<any> {
     const response = await api.get(`/projetos/${id}/stats`);
-    return response.data;
+    return unwrapData<any>(response.data);
   }
 
   // Membros do projeto
@@ -191,12 +200,12 @@ class KanbanService {
 
   async createColuna(data: CreateColunaDto): Promise<Coluna> {
     const response = await api.post('/colunas', data);
-    return response.data;
+    return unwrapData<Coluna>(response.data);
   }
 
   async updateColuna(id: number, data: UpdateColunaDto): Promise<Coluna> {
     const response = await api.patch(`/colunas/${id}`, data);
-    return response.data;
+    return unwrapData<Coluna>(response.data);
   }
 
   async deleteColuna(id: number): Promise<void> {
@@ -204,12 +213,12 @@ class KanbanService {
   }
 
   async moveColuna(id: number, ordem: number): Promise<void> {
-    await api.patch(`/colunas/${id}/move`, { ordem });
+    await api.patch(`/colunas/${id}/move`, { newOrder: ordem });
   }
 
   async getColunaStats(id: number): Promise<any> {
     const response = await api.get(`/colunas/${id}/stats`);
-    return response.data;
+    return unwrapData<any>(response.data);
   }
 
   // Tarefas
@@ -225,26 +234,22 @@ class KanbanService {
     }
     
     const response = await api.get(url);
-    const payload = response.data;
-    // API pode retornar { data, meta }; normalizar para array
-    if (payload && Array.isArray(payload.data)) return payload.data as Tarefa[];
-    if (Array.isArray(payload)) return payload as Tarefa[];
-    return [];
+    return unwrapArrayData<Tarefa>(response.data);
   }
 
   async getTarefa(id: number): Promise<Tarefa> {
     const response = await api.get(`/tarefas/${id}`);
-    return response.data;
+    return unwrapData<Tarefa>(response.data);
   }
 
   async createTarefa(data: CreateTarefaDto): Promise<Tarefa> {
     const response = await api.post('/tarefas', data);
-    return response.data;
+    return unwrapData<Tarefa>(response.data);
   }
 
   async updateTarefa(id: number, data: UpdateTarefaDto): Promise<Tarefa> {
     const response = await api.patch(`/tarefas/${id}`, data);
-    return response.data;
+    return unwrapData<Tarefa>(response.data);
   }
 
   async deleteTarefa(id: number): Promise<void> {
@@ -252,8 +257,7 @@ class KanbanService {
   }
 
   async moveTarefa(id: number, colunaId: number, ordem: number): Promise<void> {
-    // API espera ordem 0-based (aceita >=0); front usa 0-based também
-    await api.patch(`/tarefas/${id}/mover`, { colunaId: colunaId, ordem });
+    await api.patch(`/tarefas/${id}/mover`, { colunaId, ordem });
   }
 
   async reorderTarefas(colunaId: number, tarefaIds: number[]): Promise<void> {
@@ -266,33 +270,62 @@ class KanbanService {
       url += `?projeto_id=${projetoId}`;
     }
     const response = await api.get(url);
-    return response.data;
+    return unwrapArrayData<Tarefa>(response.data);
   }
 
   async getTarefaHistorico(id: number): Promise<any[]> {
     const response = await api.get(`/tarefas/${id}/historico`);
-    return response.data;
+    return unwrapArrayData<any>(response.data);
+  }
+
+  // Checklists
+  async getChecklists(tarefaId: number): Promise<Checklist[]> {
+    const response = await api.get(`/tarefas/${tarefaId}/checklists`);
+    return unwrapArrayData<Checklist>(response.data);
+  }
+
+  async createChecklist(tarefaId: number, titulo: string): Promise<Checklist> {
+    const response = await api.post(`/tarefas/${tarefaId}/checklists`, { titulo });
+    return unwrapData<Checklist>(response.data);
+  }
+
+  async deleteChecklist(id: number): Promise<void> {
+    await api.delete(`/checklists/${id}`);
+  }
+
+  async addChecklistItem(checklistId: number, texto: string): Promise<ItemChecklist> {
+    const response = await api.post(`/checklists/${checklistId}/itens`, { texto });
+    return unwrapData<ItemChecklist>(response.data);
+  }
+
+  async updateChecklistItem(itemId: number, data: { texto?: string; concluido?: boolean }): Promise<ItemChecklist> {
+    const response = await api.patch(`/checklists/itens/${itemId}`, data);
+    return unwrapData<ItemChecklist>(response.data);
+  }
+
+  async deleteChecklistItem(itemId: number): Promise<void> {
+    await api.delete(`/checklists/itens/${itemId}`);
   }
 
   // Comentários
   async getComentarios(tarefaId: number): Promise<Comentario[]> {
     const response = await api.get(`/comentarios`, { params: { tarefaId } });
-    return response.data;
+    return unwrapArrayData<Comentario>(response.data);
   }
 
   async getComentario(id: number): Promise<Comentario> {
     const response = await api.get(`/comentarios/${id}`);
-    return response.data;
+    return unwrapData<Comentario>(response.data);
   }
 
   async createComentario(data: CreateComentarioDto): Promise<Comentario> {
     const response = await api.post('/comentarios', data);
-    return response.data;
+    return unwrapData<Comentario>(response.data);
   }
 
   async updateComentario(id: number, data: UpdateComentarioDto): Promise<Comentario> {
     const response = await api.patch(`/comentarios/${id}`, data);
-    return response.data;
+    return unwrapData<Comentario>(response.data);
   }
 
   async deleteComentario(id: number): Promise<void> {
@@ -311,7 +344,7 @@ class KanbanService {
     }
     
     const response = await api.get(url);
-    return response.data;
+    return unwrapData<any>(response.data);
   }
 
   async getComentariosPorPeriodo(inicio: string, fim: string, tarefaId?: number): Promise<any> {
@@ -325,7 +358,7 @@ class KanbanService {
     url += `?${params.toString()}`;
     
     const response = await api.get(url);
-    return response.data;
+    return unwrapData<any>(response.data);
   }
 }
 

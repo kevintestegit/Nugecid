@@ -27,9 +27,10 @@ export class TarefasFiltrosService {
 
     // Filtro por responsável
     if (filtros.responsavelId) {
-      query.andWhere("tarefa.responsavelId = :responsavelId", {
-        responsavelId: filtros.responsavelId,
-      });
+      query.andWhere(
+        "(tarefa.responsavelId = :responsavelId OR responsaveis.id = :responsavelId)",
+        { responsavelId: filtros.responsavelId },
+      );
     }
 
     // Filtro por prioridade
@@ -131,11 +132,13 @@ export class TarefasFiltrosService {
     let query = this.tarefaRepository
       .createQueryBuilder("tarefa")
       .leftJoinAndSelect("tarefa.responsavel", "responsavel")
+      .leftJoinAndSelect("tarefa.responsaveis", "responsaveis")
       .leftJoinAndSelect("tarefa.coluna", "coluna")
       .leftJoinAndSelect("tarefa.projeto", "projeto")
       .leftJoinAndSelect("tarefa.comentarios", "comentarios")
       .leftJoinAndSelect("tarefa.anexos", "anexos")
-      .leftJoinAndSelect("tarefa.checklists", "checklists");
+      .leftJoinAndSelect("tarefa.checklists", "checklists")
+      .distinct(true);
 
     query = this.aplicarFiltros(query, filtros);
 
@@ -157,7 +160,11 @@ export class TarefasFiltrosService {
     switch (agruparPor) {
       case AgruparPor.RESPONSAVEL:
         tarefas.forEach((tarefa) => {
-          const chave = tarefa.responsavel?.nome || "Sem Responsável";
+          const responsaveis =
+            tarefa.responsaveis?.length
+              ? tarefa.responsaveis.map((usuario) => usuario.nome).join(", ")
+              : tarefa.responsavel?.nome || "Sem Responsável";
+          const chave = responsaveis || "Sem Responsável";
           if (!grupos[chave]) grupos[chave] = [];
           grupos[chave].push(tarefa);
         });

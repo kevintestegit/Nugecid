@@ -22,6 +22,10 @@ export interface TermoDesarquivamentoDocxOptions {
 @Injectable()
 export class NugecidDocxService {
   private readonly logger = new Logger(NugecidDocxService.name);
+  private readonly printableStatuses = [
+    "DESARQUIVADO",
+    "REARQUIVAMENTO_SOLICITADO",
+  ];
 
   constructor(
     @InjectRepository(DesarquivamentoTypeOrmEntity)
@@ -38,7 +42,7 @@ export class NugecidDocxService {
 
     if (!somenteDesarquivados.length) {
       throw new BadRequestException(
-        "Nao ha itens com status DESARQUIVADO para este processo.",
+        "Nao ha itens com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO para este processo.",
       );
     }
 
@@ -99,7 +103,7 @@ export class NugecidDocxService {
     base: DesarquivamentoTypeOrmEntity,
   ): Promise<DesarquivamentoTypeOrmEntity[]> {
     if (!base.numeroProcesso) {
-      if (base.status?.toUpperCase().trim() === "DESARQUIVADO") {
+      if (this.isPrintableStatus(base.status)) {
         return [base];
       }
       return [];
@@ -112,16 +116,16 @@ export class NugecidDocxService {
       .where("TRIM(d.numeroProcesso) = :numeroProcesso", {
         numeroProcesso: numeroProcessoNormalizado,
       })
-      .andWhere("TRIM(UPPER(d.status::text)) = :status", {
-        status: "DESARQUIVADO",
+      .andWhere("TRIM(UPPER(d.status::text)) IN (:...statuses)", {
+        statuses: this.printableStatuses,
       })
       .orderBy("d.numeroSolicitacao", "ASC")
       .addOrderBy("d.createdAt", "ASC")
       .addOrderBy("d.id", "ASC");
 
     const results = await query.getMany();
-    const filtered = results.filter(
-      (item) => item.status?.toUpperCase().trim() === "DESARQUIVADO",
+    const filtered = results.filter((item) =>
+      this.isPrintableStatus(item.status),
     );
 
     const byId = new Map<number, DesarquivamentoTypeOrmEntity>();
@@ -131,7 +135,7 @@ export class NugecidDocxService {
 
     if (
       base.id &&
-      base.status?.toUpperCase().trim() === "DESARQUIVADO" &&
+      this.isPrintableStatus(base.status) &&
       !byId.has(base.id)
     ) {
       byId.set(base.id, base);
@@ -162,7 +166,12 @@ export class NugecidDocxService {
     itens: DesarquivamentoTypeOrmEntity[],
   ): DesarquivamentoTypeOrmEntity[] {
     return itens.filter(
-      (item) => item.status?.toUpperCase().trim() === "DESARQUIVADO",
+      (item) => this.isPrintableStatus(item.status),
     );
+  }
+
+  private isPrintableStatus(status?: string | null): boolean {
+    const normalized = String(status ?? "").trim().toUpperCase();
+    return this.printableStatuses.includes(normalized);
   }
 }

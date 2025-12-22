@@ -60,6 +60,7 @@ export interface User {
   usuario: string;
   matricula?: string | null;
   avatarUrl?: string | null;
+  avatar?: string | null;
   settings?: UserSettings;
   role: {
     id: number;
@@ -335,6 +336,7 @@ export interface Tarefa {
   titulo: string;
   descricao?: string;
   responsavel_id?: number;
+  responsavel_ids?: number[];
   criador_id: number;
   prazo?: string;
   prioridade: PrioridadeTarefa;
@@ -345,6 +347,7 @@ export interface Tarefa {
   projeto?: Projeto;
   coluna?: Coluna;
   responsavel?: User;
+  responsaveis?: User[];
   criador?: User;
   comentarios?: ComentarioTarefa[];
   historico?: HistoricoTarefa[];
@@ -381,6 +384,9 @@ export interface CreateTarefaDto {
   titulo: string;
   descricao?: string;
   responsavel_id?: number;
+  responsavel_ids?: number[];
+  responsavelId?: number;
+  responsavelIds?: number[];
   prazo?: string;
   prioridade?: PrioridadeTarefa;
   tags?: string[];

@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui'
 import { Button } from '@/components/ui'
 import { 
   Clock, 
-  User, 
   Calendar, 
   Edit, 
   Trash2, 
@@ -16,6 +15,7 @@ import {
   Flag
 } from 'lucide-react'
 import { Tarefa, StatusTarefa, PrioridadeTarefa } from '@/types'
+import { Avatar, AvatarGroup } from '@/components/kanban/Avatar'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -36,6 +36,11 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
   showActions = true,
   compact = false
 }) => {
+  const responsaveis = tarefa.responsaveis?.length
+    ? tarefa.responsaveis
+    : tarefa.responsavel
+      ? [tarefa.responsavel]
+      : []
   const getStatusIcon = (status: StatusTarefa) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
@@ -154,11 +159,19 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
               </span>
             </div>
             
-            {/* Responsável */}
-            {tarefa.responsavel && (
-              <div className="flex items-center gap-1">
-                <User className="h-4 w-4" />
-                <span>{tarefa.responsavel.nome}</span>
+            {/* Responsáveis */}
+            {responsaveis.length > 0 && (
+              <div className="flex items-center gap-2">
+                {responsaveis.length > 1 ? (
+                  <AvatarGroup usuarios={responsaveis} size="xs" max={3} />
+                ) : (
+                  <Avatar usuario={responsaveis[0]} size="xs" />
+                )}
+                <span>
+                  {responsaveis.length === 1
+                    ? responsaveis[0].nome
+                    : `${responsaveis.length} pessoas`}
+                </span>
               </div>
             )}
             

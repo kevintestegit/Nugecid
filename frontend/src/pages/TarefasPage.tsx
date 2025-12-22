@@ -19,18 +19,13 @@ import {
 } from '@/components/ui'
 import { Loader2, RefreshCw, Plus, Columns, Users } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '@/services/api'
 import tarefasService from '@/services/tarefasService'
+import { kanbanService } from '@/services/kanbanService'
 import { useAuth } from '@/contexts/AuthContext'
 import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
 import { SkeletonKanbanCard, Skeleton } from '@/components/ui/Skeleton'
 import type { Coluna as KanbanDomainColumn, Tarefa as KanbanDomainTask, Usuario as KanbanDomainUser } from '@/types/kanban.types'
-
-interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  message?: string
-}
+import { PageHeader } from '@/components/layout/PageHeader'
 
 interface ProjetoResumo {
   id: number
@@ -39,6 +34,9 @@ interface ProjetoResumo {
   cor?: string
   createdAt?: string
   updatedAt?: string
+  data_criacao?: string
+  data_atualizacao?: string
+  membros?: { usuario?: KanbanDomainUser }[]
 }
 
 interface ColunaResponse {
@@ -47,6 +45,7 @@ interface ColunaResponse {
   cor?: string
   ordem?: number
   projetoId?: number
+  projeto_id?: number
   ativa?: boolean
   limiteWip?: number
   limite_wip?: number
@@ -62,7 +61,16 @@ interface TarefaResponse {
   colunaId?: number
   coluna_id?: number
   coluna?: { id: number }
+  projetoId?: number
+  projeto_id?: number
+  criadorId?: number
+  criador_id?: number
+  createdAt?: string
+  created_at?: string
+  updatedAt?: string
+  updated_at?: string
   responsavel?: { id: number; nome: string; avatarUrl?: string; avatar?: string }
+  responsaveis?: { id: number; nome: string; avatarUrl?: string; avatar?: string }[]
   tags?: string[]
   comentarios?: unknown[]
 }
@@ -77,6 +85,8 @@ type BoardTask = KanbanTarefa & { coluna_id: number; colunaId?: number }
 type ResponsibleFilter = 'all' | 'mine' | number
 
 const STORAGE_KEY = 'tarefas.selectedProjectId'
+const DENSITY_KEY = 'tarefas.boardDensity'
+type BoardDensity = 'comfortable' | 'compact'
 
 const normalizePriority = (value?: string): KanbanTarefa['prioridade'] => {
   if (!value) return 'media'
@@ -95,13 +105,13 @@ const mapColumns = (data: ColunaResponse[] | undefined, fallbackProjectId: numbe
       nome: coluna.nome,
       cor: coluna.cor ?? '#3B82F6',
       ordem: coluna.ordem ?? 1,
-      projeto_id: coluna.projetoId ?? fallbackProjectId,
+      projeto_id: coluna.projetoId ?? coluna.projeto_id ?? fallbackProjectId,
       limite_wip: coluna.limiteWip ?? coluna.limite_wip,
     }))
     .sort((a, b) => a.ordem - b.ordem)
 }
 
-const mapTasks = (data: TarefaResponse[] | undefined): BoardTask[] => {
+const mapTasks = (data: TarefaResponse[] | undefined, fallbackProjectId: number): BoardTask[] => {
   if (!data) return []
 
   const grouped = new Map<number, BoardTask[]>()
@@ -110,24 +120,40 @@ const mapTasks = (data: TarefaResponse[] | undefined): BoardTask[] => {
     const columnId = item.colunaId ?? item.coluna_id ?? item.coluna?.id ?? 0
     if (!columnId) return
 
+    const responsaveis = item.responsaveis?.map((usuario) => ({
+      id: usuario.id,
+      nome: usuario.nome,
+      usuario: usuario.nome,
+      avatar: usuario.avatarUrl ?? usuario.avatar,
+      avatarUrl: usuario.avatarUrl,
+    })) ?? []
+    const responsavel = item.responsavel
+      ? {
+          id: item.responsavel.id,
+          nome: item.responsavel.nome,
+          usuario: item.responsavel.nome,
+          avatar: item.responsavel.avatarUrl ?? item.responsavel.avatar,
+          avatarUrl: item.responsavel.avatarUrl,
+        }
+      : undefined
+
     const base: BoardTask = {
       id: item.id,
       titulo: item.titulo,
       descricao: item.descricao ?? '',
+      projetoId: item.projetoId ?? item.projeto_id ?? fallbackProjectId,
       prioridade: normalizePriority(item.prioridade),
       prazo: item.prazo ?? undefined,
-      responsavel: item.responsavel
-        ? {
-            id: item.responsavel.id,
-            nome: item.responsavel.nome,
-            avatar: item.responsavel.avatarUrl ?? item.responsavel.avatar,
-          }
-        : undefined,
-      comentarios: Array.isArray(item.comentarios) ? item.comentarios.length : undefined,
+      responsavel,
+      responsaveis: responsaveis.length ? responsaveis : responsavel ? [responsavel] : [],
+      criadorId: item.criadorId ?? item.criador_id ?? 0,
+      comentarios: Array.isArray(item.comentarios) ? item.comentarios : undefined,
       ordem: item.ordem ?? 0,
       tags: Array.isArray(item.tags) ? item.tags : [],
       coluna_id: columnId,
       colunaId: columnId,
+      createdAt: item.createdAt ?? item.created_at ?? new Date().toISOString(),
+      updatedAt: item.updatedAt ?? item.updated_at ?? new Date().toISOString(),
     }
 
     const list = grouped.get(columnId) ?? []
@@ -155,6 +181,7 @@ const buildDomainUser = (responsavel: BoardTask['responsavel'] | undefined): Kan
     nome: responsavel.nome,
     usuario: responsavel.nome,
     avatar: responsavel.avatar,
+    avatarUrl: responsavel.avatarUrl,
   }
 }
 
@@ -173,6 +200,7 @@ const buildDomainColumn = (coluna: KanbanColuna | undefined, projetoId: number):
 const buildDomainTask = (tarefa: BoardTask, projetoId: number, coluna?: KanbanColuna): KanbanDomainTask => {
   const now = new Date().toISOString()
   const colunaId = tarefa.colunaId ?? tarefa.coluna_id ?? 0
+  const responsaveis = tarefa.responsaveis?.map((responsavel) => buildDomainUser(responsavel)).filter(Boolean)
 
   return {
     id: tarefa.id,
@@ -181,7 +209,7 @@ const buildDomainTask = (tarefa: BoardTask, projetoId: number, coluna?: KanbanCo
     projetoId,
     colunaId,
     criadorId: 0,
-    responsavelId: tarefa.responsavel?.id,
+    responsavelId: tarefa.responsavel?.id ?? tarefa.responsaveis?.[0]?.id,
     prazo: tarefa.prazo,
     prioridade: tarefa.prioridade,
     ordem: tarefa.ordem,
@@ -189,13 +217,24 @@ const buildDomainTask = (tarefa: BoardTask, projetoId: number, coluna?: KanbanCo
     createdAt: now,
     updatedAt: now,
     responsavel: buildDomainUser(tarefa.responsavel),
+    responsaveis: responsaveis?.length ? responsaveis : undefined,
     coluna: buildDomainColumn(coluna, projetoId),
   }
 }
 
 const TarefasPage: React.FC = () => {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, checkPermission, isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    const previousRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+
+    return () => {
+      window.history.scrollRestoration = previousRestoration
+    }
+  }, [])
 
   const [projects, setProjects] = useState<ProjetoResumo[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
@@ -211,16 +250,34 @@ const TarefasPage: React.FC = () => {
   const [deleteTask, setDeleteTask] = useState<{ id: number; titulo: string } | null>(null)
   const [detailTask, setDetailTask] = useState<KanbanDomainTask | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [boardDensity, setBoardDensity] = useState<BoardDensity>('comfortable')
+
+  useEffect(() => {
+    const stored = localStorage.getItem(DENSITY_KEY)
+    if (stored === 'compact' || stored === 'comfortable') {
+      setBoardDensity(stored)
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(DENSITY_KEY, boardDensity)
+  }, [boardDensity])
 
   const loadProjects = useCallback(async () => {
+    if (!isAuthenticated) {
+      setProjects([])
+      setSelectedProjectId(null)
+      setProjectDetails(null)
+      setColumns([])
+      setTasks([])
+      setLoadingProjects(false)
+      return
+    }
+
     setLoadingProjects(true)
     try {
-      const response = await api.get<ApiResponse<ProjetoResumo[]>>('/projetos')
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Não foi possível carregar os projetos.')
-      }
-
-      const lista = response.data.data ?? []
+      const response = await kanbanService.getProjetos()
+      const lista = (response as unknown as ProjetoResumo[]) ?? []
       setProjects(lista)
 
       if (!lista.length) {
@@ -249,22 +306,26 @@ const TarefasPage: React.FC = () => {
     } finally {
       setLoadingProjects(false)
     }
-  }, [])
+  }, [isAuthenticated])
 
   const loadBoardData = useCallback(async (projectId: number) => {
+    if (!isAuthenticated) {
+      setProjectDetails(null)
+      setColumns([])
+      setTasks([])
+      setLoadingBoard(false)
+      return
+    }
+
     setLoadingBoard(true)
     try {
       setError(null)
-      const response = await api.get<ApiResponse<ProjetoDetalhado>>(`/projetos/${projectId}`)
-      if (!response.data.success || !response.data.data) {
-        throw new Error(response.data.message || 'Não foi possível carregar o quadro de tarefas.')
-      }
-
-      const project = response.data.data
+      const response = await kanbanService.getProjeto(projectId)
+      const project = response as unknown as ProjetoDetalhado
       
       setProjectDetails(project)
       const mappedColumns = mapColumns(project.colunas, project.id)
-      const mappedTasks = mapTasks(project.tarefas)
+      const mappedTasks = mapTasks(project.tarefas, project.id)
       
       setColumns(mappedColumns)
       setTasks(mappedTasks)
@@ -276,7 +337,7 @@ const TarefasPage: React.FC = () => {
     } finally {
       setLoadingBoard(false)
     }
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     loadProjects()
@@ -288,17 +349,22 @@ const TarefasPage: React.FC = () => {
       loadBoardData(selectedProjectId)
       setSelectedResponsibleId('all')
     }
-  }, [selectedProjectId]) // Removido loadBoardData da dependência
+  }, [selectedProjectId, loadBoardData])
 
   const responsibleOptions = useMemo(() => {
     const unique = new Map<number, { id: number; nome: string }>()
     tasks.forEach(task => {
-      if (task.responsavel) {
-        unique.set(task.responsavel.id, {
-          id: task.responsavel.id,
-          nome: task.responsavel.nome,
+      const responsaveis = task.responsaveis?.length
+        ? task.responsaveis
+        : task.responsavel
+          ? [task.responsavel]
+          : []
+      responsaveis.forEach((responsavel) => {
+        unique.set(responsavel.id, {
+          id: responsavel.id,
+          nome: responsavel.nome,
         })
-      }
+      })
     })
     return Array.from(unique.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }, [tasks])
@@ -316,10 +382,16 @@ const TarefasPage: React.FC = () => {
 
     if (selectedResponsibleId === 'mine') {
       if (!user) return []
-      return tasks.filter(task => task.responsavel?.id === user.id)
+      return tasks.filter(task =>
+        task.responsaveis?.some(responsavel => responsavel.id === user.id) ||
+        task.responsavel?.id === user.id
+      )
     }
 
-    return tasks.filter(task => task.responsavel?.id === selectedResponsibleId)
+    return tasks.filter(task =>
+      task.responsaveis?.some(responsavel => responsavel.id === selectedResponsibleId) ||
+      task.responsavel?.id === selectedResponsibleId
+    )
   }, [tasks, selectedResponsibleId, user])
 
   const stats = useMemo(() => {
@@ -377,6 +449,16 @@ const TarefasPage: React.FC = () => {
       setIsMutating(true)
       
       try {
+        const tarefa = tasks.find(item => item.id === taskId)
+        if (!checkPermission('update', 'tarefas')) {
+          toast.error('Você não tem permissão para mover tarefas.')
+          return
+        }
+        if (tarefa && user?.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
+          toast.error('Você só pode mover suas próprias tarefas.')
+          return
+        }
+
         await tarefasService.moveTarefa(taskId, {
           colunaId: targetColumnId,
           ordem: targetIndex + 1,
@@ -393,7 +475,7 @@ const TarefasPage: React.FC = () => {
         setIsMutating(false)
       }
     },
-    [selectedProjectId, loadBoardData]
+    [checkPermission, loadBoardData, selectedProjectId, tasks, user]
   )
 
   const handleReorderTasks = useCallback(
@@ -405,6 +487,16 @@ const TarefasPage: React.FC = () => {
       setIsMutating(true)
       
       try {
+        const tarefa = tasks.find(item => item.id === movedTaskId)
+        if (!checkPermission('update', 'tarefas')) {
+          toast.error('Você não tem permissão para reordenar tarefas.')
+          return
+        }
+        if (tarefa && user?.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
+          toast.error('Você só pode reordenar suas próprias tarefas.')
+          return
+        }
+
         await tarefasService.moveTarefa(movedTaskId, {
           colunaId,
           ordem: newIndex + 1,
@@ -420,7 +512,7 @@ const TarefasPage: React.FC = () => {
         setIsMutating(false)
       }
     },
-    [selectedProjectId, loadBoardData]
+    [checkPermission, loadBoardData, selectedProjectId, tasks, user]
   )
 
   const handleAddColumn = useCallback(async () => {
@@ -432,13 +524,11 @@ const TarefasPage: React.FC = () => {
 
     setIsMutating(true)
     try {
-      const response = await api.post<ApiResponse<ColunaResponse>>('/colunas', {
+      await kanbanService.createColuna({
         projetoId: selectedProjectId,
         nome: nome.trim(),
+        ordem: columns.length + 1,
       })
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Não foi possível criar a coluna.')
-      }
       toast.success('Coluna criada com sucesso!')
       await loadBoardData(selectedProjectId)
     } catch (error) {
@@ -458,12 +548,9 @@ const TarefasPage: React.FC = () => {
 
     setIsMutating(true)
     try {
-      const response = await api.patch<ApiResponse<ColunaResponse>>(`/colunas/${coluna.id}`, {
+      await kanbanService.updateColuna(coluna.id, {
         nome: novoNome.trim(),
       })
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Não foi possível atualizar a coluna.')
-      }
       toast.success('Coluna atualizada com sucesso!')
       await loadBoardData(selectedProjectId)
     } catch (error) {
@@ -483,10 +570,7 @@ const TarefasPage: React.FC = () => {
 
     setIsMutating(true)
     try {
-      const response = await api.delete<ApiResponse<unknown>>(`/colunas/${deleteColumn.id}`)
-      if (!response.data.success) {
-        throw new Error(response.data.message || 'Não foi possível excluir a coluna.')
-      }
+      await kanbanService.deleteColuna(deleteColumn.id)
       toast.success('Coluna excluída com sucesso!')
       await loadBoardData(selectedProjectId)
     } catch (error) {
@@ -505,6 +589,10 @@ const TarefasPage: React.FC = () => {
         toast.error('Selecione um projeto para criar tarefas.')
         return
       }
+      if (!checkPermission('create', 'tarefas')) {
+        toast.error('Você não tem permissão para criar tarefas')
+        return
+      }
 
       navigate('/tarefas/nova', {
         state: {
@@ -513,7 +601,7 @@ const TarefasPage: React.FC = () => {
         },
       })
     },
-    [navigate, selectedProjectId]
+    [checkPermission, navigate, selectedProjectId]
   )
 
   const handleTaskClick = useCallback(
@@ -530,12 +618,32 @@ const TarefasPage: React.FC = () => {
   )
 
   const handleTaskEdit = useCallback((tarefa: KanbanTarefa) => {
+    if (!checkPermission('update', 'tarefas')) {
+      toast.error('Você não tem permissão para editar tarefas')
+      return
+    }
+    if (user?.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
+      toast.error('Você só pode editar suas próprias tarefas')
+      return
+    }
     navigate(`/tarefas/${tarefa.id}`)
-  }, [navigate])
+  }, [checkPermission, navigate, user])
 
   const handleTaskDelete = useCallback((taskId: number, taskTitulo: string) => {
+    const tarefa = tasks.find(item => item.id === taskId)
+    if (!tarefa) return
+
+    if (!checkPermission('delete', 'tarefas')) {
+      toast.error('Você não tem permissão para excluir tarefas')
+      return
+    }
+    if (user?.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
+      toast.error('Você só pode excluir suas próprias tarefas')
+      return
+    }
+
     setDeleteTask({ id: taskId, titulo: taskTitulo })
-  }, [])
+  }, [checkPermission, tasks, user])
 
   const handleConfirmDeleteTask = useCallback(
     async () => {
@@ -570,6 +678,62 @@ const TarefasPage: React.FC = () => {
     navigate('/projetos')
   }, [navigate])
 
+  const normalizeText = useCallback((value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim()
+  , [])
+
+  const todoColumnId = useMemo(() => {
+    const todo = columns.find((coluna) => {
+      const name = normalizeText(coluna.nome ?? '')
+      return name === 'a fazer' || name === 'afazer' || name.startsWith('a fazer ')
+    })
+    return todo?.id ?? null
+  }, [columns, normalizeText])
+
+  const progressColumnId = useMemo(() => {
+    const progress = columns.find((coluna) => {
+      const name = normalizeText(coluna.nome ?? '')
+      return (
+        name === 'em progresso' ||
+        name === 'progresso' ||
+        name.startsWith('em progresso ') ||
+        name.includes('progresso')
+      )
+    })
+    return progress?.id ?? null
+  }, [columns, normalizeText])
+
+  const canStartSelectedTask = useMemo(() => {
+    if (!detailTask) return false
+    if (!todoColumnId || !progressColumnId) return false
+    return detailTask.colunaId === todoColumnId
+  }, [detailTask, progressColumnId, todoColumnId])
+
+  const handleStartTask = useCallback(async () => {
+    if (!detailTask || !progressColumnId || !selectedProjectId) return
+
+    const sourceColunaId = detailTask.colunaId
+    if (!sourceColunaId) return
+
+    const newOrder = tasks.filter(task => (task.colunaId ?? task.coluna_id) === progressColumnId).length
+    await handleMoveTask(detailTask.id, sourceColunaId, progressColumnId, newOrder)
+
+    setDetailTask(prev =>
+      prev
+        ? {
+            ...prev,
+            colunaId: progressColumnId,
+            coluna_id: progressColumnId,
+          }
+        : prev
+    )
+    toast.success('Tarefa iniciada')
+  }, [detailTask, handleMoveTask, progressColumnId, selectedProjectId, tasks])
+
   const boardLoading = loadingBoard || loadingProjects
   const disableActions = boardLoading || isMutating
 
@@ -579,8 +743,9 @@ const TarefasPage: React.FC = () => {
         nome: projectDetails.nome,
         descricao: projectDetails.descricao ?? '',
         cor: projectDetails.cor,
-        data_criacao: projectDetails.createdAt ?? '',
-        data_atualizacao: projectDetails.updatedAt ?? '',
+        data_criacao: projectDetails.createdAt ?? projectDetails.data_criacao ?? '',
+        data_atualizacao: projectDetails.updatedAt ?? projectDetails.data_atualizacao ?? '',
+        membros: projectDetails.membros,
       }
     : {
         id: 0,
@@ -593,28 +758,58 @@ const TarefasPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="flex flex-col gap-4 mb-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Quadro de Tarefas</h1>
-          <p className="text-gray-600">Organize e acompanhe as atividades da equipe em tempo real.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate('/tarefas/nova')} disabled={disableActions || !selectedProjectId}
-            className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Nova tarefa
-          </Button>
-          <Button variant="outline" onClick={handleAddColumn} disabled={disableActions || !selectedProjectId}
-            className="flex items-center gap-2">
-            <Columns className="h-4 w-4" />
-            Nova coluna
-          </Button>
-          <Button variant="ghost" onClick={handleRefresh} disabled={boardLoading} className="flex items-center gap-2">
-            {boardLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-            Atualizar
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Quadro de Tarefas"
+        description="Organize e acompanhe as atividades da equipe em tempo real."
+        breadcrumb={[{ label: 'Workspace' }, { label: 'Tarefas' }]}
+        actions={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/tarefas/nova')}
+              disabled={disableActions || !selectedProjectId}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Nova tarefa
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleAddColumn}
+              disabled={disableActions || !selectedProjectId}
+              className="flex items-center gap-2"
+            >
+              <Columns className="h-4 w-4" />
+              Nova coluna
+            </Button>
+            <div className="flex items-center rounded-full border border-gray-200 bg-white px-1">
+              <Button
+                type="button"
+                variant={boardDensity === 'comfortable' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setBoardDensity('comfortable')}
+                className="rounded-full px-3"
+              >
+                Confortável
+              </Button>
+              <Button
+                type="button"
+                variant={boardDensity === 'compact' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setBoardDensity('compact')}
+                className="rounded-full px-3"
+              >
+                Compacto
+              </Button>
+            </div>
+            <Button variant="ghost" onClick={handleRefresh} disabled={boardLoading} className="flex items-center gap-2">
+              {boardLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Atualizar
+            </Button>
+          </>
+        )}
+        className="mb-6"
+      />
 
       {error && (
         <Alert variant="warning" className="mb-6">
@@ -623,7 +818,7 @@ const TarefasPage: React.FC = () => {
         </Alert>
       )}
 
-      <Card className="mb-4">
+      <Card className="mb-4 border-gray-200/80">
         <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <Select value={selectedProjectId?.toString() ?? ''} onValueChange={handleProjectChange}>
@@ -665,21 +860,21 @@ const TarefasPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="mb-6">
+      <Card className="mb-6 border-gray-200/80">
         <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-lg border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Total de tarefas</p>
+          <div className="rounded-xl border border-gray-200/80 p-4 bg-white">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide">Total de tarefas</p>
             <p className="text-2xl font-semibold text-gray-900">{stats.total}</p>
           </div>
-          <div className="rounded-lg border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Atrasadas</p>
+          <div className="rounded-xl border border-gray-200/80 p-4 bg-white">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide">Atrasadas</p>
             <p className="text-2xl font-semibold text-red-600">{stats.overdue}</p>
           </div>
-          <div className="rounded-lg border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Próximos 7 dias</p>
+          <div className="rounded-xl border border-gray-200/80 p-4 bg-white">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide">Próximos 7 dias</p>
             <p className="text-2xl font-semibold text-blue-600">{stats.upcomingWeek}</p>
           </div>
-          <div className="rounded-lg border border-gray-200 p-4 space-y-1 text-sm text-gray-600">
+          <div className="rounded-xl border border-gray-200/80 p-4 space-y-1 text-xs text-gray-600 bg-white">
             <p className="font-semibold text-gray-900">Por prioridade</p>
             <p>Crítica: <span className="font-medium text-red-600">{stats.priorities.critica}</span></p>
             <p>Alta: <span className="font-medium text-orange-600">{stats.priorities.alta}</span></p>
@@ -690,11 +885,11 @@ const TarefasPage: React.FC = () => {
       </Card>
 
       {loadingProjects && !projects.length ? (
-        <div className="min-h-[500px] rounded-lg border border-gray-200 bg-white p-4">
+        <div className="min-h-[500px] rounded-xl border border-gray-200/80 bg-white p-4">
           <div className="flex gap-4 overflow-x-auto">
             {Array.from({ length: 3 }).map((_, colIndex) => (
               <div key={colIndex} className="flex-shrink-0 w-80">
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200/70">
                   <Skeleton variant="text" height={24} width="60%" className="mb-4" />
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, cardIndex) => (
@@ -707,7 +902,7 @@ const TarefasPage: React.FC = () => {
           </div>
         </div>
       ) : projects.length === 0 ? (
-        <Card className="py-16 text-center text-gray-600">
+        <Card className="py-16 text-center text-gray-600 border-gray-200/80">
           <CardContent>
             <p className="mb-4 text-lg">Nenhum projeto encontrado.</p>
             <Button onClick={() => navigate('/projetos')} className="gap-2">
@@ -717,7 +912,7 @@ const TarefasPage: React.FC = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="min-h-[500px] rounded-lg border border-gray-200 bg-white p-4">
+        <div className="min-h-[500px] rounded-xl border border-gray-200/80 bg-white p-4">
           <KanbanBoard
             projeto={projetoResumo}
             colunas={columns}
@@ -733,6 +928,7 @@ const TarefasPage: React.FC = () => {
             onTaskDelete={handleTaskDelete}
             onProjectSettings={handleProjectSettings}
             loading={boardLoading || isMutating}
+            density={boardDensity}
           />
         </div>
       )}
@@ -769,7 +965,7 @@ const TarefasPage: React.FC = () => {
         ]}
       />
 
-      <TaskDetailModal
+        <TaskDetailModal
         open={isDetailOpen}
         task={detailTask}
         onClose={() => {
@@ -783,11 +979,11 @@ const TarefasPage: React.FC = () => {
         }}
         onOpenTask={(taskId) => navigate(`/tarefas/${taskId}`)}
         openTaskLabel="Abrir página"
+        canStartTask={canStartSelectedTask}
+        onStartTask={handleStartTask}
       />
     </div>
   )
 }
 
 export default TarefasPage
-
-

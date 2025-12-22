@@ -28,6 +28,7 @@ import { Tarefa, StatusTarefa, PrioridadeTarefa, UpdateTarefaDto } from '@/types
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
+import { AvatarGroup } from '@/components/kanban/Avatar'
 
 const DetalheTarefaPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -375,15 +376,61 @@ const DetalheTarefaPage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-500" />
-                <div>
-                  <p className="text-sm font-medium">Responsável</p>
-                  <p className="text-sm text-gray-600">{tarefa.responsavel?.nome || 'Não atribuído'}</p>
-                </div>
+                {(() => {
+                  const responsaveis = tarefa.responsaveis?.length
+                    ? tarefa.responsaveis
+                    : tarefa.responsavel
+                      ? [tarefa.responsavel]
+                      : []
+                  if (responsaveis.length > 1) {
+                    return (
+                      <>
+                        <AvatarGroup usuarios={responsaveis} size="xs" max={4} />
+                        <div>
+                          <p className="text-sm font-medium">Responsáveis</p>
+                          <p className="text-sm text-gray-600">
+                            {responsaveis.map((usuario) => usuario.nome).join(', ')}
+                          </p>
+                        </div>
+                      </>
+                    )
+                  }
+                  return (
+                    <>
+                      <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                        {responsaveis[0]?.avatarUrl || responsaveis[0]?.avatar ? (
+                          <img
+                            src={responsaveis[0]?.avatarUrl ?? responsaveis[0]?.avatar ?? undefined}
+                            alt={responsaveis[0]?.nome ?? 'Responsável'}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-4 w-4 text-gray-500" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Responsável</p>
+                        <p className="text-sm text-gray-600">
+                          {responsaveis[0]?.nome || 'Não atribuído'}
+                        </p>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
               
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-500" />
+                <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  {tarefa.criador?.avatarUrl || tarefa.criador?.avatar ? (
+                    <img
+                      src={tarefa.criador?.avatarUrl ?? tarefa.criador?.avatar ?? undefined}
+                      alt={tarefa.criador?.nome ?? 'Criador'}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <User className="h-4 w-4 text-gray-500" />
+                  )}
+                </div>
                 <div>
                   <p className="text-sm font-medium">Criado por</p>
                   <p className="text-sm text-gray-600">{tarefa.criador?.nome}</p>

@@ -27,6 +27,7 @@ export const detalheTarefaPage = createLazyPage(() => import('@/pages/tarefas/De
 export const arquivoPage = createLazyPage(() => import('@/pages/ArquivoPage'))
 export const prateleiraDetailPage = createLazyPage(() => import('@/pages/PrateleiraDetailPage'))
 export const projetosPage = createLazyPage(() => import('@/pages/ProjetosPage'))
+export const projetoDetailPage = createLazyPage(() => import('@/pages/ProjetoDetailPage'))
 export const kanbanPage = createLazyPage(() => import('@/pages/KanbanPage'))
 export const searchIconTestPage = createLazyPage(() => import('@/components/test/SearchIconTest'))
 export const custodiaVestigiosPage = createLazyPage(() => import('@/pages/CustodiaVestigiosPage'))
@@ -46,6 +47,7 @@ export const preloadByPath: Record<string, () => Promise<unknown>> = {
   '/tarefas/nova': novaTarefaPage.preload,
   '/tarefas/:id': detalheTarefaPage.preload,
   '/projetos': projetosPage.preload,
+  '/projetos/:id': projetoDetailPage.preload,
   '/kanban/:id': kanbanPage.preload,
   '/custodia': custodiaVestigiosPage.preload,
   '/custodia/banco-vestigios': bancoVestigiosPage.preload,
@@ -58,4 +60,3 @@ export const preloadByPath: Record<string, () => Promise<unknown>> = {
   '/configuracoes': configuracoesPage.preload,
   '/test-icons': searchIconTestPage.preload,
 }
-

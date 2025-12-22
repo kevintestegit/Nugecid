@@ -60,6 +60,23 @@ export class CreateTarefaDto {
   responsavelId?: number;
 
   @ApiPropertyOptional({
+    description: "IDs dos usuários responsáveis pela tarefa",
+    example: [1, 2],
+    type: [Number],
+  })
+  @IsOptional()
+  @IsArray({ message: "Os responsáveis devem ser uma lista de IDs" })
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value.map((item) => Number(item));
+    }
+    return value ? [Number(value)] : undefined;
+  })
+  @IsInt({ each: true, message: "Cada responsável deve ser um número inteiro" })
+  @Min(1, { each: true, message: "Cada responsável deve ser maior que 0" })
+  responsavelIds?: number[];
+
+  @ApiPropertyOptional({
     description: "Data limite para conclusão da tarefa",
     example: "2024-12-31",
   })
@@ -101,4 +118,12 @@ export class CreateTarefaDto {
   @IsArray({ message: "As tags devem ser um array" })
   @IsString({ each: true, message: "Cada tag deve ser uma string" })
   tags?: string[];
+
+  @ApiPropertyOptional({
+    description: "ID da tarefa pai (para subtarefas)",
+    example: 10,
+  })
+  @IsOptional()
+  @IsInt()
+  parentId?: number;
 }

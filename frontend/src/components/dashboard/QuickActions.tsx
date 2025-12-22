@@ -119,7 +119,7 @@ const QuickActions: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-0 gap-0">
           {filteredActions.map((action, index) => {
             const Icon = action.icon
             return (

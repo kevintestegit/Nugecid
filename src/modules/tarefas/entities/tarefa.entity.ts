@@ -4,10 +4,12 @@ import {
   Column,
   ManyToOne,
   OneToMany,
+  ManyToMany,
   CreateDateColumn,
   UpdateDateColumn,
   DeleteDateColumn,
   JoinColumn,
+  JoinTable,
 } from "typeorm";
 
 import { User } from "../../users/entities/user.entity";
@@ -60,11 +62,19 @@ export class Tarefa {
   criador: User;
 
   @Column({ name: "responsavel_id", nullable: true })
-  responsavelId: number;
+  responsavelId: number | null;
 
   @ManyToOne(() => User, { eager: true })
   @JoinColumn({ name: "responsavel_id" })
   responsavel: User;
+
+  @ManyToMany(() => User, { eager: true })
+  @JoinTable({
+    name: "tarefa_responsaveis",
+    joinColumn: { name: "tarefa_id", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "usuario_id", referencedColumnName: "id" },
+  })
+  responsaveis: User[];
 
   @Column({ type: "date", nullable: true })
   prazo: Date;
@@ -96,6 +106,17 @@ export class Tarefa {
    */
   @DeleteDateColumn({ name: "deleted_at" })
   deletedAt?: Date;
+
+  // Auto-relacionamento para subtarefas
+  @Column({ name: "parent_id", nullable: true })
+  parentId: number | null;
+
+  @ManyToOne(() => Tarefa, (tarefa) => tarefa.subtarefas, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: "parent_id" })
+  parent: Tarefa;
+
+  @OneToMany(() => Tarefa, (tarefa) => tarefa.parent)
+  subtarefas: Tarefa[];
 
   // Relacionamentos (lado inverso)
   @OneToMany(() => Comentario, (comentario) => comentario.tarefa)

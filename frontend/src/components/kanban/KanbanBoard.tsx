@@ -49,6 +49,7 @@ interface KanbanBoardProps {
   onProjectMembers?: () => void;
   onProjectReports?: () => void;
   loading?: boolean;
+  density?: 'comfortable' | 'compact';
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -68,6 +69,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onProjectMembers,
   onProjectReports,
   loading = false,
+  density = 'comfortable',
 }) => {
   const [activeId, setActiveId] = useState<string | number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,20 +122,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, [tarefasList, searchTerm, selectedPriority]);
 
   // Organizar tarefas por coluna
+  const getTaskColumnId = (tarefa: Tarefa): number => {
+    const legacy = tarefa as Tarefa & { coluna_id?: number }
+    return legacy.coluna_id ?? tarefa.colunaId
+  }
+
   const tarefasPorColuna = useMemo(() => {
     const grouped: Record<number, Tarefa[]> = {};
     
     colunasList.forEach(coluna => {
       grouped[coluna.id] = filteredTarefas
-        .filter(tarefa => {
-          const colunaId = (tarefa as any).coluna_id ?? tarefa.colunaId;
-          return colunaId === coluna.id;
-        })
+        .filter(tarefa => getTaskColumnId(tarefa) === coluna.id)
         .sort((a, b) => a.ordem - b.ordem);
     });
     
     return grouped;
-  }, [colunasList, filteredTarefas]);
+  }, [colunasList, filteredTarefas, getTaskColumnId]);
 
   // Extrair usuários dos membros para o AvatarGroup
   const projectUsers = useMemo(() => {
@@ -199,8 +203,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (isActiveTask && isOverColumn) {
       const activeTask = active.data.current.tarefa as Tarefa;
       const overColumn = over.data.current.coluna as Coluna;
-      const sourceColunaId =
-        (activeTask as unknown as { coluna_id?: number }).coluna_id ?? (activeTask as any).colunaId
+      const sourceColunaId = getTaskColumnId(activeTask)
 
       const sourceColumn =
         colunasById[sourceColunaId]
@@ -218,10 +221,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (isActiveTask && isOverTask) {
       const activeTask = active.data.current.tarefa as Tarefa;
       const overTask = over.data.current.tarefa as Tarefa;
-      const activeColunaId =
-        (activeTask as unknown as { coluna_id?: number }).coluna_id ?? (activeTask as any).colunaId
-      const overColunaId =
-        (overTask as unknown as { coluna_id?: number }).coluna_id ?? (overTask as any).colunaId
+      const activeColunaId = getTaskColumnId(activeTask)
+      const overColunaId = getTaskColumnId(overTask)
 
       if (activeColunaId === overColunaId) {
         // Reordenar na mesma coluna
@@ -266,7 +267,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* New Header Design */}
       <header className="flex-shrink-0 pt-6 px-8 pb-4 bg-white dark:bg-gray-900 z-20 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-center text-sm text-gray-500 mb-4">
+        <div className="flex items-center text-xs text-gray-500 mb-3">
           <span className="hover:text-gray-800 dark:hover:text-gray-200 cursor-pointer">Projetos</span>
           <span className="mx-2">/</span>
           <span className="text-gray-900 dark:text-white font-medium">{projeto.nome}</span>
@@ -275,10 +276,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-end gap-6 mb-2">
           <div className="max-w-2xl">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">{projeto.nome}</h1>
+              <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">{projeto.nome}</h1>
               {projeto.cor && (
                 <div 
-                  className="w-4 h-4 rounded-full shadow-sm"
+                  className="w-3.5 h-3.5 rounded-full shadow-sm"
                   style={{ backgroundColor: projeto.cor }}
                 />
               )}
@@ -288,14 +289,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               {projeto.descricao || "Gerencie o fluxo de trabalho e atividades deste projeto."}
             </p>
             
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400" title="Data de criação">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2" title="Data de criação">
                 <Calendar size={16} />
                 <span>Criado em {safeDate(projeto.data_criacao, "d 'de' MMMM, yyyy")}</span>
               </div>
               
               <div className="flex items-center gap-3">
-                <span className="text-gray-500 dark:text-gray-400">Membros:</span>
+                <span>Membros:</span>
                 <AvatarGroup usuarios={projectUsers} size="sm" max={5} />
               </div>
             </div>
@@ -307,7 +308,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 <Search size={18} />
               </span>
               <input 
-                className="w-full py-1.5 pl-9 pr-4 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-1 focus:ring-gray-300 placeholder-gray-400 transition-shadow outline-none" 
+                className="w-full py-1.5 pl-9 pr-4 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-1 focus:ring-gray-300 placeholder-gray-400 transition-shadow outline-none" 
                 placeholder="Buscar no quadro..." 
                 type="text"
                 value={searchTerm}
@@ -320,7 +321,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             {onProjectMembers && (
               <button 
                 onClick={onProjectMembers}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-all whitespace-nowrap"
               >
                 <Users size={16} />
                 <span className="hidden sm:inline">Gerenciar Membros</span>
@@ -330,7 +331,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             {onProjectReports && (
               <button 
                 onClick={onProjectReports}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all whitespace-nowrap"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-all whitespace-nowrap"
               >
                 <LayoutGrid size={16} />
                 <span className="hidden sm:inline">Dashboard</span>
@@ -351,7 +352,26 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </header>
 
       {/* Board Area */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-gray-50 dark:bg-gray-900/50">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-gray-50/80 dark:bg-gray-900/40">
+        {sortedColunas.length === 0 ? (
+          <div className="h-full rounded-2xl border border-dashed border-gray-200 bg-white/80 p-10 text-center text-gray-600 flex flex-col items-center justify-center gap-4">
+            <div className="w-14 h-14 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-400">
+              <LayoutGrid size={22} />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-base font-semibold text-gray-900">Comece organizando o quadro</h3>
+              <p className="text-sm text-gray-500">
+                Crie colunas para definir o fluxo do projeto e adicione tarefas para acompanhar o trabalho.
+              </p>
+            </div>
+            {onAddColumn && (
+              <Button onClick={onAddColumn} className="gap-2">
+                <Plus size={16} />
+                Criar primeira coluna
+              </Button>
+            )}
+          </div>
+        ) : (
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -360,7 +380,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="flex h-full space-x-6">
+          <div className={cn('flex h-full', density === 'compact' ? 'space-x-4' : 'space-x-6')}>
             {sortedColunas.map((coluna) => (
                 <KanbanColumn
                   key={coluna.id}
@@ -372,6 +392,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   onTaskClick={onTaskClick}
                   onTaskEdit={onTaskEdit}
                   onTaskDelete={onTaskDelete}
+                  density={density}
                 />
               ))}
           </div>
@@ -379,11 +400,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <DragOverlay>
             {activeTarefa && (
               <div className="rotate-3 opacity-90 cursor-grabbing">
-                <KanbanCard tarefa={activeTarefa} />
+                <KanbanCard tarefa={activeTarefa} density={density} />
               </div>
             )}
           </DragOverlay>
         </DndContext>
+        )}
       </div>
     </div>
   );

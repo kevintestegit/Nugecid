@@ -392,14 +392,20 @@ export class AuthController {
           nome: { type: "string" },
           usuario: { type: "string" },
           role: { type: "string" },
+          avatarUrl: { type: "string", nullable: true },
           lastActivity: { type: "string", format: "date-time" },
         },
       },
     },
   })
   @ApiResponse({ status: 401, description: "Não autorizado" })
-  async getOnlineUsers() {
+  async getOnlineUsers(@Request() req: ExpressRequest) {
     try {
+      const requestUser = req.user as { id?: number; userId?: number } | undefined;
+      const userId = requestUser?.id ?? requestUser?.userId;
+      if (userId) {
+        await this.authService.updateUserActivity(userId);
+      }
       const onlineUsers = await this.authService.getOnlineUsers();
       this.logger.debug(
         `[ONLINE-USERS] Retornando ${onlineUsers.length} usuários online`,

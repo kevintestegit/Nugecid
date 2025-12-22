@@ -189,6 +189,7 @@ export const REQUERENTES = [
   { value: 'Delegacia Especializada de Narcóticos de Mossoró (DENARC/Mossoró)', label: 'DENARC - Mossoró' },
   { value: 'Delegacia Especializada de Narcóticos de Natal (DENARC/Natal)', label: 'DENARC - Natal' },
   { value: 'Delegacia Especializada de Repressão a Facções Criminosas (DEFAC)', label: 'DEFAC' },
+  { value: 'Cartório da Delegacia Especializada de Repressão ao Crime Organizado (CART - DEICOR)', label: 'CART - DEICOR' },
   { value: 'Delegacia Especializada de Repressão a Roubos e Furtos contra Instituições Bancárias e Empresas de Transporte de Valores - DRFB', label: 'DRFB' },
   { value: 'Delegacia Especializada de Repressão ao Crime Organizado (DRACO)', label: 'DRACO' },
   { value: 'Delegacia Especializada em Crimes de Trânsito - DECT', label: 'DECT' },

@@ -176,4 +176,43 @@ export class SecurityController {
       },
     };
   }
+
+  @Get("blocked-users")
+  @Roles("admin")
+  @ApiOperation({ summary: "Lista usuários bloqueados" })
+  @ApiResponse({ status: 200, description: "Lista de usuários bloqueados" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  async listBlockedUsers() {
+    const blockedUsers = await this.securityService.listBlockedUsers();
+
+    return {
+      success: true,
+      data: blockedUsers,
+      meta: {
+        total: blockedUsers.length,
+      },
+    };
+  }
+
+  @Delete("blocked-users/:userId")
+  @Roles("admin")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Desbloqueia um usuário" })
+  @ApiResponse({ status: 200, description: "Usuário desbloqueado com sucesso" })
+  @ApiResponse({ status: 404, description: "Usuário não encontrado" })
+  @ApiResponse({ status: 400, description: "Usuário não está bloqueado" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
+  async unblockUser(@Param("userId") userId: string) {
+    const user = await this.securityService.unblockUser(parseInt(userId, 10));
+
+    return {
+      success: true,
+      data: {
+        id: user.id,
+        usuario: user.usuario,
+        nome: user.nome,
+      },
+      message: `Usuário ${user.usuario} desbloqueado com sucesso`,
+    };
+  }
 }

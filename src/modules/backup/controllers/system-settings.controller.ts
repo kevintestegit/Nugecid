@@ -35,7 +35,11 @@ export class SystemSettingsController {
     description: "Configurações do sistema",
   })
   async getSettings() {
-    return await this.systemSettingsService.getSettings();
+    const settings = await this.systemSettingsService.getSettings();
+    return {
+      success: true,
+      data: settings,
+    };
   }
 
   @Put()
@@ -47,7 +51,12 @@ export class SystemSettingsController {
     description: "Configurações atualizadas com sucesso",
   })
   async updateSettings(@Body() updateDto: UpdateSystemSettingsDto) {
-    return await this.systemSettingsService.updateSettings(updateDto);
+    const settings = await this.systemSettingsService.updateSettings(updateDto);
+    return {
+      success: true,
+      data: settings,
+      message: "Configurações atualizadas com sucesso",
+    };
   }
 
   @Post("reset")
@@ -59,6 +68,11 @@ export class SystemSettingsController {
     description: "Configurações resetadas para valores padrão",
   })
   async resetToDefaults() {
-    return await this.systemSettingsService.resetToDefaults();
+    const settings = await this.systemSettingsService.resetToDefaults();
+    return {
+      success: true,
+      data: settings,
+      message: "Configurações resetadas para valores padrão",
+    };
   }
 }

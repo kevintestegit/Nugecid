@@ -10,16 +10,19 @@ export interface Tarefa {
   prioridade: 'baixa' | 'media' | 'alta' | 'critica';
   ordem: number;
   tags?: string[];
+  parentId?: number | null;
   createdAt: string;
   updatedAt: string;
   
   // Relações
   responsavel?: Usuario;
+  responsaveis?: Usuario[];
   coluna?: Coluna;
   projeto?: Projeto;
   comentarios?: Comentario[];
   anexos?: Anexo[];
   checklists?: Checklist[];
+  subtarefas?: Tarefa[];
 }
 
 export interface Coluna {
@@ -51,6 +54,7 @@ export interface Usuario {
   usuario: string;
   email?: string;
   avatar?: string;
+  avatarUrl?: string | null;
 }
 
 export interface Comentario {
@@ -83,9 +87,12 @@ export interface Checklist {
 export interface ItemChecklist {
   id: number;
   checklistId: number;
-  descricao: string;
+  texto: string;
   concluido: boolean;
   ordem: number;
+  concluidoPorId?: number;
+  concluidoEm?: string;
+  concluidoPor?: Usuario;
 }
 
 export interface HistoricoTarefa {
