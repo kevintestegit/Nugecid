@@ -304,8 +304,7 @@ CMD ["node", "dist/main"]
 
 Para suporte técnico ou dúvidas:
 
-- **Email**: arquivo@itep.rn.gov.br
-- **Documentação**: http://localhost:3000/api/docs
+- **Email**: arquivo@pcirn.rn.gov.br
 
 ## 📄 Licença
 
@@ -323,4 +322,5 @@ Este projeto é propriedade do Instituto Técnico-Científico de Perícia (ITEP/
 Para desenvolvimento:
 - Backend: `npm run start:backend`
 - Frontend: `npm run start:frontend` (em `frontend/`)
+
 
