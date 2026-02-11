@@ -64,15 +64,10 @@ export class BackupController {
   })
   async listBackups() {
     const backups = await this.backupService.listBackups();
-    const result = {
+    return {
       total: backups.length,
       backups,
     };
-    console.log(
-      "📋 [BackupController] Retornando lista de backups:",
-      JSON.stringify(result, null, 2),
-    );
-    return result;
   }
 
   @Post("restore/:filename")

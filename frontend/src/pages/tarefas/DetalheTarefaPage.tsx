@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Button } from '@/components/ui'
@@ -50,13 +50,7 @@ const DetalheTarefaPage: React.FC = () => {
   const [loadingHistorico, setLoadingHistorico] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
-  useEffect(() => {
-    if (id) {
-      loadTarefa()
-    }
-  }, [id])
-
-  const loadTarefa = async () => {
+  const loadTarefa = useCallback(async () => {
     if (!id) return
     
     try {
@@ -70,7 +64,13 @@ const DetalheTarefaPage: React.FC = () => {
     } finally {
       setLoadingTarefa(false)
     }
-  }
+  }, [getTarefa, id, navigate])
+
+  useEffect(() => {
+    if (id) {
+      loadTarefa()
+    }
+  }, [id, loadTarefa])
 
   const loadHistorico = async () => {
     if (!id) return
@@ -449,7 +449,7 @@ const DetalheTarefaPage: React.FC = () => {
                 <Calendar className="h-4 w-4 text-gray-500" />
                 <div>
                   <p className="text-sm font-medium">Criado em</p>
-                  <p className="text-sm text-gray-600">{formatDate(tarefa.createdAt)}</p>
+                  <p className="text-sm text-gray-600">{formatDate(tarefa.createdAt || new Date())}</p>
                 </div>
               </div>
               
@@ -467,7 +467,7 @@ const DetalheTarefaPage: React.FC = () => {
                 <Calendar className="h-4 w-4 text-gray-500" />
                 <div>
                   <p className="text-sm font-medium">Atualizado em</p>
-                  <p className="text-sm text-gray-600">{formatDate(tarefa.updatedAt)}</p>
+                  <p className="text-sm text-gray-600">{formatDate(tarefa.updatedAt || new Date())}</p>
                 </div>
               </div>
             </CardContent>
@@ -498,7 +498,7 @@ const DetalheTarefaPage: React.FC = () => {
                     <div key={index} className="border-l-2 border-gray-200 pl-3 pb-3">
                       <p className="text-sm font-medium">{item.acao}</p>
                       <p className="text-xs text-gray-500">
-                        {formatDate(item.createdAt)} - {item.usuario?.nome}
+                        {formatDate(item.createdAt || new Date())} - {item.usuario?.nome}
                       </p>
                     </div>
                   ))}

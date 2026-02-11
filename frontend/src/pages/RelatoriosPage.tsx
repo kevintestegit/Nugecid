@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
-import { BarChart } from '@/components/ui/BarChart';
-import { PieChart } from '@/components/ui/PieChart';
-import { StatsCard } from '@/components/ui/StatsCard';
-import { getCardData, getRequisicoesPorMes, getStatusDistribuicao, CardData, exportRelatorioPdf, exportRelatorioMensalPdf, FiltrosEstatisticas } from '@/services/estatisticasService';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { getCardData, getRequisicoesPorMes, getStatusDistribuicao, CardData, FiltrosEstatisticas } from '@/services/estatisticasService';
+import { exportRelatorioMensalPdf, exportRelatorioPdf } from '@/services/estatisticasExportService';
+import { createLogger } from '@/utils/logger';
 import { FileText, BarChart as BarChartIcon, PieChart as PieChartIcon, Download, Calendar, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
@@ -17,6 +16,17 @@ interface PieChartData {
   name: string;
   value: number;
 }
+
+const LazyBarChart = lazy(() =>
+  import('@/components/ui/BarChart').then(module => ({ default: module.BarChart })),
+);
+const LazyPieChart = lazy(() =>
+  import('@/components/ui/PieChart').then(module => ({ default: module.PieChart })),
+);
+const LazyStatsCard = lazy(() =>
+  import('@/components/ui/StatsCard').then(module => ({ default: module.StatsCard })),
+);
+const reportsLogger = createLogger("RelatoriosPage");
 
 export function RelatoriosPage() {
   const [cardData, setCardData] = useState<CardData | null>(null);
@@ -35,11 +45,7 @@ export function RelatoriosPage() {
   const [dataFim, setDataFim] = useState<string>('');
   const [filtrosAtivos, setFiltrosAtivos] = useState<FiltrosEstatisticas>({});
 
-  useEffect(() => {
-    fetchData(filtrosAtivos);
-  }, [filtrosAtivos]);
-
-  const fetchData = async (filtros: FiltrosEstatisticas) => {
+  const fetchData = useCallback(async (filtros: FiltrosEstatisticas) => {
     try {
       setLoading(true);
       const [cards, requisicoes, status] = await Promise.all([
@@ -58,11 +64,15 @@ export function RelatoriosPage() {
       setError(null);
     } catch (err) {
       setError('Falha ao carregar os dados de estatísticas.');
-      console.error('Erro ao carregar dados de estatísticas', err);
+      reportsLogger.error('Erro ao carregar dados de estatísticas', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData(filtrosAtivos);
+  }, [fetchData, filtrosAtivos]);
 
   const handleAplicarFiltros = () => {
     const novosFiltros: FiltrosEstatisticas = {};
@@ -84,7 +94,7 @@ export function RelatoriosPage() {
       setExportingPdf(true);
       await exportRelatorioPdf(filtrosAtivos);
     } catch (err) {
-      console.error('Erro ao exportar PDF', err);
+      reportsLogger.error('Erro ao exportar PDF', err);
       setError('Falha ao exportar relatório em PDF.');
     } finally {
       setExportingPdf(false);
@@ -96,7 +106,7 @@ export function RelatoriosPage() {
       setExportingMensalPdf(true);
       await exportRelatorioMensalPdf(selectedYear, selectedMonth);
     } catch (err) {
-      console.error('Erro ao exportar PDF mensal', err);
+      reportsLogger.error('Erro ao exportar PDF mensal', err);
       setError('Falha ao exportar relatório mensal em PDF.');
     } finally {
       setExportingMensalPdf(false);
@@ -212,11 +222,11 @@ export function RelatoriosPage() {
       )}
 
       {/* Seletor de mês/ano para relatório mensal */}
-      <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-        <Calendar className="h-5 w-5 text-gray-600" />
-        <span className="text-sm font-medium text-gray-700">Relatório Mensal:</span>
+      <div className="flex items-center gap-4 rounded-xl border border-border/70 bg-card/80 p-4 backdrop-blur-sm">
+        <Calendar className="h-5 w-5 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">Relatório Mensal:</span>
         <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-40 border-border/80 bg-background/70 text-foreground">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -228,7 +238,7 @@ export function RelatoriosPage() {
           </SelectContent>
         </Select>
         <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-          <SelectTrigger className="w-24">
+          <SelectTrigger className="w-24 border-border/80 bg-background/70 text-foreground">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -251,30 +261,40 @@ export function RelatoriosPage() {
 
       {/* Cards de Estatísticas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <StatsCard
-          title="Total de Desarquivamentos"
-          value={cardData?.totalDesarquivamentos ?? 0}
-          icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-        />
-        <StatsCard
-          title="Requisições Pendentes"
-          value={cardData?.requisicoesPendentes ?? 0}
-          icon={<BarChartIcon className="h-4 w-4 text-muted-foreground" />}
-        />
-        <StatsCard
-          title="Requisições (Este Mês)"
-          value={cardData?.requisicoesEsteMes ?? 0}
-          icon={<PieChartIcon className="h-4 w-4 text-muted-foreground" />}
-        />
+        <Suspense fallback={<div className="h-24 rounded-lg bg-muted/40" />}>
+          <LazyStatsCard
+            title="Total de Desarquivamentos"
+            value={cardData?.totalDesarquivamentos ?? 0}
+            icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+          />
+        </Suspense>
+        <Suspense fallback={<div className="h-24 rounded-lg bg-muted/40" />}>
+          <LazyStatsCard
+            title="Requisições Pendentes"
+            value={cardData?.requisicoesPendentes ?? 0}
+            icon={<BarChartIcon className="h-4 w-4 text-muted-foreground" />}
+          />
+        </Suspense>
+        <Suspense fallback={<div className="h-24 rounded-lg bg-muted/40" />}>
+          <LazyStatsCard
+            title="Requisições (Este Mês)"
+            value={cardData?.requisicoesEsteMes ?? 0}
+            icon={<PieChartIcon className="h-4 w-4 text-muted-foreground" />}
+          />
+        </Suspense>
       </div>
 
       {/* Gráficos */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <div className="col-span-4">
-          <BarChart data={requisicoesPorMes} title="Requisições por Mês" />
+          <Suspense fallback={<div className="h-[340px] rounded-lg bg-muted/40" />}>
+            <LazyBarChart data={requisicoesPorMes} title="Requisições por Mês" />
+          </Suspense>
         </div>
         <div className="col-span-3">
-          <PieChart data={statusDistribuicao} title="Distribuição por Status" />
+          <Suspense fallback={<div className="h-[340px] rounded-lg bg-muted/40" />}>
+            <LazyPieChart data={statusDistribuicao} title="Distribuição por Status" />
+          </Suspense>
         </div>
       </div>
     </div>

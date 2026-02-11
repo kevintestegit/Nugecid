@@ -29,6 +29,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     fetchNotificacoes
   } = useNotificacoes();
 
+  const normalizePriority = (prioridade?: string) => (prioridade || '').toString().trim().toLowerCase();
+  const normalizeType = (tipo?: string) => (tipo || '').toString().trim().toLowerCase();
+
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -77,18 +80,20 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
   // Obter ícone baseado no tipo da notificação
   const getNotificationIcon = (tipo: string, prioridade: string) => {
+    const normalizedPriority = normalizePriority(prioridade);
+    const normalizedType = normalizeType(tipo);
     const iconClass = cn(
       'w-4 h-4 flex-shrink-0',
-      prioridade === 'CRITICA' && 'text-red-500',
-      prioridade === 'ALTA' && 'text-orange-500',
-      prioridade === 'MEDIA' && 'text-yellow-500',
-      prioridade === 'BAIXA' && 'text-blue-500'
+      normalizedPriority === 'critica' && 'text-red-500',
+      normalizedPriority === 'alta' && 'text-orange-500',
+      normalizedPriority === 'media' && 'text-yellow-500',
+      normalizedPriority === 'baixa' && 'text-blue-500'
     );
 
-    switch (tipo) {
-      case 'SOLICITACAO_PENDENTE':
+    switch (normalizedType) {
+      case 'solicitacao_pendente':
         return <Clock className={iconClass} />;
-      case 'NOVO_PROCESSO':
+      case 'novo_processo':
         return <Info className={iconClass} />;
       default:
         return <AlertCircle className={iconClass} />;
@@ -97,17 +102,17 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
   // Obter cor da prioridade
   const getPriorityColor = (prioridade: string) => {
-    switch (prioridade) {
-      case 'CRITICA':
-        return 'border-l-red-500 bg-red-50';
-      case 'ALTA':
-        return 'border-l-orange-500 bg-orange-50';
-      case 'MEDIA':
-        return 'border-l-yellow-500 bg-yellow-50';
-      case 'BAIXA':
-        return 'border-l-blue-500 bg-blue-50';
+    switch (normalizePriority(prioridade)) {
+      case 'critica':
+        return 'border-l-red-500 bg-red-500/10';
+      case 'alta':
+        return 'border-l-orange-500 bg-orange-500/10';
+      case 'media':
+        return 'border-l-yellow-500 bg-yellow-500/10';
+      case 'baixa':
+        return 'border-l-blue-500 bg-blue-500/10';
       default:
-        return 'border-l-gray-500 bg-gray-50';
+        return 'border-l-border bg-muted/30';
     }
   };
 
@@ -132,10 +137,10 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       <div
         key={notificacao.id}
         className={cn(
-          'p-3 border-l-4 transition-all duration-200',
-          isClickable ? 'hover:bg-gray-50 cursor-pointer' : '',
+          'border-l-4 p-3 transition-all duration-200',
+          isClickable ? 'cursor-pointer hover:bg-muted/45' : '',
           getPriorityColor(notificacao.prioridade),
-          !notificacao.lida && 'bg-blue-50 border-l-blue-500'
+          !notificacao.lida && 'border-l-blue-500 bg-blue-500/10'
         )}
         role={isClickable ? 'button' : undefined}
         tabIndex={isClickable ? 0 : undefined}
@@ -153,27 +158,27 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
             {getNotificationIcon(notificacao.tipo, notificacao.prioridade)}
             <div className="flex-1 min-w-0">
               <h4 className={cn(
-                'text-sm font-medium text-gray-900 truncate',
+                'truncate text-sm font-medium text-foreground',
                 !notificacao.lida && 'font-semibold'
               )}>
                 {notificacao.titulo}
               </h4>
-              <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
                 {notificacao.descricao}
               </p>
               {extraInfo.length > 0 && (
                 <ul className="mt-2 space-y-0.5">
                   {extraInfo.map(info => (
-                    <li key={info} className="text-[11px] text-gray-500">
+                    <li key={info} className="text-[11px] text-muted-foreground/90">
                       {info}
                     </li>
                   ))}
                 </ul>
               )}
               <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-gray-500">{timeAgo}</span>
+                <span className="text-xs text-muted-foreground">{timeAgo}</span>
                 {!notificacao.lida && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                     Nova
                   </span>
                 )}
@@ -188,7 +193,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                   e.stopPropagation();
                   marcarComoLida(notificacao.id);
                 }}
-                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                className="p-1 text-muted-foreground transition-colors hover:text-primary"
                 title="Marcar como lida"
               >
                 <Check className="w-3 h-3" />
@@ -199,7 +204,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                 e.stopPropagation();
                 excluirNotificacao(notificacao.id);
               }}
-              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+              className="p-1 text-muted-foreground transition-colors hover:text-red-500"
               title="Excluir notificação"
             >
               <Trash2 className="w-3 h-3" />
@@ -218,9 +223,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       <button
         onClick={handleToggleDropdown}
         className={cn(
-          'relative inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors',
-          'text-gray-600 hover:text-gray-900 bg-muted/60 hover:bg-muted/80',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          'relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-card/70 text-foreground/80 backdrop-blur transition-all',
+          'hover:border-border hover:bg-card hover:text-foreground',
+          'focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2',
           hasNotificacoes && 'animate-pulse'
         )}
         title={`${totalNaoLidas} notificações não lidas`}
@@ -229,7 +234,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
         
         {/* Badge com contador */}
         {totalNaoLidas > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-600 rounded-full min-w-[1.25rem] h-5 shadow-md">
+          <span className="absolute right-0 top-0 inline-flex h-5 min-w-[1.25rem] -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full border border-red-500/30 bg-red-500 px-2 py-1 text-xs font-bold leading-none text-white shadow-md">
             {totalNaoLidas > 99 ? '99+' : totalNaoLidas}
           </span>
         )}
@@ -237,18 +242,20 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
+        <div className="absolute right-0 z-50 mt-2 max-h-96 w-96 overflow-hidden rounded-2xl border border-border/70 bg-card/95 shadow-[0_26px_55px_-38px_rgba(2,6,23,0.92)] backdrop-blur">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-cyan-400/15 blur-2xl" />
+          <div className="pointer-events-none absolute -left-8 -bottom-12 h-24 w-24 rounded-full bg-orange-400/10 blur-2xl" />
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <div className="relative border-b border-border/60 bg-muted/25 px-4 py-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-900">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
                 Notificações {totalNaoLidas > 0 && `(${totalNaoLidas} não lidas)`}
               </h3>
               <div className="flex items-center gap-2">
                 {totalNaoLidas > 0 && (
                   <button
                     onClick={marcarTodasComoLidas}
-                    className="text-xs text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
+                    className="flex items-center gap-1 rounded-lg border border-primary/20 bg-primary/10 px-2 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
                     title="Marcar todas como lidas"
                   >
                     <CheckCheck className="w-3 h-3" />
@@ -257,7 +264,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -269,10 +276,10 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               <button
                 onClick={() => setShowAll(false)}
                 className={cn(
-                  'text-xs px-2 py-1 rounded transition-colors',
+                  'rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition-colors',
                   !showAll
-                    ? 'bg-blue-100 text-blue-700 font-medium'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'border border-primary/20 bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 Não lidas ({totalNaoLidas})
@@ -285,10 +292,10 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                   }
                 }}
                 className={cn(
-                  'text-xs px-2 py-1 rounded transition-colors',
+                  'rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition-colors',
                   showAll
-                    ? 'bg-blue-100 text-blue-700 font-medium'
-                    : 'text-gray-600 hover:text-gray-800'
+                    ? 'border border-primary/20 bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 Todas
@@ -297,9 +304,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           </div>
 
           {/* Conteúdo */}
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-80 overflow-y-auto bg-background/45">
             {loading && (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-muted-foreground">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="mt-2 text-sm">Carregando...</p>
               </div>
@@ -313,12 +320,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
             )}
 
             {!loading && !error && displayNotifications.length === 0 && (
-              <div className="p-8 text-center text-gray-500">
-                <Bell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <div className="p-8 text-center text-muted-foreground">
+                <Bell className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
                 <p className="text-sm font-medium mb-1">
                   {showAll ? 'Nenhuma notificação' : 'Nenhuma notificação não lida'}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-muted-foreground/80">
                   {showAll 
                     ? 'Você está em dia com suas notificações!' 
                     : 'Todas as notificações foram lidas.'
@@ -328,7 +335,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
             )}
 
             {!loading && !error && displayNotifications.length > 0 && (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-border/60">
                 {displayNotifications.map(renderNotificationItem)}
               </div>
             )}
@@ -336,8 +343,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
           {/* Footer */}
           {displayNotifications.length > 0 && (
-            <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
-              <p className="text-xs text-gray-500 text-center">
+            <div className="border-t border-border/60 bg-muted/20 px-4 py-2">
+              <p className="text-center text-xs text-muted-foreground">
                 Atualizações automáticas a cada 30 segundos
               </p>
             </div>

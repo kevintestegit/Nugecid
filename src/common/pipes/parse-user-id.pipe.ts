@@ -11,7 +11,7 @@ import {
  */
 @Injectable()
 export class ParseUserIdPipe implements PipeTransform<string, number> {
-  transform(value: string, metadata: ArgumentMetadata): number {
+  transform(value: string, _metadata: ArgumentMetadata): number {
     // Verifica se é um UUID (formato comum de desarquivamentos)
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

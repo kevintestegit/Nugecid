@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class CreateTarefaResponsaveis1767200000000 implements MigrationInterface {
+export class CreateTarefaResponsaveis1767200000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS tarefa_responsaveis (

@@ -1,28 +1,57 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { SecuritySettings } from '../SecuritySettings';
+import { render, screen, fireEvent } from '@testing-library/react'
+import { SecuritySettings } from '../SecuritySettings'
+import { vi } from 'vitest'
+
+vi.mock('@/services/backupService', () => ({
+  __esModule: true,
+  default: {
+    getSystemSettings: vi.fn().mockResolvedValue({
+      data: {
+        sessionTimeout: 30,
+        twoFactorAuth: false,
+        passwordExpiry: 90,
+        maxLoginAttempts: 5,
+        requireStrongPassword: true,
+      },
+    }),
+    updateSystemSettings: vi.fn().mockResolvedValue({}),
+  },
+}))
+
+vi.mock('@/services/api', () => ({
+  apiService: {
+    listBlockedUsers: vi.fn().mockResolvedValue({ success: true, data: [] }),
+    unblockUser: vi.fn().mockResolvedValue({ success: true }),
+  },
+}))
+
+vi.mock('@/components/Security/IpMonitoring', () => ({
+  IpMonitoring: () => <div>IpMonitoringMock</div>,
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
+}))
 
 describe('SecuritySettings', () => {
-  it('should render the session card', () => {
-    render(<SecuritySettings />);
+  it('should render session and authentication cards', async () => {
+    render(<SecuritySettings />)
 
-    expect(screen.getByText('Sessão')).toBeInTheDocument();
-    expect(screen.getByLabelText('Tempo limite da sessão (minutos)')).toBeInTheDocument();
-  });
+    expect(await screen.findByText('Sessão')).toBeInTheDocument()
+    expect(screen.getByText('Autenticação')).toBeInTheDocument()
+    expect(screen.getByLabelText('Tempo limite da sessão (minutos)')).toBeInTheDocument()
+  })
 
-  it('should render the authentication card', () => {
-    render(<SecuritySettings />);
+  it('should change session timeout when input is changed', async () => {
+    render(<SecuritySettings />)
 
-    expect(screen.getByText('Autenticação')).toBeInTheDocument();
-    expect(screen.getByText('Autenticação de dois fatores')).toBeInTheDocument();
-  });
+    const input = await screen.findByLabelText('Tempo limite da sessão (minutos)')
+    fireEvent.change(input, { target: { value: '60' } })
 
-  it('should change session timeout when input is changed', () => {
-    render(<SecuritySettings />);
-
-    const input = screen.getByLabelText('Tempo limite da sessão (minutos)');
-    fireEvent.change(input, { target: { value: '60' } });
-
-    expect(input.value).toBe('60');
-  });
-});
+    expect((input as HTMLInputElement).value).toBe('60')
+  })
+})

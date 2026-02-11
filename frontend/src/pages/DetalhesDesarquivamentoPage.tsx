@@ -327,11 +327,14 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     setPreviewAnexo(null);
   };
 
-  const handleUpdateDescricao = async (anexoId: number, descricao: string) => {
+  const handleUpdateDescricao = async (
+    anexoId: number | string,
+    descricao: string,
+  ) => {
     if (!id) return;
     await updateAnexoMutation.mutateAsync({
       desarquivamentoId: Number(id),
-      anexoId,
+      anexoId: Number(anexoId),
       descricao,
     });
   };
@@ -361,10 +364,10 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="mb-2 text-lg font-semibold text-foreground">
             ID Inválido
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="mb-4 text-muted-foreground">
             O ID fornecido na URL é inválido.
           </p>
           <Button onClick={() => navigate('/desarquivamentos')} variant="outline">
@@ -385,10 +388,10 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="mb-2 text-lg font-semibold text-foreground">
             Solicitação não encontrada
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="mb-4 text-muted-foreground">
             A solicitação que você está procurando não existe ou foi removida.
           </p>
           <Button onClick={() => navigate('/desarquivamentos')} variant="outline">
@@ -430,24 +433,30 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   const isPrazoVencido = false;
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-0 bg-[radial-gradient(135%_95%_at_10%_8%,rgba(56,189,248,0.22),transparent_55%),radial-gradient(120%_85%_at_90%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.64),rgba(255,255,255,0))] dark:bg-[radial-gradient(135%_95%_at_10%_8%,rgba(14,116,144,0.28),transparent_55%),radial-gradient(120%_85%_at_90%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+      </div>
       {/* Header */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_24px_55px_-42px_rgba(15,23,42,0.75)] backdrop-blur md:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-cyan-400/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-orange-400/15 blur-3xl" />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/desarquivamentos')}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Voltar
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-foreground">
               Solicitação #{desarquivamento?.numeroSolicitacao || 'N/A'}
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="mt-1 text-sm text-muted-foreground">
               Detalhes da solicitação de desarquivamento
             </p>
           </div>
@@ -485,9 +494,10 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           )}
         </div>
       </div>
+      </div>
 
       {/* Status Card */}
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -507,22 +517,22 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-gray-600">Data de Criação</p>
-              <p className="text-gray-900">
+              <p className="text-sm text-muted-foreground">Data de Criação</p>
+              <p className="text-foreground">
                 {formatDate(desarquivamento.createdAt)}
               </p>
             </div>
             {desarquivamento.updatedAt && desarquivamento.updatedAt !== desarquivamento.createdAt && (
               <div>
-                <p className="text-sm text-gray-600">Última Atualização</p>
-                <p className="text-gray-900">
+                <p className="text-sm text-muted-foreground">Última Atualização</p>
+                <p className="text-foreground">
                   {formatDate(desarquivamento.updatedAt)}
                 </p>
               </div>
             )}
             <div>
-              <p className="text-sm text-gray-600">Prazo de Vencimento</p>
-              <p className="text-gray-400">Não definido</p>
+              <p className="text-sm text-muted-foreground">Prazo de Vencimento</p>
+              <p className="text-muted-foreground/70">Não definido</p>
             </div>
           </div>
         </CardContent>
@@ -530,7 +540,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Informações da Solicitação */}
-        <Card>
+        <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -539,11 +549,11 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-gray-600">Número NIC/LAUDO/AUTO</p>
+              <p className="text-sm text-muted-foreground">Número NIC/LAUDO/AUTO</p>
               <p className="font-mono text-lg font-medium">{desarquivamento.numeroNicLaudoAuto || 'N/A'}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Número do Processo</p>
+              <p className="text-sm text-muted-foreground">Número do Processo</p>
               <div className="mt-1 flex items-center gap-2">
                 <p className="font-mono text-lg font-medium break-all">{desarquivamento.numeroProcesso || 'N/A'}</p>
                 {desarquivamento.numeroProcesso && (
@@ -551,7 +561,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleCopyToClipboard(desarquivamento.numeroProcesso, 'numeroProcesso')}
-                      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                      className="rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                       title="Copiar número do processo"
                       aria-label="Copiar número do processo"
                     >
@@ -570,7 +580,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             </div>
 
             <div>
-              <p className="text-sm text-gray-600">Nº do Ofício</p>
+              <p className="text-sm text-muted-foreground">Nº do Ofício</p>
               <div className="mt-1 flex items-center gap-2">
                 <p className="font-mono text-lg font-medium break-all">{desarquivamento.numeroOficio || 'N/A'}</p>
                 {desarquivamento.numeroOficio && (
@@ -578,7 +588,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleCopyToClipboard(desarquivamento.numeroOficio, 'numeroOficio')}
-                      className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                      className="rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                       title="Copiar número do ofício"
                       aria-label="Copiar número do ofício"
                     >
@@ -596,44 +606,44 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Tipo de Desarquivamento</p>
+              <p className="text-sm text-muted-foreground">Tipo de Desarquivamento</p>
               <Badge variant="outline" className="mt-1">
                 {desarquivamento.tipoDesarquivamento}
               </Badge>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Tipo de Documento</p>
-              <p className="text-gray-900">
+              <p className="text-sm text-muted-foreground">Tipo de Documento</p>
+              <p className="text-foreground">
                 {desarquivamento.tipoDocumento}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Instituto</p>
-              <p className="text-gray-900">
+              <p className="text-sm text-muted-foreground">Instituto</p>
+              <p className="text-foreground">
                 {getInstitutoLabel(desarquivamento.instituto)}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Requerente</p>
-              <p className="text-gray-900">
+              <p className="text-sm text-muted-foreground">Requerente</p>
+              <p className="text-foreground">
                 {desarquivamento.requerente || '-'}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Setor Demandante</p>
-              <p className="text-gray-900">
+              <p className="text-sm text-muted-foreground">Setor Demandante</p>
+              <p className="text-foreground">
                 {desarquivamento.setorDemandante}
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Servidor Responsável</p>
-              <p className="text-gray-900">
+              <p className="text-sm text-muted-foreground">Servidor Responsável</p>
+              <p className="text-foreground">
                 {desarquivamento.servidorResponsavel}
               </p>
             </div>
             {desarquivamento.urgente && (
               <div>
-                <p className="text-sm text-gray-600">Prioridade</p>
+                <p className="text-sm text-muted-foreground">Prioridade</p>
                 <Badge variant="destructive" className="mt-1">
                   URGENTE
                 </Badge>
@@ -643,7 +653,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         </Card>
 
         {/* Informações do Requerente */}
-        <Card>
+        <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -652,32 +662,32 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-gray-600">Nome Completo</p>
+              <p className="text-sm text-muted-foreground">Nome Completo</p>
               <p className="font-medium">{desarquivamento.nomeCompleto}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Usuário Solicitante</p>
+              <p className="text-sm text-muted-foreground">Usuário Solicitante</p>
               <p className="font-medium">{desarquivamento.usuario?.nome || 'N/A'}</p>
             </div>
             {desarquivamento.responsavel && (
               <div>
-                <p className="text-sm text-gray-600">Responsável pelo Atendimento</p>
+                <p className="text-sm text-muted-foreground">Responsável pelo Atendimento</p>
                 <p className="font-medium">{desarquivamento.responsavel.nome}</p>
               </div>
             )}
             <div>
-              <p className="text-sm text-gray-600">Data de Solicitação</p>
+              <p className="text-sm text-muted-foreground">Data de Solicitação</p>
               <p className="font-medium">{formatDate(desarquivamento.dataSolicitacao)}</p>
             </div>
             {desarquivamento.dataDesarquivamentoSAG && (
               <div>
-                <p className="text-sm text-gray-600">Data do Desarquivamento - SAG</p>
+                <p className="text-sm text-muted-foreground">Data do Desarquivamento - SAG</p>
                 <p className="font-medium">{formatDate(desarquivamento.dataDesarquivamentoSAG)}</p>
               </div>
             )}
             {desarquivamento.dataDevolucaoSetor && (
               <div>
-                <p className="text-sm text-gray-600">Data da Devolução pelo Setor</p>
+                <p className="text-sm text-muted-foreground">Data da Devolução pelo Setor</p>
                 <p className="font-medium">{formatDate(desarquivamento.dataDevolucaoSetor)}</p>
               </div>
             )}
@@ -686,7 +696,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       </div>
 
       {/* Justificativa e Prazos */}
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -698,16 +708,16 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm text-gray-600 font-medium mb-2">Finalidade do Desarquivamento *</p>
-            <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
+            <p className="text-sm text-muted-foreground font-medium mb-2">Finalidade do Desarquivamento *</p>
+            <p className="text-foreground whitespace-pre-wrap bg-background/60 p-3 rounded-md border border-border/60">
               {desarquivamento.finalidadeDesarquivamento}
             </p>
           </div>
 
           {desarquivamento.justificativa && (
             <div>
-              <p className="text-sm text-gray-600 font-medium mb-2">Justificativa</p>
-              <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
+              <p className="text-sm text-muted-foreground font-medium mb-2">Justificativa</p>
+              <p className="text-foreground whitespace-pre-wrap bg-background/60 p-3 rounded-md border border-border/60">
                 {desarquivamento.justificativa}
               </p>
             </div>
@@ -716,8 +726,8 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {desarquivamento.prazoDesarquivamento && (
               <div>
-                <p className="text-sm text-gray-600 font-medium">Prazo de Desarquivamento</p>
-                <p className="text-gray-900 text-base">
+                <p className="text-sm text-muted-foreground font-medium">Prazo de Desarquivamento</p>
+                <p className="text-foreground text-base">
                   {formatDate(desarquivamento.prazoDesarquivamento)}
                 </p>
               </div>
@@ -725,8 +735,8 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             
             {desarquivamento.prazoVencimento && (
               <div>
-                <p className="text-sm text-gray-600 font-medium">Prazo de Vencimento</p>
-                <p className={`text-base font-medium ${new Date(desarquivamento.prazoVencimento) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
+                <p className="text-sm text-muted-foreground font-medium">Prazo de Vencimento</p>
+                <p className={`text-base font-medium ${new Date(desarquivamento.prazoVencimento) < new Date() ? 'text-red-600' : 'text-foreground'}`}>
                   {formatDate(desarquivamento.prazoVencimento)}
                   {new Date(desarquivamento.prazoVencimento) < new Date() && (
                     <span className="ml-2 text-xs">(Vencido)</span>
@@ -737,15 +747,15 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           </div>
 
           {desarquivamento.solicitacaoProrrogacao && (
-            <div className="pt-2 border-t border-gray-200">
+            <div className="pt-2 border-t border-border/60">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm text-gray-600 font-medium">Solicitação de Prorrogação</p>
+                <p className="text-sm text-muted-foreground font-medium">Solicitação de Prorrogação</p>
                 <Badge variant="secondary">
                   Sim
                 </Badge>
               </div>
               {desarquivamento.solicitacaoProrrogacaoTexto && (
-                <p className="text-sm text-gray-900 bg-amber-50 p-3 rounded-md border border-amber-200 whitespace-pre-wrap">
+                <p className="text-sm text-foreground bg-amber-50 p-3 rounded-md border border-amber-200 whitespace-pre-wrap">
                   {desarquivamento.solicitacaoProrrogacaoTexto}
                 </p>
               )}
@@ -753,9 +763,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           )}
 
           {desarquivamento.dadosAdicionais && (
-            <div className="pt-2 border-t border-gray-200">
-              <p className="text-sm text-gray-600 font-medium mb-2">Descrição da Solicitação</p>
-              <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md border border-gray-200">
+            <div className="pt-2 border-t border-border/60">
+              <p className="text-sm text-muted-foreground font-medium mb-2">Descrição da Solicitação</p>
+              <p className="text-foreground whitespace-pre-wrap bg-background/60 p-3 rounded-md border border-border/60">
                 {desarquivamento.dadosAdicionais}
               </p>
             </div>
@@ -764,7 +774,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       </Card>
 
       {/* Comentários */}
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5" />
@@ -777,13 +787,13 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmitComment} className="space-y-2">
             <textarea
-              className="w-full min-h-[90px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="min-h-[90px] w-full rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/80 focus:border-primary/40 focus:ring-2 focus:ring-primary/25"
               placeholder="Escreva um comentário sobre esta solicitação..."
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
               maxLength={2000}
             />
-            <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 Registrado como{' '}
                 <strong>
@@ -793,7 +803,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={addCommentMutation.isPending}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-60"
               >
                 {addCommentMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -808,25 +818,22 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
             {isLoadingComments ? (
               <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
             ) : comments.length === 0 ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Nenhum comentário registrado até o momento.
               </p>
             ) : (
               comments.map(comment => (
-                <div
-                  key={comment.id}
-                  className="border border-gray-200 rounded-md px-3 py-2"
-                >
-                  <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span className="font-medium text-gray-700">
+                <div key={comment.id} className="rounded-md border border-border/60 bg-background/55 px-3 py-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span className="font-medium text-foreground">
                       {comment.authorName}
                     </span>
                     <span>{formatDateTime(comment.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap break-words">
+                  <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
                     {comment.comment}
                   </p>
                 </div>
@@ -837,7 +844,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       </Card>
 
       {/* Histórico de Alterações */}
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
@@ -849,32 +856,32 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-start gap-3 pb-4 border-b last:border-b-0">
+            <div className="flex items-start gap-3 border-b border-border/60 pb-4 last:border-b-0">
               <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium">Solicitação criada</p>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-muted-foreground">
                     {formatDate(desarquivamento.createdAt)}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Solicitação de desarquivamento criada no sistema
                 </p>
               </div>
             </div>
 
             {desarquivamento.updatedAt !== desarquivamento.createdAt && (
-              <div className="flex items-start gap-3 pb-4 border-b last:border-b-0">
+              <div className="flex items-start gap-3 border-b border-border/60 pb-4 last:border-b-0">
                 <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">Solicitação atualizada</p>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                       {formatDate(desarquivamento.updatedAt)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Última modificação realizada na solicitação
                   </p>
                 </div>
@@ -893,11 +900,11 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                     <p className="font-medium">
                       Status alterado para {getStatusLabel(desarquivamento.status)}
                     </p>
-                    <span className="text-sm text-gray-500">
+                    <span className="text-sm text-muted-foreground">
                       {formatDate(desarquivamento.updatedAt)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     Status da solicitação foi atualizado
                   </p>
                 </div>

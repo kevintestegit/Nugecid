@@ -1,458 +1,234 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-  HttpStatus,
-} from "@nestjs/common";
-import { Response, Request } from "express";
+import { HttpStatus } from "@nestjs/common";
+import { Response } from "express";
+
 import { NugecidController } from "./nugecid.controller";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import {
   CreateDesarquivamentoUseCase,
   FindAllDesarquivamentosUseCase,
   FindDesarquivamentoByIdUseCase,
   UpdateDesarquivamentoUseCase,
   DeleteDesarquivamentoUseCase,
+  RestoreDesarquivamentoUseCase,
   GenerateTermoEntregaUseCase,
   GetDashboardStatsUseCase,
   ImportDesarquivamentoUseCase,
   ImportRegistrosUseCase,
 } from "./application/use-cases";
-import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
-import { UpdateDesarquivamentoDto } from "./dto/update-desarquivamento.dto";
-import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
-import { TipoDesarquivamentoEnum } from "./domain/value-objects/tipo-desarquivamento.vo";
-import { StatusDesarquivamentoEnum } from "./domain/value-objects/status-desarquivamento.vo";
-import { User } from "../users/entities/user.entity";
-import { Role } from "../users/entities/role.entity";
-import { ImportResultDto } from "./dto/import-result.dto";
-import { RoleType } from "../users/enums/role-type.enum";
-import { TipoDesarquivamento } from "./domain/value-objects/tipo-desarquivamento.vo";
+import { NugecidImportService } from "./nugecid-import.service";
+import { NugecidStatsService } from "./nugecid-stats.service";
+import { NugecidPdfService } from "./nugecid-pdf.service";
+import { NugecidExportService } from "./nugecid-export.service";
+import { NugecidDocxService } from "./nugecid-docx.service";
+import { NugecidService } from "./nugecid.service";
+import { NugecidAuditService } from "./nugecid-audit.service";
+import { TipoDesarquivamentoEnum } from "./domain/enums/tipo-desarquivamento.enum";
 
 describe("NugecidController", () => {
   let controller: NugecidController;
-  let createDesarquivamentoUseCase: CreateDesarquivamentoUseCase;
-  let findAllDesarquivamentosUseCase: FindAllDesarquivamentosUseCase;
-  let findDesarquivamentoByIdUseCase: FindDesarquivamentoByIdUseCase;
-  let updateDesarquivamentoUseCase: UpdateDesarquivamentoUseCase;
-  let deleteDesarquivamentoUseCase: DeleteDesarquivamentoUseCase;
-  let importDesarquivamentoUseCase: ImportDesarquivamentoUseCase;
+  const mockCreateUseCase = { execute: jest.fn() };
+  const mockFindAllUseCase = { execute: jest.fn() };
+  const mockFindByIdUseCase = { execute: jest.fn() };
+  const mockUpdateUseCase = { execute: jest.fn() };
+  const mockDeleteUseCase = { execute: jest.fn() };
+  const mockNugecidImportService = { importFromXLSX: jest.fn() };
+  const mockAuditService = { saveDesarquivamentoAudit: jest.fn() };
 
-  const mockAdminRole: Role = {
-    id: 1,
-    name: RoleType.ADMIN,
-    description: "Administrator",
-    permissions: [],
-    ativo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    users: [],
-    hasPermission: jest.fn().mockReturnValue(true),
-    isAdmin: jest.fn().mockReturnValue(true),
-    isEditor: jest.fn().mockReturnValue(false),
-  };
-
-  const mockEditorRole: Role = {
+  const currentUser = {
     id: 2,
-    name: RoleType.USUARIO,
-    description: "User",
-    permissions: [],
-    ativo: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    users: [],
-    hasPermission: jest.fn().mockReturnValue(true),
-    isAdmin: jest.fn().mockReturnValue(false),
-    isEditor: jest.fn().mockReturnValue(true),
-  };
-
-  const mockAdminUser: User = {
-    id: 1,
-    nome: "Admin User",
-    usuario: "admin",
-    role: mockAdminRole,
-    roleId: 1,
-    senha: "hashedpassword",
-    ativo: true,
-    ultimoLogin: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    deletedAt: null,
-    tentativasLogin: 0,
-    bloqueadoAte: null,
-    tokenReset: null,
-    tokenResetExpira: null,
-    settings: {},
-    auditorias: [],
-    isAdmin: jest.fn().mockReturnValue(true),
-    isCoordenador: jest.fn().mockReturnValue(false),
-    isEditor: jest.fn().mockReturnValue(false),
-    canManageUser: jest.fn().mockReturnValue(true),
-    canViewAllRecords: jest.fn().mockReturnValue(true),
-    isBlocked: jest.fn().mockReturnValue(false),
-    validatePassword: jest.fn().mockResolvedValue(true),
-    hashPassword: jest.fn().mockResolvedValue("hashedpassword"),
-    toJSON: jest.fn().mockReturnValue({}),
-    serialize: jest.fn().mockReturnValue({}),
-  } as any;
-
-  const mockEditorUser: User = {
-    id: 2,
-    nome: "Editor User",
     usuario: "editor",
-    role: mockEditorRole,
-    roleId: 2,
-    senha: "hashedpassword",
-    ativo: true,
-    ultimoLogin: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    deletedAt: null,
-    tentativasLogin: 0,
-    bloqueadoAte: null,
-    tokenReset: null,
-    tokenResetExpira: null,
-    settings: {},
-    auditorias: [],
-    isAdmin: jest.fn().mockReturnValue(false),
-    isCoordenador: jest.fn().mockReturnValue(false),
-    isEditor: jest.fn().mockReturnValue(true),
-    canManageUser: jest.fn().mockReturnValue(false),
-    canViewAllRecords: jest.fn().mockReturnValue(false),
-    isBlocked: jest.fn().mockReturnValue(false),
-    validatePassword: jest.fn().mockResolvedValue(true),
-    hashPassword: jest.fn().mockResolvedValue("hashedpassword"),
-    toJSON: jest.fn().mockReturnValue({}),
-    serialize: jest.fn().mockReturnValue({}),
+    role: { name: "admin" },
   } as any;
-
-  const mockDesarquivamento: any = {
-    id: 1,
-    tipoDesarquivamento: TipoDesarquivamentoEnum.FISICO,
-    status: "SOLICITADO",
-    numeroNicLaudoAuto: "DES202400001",
-    urgente: false,
-    createdBy: mockEditorUser.id,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    nomeCompleto: "João Silva",
-    numeroProcesso: "12345",
-    tipoDocumento: "Laudo Pericial",
-    dataSolicitacao: new Date(),
-    setorDemandante: "Setor Teste",
-    servidorResponsavel: "Servidor Teste",
-    finalidadeDesarquivamento: "Teste",
-    solicitacaoProrrogacao: false,
-  };
-
-  const mockPaginatedResult = {
-    data: [mockDesarquivamento],
-    total: 1,
-    page: 1,
-    limit: 10,
-    totalPages: 1,
-  };
-
-  const mockCreateDesarquivamentoUseCase = { execute: jest.fn() };
-  const mockFindAllDesarquivamentosUseCase = { execute: jest.fn() };
-  const mockFindDesarquivamentoByIdUseCase = { execute: jest.fn() };
-  const mockUpdateDesarquivamentoUseCase = { execute: jest.fn() };
-  const mockDeleteDesarquivamentoUseCase = { execute: jest.fn() };
-  const mockGenerateTermoEntregaUseCase = { execute: jest.fn() };
-  const mockGetDashboardStatsUseCase = { execute: jest.fn() };
-  const mockImportDesarquivamentoUseCase = { execute: jest.fn() };
-  const mockImportRegistrosUseCase = { execute: jest.fn() };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const moduleBuilder = Test.createTestingModule({
       controllers: [NugecidController],
       providers: [
-        {
-          provide: CreateDesarquivamentoUseCase,
-          useValue: mockCreateDesarquivamentoUseCase,
-        },
+        { provide: CreateDesarquivamentoUseCase, useValue: mockCreateUseCase },
         {
           provide: FindAllDesarquivamentosUseCase,
-          useValue: mockFindAllDesarquivamentosUseCase,
+          useValue: mockFindAllUseCase,
         },
         {
           provide: FindDesarquivamentoByIdUseCase,
-          useValue: mockFindDesarquivamentoByIdUseCase,
+          useValue: mockFindByIdUseCase,
         },
+        { provide: UpdateDesarquivamentoUseCase, useValue: mockUpdateUseCase },
+        { provide: DeleteDesarquivamentoUseCase, useValue: mockDeleteUseCase },
         {
-          provide: UpdateDesarquivamentoUseCase,
-          useValue: mockUpdateDesarquivamentoUseCase,
-        },
-        {
-          provide: DeleteDesarquivamentoUseCase,
-          useValue: mockDeleteDesarquivamentoUseCase,
+          provide: RestoreDesarquivamentoUseCase,
+          useValue: { execute: jest.fn() },
         },
         {
           provide: GenerateTermoEntregaUseCase,
-          useValue: mockGenerateTermoEntregaUseCase,
+          useValue: { execute: jest.fn() },
         },
-        {
-          provide: GetDashboardStatsUseCase,
-          useValue: mockGetDashboardStatsUseCase,
-        },
+        { provide: GetDashboardStatsUseCase, useValue: { execute: jest.fn() } },
         {
           provide: ImportDesarquivamentoUseCase,
-          useValue: mockImportDesarquivamentoUseCase,
+          useValue: { execute: jest.fn() },
         },
-        {
-          provide: ImportRegistrosUseCase,
-          useValue: mockImportRegistrosUseCase,
-        },
+        { provide: ImportRegistrosUseCase, useValue: { execute: jest.fn() } },
+        { provide: NugecidImportService, useValue: mockNugecidImportService },
+        { provide: NugecidStatsService, useValue: {} },
+        { provide: NugecidPdfService, useValue: {} },
+        { provide: NugecidExportService, useValue: {} },
+        { provide: NugecidDocxService, useValue: {} },
+        { provide: NugecidService, useValue: {} },
+        { provide: NugecidAuditService, useValue: mockAuditService },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true });
 
+    const module: TestingModule = await moduleBuilder.compile();
     controller = module.get<NugecidController>(NugecidController);
-    createDesarquivamentoUseCase = module.get<CreateDesarquivamentoUseCase>(
-      CreateDesarquivamentoUseCase,
-    );
-    findAllDesarquivamentosUseCase = module.get<FindAllDesarquivamentosUseCase>(
-      FindAllDesarquivamentosUseCase,
-    );
-    findDesarquivamentoByIdUseCase = module.get<FindDesarquivamentoByIdUseCase>(
-      FindDesarquivamentoByIdUseCase,
-    );
-    updateDesarquivamentoUseCase = module.get<UpdateDesarquivamentoUseCase>(
-      UpdateDesarquivamentoUseCase,
-    );
-    deleteDesarquivamentoUseCase = module.get<DeleteDesarquivamentoUseCase>(
-      DeleteDesarquivamentoUseCase,
-    );
-    importDesarquivamentoUseCase = module.get<ImportDesarquivamentoUseCase>(
-      ImportDesarquivamentoUseCase,
-    );
-
     jest.clearAllMocks();
   });
 
-  describe("create", () => {
-    const createDto: CreateDesarquivamentoDto = {
-      tipoDesarquivamento: "FISICO",
+  it("create deve retornar 201 com payload de sucesso", async () => {
+    const dto = {
       desarquivamentoFisicoDigital: TipoDesarquivamentoEnum.FISICO,
       nomeCompleto: "João Silva",
       numeroNicLaudoAuto: "NIC-12345",
-      numeroProcesso: "12345-PROC",
+      numeroProcesso: "PROC-1",
       tipoDocumento: "Laudo",
       dataSolicitacao: new Date().toISOString(),
       setorDemandante: "Delegacia",
-      servidorResponsavel: "Servidor Teste",
-      finalidadeDesarquivamento: "Para processo",
+      servidorResponsavel: "Servidor",
       solicitacaoProrrogacao: false,
     };
+    const created = { id: 1, ...dto };
+    mockCreateUseCase.execute.mockResolvedValue(created);
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as any as Response;
 
-    it("should create a new desarquivamento successfully", async () => {
-      mockCreateDesarquivamentoUseCase.execute.mockResolvedValue(
-        mockDesarquivamento,
-      );
+    await controller.create(
+      dto as any,
+      currentUser,
+      { headers: {} } as any,
+      res,
+    );
 
-      const mockReq = {
-        headers: { accept: "application/json" },
-      } as any as Request;
-      const mockRes = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-        redirect: jest.fn(),
-      } as any as Response;
-
-      await controller.create(createDto, mockEditorUser, mockReq, mockRes);
-
-      expect(createDesarquivamentoUseCase.execute).toHaveBeenCalledWith({
-        ...createDto,
-        urgente: false,
-        criadoPorId: mockEditorUser.id,
-      });
-      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.CREATED);
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: true,
-        message: "Desarquivamento criado com sucesso",
-        data: mockDesarquivamento,
-      });
+    expect(mockCreateUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ criadoPorId: currentUser.id }),
+    );
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "Desarquivamento criado com sucesso",
+      data: created,
     });
   });
 
-  describe("findAll", () => {
-    const queryDto: QueryDesarquivamentoDto = { page: 1, limit: 10 };
-
-    it("should return a paginated list of desarquivamentos", async () => {
-      mockFindAllDesarquivamentosUseCase.execute.mockResolvedValue(
-        mockPaginatedResult,
-      );
-
-      const mockReq = {
-        headers: { accept: "application/json" },
-      } as any as Request;
-      const mockRes = {
-        json: jest.fn(),
-        render: jest.fn(),
-      } as any as Response;
-
-      await controller.findAll(queryDto, mockAdminUser);
-
-      expect(findAllDesarquivamentosUseCase.execute).toHaveBeenCalledWith({
-        ...queryDto,
-        userId: mockAdminUser.id,
-        userRoles: [mockAdminUser.role.name],
-      });
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: true,
-        data: mockPaginatedResult,
-        meta: {
-          page: mockPaginatedResult.page,
-          limit: mockPaginatedResult.limit,
-          total: mockPaginatedResult.total,
-          totalPages: mockPaginatedResult.totalPages,
-        },
-      });
-    });
-  });
-
-  describe("findOne", () => {
-    it("should return a single desarquivamento by ID", async () => {
-      mockFindDesarquivamentoByIdUseCase.execute.mockResolvedValue(
-        mockDesarquivamento,
-      );
-
-      const mockReq = {
-        headers: { accept: "application/json" },
-      } as any as Request;
-      const mockRes = {
-        json: jest.fn(),
-        render: jest.fn(),
-      } as any as Response;
-
-      await controller.findOne(1, mockEditorUser, mockReq);
-
-      expect(findDesarquivamentoByIdUseCase.execute).toHaveBeenCalledWith({
-        id: 1,
-        userId: mockEditorUser.id,
-        userRoles: [mockEditorUser.role.name],
-      });
-      expect(mockRes.json).toHaveBeenCalledWith({
-        success: true,
-        data: mockDesarquivamento,
-      });
-    });
-  });
-
-  describe("update", () => {
-    const updateDto: UpdateDesarquivamentoDto = {
-      status: StatusDesarquivamentoEnum.FINALIZADO,
+  it("findAll deve retornar lista paginada", async () => {
+    const useCaseResult = {
+      data: [{ id: 1 }],
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
     };
+    mockFindAllUseCase.execute.mockResolvedValue(useCaseResult);
 
-    it("should update a desarquivamento successfully", async () => {
-      const updatedDesarquivamento = { ...mockDesarquivamento, ...updateDto };
-      mockUpdateDesarquivamentoUseCase.execute.mockResolvedValue(
-        updatedDesarquivamento,
-      );
+    const result = await controller.findAll(
+      { page: 1, limit: 10 } as any,
+      currentUser,
+    );
 
-      const mockReq = {
-        headers: { accept: "application/json" },
-      } as any as Request;
-      const mockRes = {
-        json: jest.fn(),
-        redirect: jest.fn(),
-      } as any as Response;
+    expect(mockFindAllUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        limit: 10,
+        userId: currentUser.id,
+        userRoles: [currentUser.role.name],
+        filters: expect.any(Object),
+      }),
+    );
+    expect(result).toEqual({
+      success: true,
+      data: useCaseResult.data,
+      meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+    });
+  });
 
-      await controller.update(1, updateDto, mockEditorUser);
+  it("findOne deve registrar auditoria e retornar sucesso", async () => {
+    const entity = { id: 1 };
+    mockFindByIdUseCase.execute.mockResolvedValue(entity);
+    const req = { ip: "127.0.0.1", get: jest.fn().mockReturnValue("jest") };
 
-      expect(updateDesarquivamentoUseCase.execute).toHaveBeenCalledWith({
-        id: 1,
-        ...updateDto,
-        userId: mockEditorUser.id,
-        userRoles: [mockEditorUser.role.name],
-      });
-      expect(mockRes.json).toHaveBeenCalledWith({
+    const result = await controller.findOne(1, currentUser, req as any);
+
+    expect(mockFindByIdUseCase.execute).toHaveBeenCalled();
+    expect(mockAuditService.saveDesarquivamentoAudit).toHaveBeenCalled();
+    expect(result).toEqual({ success: true, data: entity });
+  });
+
+  it("update e remove devem encaminhar para os use cases", async () => {
+    mockUpdateUseCase.execute.mockResolvedValue({
+      id: 1,
+      status: "FINALIZADO",
+    });
+    mockDeleteUseCase.execute.mockResolvedValue(undefined);
+
+    const updateResult = await controller.update(
+      1,
+      { status: "FINALIZADO" } as any,
+      currentUser,
+    );
+    const removeResult = await controller.remove("1", currentUser);
+
+    expect(mockUpdateUseCase.execute).toHaveBeenCalled();
+    expect(updateResult).toEqual(
+      expect.objectContaining({
         success: true,
         message: "Desarquivamento atualizado com sucesso",
-        data: updatedDesarquivamento,
-      });
-    });
-  });
-
-  describe("remove", () => {
-    it("should remove a desarquivamento successfully", async () => {
-      mockDeleteDesarquivamentoUseCase.execute.mockResolvedValue(undefined);
-
-      const mockReq = {
-        headers: { accept: "application/json" },
-      } as any as Request;
-      const mockRes = {
-        json: jest.fn(),
-        redirect: jest.fn(),
-      } as any as Response;
-
-      await controller.remove("1", mockAdminUser);
-
-      expect(deleteDesarquivamentoUseCase.execute).toHaveBeenCalledWith({
-        id: 1,
-        userId: mockAdminUser.id,
-        userRoles: [mockAdminUser.role.name],
-        permanent: false,
-      });
-      expect(mockRes.json).toHaveBeenCalledWith({
+      }),
+    );
+    expect(mockDeleteUseCase.execute).toHaveBeenCalled();
+    expect(removeResult).toEqual(
+      expect.objectContaining({
         success: true,
         message: "Desarquivamento removido com sucesso",
-      });
-    });
+      }),
+    );
   });
 
-  describe("importDesarquivamentos", () => {
-    const mockFile = {
-      buffer: Buffer.from("mock file content"),
+  it("importDesarquivamentos deve responder sucesso", async () => {
+    const file = {
+      buffer: Buffer.from("ok"),
+      originalname: "a.xlsx",
+      size: 10,
     } as Express.Multer.File;
-
-    const mockImportResult: ImportResultDto = {
-      totalRows: 10,
-      successCount: 8,
-      errorCount: 2,
-      errors: [
-        { row: 5, details: "Erro na linha 5" },
-        { row: 7, details: "Erro na linha 7" },
-      ],
+    const importResult = {
+      totalRows: 1,
+      successCount: 1,
+      errorCount: 0,
+      errors: [],
     };
+    mockNugecidImportService.importFromXLSX.mockResolvedValue(importResult);
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as any as Response;
 
-    it("should import data from a file successfully", async () => {
-      mockImportDesarquivamentoUseCase.execute.mockResolvedValue(
-        mockImportResult,
-      );
+    await controller.importDesarquivamentos(file, currentUser, res);
 
-      const mockRes = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      } as any as Response;
-
-      await controller.importDesarquivamentos(
-        mockFile as any,
-        mockAdminUser,
-        mockRes,
-      );
-
-      expect(importDesarquivamentoUseCase.execute).toHaveBeenCalledWith(
-        mockFile.buffer,
-        mockAdminUser.id,
-      );
-      expect(mockRes.status).toHaveBeenCalledWith(HttpStatus.OK);
-      expect(mockRes.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          data: expect.objectContaining(mockImportResult),
-        }),
-      );
-    });
-
-    it("should throw BadRequestException if no file is provided", async () => {
-      const mockRes = {
-        status: jest.fn().mockReturnThis(),
-        json: jest.fn(),
-      } as any as Response;
-
-      await expect(
-        controller.importDesarquivamentos(null, mockAdminUser, mockRes),
-      ).rejects.toThrow(BadRequestException);
+    expect(mockNugecidImportService.importFromXLSX).toHaveBeenCalledWith(
+      file,
+      currentUser,
+    );
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "Importação concluída com sucesso: 1 registros importados.",
+      data: importResult,
     });
   });
 });

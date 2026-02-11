@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { SystemSettings } from "../entities/system-settings.entity";
@@ -50,13 +50,17 @@ export class SystemSettingsService {
   ): Promise<SystemSettings> {
     const settings = await this.getSettings();
 
-    this.logger.log(`Valores recebidos para atualização: ${JSON.stringify(updateDto)}`);
+    this.logger.log(
+      `Valores recebidos para atualização: ${JSON.stringify(updateDto)}`,
+    );
     this.logger.log(`Configurações antes: ${JSON.stringify(settings)}`);
 
     // Atualiza apenas os campos fornecidos
     Object.assign(settings, updateDto);
 
-    this.logger.log(`Configurações depois de assign: ${JSON.stringify(settings)}`);
+    this.logger.log(
+      `Configurações depois de assign: ${JSON.stringify(settings)}`,
+    );
 
     const updatedSettings = await this.systemSettingsRepository.save(settings);
 

@@ -133,11 +133,7 @@ export class NugecidDocxService {
       byId.set(item.id, item);
     }
 
-    if (
-      base.id &&
-      this.isPrintableStatus(base.status) &&
-      !byId.has(base.id)
-    ) {
+    if (base.id && this.isPrintableStatus(base.status) && !byId.has(base.id)) {
       byId.set(base.id, base);
     }
 
@@ -165,13 +161,13 @@ export class NugecidDocxService {
   private filterDesarquivados(
     itens: DesarquivamentoTypeOrmEntity[],
   ): DesarquivamentoTypeOrmEntity[] {
-    return itens.filter(
-      (item) => this.isPrintableStatus(item.status),
-    );
+    return itens.filter((item) => this.isPrintableStatus(item.status));
   }
 
   private isPrintableStatus(status?: string | null): boolean {
-    const normalized = String(status ?? "").trim().toUpperCase();
+    const normalized = String(status ?? "")
+      .trim()
+      .toUpperCase();
     return this.printableStatuses.includes(normalized);
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CheckSquare, Plus, Trash2, Check, X } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -185,7 +185,7 @@ export const ChecklistSection: React.FC<ChecklistSectionProps> = ({ taskId }) =>
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('Checklist');
 
-  const fetchChecklists = async () => {
+  const fetchChecklists = useCallback(async () => {
     try {
       const data = await kanbanService.getChecklists(taskId);
       setChecklists(data);
@@ -194,11 +194,11 @@ export const ChecklistSection: React.FC<ChecklistSectionProps> = ({ taskId }) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [taskId]);
 
   useEffect(() => {
     fetchChecklists();
-  }, [taskId]);
+  }, [fetchChecklists]);
 
   const handleCreateChecklist = async () => {
     if (!newTitle.trim()) return;

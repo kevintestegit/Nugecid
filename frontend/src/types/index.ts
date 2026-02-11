@@ -1,51 +1,51 @@
 // Enums
 
 export enum StatusDesarquivamento {
-  FINALIZADO = 'FINALIZADO',
-  DESARQUIVADO = 'DESARQUIVADO',
-  NAO_COLETADO = 'NAO_COLETADO',
-  SOLICITADO = 'SOLICITADO',
-  REARQUIVAMENTO_SOLICITADO = 'REARQUIVAMENTO_SOLICITADO',
-  RETIRADO_PELO_SETOR = 'RETIRADO_PELO_SETOR',
-  NAO_LOCALIZADO = 'NAO_LOCALIZADO',
+  FINALIZADO = "FINALIZADO",
+  DESARQUIVADO = "DESARQUIVADO",
+  NAO_COLETADO = "NAO_COLETADO",
+  SOLICITADO = "SOLICITADO",
+  REARQUIVAMENTO_SOLICITADO = "REARQUIVAMENTO_SOLICITADO",
+  RETIRADO_PELO_SETOR = "RETIRADO_PELO_SETOR",
+  NAO_LOCALIZADO = "NAO_LOCALIZADO",
 }
 
 export enum TipoDesarquivamento {
-  FISICO = 'FISICO',
-  DIGITAL = 'DIGITAL',
-  NAO_LOCALIZADO = 'NAO_LOCALIZADO',
+  FISICO = "FISICO",
+  DIGITAL = "DIGITAL",
+  NAO_LOCALIZADO = "NAO_LOCALIZADO",
 }
 
 export enum TipoSolicitacao {
-  DESARQUIVAMENTO = 'DESARQUIVAMENTO',
-  COPIA = 'COPIA',
-  VISTA = 'VISTA',
-  CERTIDAO = 'CERTIDAO',
+  DESARQUIVAMENTO = "DESARQUIVAMENTO",
+  COPIA = "COPIA",
+  VISTA = "VISTA",
+  CERTIDAO = "CERTIDAO",
 }
 
 export enum UserRole {
-  ADMIN = 'admin',
-  COORDENADOR = 'coordenador',
-  NUGECID_OPERATOR = 'nugecid_operator',
-  USUARIO = 'usuario',
+  ADMIN = "admin",
+  COORDENADOR = "coordenador",
+  NUGECID_OPERATOR = "nugecid_operator",
+  USUARIO = "usuario",
 }
 
 export enum PrioridadeTarefa {
-  BAIXA = 'baixa',
-  MEDIA = 'media',
-  ALTA = 'alta',
-  CRITICA = 'critica',
+  BAIXA = "baixa",
+  MEDIA = "media",
+  ALTA = "alta",
+  CRITICA = "critica",
 }
 
 export enum StatusTarefa {
-  PENDENTE = 'pendente',
-  EM_ANDAMENTO = 'em_andamento',
-  CONCLUIDA = 'concluida',
-  CANCELADA = 'cancelada',
+  PENDENTE = "pendente",
+  EM_ANDAMENTO = "em_andamento",
+  CONCLUIDA = "concluida",
+  CANCELADA = "cancelada",
 }
 
 export interface UserSettings {
-  theme?: 'light' | 'dark';
+  theme?: "light" | "dark";
   showEmail?: boolean;
   showPhone?: boolean;
   autoSave?: boolean;
@@ -58,6 +58,7 @@ export interface User {
   id: number;
   nome: string;
   usuario: string;
+  email?: string;
   matricula?: string | null;
   avatarUrl?: string | null;
   avatar?: string | null;
@@ -68,7 +69,7 @@ export interface User {
     description: string;
     permissions: string[];
     settings?: {
-      theme?: 'light' | 'dark';
+      theme?: "light" | "dark";
       notifications?: {
         email?: boolean;
         push?: boolean;
@@ -80,12 +81,16 @@ export interface User {
   ativo: boolean;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
 }
 
 export interface Desarquivamento {
   id: number;
+  codigoBarras?: string;
   numeroSolicitacao: number;
+  tipo?: TipoSolicitacao | string;
   tipoDesarquivamento: TipoDesarquivamento;
+  desarquivamentoFisicoDigital?: TipoDesarquivamento;
   status: StatusDesarquivamento;
   nomeCompleto: string;
   numeroNicLaudoAuto: string;
@@ -101,6 +106,7 @@ export interface Desarquivamento {
   solicitacaoProrrogacao: boolean;
   solicitacaoProrrogacaoTexto?: string;
   prazoDesarquivamento?: string;
+  prazoAtendimento?: string;
   prazoVencimento?: string;
   justificativa?: string;
   dadosAdicionais?: string;
@@ -176,7 +182,7 @@ export interface QueryDesarquivamentoDto {
   instituto?: string;
   vencidos?: boolean;
   sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
+  sortOrder?: "ASC" | "DESC";
   incluirExcluidos?: boolean;
   formato?: string;
 }
@@ -332,18 +338,28 @@ export interface Coluna {
 export interface Tarefa {
   id: number;
   projeto_id: number;
+  projetoId?: number;
   coluna_id: number;
+  colunaId?: number;
   titulo: string;
   descricao?: string;
   responsavel_id?: number;
+  responsavelId?: number;
   responsavel_ids?: number[];
+  responsavelIds?: number[];
   criador_id: number;
+  criadorId?: number;
   prazo?: string;
   prioridade: PrioridadeTarefa;
+  status?: StatusTarefa;
+  statusTarefa?: StatusTarefa;
+  observacoes?: string;
   ordem: number;
   tags: string[];
   data_criacao: string;
   data_atualizacao: string;
+  createdAt?: string;
+  updatedAt?: string;
   projeto?: Projeto;
   coluna?: Coluna;
   responsavel?: User;
@@ -378,9 +394,9 @@ export interface HistoricoTarefa {
 }
 
 // DTOs para Tarefas
-export interface CreateTarefaDto {
-  projeto_id: number;
-  coluna_id: number;
+export interface CreateTarefaDto extends Record<string, unknown> {
+  projeto_id?: number;
+  coluna_id?: number;
   titulo: string;
   descricao?: string;
   responsavel_id?: number;
@@ -392,7 +408,9 @@ export interface CreateTarefaDto {
   tags?: string[];
 }
 
-export interface UpdateTarefaDto extends Partial<CreateTarefaDto> {
+export interface UpdateTarefaDto
+  extends Partial<CreateTarefaDto>,
+    Record<string, unknown> {
   ordem?: number;
 }
 
@@ -406,15 +424,59 @@ export interface QueryTarefaDto {
   limit?: number;
   search?: string;
   projeto_id?: number;
+  projetoId?: number;
   coluna_id?: number;
+  colunaId?: number;
   responsavel_id?: number;
+  responsavelId?: number;
   criador_id?: number;
+  criadorId?: number;
   prioridade?: PrioridadeTarefa | PrioridadeTarefa[];
   prazo_inicio?: string;
   prazo_fim?: string;
   tags?: string[];
   sortBy?: string;
-  sortOrder?: 'ASC' | 'DESC';
+  sortOrder?: "ASC" | "DESC";
+  incluirExcluidas?: boolean;
+}
+
+export type TarefaComentario = ComentarioTarefa;
+
+export interface TarefaChecklist {
+  id: number;
+  tarefaId: number;
+  titulo: string;
+  itens?: Array<{
+    id: number;
+    texto: string;
+    concluido: boolean;
+  }>;
+}
+
+export interface TarefaAnexo {
+  id: number;
+  tarefaId: number;
+  nomeArquivo: string;
+  caminhoArquivo?: string;
+  tipo?: string;
+  tamanho?: number;
+}
+
+export interface ImportResultDto {
+  fileName: string;
+  totalRecords: number;
+  totalLines?: number;
+  successCount: number;
+  errorCount: number;
+  processingTime?: string;
+  errors?: Array<{
+    row?: number;
+    line?: number;
+    error?: string;
+    message?: string;
+    data?: unknown;
+    details?: unknown;
+  }>;
 }
 
 export interface CreateProjetoDto {
@@ -442,7 +504,13 @@ export interface TarefasDashboardStats {
 // Global Search Types
 export interface SearchResult {
   id: number;
-  type: 'desarquivamento' | 'usuario' | 'tarefa' | 'projeto' | 'custodia';
+  type:
+    | "desarquivamento"
+    | "usuario"
+    | "tarefa"
+    | "projeto"
+    | "custodia"
+    | "pasta";
   title: string;
   subtitle?: string;
   description?: string;
@@ -464,4 +532,5 @@ export interface SearchResponse {
   total: number;
   query: string;
   typesCounts?: Record<string, number>;
+  data?: SearchResult[];
 }

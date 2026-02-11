@@ -4,13 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import {
-  Repository,
-  Not,
-  IsNull,
-  LessThanOrEqual,
-  MoreThanOrEqual,
-} from "typeorm";
+import { Repository, LessThanOrEqual } from "typeorm";
 import { SystemAnnouncement, AnnouncementViewed } from "../entities";
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from "../dto";
 import { User } from "../../users/entities/user.entity";

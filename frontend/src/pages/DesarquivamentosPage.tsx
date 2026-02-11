@@ -316,9 +316,15 @@ const DesarquivamentosPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_8%_10%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0))] dark:bg-[radial-gradient(120%_80%_at_8%_10%,rgba(14,116,144,0.24),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+      </div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
             Solicitações de Desarquivamento
@@ -328,12 +334,12 @@ const DesarquivamentosPage: React.FC = () => {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 flex gap-2">
-          <Button onClick={() => refetch()} variant="outline" size="sm">
+          <Button onClick={() => refetch()} variant="outline" size="sm" className="border-border/60 bg-background/70 backdrop-blur">
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
           {canDelete && (
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="border-border/60 bg-background/70 backdrop-blur">
               <Link to="/desarquivamentos/lixeira">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Lixeira
@@ -344,7 +350,7 @@ const DesarquivamentosPage: React.FC = () => {
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="border-border/60 bg-background/70 backdrop-blur">
                     <FileText className="h-4 w-4 mr-2" />
                     Planilha
                   </Button>
@@ -360,7 +366,7 @@ const DesarquivamentosPage: React.FC = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button asChild size="sm" className="hover:scale-100">
+              <Button asChild size="sm" className="hover:scale-100 bg-primary/90">
                 <Link to="/desarquivamentos/novo">
                   <Plus className="h-4 w-4 mr-2" />
                   Adicionar Registro
@@ -370,12 +376,16 @@ const DesarquivamentosPage: React.FC = () => {
           )}
         </div>
       </div>
+      </div>
 
       {/* Filters */}
-      <Card className="relative z-10">
+      <Card className="relative z-10 overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+              <Filter className="h-4 w-4 text-primary" />
+            </span>
             Filtros
           </CardTitle>
           <CardDescription>
@@ -385,7 +395,7 @@ const DesarquivamentosPage: React.FC = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <label htmlFor="search" className="text-sm font-medium">Buscar</label>
+              <label htmlFor="search" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Buscar</label>
               <SearchInput
                 id="search"
                 name="search"
@@ -395,7 +405,7 @@ const DesarquivamentosPage: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="status" className="text-sm font-medium">Status</label>
+              <label htmlFor="status" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Status</label>
               <Select value={statusFilter} onValueChange={handleStatusFilter}>
                 <SelectTrigger id="status" name="status">
                   <SelectValue placeholder="Todos os status" />
@@ -427,14 +437,14 @@ const DesarquivamentosPage: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="dateRange" className="text-sm font-medium">Período</label>
+              <label htmlFor="dateRange" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Período</label>
               <DateRangeInput
                 value={dateRange}
                 onChange={handleDateRangeChange}
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="tipoDesarquivamento" className="text-sm font-medium">Desarquivamento</label>
+              <label htmlFor="tipoDesarquivamento" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Desarquivamento</label>
               <Select value={tipoDesarquivamentoFilter} onValueChange={handleTipoDesarquivamentoFilter}>
                 <SelectTrigger id="tipoDesarquivamento" name="tipoDesarquivamento">
                   <SelectValue placeholder="Todos os tipos" />
@@ -451,7 +461,7 @@ const DesarquivamentosPage: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="instituto" className="text-sm font-medium">Instituto</label>
+              <label htmlFor="instituto" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Instituto</label>
               <Select value={institutoFilter} onValueChange={setInstitutoFilter}>
                 <SelectTrigger id="instituto" name="instituto">
                   <SelectValue placeholder="Todos os institutos" />
@@ -467,7 +477,7 @@ const DesarquivamentosPage: React.FC = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <label htmlFor="requerente" className="text-sm font-medium">Requerente</label>
+              <label htmlFor="requerente" className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Requerente</label>
               <Select value={requerenteFilter} onValueChange={setRequerenteFilter}>
                 <SelectTrigger id="requerente" name="requerente">
                   <SelectValue placeholder="Todos os requerentes" />
@@ -487,9 +497,10 @@ const DesarquivamentosPage: React.FC = () => {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardHeader>
-          <CardTitle>Solicitações</CardTitle>
+          <CardTitle className="text-base">Solicitações</CardTitle>
           <CardDescription>
             {data?.meta?.total
               ? `${data.meta.total} ${data.meta.total === 1 ? 'solicitação encontrada' : 'solicitações encontradas'}`

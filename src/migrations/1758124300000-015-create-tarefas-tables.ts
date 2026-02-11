@@ -226,12 +226,14 @@ export class CreateTarefasTables1758124300000 implements MigrationInterface {
       // Validar que table e trigger são identificadores válidos (apenas letras, números e underscore)
       const validIdentifier = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
       if (!validIdentifier.test(table) || !validIdentifier.test(trigger)) {
-        throw new Error(`Invalid identifier: table=${table}, trigger=${trigger}`);
+        throw new Error(
+          `Invalid identifier: table=${table}, trigger=${trigger}`,
+        );
       }
 
       const triggerExists = await queryRunner.query(
         `SELECT 1 FROM pg_trigger WHERE tgname = $1`,
-        [trigger]
+        [trigger],
       );
 
       if (!triggerExists.length) {

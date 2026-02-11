@@ -25,7 +25,6 @@ import {
 } from "./services";
 import {
   ProjetosController,
-  ProjetoMembrosController,
   ColunasController,
   TarefasController,
   ComentariosController,

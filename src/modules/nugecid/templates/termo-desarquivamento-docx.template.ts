@@ -11,8 +11,6 @@ import {
   AlignmentType,
   WidthType,
   BorderStyle,
-  HeadingLevel,
-  PageNumber,
   VerticalAlign,
   ShadingType,
   TableLayoutType,
@@ -55,22 +53,6 @@ const GRAY_SHADING = {
   color: "BFBFBF",
   fill: "BFBFBF",
 };
-
-async function loadLogoAsBase64(
-  logoPath: string,
-  logger: Logger,
-): Promise<string | null> {
-  try {
-    const fullPath = path.resolve(process.cwd(), logoPath);
-    if (fs.existsSync(fullPath)) {
-      const buffer = fs.readFileSync(fullPath);
-      return buffer.toString("base64");
-    }
-  } catch (error) {
-    logger.warn(`Não foi possível carregar logo: ${logoPath}`, error);
-  }
-  return null;
-}
 
 function createHeaderTable(
   rnLogoBuffer: Buffer | null,

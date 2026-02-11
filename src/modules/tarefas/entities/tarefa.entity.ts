@@ -111,7 +111,9 @@ export class Tarefa {
   @Column({ name: "parent_id", nullable: true })
   parentId: number | null;
 
-  @ManyToOne(() => Tarefa, (tarefa) => tarefa.subtarefas, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Tarefa, (tarefa) => tarefa.subtarefas, {
+    onDelete: "CASCADE",
+  })
   @JoinColumn({ name: "parent_id" })
   parent: Tarefa;
 

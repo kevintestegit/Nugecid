@@ -1,11 +1,23 @@
-import { useState } from 'react';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter } from '@/components/ui/AlertDialog';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
-import { useDesarquivamentosImport } from '@/hooks/useDesarquivamentosImport';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
-import { Loader2, CheckCircle, XCircle, FileWarning, Upload } from 'lucide-react';
+import { useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+} from "@/components/ui/AlertDialog";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
+import { useDesarquivamentosImport } from "@/hooks/useDesarquivamentosImport";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  FileWarning,
+  Upload,
+} from "lucide-react";
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -13,9 +25,15 @@ interface ImportModalProps {
   onImportSuccess: () => void;
 }
 
-export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalProps) => {
+export const ImportModal = ({
+  isOpen,
+  onClose,
+  onImportSuccess,
+}: ImportModalProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const { handleFileImport, isLoading, importResult, error } = useDesarquivamentosImport(onImportSuccess);
+  const { handleFileImport, isLoading, importResult, error } =
+    useDesarquivamentosImport(onImportSuccess);
+  const importErrors = importResult?.errors ?? [];
 
   const handleClose = () => {
     setSelectedFile(null);
@@ -43,26 +61,29 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
             Importar Planilha de Desarquivamentos
           </AlertDialogTitle>
         </AlertDialogHeader>
-        
+
         <div className="grid gap-4 py-4">
           <div className="grid w-full max-w-sm items-center gap-1.5">
             <Label htmlFor="planilha">Planilha (.xlsx ou .csv)</Label>
-            <Input 
-              id="planilha" 
-              type="file" 
-              accept=".xlsx,.csv" 
+            <Input
+              id="planilha"
+              type="file"
+              accept=".xlsx,.csv"
               onChange={handleFileChange}
               disabled={isLoading}
             />
             <p className="text-sm text-gray-500 mt-1">
-              Selecione um arquivo Excel (.xlsx) ou CSV (.csv) com os dados dos desarquivamentos.
+              Selecione um arquivo Excel (.xlsx) ou CSV (.csv) com os dados dos
+              desarquivamentos.
             </p>
           </div>
 
           {isLoading && (
             <div className="flex items-center justify-center p-4 bg-blue-50 rounded-lg">
               <Loader2 className="mr-2 h-8 w-8 animate-spin text-blue-600" />
-              <p className="text-blue-800">Processando planilha, por favor aguarde...</p>
+              <p className="text-blue-800">
+                Processando planilha, por favor aguarde...
+              </p>
             </div>
           )}
 
@@ -75,7 +96,9 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
           )}
 
           {importResult && (
-            <Alert variant={importResult.errorCount > 0 ? 'default' : 'default'}>
+            <Alert
+              variant={importResult.errorCount > 0 ? "default" : "default"}
+            >
               {importResult.errorCount === 0 ? (
                 <CheckCircle className="h-4 w-4 text-green-500" />
               ) : (
@@ -84,30 +107,50 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
               <AlertTitle>Relatório de Importação</AlertTitle>
               <AlertDescription>
                 <div className="space-y-2">
-                  <p><strong>Arquivo:</strong> {importResult.fileName || selectedFile?.name}</p>
-                  <p><strong>Total de Registros:</strong> {importResult.totalRecords}</p>
-                  <p className="text-green-600"><strong>Sucessos:</strong> {importResult.successCount}</p>
+                  <p>
+                    <strong>Arquivo:</strong>{" "}
+                    {importResult.fileName || selectedFile?.name}
+                  </p>
+                  <p>
+                    <strong>Total de Registros:</strong>{" "}
+                    {importResult.totalRecords}
+                  </p>
+                  <p className="text-green-600">
+                    <strong>Sucessos:</strong> {importResult.successCount}
+                  </p>
                   {importResult.errorCount > 0 && (
-                    <p className="text-red-600"><strong>Falhas:</strong> {importResult.errorCount}</p>
+                    <p className="text-red-600">
+                      <strong>Falhas:</strong> {importResult.errorCount}
+                    </p>
                   )}
                   {importResult.processingTime && (
-                    <p><strong>Tempo de Processamento:</strong> {importResult.processingTime}</p>
+                    <p>
+                      <strong>Tempo de Processamento:</strong>{" "}
+                      {importResult.processingTime}
+                    </p>
                   )}
-                  
-                  {importResult.errors && importResult.errors.length > 0 && (
+
+                  {importErrors.length > 0 && (
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-bold text-sm">Detalhes dos Erros ({importResult.errors.length}):</h4>
+                        <h4 className="font-bold text-sm">
+                          Detalhes dos Erros ({importErrors.length}):
+                        </h4>
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const errosTexto = importResult.errors
-                                .map((err: any) => `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`)
-                                .join('\n');
+                              const errosTexto = importErrors
+                                .map(
+                                  (err: any) =>
+                                    `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`,
+                                )
+                                .join("\n");
                               navigator.clipboard.writeText(errosTexto);
-                              alert('Erros copiados para área de transferência!');
+                              alert(
+                                "Erros copiados para área de transferência!",
+                              );
                             }}
                           >
                             📋 Copiar
@@ -116,12 +159,17 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const errosTexto = importResult.errors
-                                .map((err: any) => `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`)
-                                .join('\n');
-                              const blob = new Blob([errosTexto], { type: 'text/plain' });
+                              const errosTexto = importErrors
+                                .map(
+                                  (err: any) =>
+                                    `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`,
+                                )
+                                .join("\n");
+                              const blob = new Blob([errosTexto], {
+                                type: "text/plain",
+                              });
                               const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
+                              const a = document.createElement("a");
                               a.href = url;
                               a.download = `erros_importacao_${new Date().toISOString().slice(0, 10)}.txt`;
                               a.click();
@@ -134,20 +182,26 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
                       </div>
                       <div className="max-h-60 overflow-y-auto mt-2 p-3 bg-red-50 border border-red-200 rounded">
                         <ul className="space-y-2">
-                          {importResult.errors.map((err: any, index: number) => (
-                            <li key={index} className="text-sm border-b border-red-100 pb-2 last:border-0">
+                          {importErrors.map((err: any, index: number) => (
+                            <li
+                              key={index}
+                              className="text-sm border-b border-red-100 pb-2 last:border-0"
+                            >
                               <div className="font-semibold text-red-700">
                                 📍 Linha {err.line || err.row}:
                               </div>
                               <div className="text-red-600 mt-1">
-                                {err.error || err.details?.message || JSON.stringify(err.details)}
+                                {err.error ||
+                                  err.details?.message ||
+                                  JSON.stringify(err.details)}
                               </div>
                             </li>
                           ))}
                         </ul>
                       </div>
                       <p className="text-sm text-red-600 mt-2 font-semibold">
-                        ⚠️ Nenhum registro foi importado. Corrija os erros na planilha e tente novamente.
+                        ⚠️ Nenhum registro foi importado. Corrija os erros na
+                        planilha e tente novamente.
                       </p>
                     </div>
                   )}
@@ -156,15 +210,15 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
             </Alert>
           )}
         </div>
-        
+
         <AlertDialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
-            {importResult ? 'Fechar' : 'Cancelar'}
+            {importResult ? "Fechar" : "Cancelar"}
           </Button>
-          
+
           {!importResult && (
-            <Button 
-              onClick={handleUpload} 
+            <Button
+              onClick={handleUpload}
               disabled={!selectedFile || isLoading}
               className="bg-blue-600 hover:bg-blue-700"
             >

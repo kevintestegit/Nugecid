@@ -1,5 +1,5 @@
 import brasaorn from '@/components/img/Brasão-RN.png';
-import brasaoitep from '@/components/img/Brasão-ITEP.png';
+import brasaoitep from '@/components/img/brasao-itep-optimized.png';
 
 export interface RearquivamentoItem {
   numeroNicLaudoAuto: string;
@@ -149,19 +149,12 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
       text-align: center;
     }
 
-    /* Cabeçalho institucional repete em todas as páginas */
     table.documento-completo {
       width: 100%;
       border-collapse: collapse;
     }
-    table.documento-completo thead {
-      display: table-header-group;
-    }
-    table.documento-completo tfoot {
-      display: table-footer-group;
-    }
     table.documento-completo thead td,
-    table.documento-completo tfoot td {
+    table.documento-completo tbody td {
       border: none;
       padding: 0;
     }
@@ -173,18 +166,19 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
       }
       body {
         margin: 0;
-        padding: 10mm;
+        /* reserva espaço para o rodapé fixo no final da página */
+        padding: 10mm 10mm 38mm 10mm;
       }
       .faixa {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-      /* Garante que o cabeçalho e rodapé repitam em cada página */
-      table.documento-completo thead {
-        display: table-header-group;
-      }
-      table.documento-completo tfoot {
-        display: table-footer-group;
+      .print-footer {
+        position: fixed;
+        left: 10mm;
+        right: 10mm;
+        bottom: 10mm;
+        margin-top: 0;
       }
     }
   </style>
@@ -214,21 +208,6 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
         </td>
       </tr>
     </thead>
-    <tfoot>
-      <tr>
-        <td>
-          <div class="print-footer fs10 center">
-            <hr style="border: none; border-top: 1px solid #000; margin-bottom: 10pt;" />
-            <div class="rodape fs10 center" style="line-height: 1.3;">
-              <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
-              <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
-              <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
-              <p>Email: arquivogeral@pci.rn.gov.br</p>
-            </div>
-          </div>
-        </td>
-      </tr>
-    </tfoot>
     <tbody>
       <tr>
         <td>
@@ -263,6 +242,15 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
       </tr>
     </tbody>
   </table>
+  <div class="print-footer fs10 center">
+    <hr style="border: none; border-top: 1px solid #000; margin-bottom: 10pt;" />
+    <div class="rodape fs10 center" style="line-height: 1.3;">
+      <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
+      <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
+      <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
+      <p>Email: arquivogeral@pci.rn.gov.br</p>
+    </div>
+  </div>
 </body>
 </html>`;
 };

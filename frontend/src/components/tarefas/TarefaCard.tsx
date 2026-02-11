@@ -1,31 +1,31 @@
-import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { Badge } from '@/components/ui'
-import { Button } from '@/components/ui'
-import { 
-  Clock, 
-  Calendar, 
-  Edit, 
-  Trash2, 
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Badge } from "@/components/ui";
+import { Button } from "@/components/ui";
+import {
+  Clock,
+  Calendar,
+  Edit,
+  Trash2,
   CheckCircle,
   Circle,
   PlayCircle,
   XCircle,
   AlertTriangle,
-  Flag
-} from 'lucide-react'
-import { Tarefa, StatusTarefa, PrioridadeTarefa } from '@/types'
-import { Avatar, AvatarGroup } from '@/components/kanban/Avatar'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+  Flag,
+} from "lucide-react";
+import { Tarefa, StatusTarefa, PrioridadeTarefa } from "@/types";
+import { Avatar, AvatarGroup } from "@/components/kanban/Avatar";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface TarefaCardProps {
-  tarefa: Tarefa
-  onEdit?: (tarefa: Tarefa) => void
-  onDelete?: (id: number) => void
-  onStatusChange?: (id: number, status: StatusTarefa) => void
-  showActions?: boolean
-  compact?: boolean
+  tarefa: Tarefa;
+  onEdit?: (tarefa: Tarefa) => void;
+  onDelete?: (id: number) => void;
+  onStatusChange?: (id: number, status: StatusTarefa) => void;
+  showActions?: boolean;
+  compact?: boolean;
 }
 
 const TarefaCard: React.FC<TarefaCardProps> = ({
@@ -34,98 +34,107 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
   onDelete,
   onStatusChange,
   showActions = true,
-  compact = false
+  compact = false,
 }) => {
+  const statusAtual =
+    tarefa.status ?? tarefa.statusTarefa ?? StatusTarefa.PENDENTE;
   const responsaveis = tarefa.responsaveis?.length
     ? tarefa.responsaveis
     : tarefa.responsavel
       ? [tarefa.responsavel]
-      : []
+      : [];
   const getStatusIcon = (status: StatusTarefa) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
-        return <Circle className="h-4 w-4" />
+        return <Circle className="h-4 w-4" />;
       case StatusTarefa.EM_ANDAMENTO:
-        return <PlayCircle className="h-4 w-4" />
+        return <PlayCircle className="h-4 w-4" />;
       case StatusTarefa.CONCLUIDA:
-        return <CheckCircle className="h-4 w-4" />
+        return <CheckCircle className="h-4 w-4" />;
       case StatusTarefa.CANCELADA:
-        return <XCircle className="h-4 w-4" />
+        return <XCircle className="h-4 w-4" />;
       default:
-        return <Circle className="h-4 w-4" />
+        return <Circle className="h-4 w-4" />;
     }
-  }
+  };
 
   const getStatusColor = (status: StatusTarefa) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return "bg-gray-100 text-gray-800 border-gray-200";
       case StatusTarefa.EM_ANDAMENTO:
-        return 'bg-blue-100 text-blue-800 border-blue-200'
+        return "bg-blue-100 text-blue-800 border-blue-200";
       case StatusTarefa.CONCLUIDA:
-        return 'bg-green-100 text-green-800 border-green-200'
+        return "bg-green-100 text-green-800 border-green-200";
       case StatusTarefa.CANCELADA:
-        return 'bg-red-100 text-red-800 border-red-200'
+        return "bg-red-100 text-red-800 border-red-200";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
-  }
+  };
 
   const getPrioridadeColor = (prioridade: PrioridadeTarefa) => {
     switch (prioridade) {
       case PrioridadeTarefa.BAIXA:
-        return 'text-green-600'
+        return "text-green-600";
       case PrioridadeTarefa.MEDIA:
-        return 'text-yellow-600'
+        return "text-yellow-600";
       case PrioridadeTarefa.ALTA:
-        return 'text-orange-600'
+        return "text-orange-600";
       case PrioridadeTarefa.CRITICA:
-        return 'text-red-600'
+        return "text-red-600";
       default:
-        return 'text-gray-600'
+        return "text-gray-600";
     }
-  }
+  };
 
   const getPrioridadeLabel = (prioridade: PrioridadeTarefa) => {
     switch (prioridade) {
       case PrioridadeTarefa.BAIXA:
-        return 'Baixa'
+        return "Baixa";
       case PrioridadeTarefa.MEDIA:
-        return 'Média'
+        return "Média";
       case PrioridadeTarefa.ALTA:
-        return 'Alta'
+        return "Alta";
       case PrioridadeTarefa.CRITICA:
-        return 'Crítica'
+        return "Crítica";
       default:
-        return 'Não definida'
+        return "Não definida";
     }
-  }
+  };
 
   const getStatusLabel = (status: StatusTarefa) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
-        return 'Pendente'
+        return "Pendente";
       case StatusTarefa.EM_ANDAMENTO:
-        return 'Em Andamento'
+        return "Em Andamento";
       case StatusTarefa.CONCLUIDA:
-        return 'Concluída'
+        return "Concluída";
       case StatusTarefa.CANCELADA:
-        return 'Cancelada'
+        return "Cancelada";
       default:
-        return 'Não definido'
+        return "Não definido";
     }
-  }
+  };
 
-  const isAtrasada = tarefa.prazo && new Date(tarefa.prazo) < new Date() && tarefa.statusTarefa !== StatusTarefa.CONCLUIDA
+  const isAtrasada =
+    tarefa.prazo &&
+    new Date(tarefa.prazo) < new Date() &&
+    tarefa.statusTarefa !== StatusTarefa.CONCLUIDA;
 
   return (
-    <Card className={`transition-all duration-200 hover:shadow-md ${
-      isAtrasada ? 'border-red-200 bg-red-50' : ''
-    } ${compact ? 'p-2' : ''}`}>
-      <CardHeader className={compact ? 'pb-2' : 'pb-3'}>
+    <Card
+      className={`transition-all duration-200 hover:shadow-md ${
+        isAtrasada ? "border-red-200 bg-red-50" : ""
+      } ${compact ? "p-2" : ""}`}
+    >
+      <CardHeader className={compact ? "pb-2" : "pb-3"}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <CardTitle className={`${compact ? 'text-sm' : 'text-base'} font-medium`}>
+            <CardTitle
+              className={`${compact ? "text-sm" : "text-base"} font-medium`}
+            >
               {tarefa.titulo}
               {isAtrasada && (
                 <AlertTriangle className="inline-block ml-2 h-4 w-4 text-red-500" />
@@ -138,27 +147,29 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
             )}
           </div>
           <div className="flex items-center gap-2 ml-4">
-            <Badge className={`${getStatusColor(tarefa.status)} text-xs`}>
+            <Badge className={`${getStatusColor(statusAtual)} text-xs`}>
               <span className="flex items-center gap-1">
-                {getStatusIcon(tarefa.status)}
-                {getStatusLabel(tarefa.statusTarefa)}
+                {getStatusIcon(statusAtual)}
+                {getStatusLabel(statusAtual)}
               </span>
             </Badge>
           </div>
         </div>
       </CardHeader>
-      
-      <CardContent className={compact ? 'pt-0' : 'pt-0'}>
+
+      <CardContent className={compact ? "pt-0" : "pt-0"}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 text-sm text-gray-600">
             {/* Prioridade */}
             <div className="flex items-center gap-1">
-              <Flag className={`h-4 w-4 ${getPrioridadeColor(tarefa.prioridade)}`} />
+              <Flag
+                className={`h-4 w-4 ${getPrioridadeColor(tarefa.prioridade)}`}
+              />
               <span className={getPrioridadeColor(tarefa.prioridade)}>
                 {getPrioridadeLabel(tarefa.prioridade)}
               </span>
             </div>
-            
+
             {/* Responsáveis */}
             {responsaveis.length > 0 && (
               <div className="flex items-center gap-2">
@@ -174,20 +185,24 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
                 </span>
               </div>
             )}
-            
+
             {/* Prazo */}
             {tarefa.prazo && (
-              <div className={`flex items-center gap-1 ${
-                isAtrasada ? 'text-red-600 font-medium' : ''
-              }`}>
+              <div
+                className={`flex items-center gap-1 ${
+                  isAtrasada ? "text-red-600 font-medium" : ""
+                }`}
+              >
                 <Calendar className="h-4 w-4" />
                 <span>
-                  {format(new Date(tarefa.prazo), 'dd/MM/yyyy', { locale: ptBR })}
+                  {format(new Date(tarefa.prazo), "dd/MM/yyyy", {
+                    locale: ptBR,
+                  })}
                 </span>
               </div>
             )}
           </div>
-          
+
           {/* Ações */}
           {showActions && (
             <div className="flex items-center gap-1">
@@ -214,7 +229,7 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
             </div>
           )}
         </div>
-        
+
         {/* Informações adicionais em modo compacto */}
         {compact && tarefa.descricao && (
           <p className="text-xs text-gray-500 mt-2 line-clamp-1">
@@ -223,7 +238,7 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
         )}
       </CardContent>
     </Card>
-  )
-}
+  );
+};
 
-export default TarefaCard
+export default TarefaCard;

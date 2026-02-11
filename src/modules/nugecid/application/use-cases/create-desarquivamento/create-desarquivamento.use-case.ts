@@ -1,15 +1,11 @@
 import { Injectable, Inject, Logger } from "@nestjs/common";
 import {
   DesarquivamentoDomain,
-  DesarquivamentoId,
-  CodigoBarras,
-  NumeroRegistro,
-  TipoSolicitacao,
-  TipoSolicitacaoEnum,
   StatusDesarquivamento,
   IDesarquivamentoRepository,
 } from "../../../domain";
 import { TipoDesarquivamentoEnum } from "../../../domain/enums/tipo-desarquivamento.enum";
+import { CodigoBarras } from "../../../domain/value-objects";
 
 import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
 
@@ -99,7 +95,7 @@ export class CreateDesarquivamentoUseCase {
       `[NUGECID] Iniciando criação de desarquivamento para usuário ${sanitizedRequest.criadoPorId}`,
     );
     this.logger.log(
-      `[NUGECID] dadosAdicionais recebido: ${sanitizedRequest.dadosAdicionais || 'VAZIO'}`,
+      `[NUGECID] dadosAdicionais recebido: ${sanitizedRequest.dadosAdicionais || "VAZIO"}`,
     );
     this.logger.debug(
       `[NUGECID] Dados recebidos: ${JSON.stringify({
@@ -139,9 +135,11 @@ export class CreateDesarquivamentoUseCase {
           : undefined,
         setorDemandante: sanitizedRequest.setorDemandante,
         servidorResponsavel: sanitizedRequest.servidorResponsavel,
-        finalidadeDesarquivamento: sanitizedRequest.finalidadeDesarquivamento ?? "",
+        finalidadeDesarquivamento:
+          sanitizedRequest.finalidadeDesarquivamento ?? "",
         solicitacaoProrrogacao: sanitizedRequest.solicitacaoProrrogacao,
-        solicitacaoProrrogacaoTexto: sanitizedRequest.solicitacaoProrrogacaoTexto,
+        solicitacaoProrrogacaoTexto:
+          sanitizedRequest.solicitacaoProrrogacaoTexto,
         dadosAdicionais: sanitizedRequest.dadosAdicionais,
         urgente: sanitizedRequest.urgente,
         numeroOficio: sanitizedRequest.numeroOficio,

@@ -1,30 +1,41 @@
-import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { Button } from '@/components/ui'
-import { Input } from '@/components/ui'
-import { Label } from '@/components/ui'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
-import { Badge } from '@/components/ui'
-import { 
-  Filter, 
-  X, 
-  Search, 
-  Calendar, 
-  User, 
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { Input } from "@/components/ui";
+import { Label } from "@/components/ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui";
+import { Badge } from "@/components/ui";
+import {
+  Filter,
+  X,
+  Search,
+  Calendar,
+  User,
   Flag,
-  RefreshCw
-} from 'lucide-react'
-import { QueryTarefaDto, StatusTarefa, PrioridadeTarefa, User as UserType } from '@/types'
+  RefreshCw,
+} from "lucide-react";
+import {
+  QueryTarefaDto,
+  StatusTarefa,
+  PrioridadeTarefa,
+  User as UserType,
+} from "@/types";
 
 interface TarefaFiltersProps {
-  filters: QueryTarefaDto
-  onFiltersChange: (filters: QueryTarefaDto) => void
-  usuarios?: UserType[]
-  projetos?: any[]
-  onClearFilters: () => void
-  loading?: boolean
-  showAdvanced?: boolean
-  onToggleAdvanced?: () => void
+  filters: QueryTarefaDto;
+  onFiltersChange: (filters: QueryTarefaDto) => void;
+  usuarios?: UserType[];
+  projetos?: any[];
+  onClearFilters: () => void;
+  loading?: boolean;
+  showAdvanced?: boolean;
+  onToggleAdvanced?: () => void;
 }
 
 const TarefaFilters: React.FC<TarefaFiltersProps> = ({
@@ -35,58 +46,61 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
   onClearFilters,
   loading = false,
   showAdvanced = false,
-  onToggleAdvanced
+  onToggleAdvanced,
 }) => {
   const handleFilterChange = (field: keyof QueryTarefaDto, value: any) => {
     onFiltersChange({
       ...filters,
       [field]: value,
-      page: 1 // Reset para primeira página quando filtrar
-    })
-  }
+      page: 1, // Reset para primeira página quando filtrar
+    });
+  };
 
   const getActiveFiltersCount = () => {
-    let count = 0
-    if (filters.search) count++
-    if (filters.responsavelId) count++
-    if (filters.criadorId) count++
-    if (filters.projetoId) count++
-    if (filters.prioridade) count++
-    if (filters.incluirExcluidas) count++
-    return count
-  }
+    let count = 0;
+    if (filters.search) count++;
+    if (filters.responsavelId) count++;
+    if (filters.criadorId) count++;
+    if (filters.projetoId) count++;
+    if (filters.prioridade) count++;
+    if (filters.incluirExcluidas) count++;
+    return count;
+  };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
-        return 'Pendente'
+        return "Pendente";
       case StatusTarefa.EM_ANDAMENTO:
-        return 'Em Andamento'
+        return "Em Andamento";
       case StatusTarefa.CONCLUIDA:
-        return 'Concluída'
+        return "Concluída";
       case StatusTarefa.CANCELADA:
-        return 'Cancelada'
+        return "Cancelada";
       default:
-        return 'Todos os status'
+        return "Todos os status";
     }
-  }
+  };
 
   const getPrioridadeLabel = (prioridade: string) => {
     switch (prioridade) {
       case PrioridadeTarefa.BAIXA:
-        return 'Baixa'
+        return "Baixa";
       case PrioridadeTarefa.MEDIA:
-        return 'Média'
+        return "Média";
       case PrioridadeTarefa.ALTA:
-        return 'Alta'
+        return "Alta";
       case PrioridadeTarefa.CRITICA:
-        return 'Crítica'
+        return "Crítica";
       default:
-        return 'Todas as prioridades'
+        return "Todas as prioridades";
     }
-  }
+  };
 
-  const activeFiltersCount = getActiveFiltersCount()
+  const activeFiltersCount = getActiveFiltersCount();
+  const prioridadeSelecionada = Array.isArray(filters.prioridade)
+    ? filters.prioridade[0]
+    : filters.prioridade;
 
   return (
     <Card>
@@ -103,12 +117,8 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
           </div>
           <div className="flex items-center gap-2">
             {onToggleAdvanced && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onToggleAdvanced}
-              >
-                {showAdvanced ? 'Ocultar' : 'Avançado'}
+              <Button variant="outline" size="sm" onClick={onToggleAdvanced}>
+                {showAdvanced ? "Ocultar" : "Avançado"}
               </Button>
             )}
             {activeFiltersCount > 0 && (
@@ -125,7 +135,7 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
           </div>
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {/* Busca */}
         <div className="space-y-2">
@@ -135,8 +145,8 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
             <Input
               id="search"
               placeholder="Buscar por título ou descrição..."
-              value={filters.search || ''}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={filters.search || ""}
+              onChange={(e) => handleFilterChange("search", e.target.value)}
               className="pl-10"
             />
           </div>
@@ -148,8 +158,13 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
           <div className="space-y-2">
             <Label htmlFor="responsavel">Responsável</Label>
             <Select
-                value={filters.responsavelId?.toString() || 'all'}
-                onValueChange={(value) => handleFilterChange('responsavelId', value && value !== 'all' ? parseInt(value) : undefined)}
+              value={filters.responsavelId?.toString() || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "responsavelId",
+                  value && value !== "all" ? parseInt(value) : undefined,
+                )
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os responsáveis" />
@@ -172,8 +187,13 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
           <div className="space-y-2">
             <Label htmlFor="prioridade">Prioridade</Label>
             <Select
-                value={filters.prioridade || 'all'}
-                onValueChange={(value) => handleFilterChange('prioridade', value && value !== 'all' ? value : undefined)}
+              value={prioridadeSelecionada || "all"}
+              onValueChange={(value) =>
+                handleFilterChange(
+                  "prioridade",
+                  value && value !== "all" ? value : undefined,
+                )
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todas as prioridades" />
@@ -197,8 +217,13 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
             <div className="space-y-2">
               <Label htmlFor="projeto">Projeto</Label>
               <Select
-                  value={filters.projetoId?.toString() || 'all'}
-                  onValueChange={(value) => handleFilterChange('projetoId', value && value !== 'all' ? parseInt(value) : undefined)}
+                value={filters.projetoId?.toString() || "all"}
+                onValueChange={(value) =>
+                  handleFilterChange(
+                    "projetoId",
+                    value && value !== "all" ? parseInt(value) : undefined,
+                  )
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os projetos" />
@@ -223,14 +248,19 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
               <Filter className="h-4 w-4" />
               Filtros Avançados
             </h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Criador */}
               <div className="space-y-2">
                 <Label htmlFor="criador">Criado por</Label>
                 <Select
-                    value={filters.criadorId?.toString() || 'all'}
-                    onValueChange={(value) => handleFilterChange('criadorId', value && value !== 'all' ? parseInt(value) : undefined)}
+                  value={filters.criadorId?.toString() || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange(
+                      "criadorId",
+                      value && value !== "all" ? parseInt(value) : undefined,
+                    )
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Todos os criadores" />
@@ -238,7 +268,10 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
                   <SelectContent>
                     <SelectItem value="all">Todos os criadores</SelectItem>
                     {usuarios.map((usuario) => (
-                      <SelectItem key={usuario.id} value={usuario.id.toString()}>
+                      <SelectItem
+                        key={usuario.id}
+                        value={usuario.id.toString()}
+                      >
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4" />
                           {usuario.nome}
@@ -253,25 +286,31 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
               <div className="space-y-2">
                 <Label htmlFor="ordenacao">Ordenar por</Label>
                 <Select
-                  value={`${filters.sortBy || 'createdAt'}-${filters.sortOrder || 'desc'}`}
+                  value={`${filters.sortBy || "createdAt"}-${filters.sortOrder || "desc"}`}
                   onValueChange={(value) => {
-                    const [sortBy, sortOrder] = value.split('-')
-                    handleFilterChange('sortBy', sortBy)
-                    handleFilterChange('sortOrder', sortOrder)
+                    const [sortBy, sortOrder] = value.split("-");
+                    handleFilterChange("sortBy", sortBy);
+                    handleFilterChange("sortOrder", sortOrder);
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Ordenação" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="createdAt-desc">Mais recentes</SelectItem>
+                    <SelectItem value="createdAt-desc">
+                      Mais recentes
+                    </SelectItem>
                     <SelectItem value="createdAt-asc">Mais antigas</SelectItem>
                     <SelectItem value="titulo-asc">Título (A-Z)</SelectItem>
                     <SelectItem value="titulo-desc">Título (Z-A)</SelectItem>
                     <SelectItem value="prazo-asc">Prazo (próximo)</SelectItem>
                     <SelectItem value="prazo-desc">Prazo (distante)</SelectItem>
-                    <SelectItem value="prioridade-desc">Prioridade (alta)</SelectItem>
-                    <SelectItem value="prioridade-asc">Prioridade (baixa)</SelectItem>
+                    <SelectItem value="prioridade-desc">
+                      Prioridade (alta)
+                    </SelectItem>
+                    <SelectItem value="prioridade-asc">
+                      Prioridade (baixa)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -283,10 +322,14 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
                 <input
                   type="checkbox"
                   checked={filters.incluirExcluidas || false}
-                  onChange={(e) => handleFilterChange('incluirExcluidas', e.target.checked)}
+                  onChange={(e) =>
+                    handleFilterChange("incluirExcluidas", e.target.checked)
+                  }
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm text-gray-700">Incluir tarefas excluídas</span>
+                <span className="text-sm text-gray-700">
+                  Incluir tarefas excluídas
+                </span>
               </label>
             </div>
           </div>
@@ -296,7 +339,9 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
         {activeFiltersCount > 0 && (
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm font-medium text-gray-700">Filtros ativos:</span>
+              <span className="text-sm font-medium text-gray-700">
+                Filtros ativos:
+              </span>
             </div>
             <div className="flex flex-wrap gap-2">
               {filters.search && (
@@ -304,7 +349,7 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
                   <Search className="h-3 w-3" />
                   Busca: {filters.search}
                   <button
-                    onClick={() => handleFilterChange('search', '')}
+                    onClick={() => handleFilterChange("search", "")}
                     className="ml-1 hover:bg-gray-200 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
@@ -314,9 +359,12 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
               {filters.responsavelId && (
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <User className="h-3 w-3" />
-                  Responsável: {usuarios.find(u => u.id === filters.responsavelId)?.nome}
+                  Responsável:{" "}
+                  {usuarios.find((u) => u.id === filters.responsavelId)?.nome}
                   <button
-                    onClick={() => handleFilterChange('responsavelId', undefined)}
+                    onClick={() =>
+                      handleFilterChange("responsavelId", undefined)
+                    }
                     className="ml-1 hover:bg-gray-200 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
@@ -326,9 +374,9 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
               {filters.prioridade && (
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <Flag className="h-3 w-3" />
-                  {getPrioridadeLabel(filters.prioridade)}
+                  {getPrioridadeLabel(prioridadeSelecionada as string)}
                   <button
-                    onClick={() => handleFilterChange('prioridade', undefined)}
+                    onClick={() => handleFilterChange("prioridade", undefined)}
                     className="ml-1 hover:bg-gray-200 rounded-full p-0.5"
                   >
                     <X className="h-3 w-3" />
@@ -340,7 +388,7 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
         )}
       </CardContent>
     </Card>
-  )
-}
+  );
+};
 
-export default TarefaFilters
+export default TarefaFilters;

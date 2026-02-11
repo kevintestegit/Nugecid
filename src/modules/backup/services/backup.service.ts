@@ -1,13 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Cron, CronExpression } from "@nestjs/schedule";
-import { exec, execFile } from "child_process";
+import { Cron } from "@nestjs/schedule";
+import { exec } from "child_process";
 import { promisify } from "util";
 import { promises as fs } from "fs";
 import { existsSync, statSync, readdirSync } from "fs";
 import * as path from "path";
-
-const execFileAsync = promisify(execFile);
 
 const execAsync = promisify(exec);
 
@@ -26,10 +24,25 @@ export class BackupService {
   private readonly logger = new Logger(BackupService.name);
   private readonly backupDir: string;
   private readonly maxBackupDays: number;
+  private readonly maxBackupFiles: number;
+  private readonly maxTotalSizeBytes: number;
 
   constructor(private configService: ConfigService) {
-    this.backupDir = path.resolve(process.cwd(), "backups");
-    this.maxBackupDays = 7; // Manter backups dos últimos 7 dias
+    this.backupDir = path.resolve(
+      process.cwd(),
+      this.configService.get<string>("BACKUP_DIR", "./backups"),
+    );
+    this.maxBackupDays = this.getPositiveNumberEnv("BACKUP_MAX_DAYS", 30);
+    this.maxBackupFiles = this.getPositiveNumberEnv("BACKUP_MAX_FILES", 120);
+    const maxSizeGb = this.getPositiveNumberEnv("BACKUP_MAX_SIZE_GB", 20);
+    this.maxTotalSizeBytes = Math.max(1, maxSizeGb) * 1024 * 1024 * 1024;
+  }
+
+  private getPositiveNumberEnv(key: string, defaultValue: number): number {
+    const raw = this.configService.get<string | number>(key);
+    if (raw === undefined || raw === null || raw === "") return defaultValue;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
   }
 
   private async ensureBackupDirectory(): Promise<void> {
@@ -54,12 +67,13 @@ export class BackupService {
         this.logger.log(
           `✅ Backup automático completo com sucesso: ${result.filename}`,
         );
-        await this.cleanOldBackups();
       } else {
         this.logger.error(`❌ Falha no backup automático: ${result.error}`);
       }
     } catch (error) {
       this.logger.error("Erro ao executar backup automático:", error);
+    } finally {
+      await this.cleanOldBackups();
     }
   }
 
@@ -85,6 +99,26 @@ export class BackupService {
       }
     } catch (error) {
       this.logger.error("Erro ao executar backup de desarquivamentos:", error);
+    } finally {
+      await this.cleanOldBackups();
+    }
+  }
+
+  /**
+   * Limpeza de segurança (diária) para evitar crescimento contínuo de backup.
+   */
+  @Cron("30 3 * * *", {
+    name: "daily-backup-cleanup",
+    timeZone: "America/Fortaleza",
+  })
+  async scheduledBackupCleanup(): Promise<void> {
+    try {
+      const deleted = await this.cleanOldBackups();
+      this.logger.log(
+        `🧹 Limpeza diária de backup concluída: ${deleted} item(ns)`,
+      );
+    } catch (error) {
+      this.logger.error("Erro na limpeza diária de backups:", error);
     }
   }
 
@@ -92,6 +126,7 @@ export class BackupService {
    * Cria um backup completo do banco de dados e arquivos
    */
   async createFullBackup(): Promise<BackupResult> {
+    await this.ensureBackupDirectory();
     const startTime = Date.now();
     const timestamp = new Date()
       .toISOString()
@@ -113,7 +148,7 @@ export class BackupService {
       this.logger.log(
         `Executando comando: ${command.replace(/password=\S+/gi, "password=***")}`,
       );
-      
+
       // Executa com senha via variável de ambiente (mais seguro)
       if (dbConfig.isDocker) {
         await execAsync(command);
@@ -229,6 +264,7 @@ export class BackupService {
    * Cria backup específico da tabela de desarquivamentos
    */
   async createDesarquivamentoBackup(): Promise<BackupResult> {
+    await this.ensureBackupDirectory();
     const startTime = Date.now();
     const timestamp = new Date()
       .toISOString()
@@ -291,6 +327,7 @@ export class BackupService {
    */
   async listBackups(): Promise<any[]> {
     try {
+      await this.ensureBackupDirectory();
       const files = readdirSync(this.backupDir);
       const backups = files
         .filter(
@@ -338,41 +375,121 @@ export class BackupService {
    */
   async cleanOldBackups(): Promise<number> {
     try {
+      await this.ensureBackupDirectory();
       const files = readdirSync(this.backupDir);
       const now = Date.now();
       const maxAge = this.maxBackupDays * 24 * 60 * 60 * 1000;
       let deletedCount = 0;
-
-      for (const file of files) {
-        if (
-          (file.endsWith(".sql") || file.endsWith(".tar.gz")) &&
-          file.startsWith("backup_")
-        ) {
+      const managedEntries = files
+        .filter(
+          (file) =>
+            ((file.endsWith(".sql") || file.endsWith(".tar.gz")) &&
+              file.startsWith("backup_")) ||
+            file.startsWith("uploads_old_"),
+        )
+        .map((file) => {
           const filepath = path.join(this.backupDir, file);
           const stats = statSync(filepath);
-          const age = now - stats.mtime.getTime();
+          const isDirectory = stats.isDirectory();
+          return {
+            file,
+            filepath,
+            isDirectory,
+            mtime: stats.mtime.getTime(),
+            sizeBytes: isDirectory
+              ? this.getDirectorySize(filepath)
+              : stats.size,
+          };
+        })
+        .sort((a, b) => a.mtime - b.mtime); // mais antigos primeiro
 
-          if (age > maxAge) {
-            await fs.unlink(filepath);
-            deletedCount++;
-            this.logger.log(`🗑️ Backup antigo removido: ${file}`);
-          }
+      // 1) Política por idade
+      for (const entry of managedEntries) {
+        const age = now - entry.mtime;
+        if (age <= maxAge) continue;
+        await this.removeBackupEntry(entry.filepath, entry.isDirectory);
+        deletedCount++;
+        this.logger.log(
+          `🗑️ Removido por idade (> ${this.maxBackupDays} dias): ${entry.file}`,
+        );
+      }
+
+      // Recalcular após remoção por idade
+      const refreshedEntries = readdirSync(this.backupDir)
+        .filter(
+          (file) =>
+            ((file.endsWith(".sql") || file.endsWith(".tar.gz")) &&
+              file.startsWith("backup_")) ||
+            file.startsWith("uploads_old_"),
+        )
+        .map((file) => {
+          const filepath = path.join(this.backupDir, file);
+          const stats = statSync(filepath);
+          const isDirectory = stats.isDirectory();
+          return {
+            file,
+            filepath,
+            isDirectory,
+            mtime: stats.mtime.getTime(),
+            sizeBytes: isDirectory
+              ? this.getDirectorySize(filepath)
+              : stats.size,
+          };
+        })
+        .sort((a, b) => b.mtime - a.mtime); // mais novos primeiro
+
+      // 2) Política por quantidade
+      if (
+        this.maxBackupFiles > 0 &&
+        refreshedEntries.length > this.maxBackupFiles
+      ) {
+        const overflow = refreshedEntries.slice(this.maxBackupFiles);
+        for (const entry of overflow) {
+          await this.removeBackupEntry(entry.filepath, entry.isDirectory);
+          deletedCount++;
+          this.logger.log(
+            `🗑️ Removido por quantidade (max ${this.maxBackupFiles}): ${entry.file}`,
+          );
         }
       }
 
-      // Limpar diretórios de uploads antigos
-      for (const file of files) {
-        if (file.startsWith("uploads_old_")) {
+      // 3) Política por tamanho total
+      const finalEntries = readdirSync(this.backupDir)
+        .filter(
+          (file) =>
+            ((file.endsWith(".sql") || file.endsWith(".tar.gz")) &&
+              file.startsWith("backup_")) ||
+            file.startsWith("uploads_old_"),
+        )
+        .map((file) => {
           const filepath = path.join(this.backupDir, file);
           const stats = statSync(filepath);
-          const age = now - stats.mtime.getTime();
+          const isDirectory = stats.isDirectory();
+          return {
+            file,
+            filepath,
+            isDirectory,
+            mtime: stats.mtime.getTime(),
+            sizeBytes: isDirectory
+              ? this.getDirectorySize(filepath)
+              : stats.size,
+          };
+        })
+        .sort((a, b) => a.mtime - b.mtime); // remover antigos primeiro
 
-          if (age > maxAge) {
-            await execAsync(`rm -rf "${filepath}"`);
-            deletedCount++;
-            this.logger.log(`🗑️ Backup de uploads antigo removido: ${file}`);
-          }
-        }
+      let totalSize = finalEntries.reduce(
+        (sum, item) => sum + item.sizeBytes,
+        0,
+      );
+      while (totalSize > this.maxTotalSizeBytes && finalEntries.length > 0) {
+        const oldest = finalEntries.shift();
+        if (!oldest) break;
+        await this.removeBackupEntry(oldest.filepath, oldest.isDirectory);
+        deletedCount++;
+        totalSize -= oldest.sizeBytes;
+        this.logger.log(
+          `🗑️ Removido por tamanho total (${this.formatBytes(totalSize)} / ${this.formatBytes(this.maxTotalSizeBytes)}): ${oldest.file}`,
+        );
       }
 
       if (deletedCount > 0) {
@@ -392,6 +509,7 @@ export class BackupService {
    * Restaura um backup específico (banco de dados e arquivos)
    */
   async restoreBackup(filename: string): Promise<BackupResult> {
+    await this.ensureBackupDirectory();
     const filepath = path.join(this.backupDir, filename);
     const startTime = Date.now();
     let tempSqlFile: string | null = null;
@@ -430,7 +548,7 @@ export class BackupService {
         this.logger.log("🔄 Restaurando banco de dados...");
         const dbConfig = this.getDatabaseConfig();
         const restoreCommand = this.buildRestoreCommand(dbConfig, tempSqlFile);
-        
+
         // Executa com senha via variável de ambiente (mais seguro)
         if (dbConfig.isDocker) {
           await execAsync(restoreCommand);
@@ -482,7 +600,7 @@ export class BackupService {
         this.logger.log("🔄 Restaurando apenas banco de dados...");
         const dbConfig = this.getDatabaseConfig();
         const command = this.buildRestoreCommand(dbConfig, filepath);
-        
+
         // Executa com senha via variável de ambiente (mais seguro)
         if (dbConfig.isDocker) {
           await execAsync(command);
@@ -520,7 +638,40 @@ export class BackupService {
         error: error.message,
         timestamp: new Date(),
       };
+    } finally {
+      await this.cleanOldBackups();
     }
+  }
+
+  private async removeBackupEntry(
+    filepath: string,
+    isDirectory: boolean,
+  ): Promise<void> {
+    if (isDirectory) {
+      await execAsync(`rm -rf "${filepath}"`);
+      return;
+    }
+    await fs.unlink(filepath);
+  }
+
+  private getDirectorySize(dirPath: string): number {
+    let total = 0;
+    const stack = [dirPath];
+    while (stack.length) {
+      const current = stack.pop();
+      if (!current) continue;
+      const entries = readdirSync(current);
+      for (const entry of entries) {
+        const fullPath = path.join(current, entry);
+        const stats = statSync(fullPath);
+        if (stats.isDirectory()) {
+          stack.push(fullPath);
+        } else {
+          total += stats.size;
+        }
+      }
+    }
+    return total;
   }
 
   /**

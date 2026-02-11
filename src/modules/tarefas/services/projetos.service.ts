@@ -267,7 +267,9 @@ export class ProjetosService {
     if (!projeto.canUserView(userId)) {
       const isAdmin = await this.isGlobalAdmin(userId);
       if (!isAdmin) {
-        throw new ForbiddenException("Você não tem permissão para acessar este projeto");
+        throw new ForbiddenException(
+          "Você não tem permissão para acessar este projeto",
+        );
       }
     }
 
@@ -338,7 +340,9 @@ export class ProjetosService {
       !isAdminGlobal &&
       (!userMember || !userMember.canManageMembers())
     ) {
-      throw new ForbiddenException("Você não tem permissão para adicionar membros");
+      throw new ForbiddenException(
+        "Você não tem permissão para adicionar membros",
+      );
     }
 
     const query = this.userRepository

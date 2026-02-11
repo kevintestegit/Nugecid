@@ -25,9 +25,7 @@ export class FixComentariosTimestamps1733835400000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(
-      `DROP INDEX IF EXISTS idx_comentarios_data;`,
-    );
+    await queryRunner.query(`DROP INDEX IF EXISTS idx_comentarios_data;`);
     await queryRunner.query(`
       ALTER TABLE comentarios
         DROP COLUMN IF EXISTS data_atualizacao,

@@ -3,7 +3,6 @@ import {
   IsNotEmpty,
   IsDateString,
   IsOptional,
-  IsEnum,
   IsBoolean,
 } from "class-validator";
 import { Transform } from "class-transformer";

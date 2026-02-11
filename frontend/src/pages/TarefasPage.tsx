@@ -72,7 +72,7 @@ interface TarefaResponse {
   responsavel?: { id: number; nome: string; avatarUrl?: string; avatar?: string }
   responsaveis?: { id: number; nome: string; avatarUrl?: string; avatar?: string }[]
   tags?: string[]
-  comentarios?: unknown[]
+  comentarios?: KanbanDomainTask['comentarios']
 }
 
 interface ProjetoDetalhado extends ProjetoResumo {
@@ -147,7 +147,9 @@ const mapTasks = (data: TarefaResponse[] | undefined, fallbackProjectId: number)
       responsavel,
       responsaveis: responsaveis.length ? responsaveis : responsavel ? [responsavel] : [],
       criadorId: item.criadorId ?? item.criador_id ?? 0,
-      comentarios: Array.isArray(item.comentarios) ? item.comentarios : undefined,
+      comentarios: Array.isArray(item.comentarios)
+        ? (item.comentarios as KanbanDomainTask['comentarios'])
+        : undefined,
       ordem: item.ordem ?? 0,
       tags: Array.isArray(item.tags) ? item.tags : [],
       coluna_id: columnId,
@@ -200,7 +202,9 @@ const buildDomainColumn = (coluna: KanbanColuna | undefined, projetoId: number):
 const buildDomainTask = (tarefa: BoardTask, projetoId: number, coluna?: KanbanColuna): KanbanDomainTask => {
   const now = new Date().toISOString()
   const colunaId = tarefa.colunaId ?? tarefa.coluna_id ?? 0
-  const responsaveis = tarefa.responsaveis?.map((responsavel) => buildDomainUser(responsavel)).filter(Boolean)
+  const responsaveis = tarefa.responsaveis
+    ?.map((responsavel) => buildDomainUser(responsavel))
+    .filter((value): value is KanbanDomainUser => Boolean(value))
 
   return {
     id: tarefa.id,
@@ -362,7 +366,7 @@ const TarefasPage: React.FC = () => {
       responsaveis.forEach((responsavel) => {
         unique.set(responsavel.id, {
           id: responsavel.id,
-          nome: responsavel.nome,
+          nome: responsavel.nome || responsavel.usuario || 'Usuário',
         })
       })
     })
@@ -537,7 +541,7 @@ const TarefasPage: React.FC = () => {
     } finally {
       setIsMutating(false)
     }
-  }, [loadBoardData, selectedProjectId])
+  }, [columns.length, loadBoardData, selectedProjectId])
 
   const handleEditColumn = useCallback(async (coluna: KanbanColuna) => {
     if (!selectedProjectId) return
@@ -921,11 +925,17 @@ const TarefasPage: React.FC = () => {
             onReorderTasks={handleReorderTasks}
             onAddColumn={handleAddColumn}
             onEditColumn={handleEditColumn}
-            onDeleteColumn={handleDeleteColumn}
+            onDeleteColumn={(colunaId) => {
+              const coluna = columns.find((item) => item.id === colunaId)
+              handleDeleteColumn(colunaId, coluna?.nome ?? 'Coluna')
+            }}
             onAddTask={handleAddTask}
             onTaskClick={handleTaskClick}
             onTaskEdit={handleTaskEdit}
-            onTaskDelete={handleTaskDelete}
+            onTaskDelete={(taskId) => {
+              const task = tasks.find((item) => item.id === taskId)
+              handleTaskDelete(taskId, task?.titulo ?? 'Tarefa')
+            }}
             onProjectSettings={handleProjectSettings}
             loading={boardLoading || isMutating}
             density={boardDensity}

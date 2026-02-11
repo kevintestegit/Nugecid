@@ -85,7 +85,7 @@ class Logger {
 
   debug(message: string, data?: unknown): void {
     if (this.shouldLog('debug')) {
-      logger.debug(this.formatMessage('debug', message), data ? this.sanitizeData(data) : '');
+      console.debug(this.formatMessage('debug', message), data ? this.sanitizeData(data) : '');
     }
   }
 
@@ -97,14 +97,14 @@ class Logger {
 
   warn(message: string, data?: unknown): void {
     if (this.shouldLog('warn')) {
-      logger.warn(this.formatMessage('warn', message), data ? this.sanitizeData(data) : '');
+      console.warn(this.formatMessage('warn', message), data ? this.sanitizeData(data) : '');
     }
   }
 
   error(message: string, error?: unknown): void {
     if (this.shouldLog('error')) {
       const sanitizedError = this.sanitizeData(error);
-      logger.error(this.formatMessage('error', message), sanitizedError);
+      console.error(this.formatMessage('error', message), sanitizedError);
       
       // Em produção, enviar erros para um serviço de monitoramento
       if (this.config.sendToServer && isProduction) {

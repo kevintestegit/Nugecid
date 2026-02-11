@@ -28,7 +28,7 @@ export const KanbanFilters: React.FC<KanbanFiltersProps> = ({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [busca]);
+  }, [busca, filtros, onFiltrosChange]);
 
   const handleClearFilters = () => {
     setBusca('');

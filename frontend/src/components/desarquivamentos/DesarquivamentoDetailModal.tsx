@@ -1,6 +1,12 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { createPortal } from 'react-dom';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+} from "react";
+import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   X,
   FileText,
@@ -17,25 +23,25 @@ import {
   Copy,
   Check,
   Download,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   useDesarquivamento,
   useDesarquivamentoComments,
   useAddDesarquivamentoComment,
   useDownloadTermoDocx,
-} from '@/hooks/useDesarquivamentos';
+} from "@/hooks/useDesarquivamentos";
 import {
   getStatusLabel,
   getTipoDesarquivamentoLabel,
   formatDate,
-} from '@/utils/format';
-import { formatDateTime } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { printRearquivamento } from './print-templates';
-import brasaorn from '@/components/img/Brasão-RN.png';
-import brasaoitep from '@/components/img/Brasão-ITEP.png';
-import { getInstitutoLabel } from '@/constants/institutos';
+} from "@/utils/format";
+import { formatDateTime } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { printRearquivamento } from "./print-templates";
+import brasaorn from "@/components/img/Brasão-RN.png";
+import brasaoitep from "@/components/img/brasao-itep-optimized.png";
+import { getInstitutoLabel } from "@/constants/institutos";
 interface DesarquivamentoDetailModalProps {
   id: number;
   onClose: () => void;
@@ -52,11 +58,11 @@ export const DesarquivamentoDetailModal: React.FC<
   const comments = commentsResponse?.data ?? [];
   const addCommentMutation = useAddDesarquivamentoComment(id);
   const downloadDocxMutation = useDownloadTermoDocx();
-  const [commentText, setCommentText] = useState('');
+  const [commentText, setCommentText] = useState("");
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
-  const previousBodyOverflowRef = useRef<string>('');
-  const previousHtmlOverflowRef = useRef<string>('');
+  const previousBodyOverflowRef = useRef<string>("");
+  const previousHtmlOverflowRef = useRef<string>("");
   const [showPrintDropdown, setShowPrintDropdown] = useState(false);
   const printDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -65,16 +71,19 @@ export const DesarquivamentoDetailModal: React.FC<
     const html = document.documentElement;
     previousBodyOverflowRef.current = document.body.style.overflow;
     previousHtmlOverflowRef.current = html.style.overflow;
-    document.body.style.overflow = 'hidden';
-    html.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (printDropdownRef.current && !printDropdownRef.current.contains(event.target as Node)) {
+      if (
+        printDropdownRef.current &&
+        !printDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowPrintDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
 
     return () => {
       setIsMounted(false);
@@ -82,13 +91,13 @@ export const DesarquivamentoDetailModal: React.FC<
         previousBodyOverflowRef.current &&
         previousBodyOverflowRef.current.trim().length > 0
           ? previousBodyOverflowRef.current
-          : 'auto';
+          : "auto";
       html.style.overflow =
         previousHtmlOverflowRef.current &&
         previousHtmlOverflowRef.current.trim().length > 0
           ? previousHtmlOverflowRef.current
-          : 'auto';
-      document.removeEventListener('mousedown', handleClickOutside);
+          : "auto";
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -104,19 +113,19 @@ export const DesarquivamentoDetailModal: React.FC<
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         event.preventDefault();
         onClose();
         return;
       }
 
-      if (event.key === 'Enter') {
+      if (event.key === "Enter") {
         const target = event.target as HTMLElement | null;
         if (
           target &&
-          (target.tagName === 'TEXTAREA' ||
-            target.tagName === 'INPUT' ||
-            target.tagName === 'SELECT' ||
+          (target.tagName === "TEXTAREA" ||
+            target.tagName === "INPUT" ||
+            target.tagName === "SELECT" ||
             target.isContentEditable)
         ) {
           return;
@@ -125,8 +134,8 @@ export const DesarquivamentoDetailModal: React.FC<
         handleViewDetails();
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleViewDetails, onClose]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -137,35 +146,35 @@ export const DesarquivamentoDetailModal: React.FC<
     e.preventDefault();
     const trimmed = commentText.trim();
     if (!trimmed) {
-      toast.error('Digite um comentário antes de enviar.');
+      toast.error("Digite um comentário antes de enviar.");
       return;
     }
 
     try {
       await addCommentMutation.mutateAsync(trimmed);
-      setCommentText('');
-      toast.success('Comentário adicionado com sucesso.');
+      setCommentText("");
+      toast.success("Comentário adicionado com sucesso.");
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
-        'Não foi possível adicionar o comentário.';
+        "Não foi possível adicionar o comentário.";
       toast.error(message);
     }
   };
 
   const placeholderTemplate = useMemo(
     () => ({
-      processoEletronico: '{{processo_eletronico}}',
-      tipoDocumentoPrimeiroItem: '{{tipo_documento_1}}',
-      nomePrimeiroItem: '{{nome_1}}',
-      numeroPrimeiroItem: '{{numero_1}}',
+      processoEletronico: "{{processo_eletronico}}",
+      tipoDocumentoPrimeiroItem: "{{tipo_documento_1}}",
+      nomePrimeiroItem: "{{nome_1}}",
+      numeroPrimeiroItem: "{{numero_1}}",
     }),
     [],
   );
 
   const handlePrintDesarquivamento = async () => {
     if (!item) {
-      toast.error('Nao foi possivel localizar os dados para gerar o termo.');
+      toast.error("Nao foi possivel localizar os dados para gerar o termo.");
       return;
     }
 
@@ -173,33 +182,33 @@ export const DesarquivamentoDetailModal: React.FC<
       // Buscar registros relacionados pelo mesmo número de processo
       const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
       });
 
       if (!relatedResponse.ok) {
-        throw new Error('Erro ao buscar registros relacionados');
+        throw new Error("Erro ao buscar registros relacionados");
       }
 
       const relatedData = await relatedResponse.json();
       const relatedRecords = relatedData.success ? relatedData.data : [item];
 
       const eligibleRecords = (relatedRecords || []).filter((record: any) => {
-        const statusValue = String(record?.status ?? '')
+        const statusValue = String(record?.status ?? "")
           .trim()
           .toUpperCase();
-        return statusValue === 'DESARQUIVADO';
+        return statusValue === "DESARQUIVADO";
       });
 
       if (!eligibleRecords.length) {
         toast.error(
-          'Somente registros desarquivados podem gerar o termo de impressão.',
+          "Somente registros desarquivados podem gerar o termo de impressão.",
         );
         return;
       }
 
       const baseHref =
-        window.location.origin + (import.meta.env?.BASE_URL ?? '/');
+        window.location.origin + (import.meta.env?.BASE_URL ?? "/");
       const toAbs = (url: string) => new URL(url, baseHref).toString();
 
       const logoRN = toAbs(brasaorn);
@@ -207,38 +216,38 @@ export const DesarquivamentoDetailModal: React.FC<
 
       const escapeHtml = (value: unknown): string => {
         if (value === null || value === undefined) {
-          return '';
+          return "";
         }
         return String(value).replace(
           /[&<>"']/g,
-          match =>
+          (match) =>
             ({
-              '&': '&amp;',
-              '"': '&quot;',
-              "'": '&#39;',
-              '<': '&lt;',
-              '>': '&gt;',
+              "&": "&amp;",
+              '"': "&quot;",
+              "'": "&#39;",
+              "<": "&lt;",
+              ">": "&gt;",
             })[match] || match,
         );
       };
 
       const userName = escapeHtml(
-        user?.nome || user?.usuario || 'Usuário não identificado',
+        user?.nome || user?.usuario || "Usuário não identificado",
       );
       const matricula = escapeHtml(
         (user as any)?.matricula ||
           (user as any)?.matriculaFuncionario ||
-          'Matrícula não informada',
+          "Matrícula não informada",
       );
       const assinaturaDate = new Date();
       const dataAssinatura = escapeHtml(
-        assinaturaDate.toLocaleDateString('pt-BR'),
+        assinaturaDate.toLocaleDateString("pt-BR"),
       );
       const horaAssinatura = escapeHtml(
-        assinaturaDate.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
+        assinaturaDate.toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
         }),
       );
 
@@ -246,17 +255,17 @@ export const DesarquivamentoDetailModal: React.FC<
       const detailRows = eligibleRecords
         .map((record: any, globalIndex: number) => {
           const rawItems = Array.isArray(record?.itens) ? record.itens : [];
-          const identifiers = (record.numeroNicLaudoAuto || '')
+          const identifiers = (record.numeroNicLaudoAuto || "")
             .split(/[,;]+/)
             .map((part: string) => part.trim())
             .filter(Boolean);
           const fallbackIdentifiers =
             identifiers.length > 0
               ? identifiers
-              : [record.numeroNicLaudoAuto || '-'];
+              : [record.numeroNicLaudoAuto || "-"];
 
           const inferredQuantity =
-            typeof record.quantidadeItens === 'number' &&
+            typeof record.quantidadeItens === "number" &&
             record.quantidadeItens > 0
               ? record.quantidadeItens
               : rawItems.length > 0
@@ -275,17 +284,17 @@ export const DesarquivamentoDetailModal: React.FC<
             (code: string, localIndex: number) => {
               const current = rawItems[localIndex];
               const typeValue =
-                current && typeof current === 'object'
+                current && typeof current === "object"
                   ? (current?.tipo ??
                     current?.tipoDocumento ??
                     current?.descricaoTipo)
                   : undefined;
               const nameValue =
-                current && typeof current === 'object'
+                current && typeof current === "object"
                   ? (current?.nome ?? current?.registro ?? current?.titulo)
                   : undefined;
               const observationValue =
-                current && typeof current === 'object'
+                current && typeof current === "object"
                   ? (current?.observacao ??
                     current?.descricao ??
                     current?.detalhe)
@@ -294,9 +303,9 @@ export const DesarquivamentoDetailModal: React.FC<
               return {
                 index: globalIndex + 1, // Numeração sequencial global
                 type: escapeHtml(typeValue ?? baseType),
-                name: escapeHtml(nameValue ?? record.nomeCompleto ?? '-'),
-                code: escapeHtml(code ?? '-'),
-                observation: escapeHtml(observationValue ?? ''),
+                name: escapeHtml(nameValue ?? record.nomeCompleto ?? "-"),
+                code: escapeHtml(code ?? "-"),
+                observation: escapeHtml(observationValue ?? ""),
               };
             },
           );
@@ -306,23 +315,23 @@ export const DesarquivamentoDetailModal: React.FC<
         .flat();
 
       const processNumber = escapeHtml(
-        item.numeroProcesso || String(item.id ?? '-'),
+        item.numeroProcesso || String(item.id ?? "-"),
       );
       // Data "agora" (no cliente) para o termo impresso
       const hoje = new Date();
       const dataRetirada = escapeHtml(
-        typeof formatDate === 'function'
+        typeof formatDate === "function"
           ? formatDate(hoje)
-          : hoje.toLocaleDateString('pt-BR'),
+          : hoje.toLocaleDateString("pt-BR"),
       );
       const tipoDocumentoPrincipal = escapeHtml(
         item.tipoDocumento ||
           getTipoDesarquivamentoLabel(item.tipoDesarquivamento as any),
       );
-      const nomeRegistro = escapeHtml(item.nomeCompleto ?? '-');
+      const nomeRegistro = escapeHtml(item.nomeCompleto ?? "-");
 
       const rowsHtml = detailRows
-        .map((row) => {
+        .map((row: any) => {
           const isFirstRow = row.index === 1;
           const typeCell = isFirstRow
             ? placeholderTemplate.tipoDocumentoPrimeiroItem
@@ -342,7 +351,7 @@ export const DesarquivamentoDetailModal: React.FC<
         <td class="col-num">${numberCell}</td>
       </tr>`;
         })
-        .join('');
+        .join("");
 
       const templateHtml = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -416,6 +425,9 @@ export const DesarquivamentoDetailModal: React.FC<
       width: 100%;
       border-collapse: collapse;
     }
+    table.documento-completo tbody {
+      height: 100%;
+    }
     table.documento-completo thead {
       display: table-header-group;
     }
@@ -454,6 +466,16 @@ export const DesarquivamentoDetailModal: React.FC<
       }
       table.documento-completo tfoot {
         display: table-footer-group;
+      }
+      /*
+       * Em documento curto (1 página), empurra o tfoot para o final da folha.
+       * O valor usa margem de segurança para evitar criar página em branco.
+       */
+      table.documento-completo {
+        min-height: 274mm;
+      }
+      table.documento-completo tbody > tr > td {
+        vertical-align: top;
       }
       /* Bloco de assinaturas nunca quebra */
       .assinaturas-bloco {
@@ -521,7 +543,7 @@ export const DesarquivamentoDetailModal: React.FC<
               </tr>
               <tr>
                 <td colspan="4" class="faixa center fs12">
-                  ${placeholderTemplate.processoEletronico || ''}
+                  ${placeholderTemplate.processoEletronico || ""}
                 </td>
               </tr>
 
@@ -575,7 +597,7 @@ export const DesarquivamentoDetailModal: React.FC<
                 </tr>
                 <tr>
                   <td class="fs11 vermelho"><strong>DATA DE RETIRADA</strong></td>
-                  <td class="fs11">${dataRetirada || '&nbsp;'}</td>
+                  <td class="fs11">${dataRetirada || "&nbsp;"}</td>
                 </tr>
                 <tr>
                   <td class="fs11 vermelho"><strong>DATA DE DEVOLUÇÃO</strong></td>
@@ -601,9 +623,9 @@ export const DesarquivamentoDetailModal: React.FC<
       const placeholderValues: Record<string, string> = {
         [placeholderTemplate.processoEletronico]: processNumber,
         [placeholderTemplate.tipoDocumentoPrimeiroItem]:
-          detailRows[0]?.type ?? '-',
-        [placeholderTemplate.nomePrimeiroItem]: detailRows[0]?.name ?? '-',
-        [placeholderTemplate.numeroPrimeiroItem]: detailRows[0]?.code ?? '-',
+          detailRows[0]?.type ?? "-",
+        [placeholderTemplate.nomePrimeiroItem]: detailRows[0]?.name ?? "-",
+        [placeholderTemplate.numeroPrimeiroItem]: detailRows[0]?.code ?? "-",
       };
 
       const html = Object.entries(placeholderValues).reduce(
@@ -613,16 +635,19 @@ export const DesarquivamentoDetailModal: React.FC<
         templateHtml,
       );
 
-      const printWindow = window.open('', '_blank', 'width=900,height=650');
+      const printWindow = window.open("", "_blank", "width=900,height=650");
       if (!printWindow) {
-        toast.error('Nao foi possivel abrir a janela de impressao.');
+        toast.error("Nao foi possivel abrir a janela de impressao.");
         return;
       }
 
       printWindow.document.write(html);
       printWindow.document.close();
 
+      let hasPrinted = false;
       const tryPrint = () => {
+        if (hasPrinted) return;
+        hasPrinted = true;
         printWindow.focus();
         printWindow.print();
         printWindow.close();
@@ -633,44 +658,49 @@ export const DesarquivamentoDetailModal: React.FC<
         setTimeout(tryPrint, 300);
       } else {
         let loaded = 0;
+        const failSafe = window.setTimeout(tryPrint, 2000);
         const done = () => {
           loaded++;
-          if (loaded === imgs.length) tryPrint();
+          if (loaded === imgs.length) {
+            window.clearTimeout(failSafe);
+            tryPrint();
+          }
         };
-        const failSafe = setTimeout(tryPrint, 2000);
-        imgs.forEach(img => {
+        imgs.forEach((img) => {
           if (img.complete) {
             done();
           } else {
-            img.addEventListener('load', done, { once: true });
-            img.addEventListener('error', done, { once: true });
+            img.addEventListener("load", done, { once: true });
+            img.addEventListener("error", done, { once: true });
           }
         });
       }
     } catch (error) {
-      console.error('Erro ao gerar termo:', error);
-      toast.error('Erro ao gerar termo de impressão');
+      console.error("Erro ao gerar termo:", error);
+      toast.error("Erro ao gerar termo de impressão");
     }
   };
 
   const handleDownloadDocx = async () => {
     if (!item) {
-      toast.error('Não foi possível localizar os dados para gerar o documento.');
+      toast.error(
+        "Não foi possível localizar os dados para gerar o documento.",
+      );
       return;
     }
 
     try {
       await downloadDocxMutation.mutateAsync(id);
-      toast.success('Documento DOCX baixado com sucesso!');
+      toast.success("Documento DOCX baixado com sucesso!");
     } catch (error) {
-      console.error('Erro ao baixar DOCX:', error);
-      toast.error('Erro ao baixar documento DOCX');
+      console.error("Erro ao baixar DOCX:", error);
+      toast.error("Erro ao baixar documento DOCX");
     }
   };
 
   const handlePrintRearquivamento = async () => {
     if (!item) {
-      toast.error('Não foi possível localizar os dados para gerar o termo.');
+      toast.error("Não foi possível localizar os dados para gerar o termo.");
       return;
     }
 
@@ -678,12 +708,12 @@ export const DesarquivamentoDetailModal: React.FC<
       // Buscar registros relacionados pelo mesmo número de processo com status REARQUIVAMENTO_SOLICITADO
       const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
         },
       });
 
       if (!relatedResponse.ok) {
-        throw new Error('Erro ao buscar registros relacionados');
+        throw new Error("Erro ao buscar registros relacionados");
       }
 
       const relatedData = await relatedResponse.json();
@@ -691,10 +721,10 @@ export const DesarquivamentoDetailModal: React.FC<
 
       // Filtrar apenas registros com status REARQUIVAMENTO_SOLICITADO
       const eligibleRecords = (relatedRecords || []).filter((record: any) => {
-        const statusValue = String(record?.status ?? '')
+        const statusValue = String(record?.status ?? "")
           .trim()
           .toUpperCase();
-        return statusValue === 'REARQUIVAMENTO_SOLICITADO';
+        return statusValue === "REARQUIVAMENTO_SOLICITADO";
       });
 
       if (!eligibleRecords.length) {
@@ -706,57 +736,58 @@ export const DesarquivamentoDetailModal: React.FC<
 
       const escapeHtml = (value: unknown): string => {
         if (value === null || value === undefined) {
-          return '';
+          return "";
         }
         return String(value).replace(
           /[&<>"']/g,
-          match =>
+          (match) =>
             ({
-              '&': '&amp;',
-              '"': '&quot;',
-              "'": '&#39;',
-              '<': '&lt;',
-              '>': '&gt;',
+              "&": "&amp;",
+              '"': "&quot;",
+              "'": "&#39;",
+              "<": "&lt;",
+              ">": "&gt;",
             })[match] || match,
         );
       };
 
       const userName = escapeHtml(
-        user?.nome || user?.usuario || 'Usuário não identificado',
+        user?.nome || user?.usuario || "Usuário não identificado",
       );
       const matricula = escapeHtml(
         (user as any)?.matricula ||
           (user as any)?.matriculaFuncionario ||
-          'Matrícula não informada',
+          "Matrícula não informada",
       );
       const assinaturaDate = new Date();
       const dataAssinatura = escapeHtml(
-        assinaturaDate.toLocaleDateString('pt-BR'),
+        assinaturaDate.toLocaleDateString("pt-BR"),
       );
       const horaAssinatura = escapeHtml(
-        assinaturaDate.toLocaleTimeString('pt-BR', {
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
+        assinaturaDate.toLocaleTimeString("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
         }),
       );
 
       const processNumber = escapeHtml(
-        item.numeroProcesso || String(item.id ?? '-'),
+        item.numeroProcesso || String(item.id ?? "-"),
       );
-      const dataHoraRecebimento = escapeHtml(
-        formatDate(new Date()) || '-',
-      );
+      const dataHoraRecebimento = escapeHtml(formatDate(new Date()) || "-");
 
       // Montar lista de itens para o template (NIC/Laudo no campo NÚMERO, tipoDocumento - NomeCompleto no campo DESCRIÇÃO)
       const itens = eligibleRecords.map((record: any) => {
-        const tipo = record.tipoDocumento || 
-          getTipoDesarquivamentoLabel(record.tipoDesarquivamento) || '';
-        const nome = record.nomeCompleto || '';
-        const descricao = tipo && nome ? `${tipo} - ${nome}` : tipo || nome || '';
-        
+        const tipo =
+          record.tipoDocumento ||
+          getTipoDesarquivamentoLabel(record.tipoDesarquivamento) ||
+          "";
+        const nome = record.nomeCompleto || "";
+        const descricao =
+          tipo && nome ? `${tipo} - ${nome}` : tipo || nome || "";
+
         return {
-          numeroNicLaudoAuto: record.numeroNicLaudoAuto || '',
+          numeroNicLaudoAuto: record.numeroNicLaudoAuto || "",
           descricao,
         };
       });
@@ -771,8 +802,8 @@ export const DesarquivamentoDetailModal: React.FC<
         itens,
       });
     } catch (error) {
-      console.error('Erro ao gerar termo de rearquivamento:', error);
-      toast.error('Erro ao gerar termo de rearquivamento');
+      console.error("Erro ao gerar termo de rearquivamento:", error);
+      toast.error("Erro ao gerar termo de rearquivamento");
     }
   };
 
@@ -783,7 +814,14 @@ export const DesarquivamentoDetailModal: React.FC<
   const modalNode = (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[10000]"
-      style={{ top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
+      style={{
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: "100vw",
+        height: "100vh",
+      }}
       onClick={handleBackdropClick}
     >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -832,7 +870,9 @@ export const DesarquivamentoDetailModal: React.FC<
                   </div>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-600 font-medium mb-1">Status</div>
+                  <div className="text-xs text-gray-600 font-medium mb-1">
+                    Status
+                  </div>
                   <div className="text-lg font-semibold text-gray-900">
                     {getStatusLabel(item.status as any)}
                   </div>
@@ -860,72 +900,79 @@ export const DesarquivamentoDetailModal: React.FC<
                 )}
               </div>
 
-	              {/* Informações do Documento */}
-	              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {/* Informações do Documento */}
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
                   <FileText className="h-5 w-5 text-gray-600" />
                   <h4 className="text-base font-semibold text-gray-900">
                     Informações do Documento
                   </h4>
                 </div>
-	                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-	                  <DetailRow label="Nome Completo" value={item.nomeCompleto} />
-	                  <DetailRow
-	                    label="Nº NIC/Laudo/Auto/IT"
-	                    value={
-	                      item.numeroNicLaudoAuto?.startsWith('MISSING-')
-	                        ? 'N/A'
-	                        : item.numeroNicLaudoAuto
-	                    }
-	                  />
-	                  <DetailRow label="Nº Processo" value={item.numeroProcesso} copyable />
-	                  <DetailRow
-	                    label="Tipo de Documento"
-	                    value={item.tipoDocumento}
-	                  />
+                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  <DetailRow label="Nome Completo" value={item.nomeCompleto} />
+                  <DetailRow
+                    label="Nº NIC/Laudo/Auto/IT"
+                    value={
+                      item.numeroNicLaudoAuto?.startsWith("MISSING-")
+                        ? "N/A"
+                        : item.numeroNicLaudoAuto
+                    }
+                  />
+                  <DetailRow
+                    label="Nº Processo"
+                    value={item.numeroProcesso}
+                    copyable
+                  />
+                  <DetailRow
+                    label="Tipo de Documento"
+                    value={item.tipoDocumento}
+                  />
                   {(item as any).quantidadeItens && (
-                    <DetailRow 
-                      label="Quantidade de Itens" 
-                      value={(item as any).quantidadeItens} 
+                    <DetailRow
+                      label="Quantidade de Itens"
+                      value={(item as any).quantidadeItens}
                     />
                   )}
                   <div className="md:col-span-2">
-                    <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Descrição da Solicitação</div>
+                    <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                      Descrição da Solicitação
+                    </div>
                     <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
-                      {item.dadosAdicionais || '-'}
+                      {item.dadosAdicionais || "-"}
                     </div>
                   </div>
                 </div>
               </div>
 
-	              {/* Setor e Responsável */}
-	              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {/* Setor e Responsável */}
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
                   <User className="h-5 w-5 text-gray-600" />
                   <h4 className="text-base font-semibold text-gray-900">
                     Setor e Responsável
                   </h4>
                 </div>
-	                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-	                  <DetailRow
-	                    label="Setor Demandante"
-	                    value={item.setorDemandante}
-	                  />
-	                  <DetailRow
-	                    label="Servidor Responsável"
-	                    value={item.servidorResponsavel}
-	                  />
-	                  <DetailRow
-	                    label="Instituto"
-	                    value={getInstitutoLabel(item.instituto)}
-	                  />
-	                  <DetailRow
-	                    label="Requerente"
-	                    value={item.requerente}
-	                  />
-	                  <DetailRow label="Nº do Ofício" value={item.numeroOficio} copyable />
-	                </div>
-	              </div>
+                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                  <DetailRow
+                    label="Setor Demandante"
+                    value={item.setorDemandante}
+                  />
+                  <DetailRow
+                    label="Servidor Responsável"
+                    value={item.servidorResponsavel}
+                  />
+                  <DetailRow
+                    label="Instituto"
+                    value={getInstitutoLabel(item.instituto)}
+                  />
+                  <DetailRow label="Requerente" value={item.requerente} />
+                  <DetailRow
+                    label="Nº do Ofício"
+                    value={item.numeroOficio}
+                    copyable
+                  />
+                </div>
+              </div>
 
               {/* Justificativa e Prazos */}
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -938,7 +985,9 @@ export const DesarquivamentoDetailModal: React.FC<
                 <div className="p-5 space-y-4">
                   {(item as any).justificativa && (
                     <div>
-                      <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">Justificativa</div>
+                      <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                        Justificativa
+                      </div>
                       <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
                         {(item as any).justificativa}
                       </div>
@@ -949,7 +998,8 @@ export const DesarquivamentoDetailModal: React.FC<
                     value={item.finalidadeDesarquivamento}
                     fullWidth
                   />
-                  {((item as any).prazoDesarquivamento || (item as any).prazoVencimento) && (
+                  {((item as any).prazoDesarquivamento ||
+                    (item as any).prazoVencimento) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-3 border-t border-gray-200">
                       {(item as any).prazoDesarquivamento && (
                         <DetailRow
@@ -961,7 +1011,9 @@ export const DesarquivamentoDetailModal: React.FC<
                         <DetailRow
                           label="Prazo de Vencimento"
                           value={formatDate((item as any).prazoVencimento)}
-                          highlight={new Date((item as any).prazoVencimento) < new Date()}
+                          highlight={
+                            new Date((item as any).prazoVencimento) < new Date()
+                          }
                         />
                       )}
                     </div>
@@ -980,14 +1032,16 @@ export const DesarquivamentoDetailModal: React.FC<
                 <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
                   <DetailRow
                     label="Data de Solicitação"
-                    value={formatDate(item.dataSolicitacao || (item as any).createdAt)}
+                    value={formatDate(
+                      item.dataSolicitacao || (item as any).createdAt,
+                    )}
                   />
                   <DetailRow
                     label="Data Desarquivamento - SAG"
                     value={
                       item.dataDesarquivamentoSAG
                         ? formatDate(item.dataDesarquivamentoSAG)
-                        : 'Aguardando'
+                        : "Aguardando"
                     }
                     highlight={!item.dataDesarquivamentoSAG}
                   />
@@ -996,7 +1050,7 @@ export const DesarquivamentoDetailModal: React.FC<
                     value={
                       item.dataDevolucaoSetor
                         ? formatDate(item.dataDevolucaoSetor)
-                        : 'Aguardando'
+                        : "Aguardando"
                     }
                     highlight={!item.dataDevolucaoSetor}
                   />
@@ -1004,7 +1058,8 @@ export const DesarquivamentoDetailModal: React.FC<
               </div>
 
               {/* Prorrogação */}
-              {(item.solicitacaoProrrogacao || (item as any).solicitacaoProrrogacaoTexto) && (
+              {(item.solicitacaoProrrogacao ||
+                (item as any).solicitacaoProrrogacaoTexto) && (
                 <div className="bg-amber-50 rounded-lg border border-amber-200 overflow-hidden">
                   <div className="bg-amber-100 border-b border-amber-200 px-4 py-3 flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-amber-700" />
@@ -1015,11 +1070,13 @@ export const DesarquivamentoDetailModal: React.FC<
                   <div className="p-5">
                     <DetailRow
                       label="Prorrogação Solicitada"
-                      value={item.solicitacaoProrrogacao ? 'SIM' : 'NÃO'}
+                      value={item.solicitacaoProrrogacao ? "SIM" : "NÃO"}
                     />
                     {(item as any).solicitacaoProrrogacaoTexto && (
                       <div className="mt-3">
-                        <div className="text-sm font-semibold text-amber-800 mb-2">Justificativa:</div>
+                        <div className="text-sm font-semibold text-amber-800 mb-2">
+                          Justificativa:
+                        </div>
                         <div className="text-sm text-gray-800 bg-white rounded-lg p-3 border border-amber-200">
                           {(item as any).solicitacaoProrrogacaoTexto}
                         </div>
@@ -1043,14 +1100,14 @@ export const DesarquivamentoDetailModal: React.FC<
                       className="w-full min-h-[100px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                       placeholder="Adicione um comentário sobre esta solicitação..."
                       value={commentText}
-                      onChange={e => setCommentText(e.target.value)}
+                      onChange={(e) => setCommentText(e.target.value)}
                       maxLength={2000}
                     />
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-gray-500">
-                        Comentando como{' '}
+                        Comentando como{" "}
                         <strong className="text-gray-700">
-                          {user?.nome || user?.usuario || 'Usuário'}
+                          {user?.nome || user?.usuario || "Usuário"}
                         </strong>
                       </span>
                       <button
@@ -1086,7 +1143,7 @@ export const DesarquivamentoDetailModal: React.FC<
                         </p>
                       </div>
                     ) : (
-                      comments.map(comment => (
+                      comments.map((comment) => (
                         <div
                           key={comment.id}
                           className="bg-gray-50 border-l-4 border-indigo-500 rounded-lg px-4 py-3 shadow-sm"
@@ -1096,7 +1153,9 @@ export const DesarquivamentoDetailModal: React.FC<
                               <User className="h-3 w-3" />
                               {comment.authorName}
                             </span>
-                            <span className="text-gray-500">{formatDateTime(comment.createdAt)}</span>
+                            <span className="text-gray-500">
+                              {formatDateTime(comment.createdAt)}
+                            </span>
                           </div>
                           <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
                             {comment.comment}
@@ -1125,9 +1184,11 @@ export const DesarquivamentoDetailModal: React.FC<
             >
               <Printer className="h-4 w-4" />
               Imprimir Termo
-              <ChevronDown className={`h-4 w-4 transition-transform ${showPrintDropdown ? 'rotate-0' : 'rotate-180'}`} />
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${showPrintDropdown ? "rotate-0" : "rotate-180"}`}
+              />
             </button>
-            
+
             {showPrintDropdown && (
               <div className="absolute bottom-full mb-2 right-0 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <button
@@ -1138,7 +1199,9 @@ export const DesarquivamentoDetailModal: React.FC<
                   className="w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors flex items-center gap-2 rounded-t-lg"
                 >
                   <FileText className="h-4 w-4 text-indigo-600" />
-                  <span className="text-sm font-medium text-gray-700">Desarquivamento</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Desarquivamento
+                  </span>
                 </button>
                 <div className="border-t border-gray-100"></div>
                 <button
@@ -1149,7 +1212,9 @@ export const DesarquivamentoDetailModal: React.FC<
                   className="w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors flex items-center gap-2 rounded-b-lg"
                 >
                   <FileText className="h-4 w-4 text-indigo-600" />
-                  <span className="text-sm font-medium text-gray-700">Rearquivamento</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Rearquivamento
+                  </span>
                 </button>
               </div>
             )}
@@ -1194,18 +1259,18 @@ const copyTextSafely = async (text: string): Promise<boolean> => {
     // fallback below
   }
 
-  const textArea = document.createElement('textarea');
+  const textArea = document.createElement("textarea");
   textArea.value = text;
-  textArea.style.position = 'fixed';
-  textArea.style.opacity = '0';
-  textArea.style.pointerEvents = 'none';
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  textArea.style.pointerEvents = "none";
   document.body.appendChild(textArea);
   textArea.focus();
   textArea.select();
 
   let successful = false;
   try {
-    successful = document.execCommand('copy');
+    successful = document.execCommand("copy");
   } catch (error) {
     successful = false;
   } finally {
@@ -1246,37 +1311,37 @@ const DetailRow = ({
     try {
       const success = await copyTextSafely(String(value));
       if (!success) {
-        throw new Error('Copy command was unsuccessful');
+        throw new Error("Copy command was unsuccessful");
       }
       setCopied(true);
     } catch (error) {
-      console.error('Erro ao copiar número do processo:', error);
-      toast.error('Não foi possível copiar o valor.');
+      console.error("Erro ao copiar número do processo:", error);
+      toast.error("Não foi possível copiar o valor.");
     }
   };
 
   const baseValueClasses = `text-sm font-medium break-words ${
-    highlight ? 'text-orange-600 italic' : 'text-gray-900'
+    highlight ? "text-orange-600 italic" : "text-gray-900"
   }`;
 
   if (!copyable) {
     return (
-      <div className={fullWidth ? 'md:col-span-2' : ''}>
+      <div className={fullWidth ? "md:col-span-2" : ""}>
         <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
           {label}
         </div>
-        <div className={baseValueClasses}>{value || '-'}</div>
+        <div className={baseValueClasses}>{value || "-"}</div>
       </div>
     );
   }
 
   return (
-    <div className={fullWidth ? 'md:col-span-2' : ''}>
+    <div className={fullWidth ? "md:col-span-2" : ""}>
       <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
         {label}
       </div>
       <div className={`${baseValueClasses} flex items-center gap-2`}>
-        <span className="font-mono break-all">{value || '-'}</span>
+        <span className="font-mono break-all">{value || "-"}</span>
         {value && (
           <>
             <button
@@ -1305,7 +1370,7 @@ const DetailRow = ({
 const Detail = ({ label, value }: { label: string; value?: any }) => (
   <div>
     <div className="text-xs text-gray-500 mb-1">{label}</div>
-    <div className="text-sm text-gray-900 break-words">{value || '-'}</div>
+    <div className="text-sm text-gray-900 break-words">{value || "-"}</div>
   </div>
 );
 

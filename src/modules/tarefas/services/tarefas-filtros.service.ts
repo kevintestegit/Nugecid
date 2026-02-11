@@ -160,10 +160,9 @@ export class TarefasFiltrosService {
     switch (agruparPor) {
       case AgruparPor.RESPONSAVEL:
         tarefas.forEach((tarefa) => {
-          const responsaveis =
-            tarefa.responsaveis?.length
-              ? tarefa.responsaveis.map((usuario) => usuario.nome).join(", ")
-              : tarefa.responsavel?.nome || "Sem Responsável";
+          const responsaveis = tarefa.responsaveis?.length
+            ? tarefa.responsaveis.map((usuario) => usuario.nome).join(", ")
+            : tarefa.responsavel?.nome || "Sem Responsável";
           const chave = responsaveis || "Sem Responsável";
           if (!grupos[chave]) grupos[chave] = [];
           grupos[chave].push(tarefa);

@@ -19,7 +19,6 @@ import {
   BadRequestException,
   Header,
   NotFoundException,
-  InternalServerErrorException,
   ForbiddenException,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -104,7 +103,6 @@ export class NugecidController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    console.log('[Controller] create - dadosAdicionais recebido:', createDesarquivamentoDto.dadosAdicionais);
     const result = await this.createDesarquivamentoUseCase.execute({
       ...createDesarquivamentoDto,
       criadoPorId: currentUser.id,
@@ -528,8 +526,10 @@ export class NugecidController {
     @CurrentUser() currentUser: User,
   ) {
     // Debug: Log dos parâmetros de data recebidos
-    this.logger.log(`[findAll] Query params recebidos: startDate=${(queryDto as any).startDate}, endDate=${(queryDto as any).endDate}, dataInicio=${(queryDto as any).dataInicio}, dataFim=${(queryDto as any).dataFim}`);
-    
+    this.logger.log(
+      `[findAll] Query params recebidos: startDate=${(queryDto as any).startDate}, endDate=${(queryDto as any).endDate}, dataInicio=${(queryDto as any).dataInicio}, dataFim=${(queryDto as any).dataFim}`,
+    );
+
     // Mapear Query DTO -> filtros esperados pelo use case/repositório
     const filters = {
       search: queryDto.search,
@@ -547,14 +547,18 @@ export class NugecidController {
       instituto: queryDto.instituto,
       requerente: queryDto.requerente,
       dataInicio:
-        (queryDto as any).startDate || (queryDto as any).dataInicio || undefined,
+        (queryDto as any).startDate ||
+        (queryDto as any).dataInicio ||
+        undefined,
       dataFim:
         (queryDto as any).endDate || (queryDto as any).dataFim || undefined,
       incluirExcluidos: (queryDto as any).incluirExcluidos || false,
     };
 
     // Debug: Log dos filtros montados
-    this.logger.log(`[findAll] Filtros montados: dataInicio=${filters.dataInicio}, dataFim=${filters.dataFim}`);
+    this.logger.log(
+      `[findAll] Filtros montados: dataInicio=${filters.dataInicio}, dataFim=${filters.dataFim}`,
+    );
 
     const result = await this.findAllDesarquivamentosUseCase.execute({
       page: queryDto.page,
@@ -819,10 +823,7 @@ export class NugecidController {
     type: "integer",
   })
   @ApiBearerAuth()
-  async findRelatedByProcess(
-    @Param("id", ParseIntPipe) id: number,
-    @CurrentUser() currentUser: User,
-  ) {
+  async findRelatedByProcess(@Param("id", ParseIntPipe) id: number) {
     const result = await this.nugecidService.findRelatedByProcess(id);
 
     return {
@@ -935,7 +936,6 @@ export class NugecidController {
     @Body() updateDesarquivamentoDto: UpdateDesarquivamentoDto,
     @CurrentUser() currentUser: User,
   ) {
-    console.log('[Controller] update - dadosAdicionais recebido:', updateDesarquivamentoDto.dadosAdicionais);
     try {
       const result = await this.updateDesarquivamentoUseCase.execute({
         id,
@@ -1047,7 +1047,7 @@ export class NugecidController {
     }
 
     try {
-      const result = await this.deleteDesarquivamentoUseCase.execute({
+      await this.deleteDesarquivamentoUseCase.execute({
         id,
         userId: currentUser.id,
         userRoles: [currentUser.role?.name || "USER"],

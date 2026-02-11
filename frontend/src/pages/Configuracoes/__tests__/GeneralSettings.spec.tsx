@@ -1,55 +1,48 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { GeneralSettings } from '../GeneralSettings';
-import { ThemeProvider } from '@/contexts/ThemeContext';
+import { render, screen } from '@testing-library/react'
+import { GeneralSettings } from '../GeneralSettings'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { vi } from 'vitest'
+
+vi.mock('@/services/api', () => ({
+  apiService: {
+    getNotificationPreferences: vi.fn().mockResolvedValue({
+      success: true,
+      data: {
+        id: 1,
+        userId: 1,
+        inAppEnabled: true,
+        pushEnabled: false,
+        soundEnabled: true,
+        enabledTypes: {},
+        pushSubscription: null,
+      },
+    }),
+    updateNotificationPreferences: vi.fn().mockResolvedValue({
+      success: true,
+      data: {},
+    }),
+  },
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
+}))
 
 describe('GeneralSettings', () => {
-  it('should render the appearance card', () => {
+  it('should render appearance and notifications cards', async () => {
     render(
       <ThemeProvider>
         <GeneralSettings />
       </ThemeProvider>
-    );
+    )
 
-    expect(screen.getByText('Aparência')).toBeInTheDocument();
-    expect(screen.getByText('Modo escuro')).toBeInTheDocument();
-  });
-
-  it('should render the language card', () => {
-    render(
-      <ThemeProvider>
-        <GeneralSettings />
-      </ThemeProvider>
-    );
-
-    expect(screen.getByText('Idioma')).toBeInTheDocument();
-    expect(screen.getByLabelText('Idioma do sistema')).toBeInTheDocument();
-  });
-
-  it('should render the notifications card', () => {
-    render(
-      <ThemeProvider>
-        <GeneralSettings />
-      </ThemeProvider>
-    );
-
-    expect(screen.getByText('Notificações')).toBeInTheDocument();
-    expect(screen.getByText('Email')).toBeInTheDocument();
-    expect(screen.getByText('Push')).toBeInTheDocument();
-    expect(screen.getByText('Desktop')).toBeInTheDocument();
-    expect(screen.getByText('Som')).toBeInTheDocument();
-  });
-
-  it('should change language when select is changed', () => {
-    render(
-      <ThemeProvider>
-        <GeneralSettings />
-      </ThemeProvider>
-    );
-
-    const select = screen.getByLabelText('Idioma do sistema');
-    fireEvent.change(select, { target: { value: 'en-US' } });
-
-    expect(select.value).toBe('en-US');
-  });
-});
+    expect(await screen.findByText('Aparência')).toBeInTheDocument()
+    expect(screen.getByText('Notificações')).toBeInTheDocument()
+    expect(screen.getByText('Notificações in-app')).toBeInTheDocument()
+    expect(screen.getByText('Push (Navegador)')).toBeInTheDocument()
+  })
+})

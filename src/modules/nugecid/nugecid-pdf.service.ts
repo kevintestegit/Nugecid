@@ -8,9 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import * as PdfMake from "pdfmake/build/pdfmake";
-import * as pdfFonts from "pdfmake/build/vfs_fonts";
-const PdfPrinter = require("pdfmake");
+import PdfPrinter from "pdfmake";
 import { TDocumentDefinitions } from "pdfmake/interfaces";
 import htmlToPdfmake from "html-to-pdfmake";
 import { JSDOM } from "jsdom";
@@ -53,19 +51,31 @@ export class NugecidPdfService {
       "Roboto",
     );
 
-    const missingFonts = [
+    const requiredFonts = [
       "Roboto-Regular.ttf",
       "Roboto-Medium.ttf",
       "Roboto-Italic.ttf",
       "Roboto-MediumItalic.ttf",
-    ].filter((file) => !fs.existsSync(path.join(fontsPath, file)));
+    ];
+    const invalidOrMissingFonts = requiredFonts.filter((file) => {
+      const fullPath = path.join(fontsPath, file);
+      if (!fs.existsSync(fullPath)) return true;
+      return this.isLikelyInvalidFont(fullPath);
+    });
 
-    if (missingFonts.length) {
+    if (invalidOrMissingFonts.length) {
       this.logger.warn(
-        `Fontes necessárias para o PDF não foram encontradas (${missingFonts.join(
-          ", ",
-        )}). Verifique o diretório src/assets/fonts/Roboto.`,
+        `Fontes Roboto ausentes/inválidas (${invalidOrMissingFonts.join(", ")}). Usando fallback Helvetica.`,
       );
+      this.pdfPrinter = new PdfPrinter({
+        Roboto: {
+          normal: "Helvetica",
+          bold: "Helvetica-Bold",
+          italics: "Helvetica-Oblique",
+          bolditalics: "Helvetica-BoldOblique",
+        },
+      });
+      return;
     }
 
     this.pdfPrinter = new PdfPrinter({
@@ -76,6 +86,20 @@ export class NugecidPdfService {
         bolditalics: path.join(fontsPath, "Roboto-MediumItalic.ttf"),
       },
     });
+  }
+
+  private isLikelyInvalidFont(fontPath: string): boolean {
+    try {
+      const header = fs.readFileSync(fontPath).subarray(0, 16).toString("utf8");
+      const normalized = header.trim().toLowerCase();
+      return (
+        normalized.startsWith("<!doctype") ||
+        normalized.startsWith("<html") ||
+        normalized.startsWith("<")
+      );
+    } catch {
+      return true;
+    }
   }
 
   async generatePdf(
@@ -145,16 +169,46 @@ export class NugecidPdfService {
               : { text: "", width: 50 },
             {
               stack: [
-                { text: "GOVERNO DO ESTADO DO RIO GRANDE DO NORTE", alignment: "center" as const, bold: true, fontSize: 8 },
-                { text: "SECRETARIA DE SEGURANÇA PÚBLICA E DEFESA SOCIAL", alignment: "center" as const, bold: true, fontSize: 8 },
-                { text: "POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE", alignment: "center" as const, bold: true, fontSize: 8 },
-                { text: "NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID", alignment: "center" as const, bold: true, fontSize: 7 },
-                { text: "ARQUIVO GERAL - PCIRN", alignment: "center" as const, bold: true, fontSize: 8, margin: [0, 3, 0, 0] },
+                {
+                  text: "GOVERNO DO ESTADO DO RIO GRANDE DO NORTE",
+                  alignment: "center" as const,
+                  bold: true,
+                  fontSize: 8,
+                },
+                {
+                  text: "SECRETARIA DE SEGURANÇA PÚBLICA E DEFESA SOCIAL",
+                  alignment: "center" as const,
+                  bold: true,
+                  fontSize: 8,
+                },
+                {
+                  text: "POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE",
+                  alignment: "center" as const,
+                  bold: true,
+                  fontSize: 8,
+                },
+                {
+                  text: "NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID",
+                  alignment: "center" as const,
+                  bold: true,
+                  fontSize: 7,
+                },
+                {
+                  text: "ARQUIVO GERAL - PCIRN",
+                  alignment: "center" as const,
+                  bold: true,
+                  fontSize: 8,
+                  margin: [0, 3, 0, 0],
+                },
               ],
               width: "*",
             },
             logos.itepLogo
-              ? { image: logos.itepLogo, width: 55, alignment: "center" as const }
+              ? {
+                  image: logos.itepLogo,
+                  width: 55,
+                  alignment: "center" as const,
+                }
               : { text: "", width: 55 },
           ],
           margin: [0, 0, 0, 15],
@@ -190,8 +244,23 @@ export class NugecidPdfService {
             headerRows: 0,
             widths: ["*"],
             body: [
-              [{ text: "Nº. DE PROCESSO ELETRÔNICO", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 10 }],
-              [{ text: base.numeroProcesso || "", alignment: "center" as const, fillColor: "#bfbfbf", fontSize: 9 }],
+              [
+                {
+                  text: "Nº. DE PROCESSO ELETRÔNICO",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 10,
+                },
+              ],
+              [
+                {
+                  text: base.numeroProcesso || "",
+                  alignment: "center" as const,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                },
+              ],
             ],
           },
           margin: [0, 0, 0, 0],
@@ -204,10 +273,34 @@ export class NugecidPdfService {
             widths: [25, 90, 170, "*"],
             body: [
               [
-                { text: "Nº", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 9 },
-                { text: "TIPO DE DOCUMENTO", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 9 },
-                { text: "NOME", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 9 },
-                { text: "NÚMERO", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 9 },
+                {
+                  text: "Nº",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                },
+                {
+                  text: "TIPO DE DOCUMENTO",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                },
+                {
+                  text: "NOME",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                },
+                {
+                  text: "NÚMERO",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                },
               ],
               ...documentRows,
             ],
@@ -222,18 +315,41 @@ export class NugecidPdfService {
             widths: [180, 80, "*"],
             body: [
               [
-                { text: "SETOR DE ARQUIVO GERAL\nResponsável pela ENTREGA", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 9 },
-                { text: "SETOR SOLICITANTE\nResponsável pelo RECEBIMENTO", alignment: "center" as const, bold: true, fillColor: "#bfbfbf", fontSize: 9, colSpan: 2 },
+                {
+                  text: "SETOR DE ARQUIVO GERAL\nResponsável pela ENTREGA",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                },
+                {
+                  text: "SETOR SOLICITANTE\nResponsável pelo RECEBIMENTO",
+                  alignment: "center" as const,
+                  bold: true,
+                  fillColor: "#bfbfbf",
+                  fontSize: 9,
+                  colSpan: 2,
+                },
                 {},
               ],
               [
-                { text: "\n\n\n________________________\nASSINATURA", alignment: "center" as const, rowSpan: 5, fontSize: 9 },
+                {
+                  text: "\n\n\n________________________\nASSINATURA",
+                  alignment: "center" as const,
+                  rowSpan: 5,
+                  fontSize: 9,
+                },
                 { text: "SETOR", bold: true, color: "red", fontSize: 9 },
                 { text: "", fontSize: 9 },
               ],
               [
                 {},
-                { text: "ASSINATURA DO SERVIDOR", bold: true, color: "red", fontSize: 9 },
+                {
+                  text: "ASSINATURA DO SERVIDOR",
+                  bold: true,
+                  color: "red",
+                  fontSize: 9,
+                },
                 { text: "", fontSize: 9 },
               ],
               [
@@ -243,12 +359,22 @@ export class NugecidPdfService {
               ],
               [
                 {},
-                { text: "DATA DE RETIRADA", bold: true, color: "red", fontSize: 9 },
+                {
+                  text: "DATA DE RETIRADA",
+                  bold: true,
+                  color: "red",
+                  fontSize: 9,
+                },
                 { text: dataAssinatura, fontSize: 9 },
               ],
               [
                 {},
-                { text: "DATA DE DEVOLUÇÃO", bold: true, color: "red", fontSize: 9 },
+                {
+                  text: "DATA DE DEVOLUÇÃO",
+                  bold: true,
+                  color: "red",
+                  fontSize: 9,
+                },
                 { text: "", fontSize: 9 },
               ],
             ],
@@ -278,11 +404,32 @@ export class NugecidPdfService {
       // Rodapé
       footer: {
         stack: [
-          { canvas: [{ type: "line", x1: 28, y1: 0, x2: 567, y2: 0, lineWidth: 0.5 }] },
-          { text: "Polícia Científica do Rio Grande do Norte - PCIRN", alignment: "center" as const, fontSize: 7, margin: [0, 5, 0, 0] },
-          { text: "Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID", alignment: "center" as const, fontSize: 7 },
-          { text: "Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928", alignment: "center" as const, fontSize: 7 },
-          { text: "Email: arquivogeral@pci.rn.gov.br", alignment: "center" as const, fontSize: 7 },
+          {
+            canvas: [
+              { type: "line", x1: 28, y1: 0, x2: 567, y2: 0, lineWidth: 0.5 },
+            ],
+          },
+          {
+            text: "Polícia Científica do Rio Grande do Norte - PCIRN",
+            alignment: "center" as const,
+            fontSize: 7,
+            margin: [0, 5, 0, 0],
+          },
+          {
+            text: "Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID",
+            alignment: "center" as const,
+            fontSize: 7,
+          },
+          {
+            text: "Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928",
+            alignment: "center" as const,
+            fontSize: 7,
+          },
+          {
+            text: "Email: arquivogeral@pci.rn.gov.br",
+            alignment: "center" as const,
+            fontSize: 7,
+          },
         ],
         margin: [28, 0, 28, 10],
       },
@@ -518,11 +665,7 @@ ${sections}
       byId.set(item.id, item);
     }
 
-    if (
-      base.id &&
-      this.isPrintableStatus(base.status) &&
-      !byId.has(base.id)
-    ) {
+    if (base.id && this.isPrintableStatus(base.status) && !byId.has(base.id)) {
       byId.set(base.id, base);
     }
 
@@ -564,7 +707,9 @@ ${sections}
   }
 
   private isPrintableStatus(status?: string | null): boolean {
-    const normalized = String(status ?? "").trim().toUpperCase();
+    const normalized = String(status ?? "")
+      .trim()
+      .toUpperCase();
     return this.printableStatuses.includes(normalized);
   }
 

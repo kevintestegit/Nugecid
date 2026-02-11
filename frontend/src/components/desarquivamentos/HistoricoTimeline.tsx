@@ -2,7 +2,7 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Clock, User, CheckCircle, XCircle } from 'lucide-react'
-import { useDesarquivamentoHistorico, HistoricoItem } from '@/hooks/useDesarquivamentoHistorico'
+import { useDesarquivamentoHistorico } from '@/hooks/useDesarquivamentoHistorico'
 import { formatDate } from '@/utils/format'
 import { cn } from '@/lib/utils'
 
@@ -41,7 +41,7 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({ desarquiva
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -55,7 +55,7 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({ desarquiva
 
   if (error) {
     return (
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -71,7 +71,7 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({ desarquiva
 
   if (!historico || historico.length === 0) {
     return (
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -84,7 +84,7 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({ desarquiva
   }
 
   return (
-    <Card>
+    <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
@@ -101,7 +101,7 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({ desarquiva
 
           {/* Items da timeline */}
           <div className="space-y-6">
-            {historico.map((item, index) => (
+            {historico.map((item) => (
               <div key={item.id} className="relative pl-10">
                 {/* Ponto da timeline */}
                 <div className="absolute left-0 top-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-border bg-background">
@@ -134,7 +134,7 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({ desarquiva
 
                   {/* Detalhes adicionais (se houver mudanças) */}
                   {item.details?.changes && Object.keys(item.details.changes).length > 0 && (
-                    <div className="mt-2 rounded-lg border border-border bg-muted/50 p-3 text-xs space-y-1">
+                    <div className="mt-2 space-y-1 rounded-lg border border-border/70 bg-background/60 p-3 text-xs">
                       <div className="font-semibold text-muted-foreground">Alterações:</div>
                       {Object.entries(item.details.changes).map(([key, value]: [string, any]) => (
                         <div key={key} className="flex gap-2">

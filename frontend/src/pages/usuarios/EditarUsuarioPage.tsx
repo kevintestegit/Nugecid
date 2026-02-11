@@ -2,16 +2,19 @@ import React from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Edit, Loader2 } from 'lucide-react'
 import { useUser, useUpdateUser, useUserPermissions } from '@/hooks/useUsers'
-import { UpdateUserDto } from '@/types'
+import { UpdateUserDto, UserRole } from '@/types'
 import UsuarioForm from '@/components/usuarios/UsuarioForm'
 import { isValidUserIdFormat, parseNumericId } from '@/utils/validation'
 
 const EditarUsuarioPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { canManageUsers } = useUserPermissions()
   
   // Validação do ID antes de fazer a conversão
   const userId = parseNumericId(id);
+  const { data: userResponse, isLoading: isLoadingUser, error } = useUser(userId ?? 0)
+  const updateUserMutation = useUpdateUser()
   
   // Se o ID não for válido, mostrar erro
   if (id && !isValidUserIdFormat(id)) {
@@ -38,10 +41,6 @@ const EditarUsuarioPage: React.FC = () => {
     )
   }
   
-  const { canManageUsers } = useUserPermissions()
-  const { data: userResponse, isLoading: isLoadingUser, error } = useUser(userId!)
-  const updateUserMutation = useUpdateUser()
-
   // Redirecionar se não tiver permissão
   if (!canManageUsers) {
     return (
@@ -105,8 +104,18 @@ const EditarUsuarioPage: React.FC = () => {
   }
 
   const user = userResponse.data
+  const roleName = user.role?.name?.toLowerCase()
+  const normalizedRole: UserRole =
+    roleName === UserRole.ADMIN
+      ? UserRole.ADMIN
+      : roleName === UserRole.COORDENADOR
+        ? UserRole.COORDENADOR
+        : roleName === UserRole.NUGECID_OPERATOR
+          ? UserRole.NUGECID_OPERATOR
+          : UserRole.USUARIO
 
   const handleSubmit = async (data: UpdateUserDto) => {
+    if (!userId) return
     try {
       await updateUserMutation.mutateAsync({ id: userId, data })
       navigate('/usuarios')
@@ -156,8 +165,7 @@ const EditarUsuarioPage: React.FC = () => {
         <UsuarioForm
           initialData={{
             nome: user.nome,
-            email: user.email,
-            role: user.role,
+            role: normalizedRole,
             ativo: user.ativo
           }}
           onSubmit={handleSubmit}

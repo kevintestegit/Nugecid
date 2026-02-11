@@ -58,12 +58,7 @@ export class VestigiosService {
 
     query.orderBy("vestigio.createdAt", "DESC");
 
-    const result = await query.getMany();
-    console.log(
-      "[VestigiosService] findAll - Retornando vestígios:",
-      result.length,
-    );
-    return result;
+    return await query.getMany();
   }
 
   async findOne(id: string): Promise<Vestigio> {

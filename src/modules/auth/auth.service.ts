@@ -9,11 +9,10 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
-import * as bcrypt from "bcryptjs";
 
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
-import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
+import { Auditoria } from "../audit/entities/auditoria.entity";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 
@@ -588,7 +587,8 @@ export class AuthService implements OnModuleInit {
    * Remove campos sensíveis do usuário
    */
   private sanitizeUser(user: User): any {
-    const { senha, ...sanitizedUser } = user;
+    const sanitizedUser = { ...user } as Partial<User>;
+    delete sanitizedUser.senha;
     return sanitizedUser;
   }
 }

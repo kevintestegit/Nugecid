@@ -55,9 +55,9 @@ const PrateleiraDetailPage: React.FC = () => {
   const { uploadArquivos, isUploadingArquivos, deleteArquivo, isDeletingArquivo } = usePastas();
 
   const pasta = data?.pasta;
-  const planilhas = data?.planilhas ?? [];
+  const planilhas = useMemo(() => data?.planilhas ?? [], [data?.planilhas]);
   const totalItens = data?.totalItens ?? 0;
-  const arquivos = pasta?.arquivos ?? [];
+  const arquivos = useMemo(() => pasta?.arquivos ?? [], [pasta?.arquivos]);
 
   const cardClass = "rounded-xl border border-border/50 bg-muted/20"
   const cardTitleClass = "text-lg font-semibold text-foreground"

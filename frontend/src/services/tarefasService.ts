@@ -1,4 +1,4 @@
-import { api } from './api'
+import { api } from "./api";
 import type {
   Tarefa,
   CreateTarefaDto,
@@ -10,245 +10,312 @@ import type {
   HistoricoTarefa,
   TarefaComentario,
   TarefaChecklist,
-  TarefaAnexo
-} from '@/types'
+  TarefaAnexo,
+} from "@/types";
 
 class TarefasService {
-  private baseUrl = '/tarefas'
+  private baseUrl = "/tarefas";
 
   // CRUD básico
-  async getTarefas(params?: QueryTarefaDto): Promise<PaginatedResponse<Tarefa>> {
-    const queryParams = new URLSearchParams()
-    
-    if (params?.projetoId) queryParams.append('projetoId', params.projetoId.toString())
-    if (params?.colunaId) queryParams.append('colunaId', params.colunaId.toString())
-    if (params?.responsavelId) queryParams.append('responsavelId', params.responsavelId.toString())
-    if (params?.criadorId) queryParams.append('criadorId', params.criadorId.toString())
-    if (params?.prioridade) queryParams.append('prioridade', params.prioridade)
-    if (params?.search) queryParams.append('search', params.search)
-    if (params?.page) queryParams.append('page', params.page.toString())
-    if (params?.limit) queryParams.append('limit', params.limit.toString())
-    if (params?.sortBy) queryParams.append('sortBy', params.sortBy)
-    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder)
-    if (params?.incluirExcluidas) queryParams.append('incluirExcluidas', params.incluirExcluidas.toString())
+  async getTarefas(
+    params?: QueryTarefaDto,
+  ): Promise<PaginatedResponse<Tarefa>> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.projetoId ?? params?.projeto_id)
+      queryParams.append(
+        "projetoId",
+        String(params?.projetoId ?? params?.projeto_id),
+      );
+    if (params?.colunaId ?? params?.coluna_id)
+      queryParams.append(
+        "colunaId",
+        String(params?.colunaId ?? params?.coluna_id),
+      );
+    if (params?.responsavelId ?? params?.responsavel_id)
+      queryParams.append(
+        "responsavelId",
+        String(params?.responsavelId ?? params?.responsavel_id),
+      );
+    if (params?.criadorId ?? params?.criador_id)
+      queryParams.append(
+        "criadorId",
+        String(params?.criadorId ?? params?.criador_id),
+      );
+    if (params?.prioridade) {
+      const prioridade = Array.isArray(params.prioridade)
+        ? params.prioridade.join(",")
+        : params.prioridade;
+      queryParams.append("prioridade", prioridade);
+    }
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.page) queryParams.append("page", params.page.toString());
+    if (params?.limit) queryParams.append("limit", params.limit.toString());
+    if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
+    if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
+    if (params?.incluirExcluidas)
+      queryParams.append(
+        "incluirExcluidas",
+        params.incluirExcluidas.toString(),
+      );
 
     const response = await api.get<PaginatedResponse<Tarefa>>(
-      `${this.baseUrl}?${queryParams.toString()}`
-    )
-    return response.data
+      `${this.baseUrl}?${queryParams.toString()}`,
+    );
+    return response.data;
   }
 
   async getTarefa(id: number): Promise<Tarefa> {
-    const response = await api.get<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}`)
+    const response = await api.get<ApiResponse<Tarefa>>(
+      `${this.baseUrl}/${id}`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao buscar tarefa')
+      throw new Error(response.data.message || "Erro ao buscar tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async createTarefa(data: CreateTarefaDto): Promise<Tarefa> {
-    const response = await api.post<ApiResponse<Tarefa>>(this.baseUrl, data)
+    const response = await api.post<ApiResponse<Tarefa>>(this.baseUrl, data);
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao criar tarefa')
+      throw new Error(response.data.message || "Erro ao criar tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async updateTarefa(id: number, data: UpdateTarefaDto): Promise<Tarefa> {
-    const response = await api.patch<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}`, data)
+    const response = await api.patch<ApiResponse<Tarefa>>(
+      `${this.baseUrl}/${id}`,
+      data,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao atualizar tarefa')
+      throw new Error(response.data.message || "Erro ao atualizar tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async deleteTarefa(id: number): Promise<void> {
-    const response = await api.delete<ApiResponse>(`${this.baseUrl}/${id}`)
+    const response = await api.delete<ApiResponse>(`${this.baseUrl}/${id}`);
     if (!response.data.success) {
-      throw new Error(response.data.message || 'Erro ao excluir tarefa')
+      throw new Error(response.data.message || "Erro ao excluir tarefa");
     }
   }
 
   // Operações específicas
   async moveTarefa(id: number, data: MoveTarefaDto): Promise<Tarefa> {
-    const response = await api.patch<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}/mover`, data)
+    const response = await api.patch<ApiResponse<Tarefa>>(
+      `${this.baseUrl}/${id}/mover`,
+      data,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao mover tarefa')
+      throw new Error(response.data.message || "Erro ao mover tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
   async getTarefasAtrasadas(projetoId: number): Promise<Tarefa[]> {
     const response = await api.get<ApiResponse<Tarefa[]>>(
-      `${this.baseUrl}/atrasadas?projetoId=${projetoId}`
-    )
+      `${this.baseUrl}/atrasadas?projetoId=${projetoId}`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao buscar tarefas atrasadas')
+      throw new Error(
+        response.data.message || "Erro ao buscar tarefas atrasadas",
+      );
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async getHistoricoTarefa(id: number): Promise<HistoricoTarefa[]> {
-    const response = await api.get<ApiResponse<HistoricoTarefa[]>>(`${this.baseUrl}/${id}/historico`)
+    const response = await api.get<ApiResponse<HistoricoTarefa[]>>(
+      `${this.baseUrl}/${id}/historico`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao buscar histórico da tarefa')
+      throw new Error(
+        response.data.message || "Erro ao buscar histórico da tarefa",
+      );
     }
-    return response.data.data
+    return response.data.data;
   }
 
   // Comentários
   async getComentarios(tarefaId: number): Promise<TarefaComentario[]> {
-    const response = await api.get<ApiResponse<TarefaComentario[]>>(`${this.baseUrl}/${tarefaId}/comentarios`)
+    const response = await api.get<ApiResponse<TarefaComentario[]>>(
+      `${this.baseUrl}/${tarefaId}/comentarios`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao buscar comentários')
+      throw new Error(response.data.message || "Erro ao buscar comentários");
     }
-    return response.data.data
+    return response.data.data;
   }
 
-  async createComentario(tarefaId: number, conteudo: string): Promise<TarefaComentario> {
+  async createComentario(
+    tarefaId: number,
+    conteudo: string,
+  ): Promise<TarefaComentario> {
     const response = await api.post<ApiResponse<TarefaComentario>>(
       `${this.baseUrl}/${tarefaId}/comentarios`,
-      { conteudo }
-    )
+      { conteudo },
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao criar comentário')
+      throw new Error(response.data.message || "Erro ao criar comentário");
     }
-    return response.data.data
+    return response.data.data;
   }
 
-  async updateComentario(tarefaId: number, comentarioId: number, conteudo: string): Promise<TarefaComentario> {
+  async updateComentario(
+    tarefaId: number,
+    comentarioId: number,
+    conteudo: string,
+  ): Promise<TarefaComentario> {
     const response = await api.patch<ApiResponse<TarefaComentario>>(
       `${this.baseUrl}/${tarefaId}/comentarios/${comentarioId}`,
-      { conteudo }
-    )
+      { conteudo },
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao atualizar comentário')
+      throw new Error(response.data.message || "Erro ao atualizar comentário");
     }
-    return response.data.data
+    return response.data.data;
   }
 
-  async deleteComentario(tarefaId: number, comentarioId: number): Promise<void> {
+  async deleteComentario(
+    tarefaId: number,
+    comentarioId: number,
+  ): Promise<void> {
     const response = await api.delete<ApiResponse>(
-      `${this.baseUrl}/${tarefaId}/comentarios/${comentarioId}`
-    )
+      `${this.baseUrl}/${tarefaId}/comentarios/${comentarioId}`,
+    );
     if (!response.data.success) {
-      throw new Error(response.data.message || 'Erro ao excluir comentário')
+      throw new Error(response.data.message || "Erro ao excluir comentário");
     }
   }
 
   // Checklists
   async getChecklists(tarefaId: number): Promise<TarefaChecklist[]> {
-    const response = await api.get<ApiResponse<TarefaChecklist[]>>(`${this.baseUrl}/${tarefaId}/checklists`)
+    const response = await api.get<ApiResponse<TarefaChecklist[]>>(
+      `${this.baseUrl}/${tarefaId}/checklists`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao buscar checklists')
+      throw new Error(response.data.message || "Erro ao buscar checklists");
     }
-    return response.data.data
+    return response.data.data;
   }
 
-  async createChecklist(tarefaId: number, titulo: string): Promise<TarefaChecklist> {
+  async createChecklist(
+    tarefaId: number,
+    titulo: string,
+  ): Promise<TarefaChecklist> {
     const response = await api.post<ApiResponse<TarefaChecklist>>(
       `${this.baseUrl}/${tarefaId}/checklists`,
-      { titulo }
-    )
+      { titulo },
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao criar checklist')
+      throw new Error(response.data.message || "Erro ao criar checklist");
     }
-    return response.data.data
+    return response.data.data;
   }
 
-  async updateChecklist(tarefaId: number, checklistId: number, titulo: string): Promise<TarefaChecklist> {
+  async updateChecklist(
+    tarefaId: number,
+    checklistId: number,
+    titulo: string,
+  ): Promise<TarefaChecklist> {
     const response = await api.patch<ApiResponse<TarefaChecklist>>(
       `${this.baseUrl}/${tarefaId}/checklists/${checklistId}`,
-      { titulo }
-    )
+      { titulo },
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao atualizar checklist')
+      throw new Error(response.data.message || "Erro ao atualizar checklist");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async deleteChecklist(tarefaId: number, checklistId: number): Promise<void> {
     const response = await api.delete<ApiResponse>(
-      `${this.baseUrl}/${tarefaId}/checklists/${checklistId}`
-    )
+      `${this.baseUrl}/${tarefaId}/checklists/${checklistId}`,
+    );
     if (!response.data.success) {
-      throw new Error(response.data.message || 'Erro ao excluir checklist')
+      throw new Error(response.data.message || "Erro ao excluir checklist");
     }
   }
 
   // Anexos
   async getAnexos(tarefaId: number): Promise<TarefaAnexo[]> {
-    const response = await api.get<ApiResponse<TarefaAnexo[]>>(`${this.baseUrl}/${tarefaId}/anexos`)
+    const response = await api.get<ApiResponse<TarefaAnexo[]>>(
+      `${this.baseUrl}/${tarefaId}/anexos`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao buscar anexos')
+      throw new Error(response.data.message || "Erro ao buscar anexos");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async uploadAnexo(tarefaId: number, file: File): Promise<TarefaAnexo> {
-    const formData = new FormData()
-    formData.append('file', file)
+    const formData = new FormData();
+    formData.append("file", file);
 
     const response = await api.post<ApiResponse<TarefaAnexo>>(
       `${this.baseUrl}/${tarefaId}/anexos`,
       formData,
       {
         headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      }
-    )
-    
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    );
+
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao fazer upload do anexo')
+      throw new Error(response.data.message || "Erro ao fazer upload do anexo");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async downloadAnexo(tarefaId: number, anexoId: number): Promise<Blob> {
     const response = await api.get(
       `${this.baseUrl}/${tarefaId}/anexos/${anexoId}/download`,
-      { responseType: 'blob' }
-    )
-    return response.data
+      { responseType: "blob" },
+    );
+    return response.data;
   }
 
   async deleteAnexo(tarefaId: number, anexoId: number): Promise<void> {
     const response = await api.delete<ApiResponse>(
-      `${this.baseUrl}/${tarefaId}/anexos/${anexoId}`
-    )
+      `${this.baseUrl}/${tarefaId}/anexos/${anexoId}`,
+    );
     if (!response.data.success) {
-      throw new Error(response.data.message || 'Erro ao excluir anexo')
+      throw new Error(response.data.message || "Erro ao excluir anexo");
     }
   }
 
   // Utilitários
   async duplicarTarefa(id: number): Promise<Tarefa> {
-    const response = await api.post<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}/duplicate`)
+    const response = await api.post<ApiResponse<Tarefa>>(
+      `${this.baseUrl}/${id}/duplicate`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao duplicar tarefa')
+      throw new Error(response.data.message || "Erro ao duplicar tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async arquivarTarefa(id: number): Promise<Tarefa> {
-    const response = await api.patch<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}/archive`)
+    const response = await api.patch<ApiResponse<Tarefa>>(
+      `${this.baseUrl}/${id}/archive`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao arquivar tarefa')
+      throw new Error(response.data.message || "Erro ao arquivar tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
 
   async desarquivarTarefa(id: number): Promise<Tarefa> {
-    const response = await api.patch<ApiResponse<Tarefa>>(`${this.baseUrl}/${id}/unarchive`)
+    const response = await api.patch<ApiResponse<Tarefa>>(
+      `${this.baseUrl}/${id}/unarchive`,
+    );
     if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || 'Erro ao desarquivar tarefa')
+      throw new Error(response.data.message || "Erro ao desarquivar tarefa");
     }
-    return response.data.data
+    return response.data.data;
   }
 }
 
-export const tarefasService = new TarefasService()
-export default tarefasService
-
-
-
+export const tarefasService = new TarefasService();
+export default tarefasService;

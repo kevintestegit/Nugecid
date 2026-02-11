@@ -153,7 +153,7 @@ export class ComentariosService {
     Object.assign(comentario, updateComentarioDto);
     comentario.editado = true;
 
-    const savedComentario = await this.comentarioRepository.save(comentario);
+    await this.comentarioRepository.save(comentario);
 
     // Criar histórico de edição
     await this.createHistoryEntry(

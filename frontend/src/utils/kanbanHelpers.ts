@@ -246,7 +246,7 @@ export const ordenarTarefas = (
         return new Date(a.prazo).getTime() - new Date(b.prazo).getTime();
       });
     
-    case 'prioridade':
+    case 'prioridade': {
       const prioridadeOrdem: Record<string, number> = {
         critica: 0,
         alta: 1,
@@ -256,6 +256,7 @@ export const ordenarTarefas = (
       return tarefasCopy.sort((a, b) => 
         prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade]
       );
+    }
     
     case 'titulo':
       return tarefasCopy.sort((a, b) => 

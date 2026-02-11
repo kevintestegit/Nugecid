@@ -80,10 +80,6 @@ export class DesarquivamentoMapper {
       domain.dataDevolucaoSetor === undefined
         ? null
         : domain.dataDevolucaoSetor;
-    console.log("[Mapper] toTypeOrm - Convertendo dataDevolucaoSetor:", {
-      domain: domain.dataDevolucaoSetor,
-      entity: dataDevolucao,
-    });
     entity.dataDevolucaoSetor = dataDevolucao;
     entity.setorDemandante = domain.setorDemandante;
     entity.servidorResponsavel = domain.servidorResponsavel;

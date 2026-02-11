@@ -100,10 +100,13 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <CheckSquare className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+              <CheckSquare className="h-4 w-4 text-primary" />
+            </span>
             Minhas Tarefas
           </CardTitle>
           <CardDescription className="text-sm text-muted-foreground/80">
@@ -129,12 +132,15 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
   }
 
   return (
-    <Card className="border-gray-200/80">
+    <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <div className="flex flex-col space-y-1.5">
-            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-              <CheckSquare className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+                <CheckSquare className="h-4 w-4 text-primary" />
+              </span>
               Minhas Tarefas
             </CardTitle>
             <CardDescription className="text-sm text-muted-foreground/80">
@@ -148,7 +154,7 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
             </Link>
           </Button>
         </div>
-        <div className="flex gap-4 border-b border-gray-100 pt-3 text-xs font-medium text-gray-500">
+        <div className="flex gap-4 border-b border-border/50 pt-3 text-xs font-medium text-muted-foreground">
           {[
             { key: 'all', label: 'Todas' },
             { key: 'PENDENTE', label: 'A Fazer' },
@@ -163,7 +169,7 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
                 'pb-3 transition-colors',
                 activeTab === tab.key
                   ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               {tab.label}
@@ -173,23 +179,23 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
       </CardHeader>
       <CardContent>
         {!hasAnyTasks ? (
-          <div className="py-10 text-center text-gray-500">
-            <CheckSquare className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <div className="py-10 text-center text-muted-foreground">
+            <CheckSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm">Você não tem tarefas pendentes.</p>
           </div>
         ) : filteredTasks.length === 0 ? (
-          <div className="py-8 text-center text-gray-500">
+          <div className="py-8 text-center text-muted-foreground">
             Nenhuma tarefa encontrada para este filtro.
           </div>
         ) : (
           <div className="space-y-3">
             {filteredTasks.slice(0, 5).map((task) => (
-              <div 
+              <div
                 key={task.id} 
-                className="flex items-center justify-between gap-4 p-4 rounded-xl border border-gray-200/70 hover:border-gray-300 hover:bg-gray-50/70 transition-colors"
+                className="flex items-center justify-between gap-4 rounded-xl border border-border/45 bg-background/70 p-4 transition-colors hover:border-border/70 hover:bg-muted/35"
               >
                 <div className="min-w-0 space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Badge className={cn('rounded-full px-2 py-0.5 text-[10px] uppercase', getPrioridadeColor(task.prioridade))}>
                       {getPrioridadeLabel(task.prioridade)}
                     </Badge>
@@ -204,12 +210,12 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
                       </span>
                     )}
                   </div>
-                  <h4 className="text-sm font-semibold text-gray-900 truncate">
+                  <h4 className="truncate text-sm font-semibold text-foreground">
                     {task.titulo}
                   </h4>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {task.projeto && (
-                      <span className="flex items-center rounded-full border border-gray-200 px-2.5 py-0.5 text-[11px] text-gray-600">
+                      <span className="flex items-center rounded-full border border-border/70 px-2.5 py-0.5 text-[11px] text-muted-foreground">
                         {task.projeto.nome}
                       </span>
                     )}
@@ -229,7 +235,7 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
                       return responsaveis.length > 1 ? (
                         <AvatarGroup usuarios={normalized} size="xs" max={3} />
                       ) : (
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-white">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-border/70">
                           <Avatar usuario={normalized[0]} size="xs" showTooltip={false} />
                         </span>
                       )
@@ -238,8 +244,8 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to={`/tarefas/${task.id}`} className="flex items-center justify-center h-9 w-9 rounded-full border border-gray-200 hover:border-gray-300">
-                      <ArrowRight className="h-4 w-4 text-gray-500" />
+                    <Link to={`/tarefas/${task.id}`} className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-border">
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     </Link>
                   </Button>
                 </div>
@@ -249,7 +255,7 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
         )}
         
         {filteredTasks.length > 5 && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 border-t border-border/60 pt-4">
             <Button variant="outline" className="w-full" asChild>
               <Link to="/tarefas" className="flex items-center justify-center gap-2">
                 Ver todas as tarefas ({filteredTasks.length})

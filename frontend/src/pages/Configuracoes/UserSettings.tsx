@@ -53,7 +53,7 @@ export const UserSettings: React.FC = () => {
     [userConfig, baselinePreferences],
   );
   
-  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(user?.avatarUrl);
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(user?.avatarUrl ?? undefined);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -152,7 +152,7 @@ export const UserSettings: React.FC = () => {
   const handleAvatarRemove = async () => {
     if (avatarFile) {
       setAvatarFile(null);
-      setAvatarPreview(user?.avatarUrl);
+      setAvatarPreview(user?.avatarUrl ?? undefined);
       return;
     }
 

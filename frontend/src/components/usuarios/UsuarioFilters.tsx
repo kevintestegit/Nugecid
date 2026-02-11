@@ -52,12 +52,12 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
-        <Filter className="h-5 w-5 text-gray-600" />
-        <h3 className="text-lg font-medium text-gray-900">Filtros</h3>
+        <Filter className="h-5 w-5 text-primary" />
+        <h3 className="text-base font-semibold text-foreground">Filtros</h3>
         {hasActiveFilters && (
           <button
             onClick={handleClearFilters}
-            className="ml-auto inline-flex items-center gap-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            className="ml-auto inline-flex items-center gap-1 rounded-lg border border-border/70 bg-background/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground transition-colors hover:text-foreground"
           >
             <X className="h-4 w-4" />
             Limpar filtros
@@ -68,7 +68,7 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Campo de busca */}
         <div className="space-y-2">
-          <label htmlFor="search" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="search" className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Buscar usuário
           </label>
           <SearchInput
@@ -81,14 +81,14 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
 
         {/* Filtro por papel */}
         <div className="space-y-2">
-          <label htmlFor="role" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="role" className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Papel do usuário
           </label>
           <select
             id="role"
             value={params.role || ''}
             onChange={handleRoleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+            className="w-full rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary/50 focus:ring-2 focus:ring-primary/35"
           >
             <option value="">Todos os papéis</option>
             <option value="admin">Administrador</option>
@@ -100,14 +100,14 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
         {/* Filtro por status (apenas para admins) */}
         {canManageUsers && (
           <div className="space-y-2">
-            <label htmlFor="active" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="active" className="block text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               Status do usuário
             </label>
             <select
               id="active"
               value={params.includeDeleted ? 'deleted' : (params.active === undefined ? '' : params.active.toString())}
               onChange={handleActiveChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-primary/50 focus:ring-2 focus:ring-primary/35"
             >
               <option value="">Todos os status</option>
               <option value="true">Ativos</option>
@@ -120,15 +120,15 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
 
       {/* Indicadores de filtros ativos */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-          <span className="text-sm text-gray-600">Filtros ativos:</span>
+        <div className="flex flex-wrap gap-2 border-t border-border/70 pt-2">
+          <span className="text-sm text-muted-foreground">Filtros ativos:</span>
           
           {params.search && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-xs text-primary">
               Busca: "{params.search}"
               <button
                 onClick={() => onParamsChange({ search: undefined })}
-                className="hover:bg-blue-200 rounded-full p-0.5"
+                className="rounded-full p-0.5 hover:bg-primary/20"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -136,11 +136,11 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
           )}
           
           {params.role && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300">
               Papel: {params.role === 'admin' ? 'Administrador' : params.role === 'coordenador' ? 'Coordenador' : 'Usuário'}
               <button
                 onClick={() => onParamsChange({ role: undefined })}
-                className="hover:bg-green-200 rounded-full p-0.5"
+                className="rounded-full p-0.5 hover:bg-emerald-500/20"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -148,11 +148,11 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
           )}
           
           {params.active === false && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-700 dark:text-red-300">
               Status: Inativos
               <button
                 onClick={() => onParamsChange({ active: true })}
-                className="hover:bg-red-200 rounded-full p-0.5"
+                className="rounded-full p-0.5 hover:bg-red-500/20"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -160,11 +160,11 @@ const UsuarioFilters: React.FC<UsuarioFiltersProps> = ({
           )}
           
           {params.includeDeleted && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded-full">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1 text-xs text-foreground/85">
               Incluindo deletados
               <button
                 onClick={() => onParamsChange({ includeDeleted: undefined, active: true })}
-                className="hover:bg-gray-200 rounded-full p-0.5"
+                className="rounded-full p-0.5 hover:bg-muted"
               >
                 <X className="h-3 w-3" />
               </button>

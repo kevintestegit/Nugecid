@@ -1,6 +1,5 @@
 import { Controller, Get, Req, UseGuards, Res, Query } from "@nestjs/common";
 import { Request, Response } from "express";
-import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 
 import { AppService } from "./app.service";
@@ -114,8 +113,6 @@ export class AppController {
     @Query("limit") limit?: string,
     @Query("offset") offset?: string,
   ) {
-    console.log("🔍 Busca recebida:", { query, types, limit, offset });
-
     const searchTypes = types
       ? types.split(",").map((t) => t.trim())
       : undefined;
@@ -128,8 +125,6 @@ export class AppController {
       limit: searchLimit,
       offset: searchOffset,
     });
-
-    console.log("✅ Resultados encontrados:", results.total);
     return results;
   }
 }

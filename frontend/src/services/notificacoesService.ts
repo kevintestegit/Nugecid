@@ -99,23 +99,12 @@ export class NotificacoesService {
    * Buscar apenas notificações não lidas
    */
   async buscarNaoLidas(): Promise<Notificacao[]> {
-    try {
-      const response = await api.get<ApiResponseEnvelope<NotificacoesResponse>>(`${this.baseUrl}/nao-lidas`);
-      const payload = unwrap<NotificacoesResponse>(response);
-      if (Array.isArray(payload?.data)) {
-        return payload.data;
-      }
-      return Array.isArray(payload as any) ? (payload as any) : [];
-    } catch (err: any) {
-      console.error('Erro detalhado ao buscar não lidas:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message,
-        url: `${this.baseUrl}/nao-lidas`
-      });
-      // Em caso de erro, retornar array vazio em vez de lançar erro
-      return [];
+    const response = await api.get<ApiResponseEnvelope<NotificacoesResponse>>(`${this.baseUrl}/nao-lidas`);
+    const payload = unwrap<NotificacoesResponse>(response);
+    if (Array.isArray(payload?.data)) {
+      return payload.data;
     }
+    return Array.isArray(payload as any) ? (payload as any) : [];
   }
 
   /**
@@ -169,25 +158,8 @@ export class NotificacoesService {
    * Buscar estatísticas das notificações
    */
   async buscarEstatisticas(): Promise<EstatisticasNotificacoes> {
-    try {
-      const response = await api.get<ApiResponseEnvelope<EstatisticasNotificacoes>>(`${this.baseUrl}/estatisticas`);
-      return unwrap<EstatisticasNotificacoes>(response);
-    } catch (err: any) {
-      console.error('Erro detalhado ao buscar estatísticas:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message,
-        url: `${this.baseUrl}/estatisticas`
-      });
-      // Em caso de erro, retornar estatísticas vazias
-      return {
-        total: 0,
-        naoLidas: 0,
-        lidas: 0,
-        porTipo: {},
-        porPrioridade: {}
-      };
-    }
+    const response = await api.get<ApiResponseEnvelope<EstatisticasNotificacoes>>(`${this.baseUrl}/estatisticas`);
+    return unwrap<EstatisticasNotificacoes>(response);
   }
 
   /**

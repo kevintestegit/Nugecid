@@ -16,13 +16,7 @@ import {
   Request,
   Response,
 } from "@nestjs/common";
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 import {
   Request as ExpressRequest,
   Response as ExpressResponse,
@@ -46,7 +40,6 @@ import { UpdateUserDto } from "./application/dto/update-user.dto";
 import { QueryUsersDto } from "./application/dto/query-users.dto";
 
 // Guards and Decorators
-import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";

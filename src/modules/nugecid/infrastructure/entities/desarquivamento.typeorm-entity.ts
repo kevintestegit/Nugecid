@@ -11,7 +11,6 @@ import {
   Index,
 } from "typeorm";
 import { User } from "../../../users/entities/user.entity";
-import { StatusDesarquivamentoEnum } from "../../domain/enums/status-desarquivamento.enum";
 import { DesarquivamentoCommentTypeOrmEntity } from "./desarquivamento-comment.typeorm-entity";
 import { DesarquivamentoAnexoTypeOrmEntity } from "./desarquivamento-anexo.typeorm-entity";
 

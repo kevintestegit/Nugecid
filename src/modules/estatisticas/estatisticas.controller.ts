@@ -19,7 +19,10 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RoleType } from "../users/enums/role-type.enum";
 import { EstatisticasService } from "./estatisticas.service";
-import { FiltrosEstatisticasDto, PaginacaoDto } from "./dto/filtros-estatisticas.dto";
+import {
+  FiltrosEstatisticasDto,
+  PaginacaoDto,
+} from "./dto/filtros-estatisticas.dto";
 
 @ApiTags("Estatísticas")
 @ApiBearerAuth()
@@ -40,22 +43,17 @@ export class EstatisticasController {
     @Request() req: ExpressRequest,
   ) {
     const user = req.user as any;
-    const isAdmin = user?.role?.name === 'admin' || user?.role?.name === 'coordenador';
-    
-    console.log('[STATS] User:', user?.id, 'Role:', user?.role?.name, 'isAdmin:', isAdmin);
-    
+    const isAdmin =
+      user?.role?.name === "admin" || user?.role?.name === "coordenador";
+
     const filtrosFormatados = {
       dataInicio: filtros.dataInicio ? new Date(filtros.dataInicio) : undefined,
       dataFim: filtros.dataFim ? new Date(filtros.dataFim) : undefined,
       userId: isAdmin ? undefined : user?.id, // Filtrar por usuário se não for admin/coordenador
     };
-    
-    console.log('[STATS] Filtros:', JSON.stringify(filtrosFormatados));
-    
+
     const data = await this.estatisticasService.getCardData(filtrosFormatados);
-    
-    console.log('[STATS] Total retornado:', data.totalDesarquivamentos);
-    
+
     return { success: true, data };
   }
 
@@ -80,9 +78,8 @@ export class EstatisticasController {
       dataFim: filtros.dataFim ? new Date(filtros.dataFim) : undefined,
       userId: isAdmin ? undefined : user?.id,
     };
-    const data = await this.estatisticasService.getRequisicoesPorMes(
-      filtrosFormatados,
-    );
+    const data =
+      await this.estatisticasService.getRequisicoesPorMes(filtrosFormatados);
     return { success: true, data };
   }
 
@@ -172,16 +169,15 @@ export class EstatisticasController {
     const isAdmin =
       user?.role?.name === "admin" || user?.role?.name === "coordenador";
 
-    const pdfBuffer =
-      await this.estatisticasService.generateRelatorioMensalPdf(
-        parseInt(ano),
-        parseInt(mes),
-        {
-          pagina: paginacao.pagina,
-          limite: paginacao.limite,
-        },
-        isAdmin ? undefined : user?.id,
-      );
+    const pdfBuffer = await this.estatisticasService.generateRelatorioMensalPdf(
+      parseInt(ano),
+      parseInt(mes),
+      {
+        pagina: paginacao.pagina,
+        limite: paginacao.limite,
+      },
+      isAdmin ? undefined : user?.id,
+    );
     const fileName = `relatorio-mensal-${ano}-${mes.padStart(2, "0")}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");

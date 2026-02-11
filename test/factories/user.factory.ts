@@ -1,5 +1,4 @@
 import { User } from "../../src/modules/users/entities/user.entity";
-import { Role } from "../../src/modules/users/entities/role.entity";
 import { RoleFactory } from "./role.factory";
 import { DeepPartial } from "typeorm";
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 import { AnnouncementModal } from '@/components/announcements/AnnouncementModal'
 
@@ -11,7 +11,7 @@ vi.mock('@/services/api', () => ({
   },
 }))
 
-const apiService = (await import('@/services/api')).apiService as {
+const apiService = (await import('@/services/api')).apiService as unknown as {
   getActiveAnnouncements: ReturnType<typeof vi.fn>
 }
 
@@ -44,5 +44,4 @@ describe('AnnouncementModal', () => {
     })
   })
 })
-
 

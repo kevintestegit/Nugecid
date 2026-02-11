@@ -7,13 +7,13 @@ export interface Tarefa {
   criadorId: number;
   responsavelId?: number;
   prazo?: string;
-  prioridade: 'baixa' | 'media' | 'alta' | 'critica';
+  prioridade: "baixa" | "media" | "alta" | "critica";
   ordem: number;
   tags?: string[];
   parentId?: number | null;
   createdAt: string;
   updatedAt: string;
-  
+
   // Relações
   responsavel?: Usuario;
   responsaveis?: Usuario[];
@@ -50,10 +50,10 @@ export interface Projeto {
 
 export interface Usuario {
   id: number;
-  nome: string;
-  usuario: string;
+  nome?: string;
+  usuario?: string;
   email?: string;
-  avatar?: string;
+  avatar?: string | null;
   avatarUrl?: string | null;
 }
 
@@ -110,11 +110,11 @@ export interface HistoricoTarefa {
 export interface FiltrosKanban {
   projetoId?: number;
   responsavelId?: number;
-  prioridade?: 'baixa' | 'media' | 'alta' | 'critica';
+  prioridade?: "baixa" | "media" | "alta" | "critica";
   tags?: string[];
-  prazo?: 'atrasadas' | 'hoje' | 'semana' | 'mes' | 'sem_prazo';
+  prazo?: "atrasadas" | "hoje" | "semana" | "mes" | "sem_prazo";
   busca?: string;
-  agruparPor?: 'responsavel' | 'prioridade' | 'prazo' | 'tags';
+  agruparPor?: "responsavel" | "prioridade" | "prazo" | "tags";
   comComentarios?: boolean;
   comAnexos?: boolean;
 }
@@ -133,22 +133,22 @@ export interface WipStatus {
   exceeded: boolean;
 }
 
-export type PapelMembro = 'admin' | 'editor' | 'viewer';
+export type PapelMembro = "admin" | "editor" | "viewer";
 
 export interface MembroProjeto {
   id: number;
-  projetoId: number;
-  usuarioId: number;
+  projetoId?: number;
+  usuarioId?: number;
   papel: PapelMembro;
   usuario?: Usuario;
 }
 
 // Helpers para calcular status de prazo
 export enum PrazoStatus {
-  OK = 'ok',
-  PROXIMO = 'proximo',
-  ATRASADO = 'atrasado',
-  SEM_PRAZO = 'sem_prazo',
+  OK = "ok",
+  PROXIMO = "proximo",
+  ATRASADO = "atrasado",
+  SEM_PRAZO = "sem_prazo",
 }
 
 export interface PrazoInfo {

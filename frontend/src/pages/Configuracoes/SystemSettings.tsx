@@ -32,6 +32,13 @@ import { toast } from 'sonner';
 import { LinearProgress, MultiStepProgress } from '@/components/ui/ProgressBar';
 import { ErrorMessage, getErrorMessage } from '@/components/ui/ErrorMessage';
 
+type RestoreStepStatus = 'pending' | 'current' | 'completed' | 'error';
+type RestoreStep = {
+  label: string;
+  description: string;
+  status: RestoreStepStatus;
+};
+
 export const SystemSettings: React.FC = () => {
   const [systemConfig, setSystemConfig] = useState({
     autoBackup: true,
@@ -51,7 +58,7 @@ export const SystemSettings: React.FC = () => {
   const [availableBackups, setAvailableBackups] = useState<BackupListItem[]>([]);
   const [selectedBackup, setSelectedBackup] = useState<BackupListItem | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [restoreSteps, setRestoreSteps] = useState([
+  const [restoreSteps, setRestoreSteps] = useState<RestoreStep[]>([
     { label: 'Preparação', description: 'Validando backup', status: 'pending' as const },
     { label: 'Banco de Dados', description: 'Restaurando dados', status: 'pending' as const },
     { label: 'Arquivos', description: 'Restaurando uploads', status: 'pending' as const },
@@ -214,7 +221,7 @@ export const SystemSettings: React.FC = () => {
     setBackupError(null);
 
     // Função para atualizar o status de um passo
-    const updateStepStatus = (stepIndex: number, status: 'pending' | 'current' | 'completed' | 'error') => {
+    const updateStepStatus = (stepIndex: number, status: RestoreStepStatus) => {
       setRestoreSteps(prev => prev.map((step, idx) =>
         idx === stepIndex ? { ...step, status } : step
       ));
@@ -458,7 +465,7 @@ export const SystemSettings: React.FC = () => {
             <CardTitle className="text-lg">Escavador SEIRN</CardTitle>
             <CardDescription>Monitora “Recebidos” no SEI e gera notificações internas.</CardDescription>
           </div>
-          <Badge variant={escavadorStatus?.running ? 'success' : 'secondary'}>
+          <Badge variant={escavadorStatus?.running ? 'default' : 'secondary'}>
             {escavadorStatus?.running ? 'Rodando' : 'Parado'}
           </Badge>
         </CardHeader>

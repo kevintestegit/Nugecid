@@ -1,6 +1,6 @@
 import "module-alias/register";
-import { NestFactory, Reflector } from "@nestjs/core";
-import { ValidationPipe, Logger, BadRequestException } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
@@ -51,7 +51,6 @@ async function bootstrap() {
                 ],
                 scriptSrc: [
                   "'self'",
-                  "'unsafe-inline'",
                   "https://cdn.jsdelivr.net",
                   "https://cdnjs.cloudflare.com",
                 ],
@@ -62,6 +61,8 @@ async function bootstrap() {
                   "https://cdnjs.cloudflare.com",
                 ],
                 connectSrc: ["'self'"],
+                objectSrc: ["'none'"],
+                baseUri: ["'self'"],
               },
             }
           : false,

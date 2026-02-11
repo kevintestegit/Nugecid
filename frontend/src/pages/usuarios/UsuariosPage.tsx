@@ -35,14 +35,14 @@ const UsuariosPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <Users className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+          <h2 className="mb-2 text-xl font-semibold text-foreground">
             Acesso Negado
           </h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             Você não tem permissão para acessar esta página.
           </p>
-          <div className="mt-4 text-xs text-gray-500">
+          <div className="mt-4 text-xs text-muted-foreground/80">
             <p>Abra o Console (F12) para ver detalhes do erro</p>
           </div>
         </div>
@@ -85,29 +85,34 @@ const UsuariosPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_24px_55px_-42px_rgba(15,23,42,0.75)] backdrop-blur md:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-cyan-400/15 blur-3xl" />
+        <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-orange-400/15 blur-3xl" />
+
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-            <Users className="h-5 w-5 text-blue-600" />
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+            <Users className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Gerenciamento de Usuários</h1>
-            <p className="text-gray-600">Gerencie usuários do sistema</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Gerenciamento de Usuários</h1>
+            <p className="text-sm text-muted-foreground">Gerencie usuários do sistema</p>
           </div>
         </div>
         {canManageUsers && (
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:ring-2 focus:ring-primary/40 focus:ring-offset-2"
           >
             <Plus className="h-4 w-4" />
             Novo Usuário
           </button>
         )}
       </div>
+      </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="rounded-2xl border border-border/60 bg-card/80 p-6 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <UsuarioFilters
           params={queryParams}
           onParamsChange={handleFilterChange}
@@ -116,7 +121,7 @@ const UsuariosPage: React.FC = () => {
       </div>
 
       {/* Tabela */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/80 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
         <UsuariosTable
           users={usersResponse?.data || []}
           meta={usersResponse?.meta}

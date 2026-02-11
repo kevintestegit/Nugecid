@@ -1,8 +1,8 @@
-import { IsOptional, IsString, MaxLength, IsBoolean } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString, MaxLength, IsBoolean } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class UpdateItemChecklistDto {
-  @ApiProperty({ example: 'Verificar responsividade mobile', required: false })
+  @ApiProperty({ example: "Verificar responsividade mobile", required: false })
   @IsOptional()
   @IsString()
   @MaxLength(500)

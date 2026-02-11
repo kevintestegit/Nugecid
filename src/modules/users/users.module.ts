@@ -31,9 +31,6 @@ import {
   GetRolesUseCase,
 } from "./application/use-cases";
 
-// Repository Interfaces
-import { IUserRepository, IRoleRepository } from "./domain/repositories";
-
 // Repository Implementations
 import {
   TypeOrmUserRepository,

@@ -82,6 +82,8 @@ const NugecidListPage: React.FC = () => {
     toast.success('Lista atualizada com sucesso!')
   }
 
+  const { data: desarquivamentos = [], meta } = response || {}
+
   // Atualizar notificações quando os dados mudarem
   React.useEffect(() => {
     if (desarquivamentos) {
@@ -116,8 +118,6 @@ const NugecidListPage: React.FC = () => {
       </div>
     )
   }
-
-  const { data: desarquivamentos = [], meta } = response || {}
 
   return (
     <div className="space-y-6">
