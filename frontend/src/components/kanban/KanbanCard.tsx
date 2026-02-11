@@ -1,25 +1,39 @@
-import React from 'react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { MessageCircle, Paperclip, MoreHorizontal, Flag, Calendar } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { Tarefa } from '../../types/kanban.types';
-import { Avatar, AvatarGroup } from './Avatar';
-import { PrazoBadge } from './PrazoBadge';
-import { TagList } from './TagBadge';
-import { getPrioridadeCor } from '../../utils/kanbanHelpers';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import React from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  MessageCircle,
+  Paperclip,
+  MoreHorizontal,
+  Flag,
+  Calendar,
+} from "lucide-react";
+import { cn } from "../../lib/utils";
+import { Tarefa } from "../../types/kanban.types";
+import { Avatar, AvatarGroup } from "./Avatar";
+import { PrazoBadge } from "./PrazoBadge";
+import { TagList } from "./TagBadge";
+import { getPrioridadeCor } from "../../utils/kanbanHelpers";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface KanbanCardProps {
   tarefa: Tarefa;
   onClick?: (tarefa: Tarefa) => void;
   onEdit?: (tarefa: Tarefa) => void;
   onDelete?: (tarefaId: number) => void;
-  density?: 'comfortable' | 'compact';
+  density?: "comfortable" | "compact";
 }
 
-export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit, onDelete, density = 'comfortable' }) => {
+export type { Tarefa } from "../../types/kanban.types";
+
+export const KanbanCard: React.FC<KanbanCardProps> = ({
+  tarefa,
+  onClick,
+  onEdit,
+  onDelete,
+  density = "comfortable",
+}) => {
   const {
     attributes,
     listeners,
@@ -30,7 +44,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
   } = useSortable({
     id: tarefa.id,
     data: {
-      type: 'tarefa',
+      type: "tarefa",
       tarefa,
       colunaId: tarefa.colunaId,
     },
@@ -48,18 +62,18 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
     : tarefa.responsavel
       ? [tarefa.responsavel]
       : [];
-  
+
   const getPriorityStyles = (prioridade: string) => {
     switch (prioridade.toLowerCase()) {
-      case 'alta':
-      case 'critica':
-        return 'bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50';
-      case 'media':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-900/50';
-      case 'baixa':
-        return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+      case "alta":
+      case "critica":
+        return "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50";
+      case "media":
+        return "bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-900/50";
+      case "baixa":
+        return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
       default:
-        return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+        return "bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
     }
   };
 
@@ -70,30 +84,32 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
       {...attributes}
       {...listeners}
       className={cn(
-        'touch-none group',
-        isDragging && 'opacity-50 scale-105 z-50'
+        "touch-none group",
+        isDragging && "opacity-50 scale-105 z-50",
       )}
     >
       <div
         className={cn(
-          'bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50/70 dark:hover:bg-gray-900/80 transition-colors cursor-pointer relative',
-          density === 'compact' ? 'p-3' : 'p-4',
-          isDragging ? 'rotate-2' : ''
+          "bg-white dark:bg-gray-900 rounded-xl border border-gray-200/80 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50/70 dark:hover:bg-gray-900/80 transition-colors cursor-pointer relative",
+          density === "compact" ? "p-3" : "p-4",
+          isDragging ? "rotate-2" : "",
         )}
         onClick={() => onClick?.(tarefa)}
       >
         {/* Header: Priority & More Options */}
         <div className="flex justify-between items-start mb-2">
           <div className="flex gap-2">
-            <span className={cn(
-              'rounded text-[10px] font-semibold uppercase border',
-              density === 'compact' ? 'px-1.5 py-0.5' : 'px-2 py-0.5',
-              getPriorityStyles(tarefa.prioridade)
-            )}>
+            <span
+              className={cn(
+                "rounded text-[10px] font-semibold uppercase border",
+                density === "compact" ? "px-1.5 py-0.5" : "px-2 py-0.5",
+                getPriorityStyles(tarefa.prioridade),
+              )}
+            >
               {tarefa.prioridade}
             </span>
           </div>
-          <button 
+          <button
             className="text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800"
             onClick={(e) => {
               e.stopPropagation();
@@ -107,7 +123,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
         {/* Tags */}
         {tarefa.tags && tarefa.tags.length > 0 && (
           <div className="flex gap-1 mb-2 flex-wrap">
-             <TagList tags={tarefa.tags} max={3} size="xs" variant="modern" />
+            <TagList tags={tarefa.tags} max={3} size="xs" variant="modern" />
           </div>
         )}
 
@@ -118,10 +134,12 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
 
         {/* Description */}
         {tarefa.descricao && (
-          <p className={cn(
-            'text-xs text-gray-600 dark:text-gray-400 line-clamp-2',
-            density === 'compact' ? 'mb-3' : 'mb-4'
-          )}>
+          <p
+            className={cn(
+              "text-xs text-gray-600 dark:text-gray-400 line-clamp-2",
+              density === "compact" ? "mb-3" : "mb-4",
+            )}
+          >
             {tarefa.descricao}
           </p>
         )}
@@ -144,15 +162,19 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ tarefa, onClick, onEdit,
           {/* Stats/Icons */}
           <div className="flex items-center gap-3 text-gray-400 text-xs">
             {tarefa.prazo && (
-              <div className={cn(
-                "flex items-center gap-1 hover:text-gray-600",
-                new Date(tarefa.prazo) < new Date() ? "text-red-500" : ""
-              )}>
+              <div
+                className={cn(
+                  "flex items-center gap-1 hover:text-gray-600",
+                  new Date(tarefa.prazo) < new Date() ? "text-red-500" : "",
+                )}
+              >
                 <Flag size={14} />
-                <span>{format(new Date(tarefa.prazo), 'dd MMM', { locale: ptBR })}</span>
+                <span>
+                  {format(new Date(tarefa.prazo), "dd MMM", { locale: ptBR })}
+                </span>
               </div>
             )}
-            
+
             {comentariosCount > 0 && (
               <div className="flex items-center gap-1 hover:text-gray-600">
                 <MessageCircle size={14} />

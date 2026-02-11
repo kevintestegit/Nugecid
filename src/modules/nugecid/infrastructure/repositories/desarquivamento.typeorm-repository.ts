@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, SelectQueryBuilder, In, Brackets } from "typeorm";
+import { Repository, SelectQueryBuilder, Brackets } from "typeorm";
 import { Logger } from "@nestjs/common";
 import { DesarquivamentoTypeOrmEntity } from "../entities/desarquivamento.typeorm-entity";
 import {
@@ -11,10 +11,7 @@ import {
 } from "../../domain/interfaces/desarquivamento.repository.interface";
 import { DesarquivamentoDomain } from "../../domain/entities/desarquivamento.entity";
 import { DesarquivamentoMapper } from "../mappers/desarquivamento.mapper";
-import {
-  DesarquivamentoId,
-  StatusDesarquivamento,
-} from "../../domain/value-objects";
+import { DesarquivamentoId } from "../../domain/value-objects";
 import { StatusDesarquivamentoEnum } from "../../domain/enums/status-desarquivamento.enum";
 import { TipoDesarquivamentoEnum } from "../../domain/enums/tipo-desarquivamento.enum";
 
@@ -46,7 +43,7 @@ export class DesarquivamentoTypeOrmRepository
     }
 
     this.logger.log(
-      `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | dadosAdicionais=${entity.dadosAdicionais || 'VAZIO'}`,
+      `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | dadosAdicionais=${entity.dadosAdicionais || "VAZIO"}`,
     );
     const savedEntity = await this.repository.save(entity);
     return this.mapper.toDomain(savedEntity);
@@ -55,21 +52,8 @@ export class DesarquivamentoTypeOrmRepository
   async update(
     desarquivamento: DesarquivamentoDomain,
   ): Promise<DesarquivamentoDomain> {
-    console.log("[Repository] update - Domain antes do mapper:", {
-      dadosAdicionais: desarquivamento.dadosAdicionais,
-      solicitacaoProrrogacaoTexto: desarquivamento.solicitacaoProrrogacaoTexto,
-    });
     const entity = this.mapper.toTypeOrm(desarquivamento);
-    console.log("[Repository] update - Entity após mapper:", {
-      id: entity.id,
-      dadosAdicionais: entity.dadosAdicionais,
-      solicitacaoProrrogacaoTexto: entity.solicitacaoProrrogacaoTexto,
-    });
     const savedEntity = await this.repository.save(entity);
-    console.log("[Repository] update - Entity após save:", {
-      id: savedEntity.id,
-      dadosAdicionais: savedEntity.dadosAdicionais,
-    });
     return this.mapper.toDomain(savedEntity);
   }
 
@@ -110,7 +94,7 @@ export class DesarquivamentoTypeOrmRepository
       queryBuilder.orderBy("d.createdAt", "DESC");
     }
 
-    const [entities, total] = await queryBuilder
+    const [entities] = await queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -539,7 +523,9 @@ export class DesarquivamentoTypeOrmRepository
     } = filters;
 
     // Debug log para filtros de data
-    this.logger.log(`[applyFilters] dataInicio=${dataInicio}, dataFim=${dataFim}, tipo dataInicio=${typeof dataInicio}, tipo dataFim=${typeof dataFim}`);
+    this.logger.log(
+      `[applyFilters] dataInicio=${dataInicio}, dataFim=${dataFim}, tipo dataInicio=${typeof dataInicio}, tipo dataFim=${typeof dataFim}`,
+    );
 
     // Filtro por status (suporta múltiplos)
     if (Array.isArray(statusList) && statusList.length > 0) {
@@ -588,18 +574,22 @@ export class DesarquivamentoTypeOrmRepository
       const startDateStr = dataInicio ? formatDate(dataInicio) : undefined;
       const endDateStr = dataFim ? formatDate(dataFim) : undefined;
 
-      this.logger.log(`[applyFilters] Aplicando filtro de datas: startDateStr=${startDateStr}, endDateStr=${endDateStr}`);
+      this.logger.log(
+        `[applyFilters] Aplicando filtro de datas: startDateStr=${startDateStr}, endDateStr=${endDateStr}`,
+      );
 
       // O frontend já adiciona 1 dia ao endDate, então usamos < endDate diretamente
       if (startDateStr && endDateStr) {
         qb.andWhere(
           "d.dataSolicitacao >= CAST(:dataInicio AS TIMESTAMP) AND d.dataSolicitacao < CAST(:dataFim AS TIMESTAMP)",
-          { 
-            dataInicio: `${startDateStr} 00:00:00`, 
-            dataFim: `${endDateStr} 00:00:00`
+          {
+            dataInicio: `${startDateStr} 00:00:00`,
+            dataFim: `${endDateStr} 00:00:00`,
           },
         );
-        this.logger.log(`[applyFilters] Query: dataSolicitacao >= '${startDateStr} 00:00:00' AND < '${endDateStr} 00:00:00'`);
+        this.logger.log(
+          `[applyFilters] Query: dataSolicitacao >= '${startDateStr} 00:00:00' AND < '${endDateStr} 00:00:00'`,
+        );
       } else if (startDateStr) {
         qb.andWhere("d.dataSolicitacao >= CAST(:dataInicio AS TIMESTAMP)", {
           dataInicio: `${startDateStr} 00:00:00`,

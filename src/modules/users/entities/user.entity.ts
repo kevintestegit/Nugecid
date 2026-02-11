@@ -138,12 +138,18 @@ export class User {
 
   // Serialização (remove campos sensíveis)
   toJSON() {
-    const { senha, tokenReset, tokenResetExpira, ...result } = this;
+    const result = { ...this } as Partial<User>;
+    delete result.senha;
+    delete result.tokenReset;
+    delete result.tokenResetExpira;
     return result;
   }
 
   serialize() {
-    const { senha, tokenReset, tokenResetExpira, ...result } = this;
+    const result = { ...this } as Partial<User>;
+    delete result.senha;
+    delete result.tokenReset;
+    delete result.tokenResetExpira;
     return result;
   }
 }

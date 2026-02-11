@@ -1,80 +1,146 @@
-import { useState, useEffect, useCallback } from 'react';
-import { 
-  notificacoesService, 
-  Notificacao, 
-  NotificacoesResponse, 
-  EstatisticasNotificacoes 
-} from '../services/notificacoesService';
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import {
+  notificacoesService,
+  Notificacao,
+  EstatisticasNotificacoes,
+} from "../services/notificacoesService";
+
+export type { Notificacao };
 
 export const useNotificacoes = () => {
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [naoLidas, setNaoLidas] = useState<Notificacao[]>([]);
-  const [estatisticas, setEstatisticas] = useState<EstatisticasNotificacoes | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [estatisticas, setEstatisticas] =
+    useState<EstatisticasNotificacoes | null>(null);
+  const [loadingNotificacoes, setLoadingNotificacoes] = useState(false);
+  const [loadingNaoLidas, setLoadingNaoLidas] = useState(false);
+  const [loadingEstatisticas, setLoadingEstatisticas] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pollingEnabled, setPollingEnabled] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(
+    typeof document !== "undefined" ? !document.hidden : true,
+  );
+
+  const isMountedRef = useRef(true);
+  const notificacoesReqIdRef = useRef(0);
+  const naoLidasReqIdRef = useRef(0);
+  const estatisticasReqIdRef = useRef(0);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsPageVisible(!document.hidden);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   // Buscar todas as notificações
-  const fetchNotificacoes = useCallback(async (params?: {
-    page?: number;
-    limit?: number;
-    lida?: boolean;
-    tipo?: string;
-    prioridade?: string;
-  }) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await notificacoesService.buscarNotificacoes(params);
-      
-      setNotificacoes(response.data);
-      return response;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Erro ao buscar notificações';
-      setError(errorMessage);
-      console.error('Erro ao buscar notificações:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchNotificacoes = useCallback(
+    async (params?: {
+      page?: number;
+      limit?: number;
+      lida?: boolean;
+      tipo?: string;
+      prioridade?: string;
+    }) => {
+      const requestId = ++notificacoesReqIdRef.current;
+      try {
+        setLoadingNotificacoes(true);
+        setError(null);
+
+        const response = await notificacoesService.buscarNotificacoes(params);
+
+        if (
+          !isMountedRef.current ||
+          requestId !== notificacoesReqIdRef.current
+        ) {
+          return response;
+        }
+
+        setNotificacoes(Array.isArray(response.data) ? response.data : []);
+        return response;
+      } catch (err: any) {
+        if (
+          !isMountedRef.current ||
+          requestId !== notificacoesReqIdRef.current
+        ) {
+          throw err;
+        }
+        const errorMessage =
+          err.response?.data?.message || "Erro ao buscar notificações";
+        setError(errorMessage);
+        console.error("Erro ao buscar notificações:", err);
+        throw err;
+      } finally {
+        if (
+          isMountedRef.current &&
+          requestId === notificacoesReqIdRef.current
+        ) {
+          setLoadingNotificacoes(false);
+        }
+      }
+    },
+    [],
+  );
 
   // Buscar apenas notificações não lidas
   const fetchNaoLidas = useCallback(async () => {
+    const requestId = ++naoLidasReqIdRef.current;
     try {
-      setLoading(true);
+      setLoadingNaoLidas(true);
       const data = await notificacoesService.buscarNaoLidas();
-      // Garantir que data sempre seja um array
+
+      if (!isMountedRef.current || requestId !== naoLidasReqIdRef.current) {
+        return;
+      }
+
       setNaoLidas(Array.isArray(data) ? data : []);
       setError(null);
     } catch (err) {
-      setError('Erro ao carregar notificações não lidas');
-      console.error('Erro ao buscar notificações não lidas:', err);
-      // Em caso de erro, definir como array vazio
-      setNaoLidas([]);
+      if (!isMountedRef.current || requestId !== naoLidasReqIdRef.current) {
+        return;
+      }
+      setError("Erro ao carregar notificações não lidas");
+      console.error("Erro ao buscar notificações não lidas:", err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current && requestId === naoLidasReqIdRef.current) {
+        setLoadingNaoLidas(false);
+      }
     }
   }, []);
 
   // Buscar estatísticas
   const fetchEstatisticas = useCallback(async () => {
+    const requestId = ++estatisticasReqIdRef.current;
     try {
+      setLoadingEstatisticas(true);
       const data = await notificacoesService.buscarEstatisticas();
+
+      if (!isMountedRef.current || requestId !== estatisticasReqIdRef.current) {
+        return;
+      }
+
       setEstatisticas(data);
       setError(null);
     } catch (err) {
-      setError('Erro ao carregar estatísticas');
-      console.error('Erro ao buscar estatísticas:', err);
-      // Em caso de erro, definir estatísticas vazias
-      setEstatisticas({
-        total: 0,
-        naoLidas: 0,
-        lidas: 0,
-        porTipo: {},
-        porPrioridade: {}
-      });
+      if (!isMountedRef.current || requestId !== estatisticasReqIdRef.current) {
+        return;
+      }
+      setError("Erro ao carregar estatísticas");
+      console.error("Erro ao buscar estatísticas:", err);
+    } finally {
+      if (isMountedRef.current && requestId === estatisticasReqIdRef.current) {
+        setLoadingEstatisticas(false);
+      }
     }
   }, []);
 
@@ -82,20 +148,28 @@ export const useNotificacoes = () => {
   const marcarComoLida = useCallback(async (id: number) => {
     try {
       await notificacoesService.marcarComoLida(id);
-      
+
       // Atualizar estado local
-      setNotificacoes(prev => 
-        prev.map(notif => 
-          notif.id === id ? { ...notif, lida: true } : notif
-        )
+      setNotificacoes((prev) =>
+        prev.map((notif) =>
+          notif.id === id ? { ...notif, lida: true } : notif,
+        ),
       );
-      
-      setNaoLidas(prev => prev.filter(notif => notif.id !== id));
-      
+
+      setNaoLidas((prev) => prev.filter((notif) => notif.id !== id));
+      setEstatisticas((prev) => {
+        if (!prev || prev.naoLidas <= 0) return prev;
+        return {
+          ...prev,
+          naoLidas: Math.max(0, prev.naoLidas - 1),
+          lidas: prev.lidas + 1,
+        };
+      });
+
       setError(null);
     } catch (err) {
-      setError('Erro ao marcar notificação como lida');
-      console.error('Erro ao marcar como lida:', err);
+      setError("Erro ao marcar notificação como lida");
+      console.error("Erro ao marcar como lida:", err);
     }
   }, []);
 
@@ -103,17 +177,25 @@ export const useNotificacoes = () => {
   const marcarTodasComoLidas = useCallback(async () => {
     try {
       await notificacoesService.marcarTodasComoLidas();
-      
+
       // Atualizar estado local
-      setNotificacoes(prev => 
-        prev.map(notif => ({ ...notif, lida: true }))
+      setNotificacoes((prev) =>
+        prev.map((notif) => ({ ...notif, lida: true })),
       );
-      
+
       setNaoLidas([]);
+      setEstatisticas((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          lidas: prev.lidas + prev.naoLidas,
+          naoLidas: 0,
+        };
+      });
       setError(null);
     } catch (err) {
-      setError('Erro ao marcar todas as notificações como lidas');
-      console.error('Erro ao marcar todas como lidas:', err);
+      setError("Erro ao marcar todas as notificações como lidas");
+      console.error("Erro ao marcar todas como lidas:", err);
     }
   }, []);
 
@@ -121,61 +203,72 @@ export const useNotificacoes = () => {
   const excluirNotificacao = useCallback(async (id: number) => {
     try {
       await notificacoesService.excluir(id);
-      
-      // Atualizar estado local
-      const notificacaoExcluida = notificacoes.find(n => n.id === id);
-      
-      setNotificacoes(prev => prev.filter(notif => notif.id !== id));
-      setNaoLidas(prev => prev.filter(notif => notif.id !== id));
-      
-      // Atualizar estatísticas
-      if (estatisticas && notificacaoExcluida) {
-        setEstatisticas(prev => prev ? {
+
+      let wasUnread = false;
+      setNotificacoes((prev) => {
+        const target = prev.find((notif) => notif.id === id);
+        wasUnread = target ? !target.lida : false;
+        return prev.filter((notif) => notif.id !== id);
+      });
+      setNaoLidas((prev) => prev.filter((notif) => notif.id !== id));
+
+      setEstatisticas((prev) => {
+        if (!prev) return prev;
+        return {
           ...prev,
-          total: prev.total - 1,
-          naoLidas: notificacaoExcluida.lida ? prev.naoLidas : prev.naoLidas - 1,
-          lidas: notificacaoExcluida.lida ? prev.lidas - 1 : prev.lidas
-        } : null);
-      }
+          total: Math.max(0, prev.total - 1),
+          naoLidas: wasUnread ? Math.max(0, prev.naoLidas - 1) : prev.naoLidas,
+          lidas: wasUnread ? prev.lidas : Math.max(0, prev.lidas - 1),
+        };
+      });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Erro ao excluir notificação';
+      const errorMessage =
+        err.response?.data?.message || "Erro ao excluir notificação";
       setError(errorMessage);
-      console.error('Erro ao excluir notificação:', err);
+      console.error("Erro ao excluir notificação:", err);
       throw err;
     }
-  }, [notificacoes, estatisticas]);
+  }, []);
 
   // Polling para buscar novas notificações a cada 30 segundos
   useEffect(() => {
-    if (!pollingEnabled) return;
+    if (!pollingEnabled || !isPageVisible) return;
 
     const interval = setInterval(async () => {
       try {
-        await fetchNaoLidas();
-        await fetchEstatisticas();
+        if (
+          typeof navigator !== "undefined" &&
+          "onLine" in navigator &&
+          !navigator.onLine
+        ) {
+          return;
+        }
+        await Promise.all([fetchNaoLidas(), fetchEstatisticas()]);
       } catch (err) {
         // Silenciar erros do polling para não spam no console
       }
     }, 30000); // 30 segundos
 
     return () => clearInterval(interval);
-  }, [fetchNaoLidas, fetchEstatisticas, pollingEnabled]);
+  }, [fetchNaoLidas, fetchEstatisticas, pollingEnabled, isPageVisible]);
 
   // Carregar dados iniciais
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        await Promise.all([
-          fetchNaoLidas(),
-          fetchEstatisticas()
-        ]);
+        await Promise.all([fetchNaoLidas(), fetchEstatisticas()]);
       } catch (err) {
-        console.error('Erro ao carregar dados iniciais:', err);
+        console.error("Erro ao carregar dados iniciais:", err);
       }
     };
 
     loadInitialData();
   }, [fetchNaoLidas, fetchEstatisticas]);
+
+  const loading = useMemo(
+    () => loadingNotificacoes || loadingNaoLidas || loadingEstatisticas,
+    [loadingNotificacoes, loadingNaoLidas, loadingEstatisticas],
+  );
 
   return {
     // Estados
@@ -183,9 +276,12 @@ export const useNotificacoes = () => {
     naoLidas,
     estatisticas,
     loading,
+    loadingNotificacoes,
+    loadingNaoLidas,
+    loadingEstatisticas,
     error,
     pollingEnabled,
-    
+
     // Ações
     fetchNotificacoes,
     fetchNaoLidas,
@@ -194,7 +290,7 @@ export const useNotificacoes = () => {
     marcarTodasComoLidas,
     excluirNotificacao,
     setPollingEnabled,
-    
+
     // Computed values
     totalNaoLidas: naoLidas.length,
     hasNotificacoes: naoLidas.length > 0,

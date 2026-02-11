@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, MoreThan, LessThan, Between, Not, IsNull } from "typeorm";
+import { Repository, MoreThan } from "typeorm";
 
 import { BlockedIp } from "./entities/blocked-ip.entity";
 import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
@@ -328,7 +328,7 @@ export class SecurityService {
    */
   async listBlockedUsers(): Promise<BlockedUserInfo[]> {
     const now = new Date();
-    
+
     const users = await this.userRepository.find({
       where: {
         bloqueadoAte: MoreThan(now),
@@ -359,12 +359,14 @@ export class SecurityService {
     }
 
     if (!user.bloqueadoAte || user.bloqueadoAte <= new Date()) {
-      throw new BadRequestException(`Usuário ${user.usuario} não está bloqueado`);
+      throw new BadRequestException(
+        `Usuário ${user.usuario} não está bloqueado`,
+      );
     }
 
     user.bloqueadoAte = null;
     user.tentativasLogin = 0;
-    
+
     const updated = await this.userRepository.save(user);
 
     this.logger.log(`Usuário ${user.usuario} (ID: ${userId}) desbloqueado`);

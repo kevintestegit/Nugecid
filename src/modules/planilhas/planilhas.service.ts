@@ -415,7 +415,7 @@ export class PlanilhasService {
 
     const linhas = dataRows.map((row, index) => {
       const linha: PlanilhaGeralLinha = {};
-      normalizedHeaders.forEach((coluna, colIndex) => {
+      normalizedHeaders.forEach((coluna) => {
         if (headerRow.includes(coluna)) {
           const idx = headerRow.indexOf(coluna);
           linha[coluna] =

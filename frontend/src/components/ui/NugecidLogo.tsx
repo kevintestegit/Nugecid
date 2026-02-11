@@ -5,20 +5,17 @@ interface NugecidLogoProps {
   className?: string
 }
 
-// Versão com gorro "pendurado" na letra N
 export const NugecidLogo: React.FC<NugecidLogoProps> = ({
   showText = true,
   className = "",
 }) => {
   if (showText) {
-    // Logo completa com touca apoiada e pendurada no "N"
     return (
       <svg
         viewBox="0 0 180 55"
         className={className}
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Texto NUGECID */}
         <text
           x="0"
           y="45"
@@ -31,59 +28,46 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
           NUGECID
         </text>
 
-        {/* Gorro pendurado no "N" (ancorado na parte superior esquerda da letra) */}
-        {/*
-          Ideia geral:
-          - Primeiro fazemos um pequeno translate para aproximar o gorro da letra.
-          - Depois aplicamos uma rotação com centro na borda branca (a "base" do gorro),
-            dando a sensação de que ele está pendurado e caindo para o lado.
-        */}
-        <g transform="translate(-5, 3) rotate(-28 10 22)">
-          {/* Corpo da touca (triângulo vermelho) */}
+        {/* Premium carnaval accent: minimalista, com traço limpo e destaque dourado */}
+        <g transform="translate(-2, -2)">
           <path
-            d="M 10 8 L 2 20 L 18 20 Z"
-            fill="#DC2626"
-            stroke="#B91C1C"
-            strokeWidth="0.7"
-          />
-
-          {/* Borda branca da touca encostando na parte de cima do N */}
-          <ellipse cx="10" cy="20" rx="10" ry="2.3" fill="#FFFFFF" />
-
-          {/* Pompom branco, um pouco deslocado para baixo para parecer pendurado */}
-          <circle cx="16.5" cy="10" r="3" fill="#FFFFFF" />
-
-          {/* Sombra do pompom */}
-          <ellipse
-            cx="16.5"
-            cy="11"
-            rx="2.1"
-            ry="1.2"
-            fill="#E5E7EB"
-            opacity="0.6"
-          />
-
-          {/* Detalhe de brilho na touca */}
-          <path
-            d="M 7 13 Q 10 14.2 13 13"
-            stroke="#EF4444"
-            strokeWidth="1.2"
+            d="M 1 14 C 22 2, 58 2, 84 14"
+            stroke="currentColor"
+            strokeWidth="2.15"
             fill="none"
-            opacity="0.5"
+            strokeLinecap="round"
+            opacity="0.86"
           />
+
+          {/* Sombrinha 1 */}
+          <path d="M 10.8 16.4 A 6.9 6.9 0 0 1 24.6 16.4 Z" fill="currentColor" opacity="0.95" />
+          <path d="M 13.9 16.4 A 3.45 3.45 0 0 1 20.9 16.4 Z" fill="#F59E0B" opacity="0.96" />
+          <path d="M 17.3 16.4 L 17.3 25.4" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M 17.3 25.4 Q 19.1 26.9 20.2 25.2" stroke="currentColor" strokeWidth="1.45" fill="none" strokeLinecap="round" />
+
+          {/* Sombrinha 2 */}
+          <path d="M 33.8 13.5 A 6.9 6.9 0 0 1 47.6 13.5 Z" fill="currentColor" opacity="0.95" />
+          <path d="M 36.9 13.5 A 3.45 3.45 0 0 1 43.9 13.5 Z" fill="#F59E0B" opacity="0.96" />
+          <path d="M 40.3 13.5 L 40.3 22.5" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M 40.3 22.5 Q 42.1 24 43.2 22.3" stroke="currentColor" strokeWidth="1.45" fill="none" strokeLinecap="round" />
+
+          {/* Sombrinha 3 */}
+          <path d="M 56.8 17.1 A 6.9 6.9 0 0 1 70.6 17.1 Z" fill="currentColor" opacity="0.95" />
+          <path d="M 59.9 17.1 A 3.45 3.45 0 0 1 66.9 17.1 Z" fill="#F59E0B" opacity="0.96" />
+          <path d="M 63.3 17.1 L 63.3 26.1" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" />
+          <path d="M 63.3 26.1 Q 65.1 27.6 66.2 25.9" stroke="currentColor" strokeWidth="1.45" fill="none" strokeLinecap="round" />
         </g>
       </svg>
     )
   }
 
-  // Logo compacta (apenas "N" com o gorro pendurado)
+  // Compact logo: "N" with carnival accent
   return (
     <svg
       viewBox="0 0 35 50"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Letra N */}
       <text
         x="5"
         y="45"
@@ -95,43 +79,27 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
         N
       </text>
 
-      {/*
-        Para a versão compacta, usamos um ajuste mais fino no translate/rotate
-        para o gorro parecer pendurado na "perna" esquerda do N.
-      */}
-      <g transform="translate(0, 5) rotate(-30 10 20)">
-        {/* Corpo da touca (triângulo vermelho) */}
+      <g transform="translate(-1, 2)">
         <path
-          d="M 10 8 L 2 20 L 18 20 Z"
-          fill="#DC2626"
-          stroke="#B91C1C"
-          strokeWidth="0.7"
-        />
-
-        {/* Borda branca da touca */}
-        <ellipse cx="10" cy="20" rx="10" ry="2.3" fill="#FFFFFF" />
-
-        {/* Pompom branco um pouco mais baixo e à direita para dar sensação de queda */}
-        <circle cx="17" cy="11" r="3" fill="#FFFFFF" />
-
-        {/* Sombra do pompom */}
-        <ellipse
-          cx="17"
-          cy="12"
-          rx="2.1"
-          ry="1.2"
-          fill="#E5E7EB"
-          opacity="0.6"
-        />
-
-        {/* Detalhe de brilho na touca */}
-        <path
-          d="M 7 13 Q 10 14.2 13 13"
-          stroke="#EF4444"
-          strokeWidth="1.2"
+          d="M 4 12 C 11 5.5, 20 5.5, 27 12"
+          stroke="currentColor"
+          strokeWidth="1.7"
           fill="none"
-          opacity="0.5"
+          strokeLinecap="round"
+          opacity="0.86"
         />
+
+        {/* Sombrinha compacta 1 premium */}
+        <path d="M 5.4 13.2 A 3.8 3.8 0 0 1 13 13.2 Z" fill="currentColor" opacity="0.95" />
+        <path d="M 7.2 13.2 A 1.9 1.9 0 0 1 11 13.2 Z" fill="#F59E0B" opacity="0.96" />
+        <path d="M 9.1 13.2 L 9.1 18.2" stroke="currentColor" strokeWidth="0.96" strokeLinecap="round" />
+        <path d="M 9.1 18.2 Q 10 19 10.5 18.1" stroke="currentColor" strokeWidth="0.96" fill="none" strokeLinecap="round" />
+
+        {/* Sombrinha compacta 2 premium */}
+        <path d="M 16.2 12.1 A 3.8 3.8 0 0 1 23.8 12.1 Z" fill="currentColor" opacity="0.95" />
+        <path d="M 18 12.1 A 1.9 1.9 0 0 1 21.8 12.1 Z" fill="#F59E0B" opacity="0.96" />
+        <path d="M 19.9 12.1 L 19.9 17.1" stroke="currentColor" strokeWidth="0.96" strokeLinecap="round" />
+        <path d="M 19.9 17.1 Q 20.8 17.9 21.3 17" stroke="currentColor" strokeWidth="0.96" fill="none" strokeLinecap="round" />
       </g>
     </svg>
   )

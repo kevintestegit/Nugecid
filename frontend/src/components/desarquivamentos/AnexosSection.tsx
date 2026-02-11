@@ -145,10 +145,10 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
   }
 
   return (
-    <Card>
+    <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Paperclip className="h-5 w-5" />
+          <Paperclip className="h-5 w-5 text-primary" />
           {title}
         </CardTitle>
         <CardDescription>{description}</CardDescription>
@@ -156,10 +156,10 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
       <CardContent className="space-y-4">
         {/* Upload de anexo */}
         {canEdit && (
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+          <div className="rounded-xl border-2 border-dashed border-border/70 bg-background/40 p-4">
             <div className="text-center">
-              <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-2">
+              <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="mb-2 text-sm text-muted-foreground">
                 Arraste um arquivo aqui ou clique para selecionar
               </p>
               <input
@@ -171,15 +171,15 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
               />
               <label
                 htmlFor={`file-upload-${tipoAnexo}`}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 cursor-pointer"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
               >
                 <Upload className="h-4 w-4" />
                 Selecionar arquivo
               </label>
               {selectedFile && (
-                <div className="mt-4 space-y-3 bg-gray-50 p-4 rounded">
+                <div className="mt-4 space-y-3 rounded-xl border border-border/70 bg-background/60 p-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-foreground">
                       {selectedFile.name}
                     </span>
                     <button
@@ -187,7 +187,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                         setSelectedFile(null)
                         setFileDescricao('')
                       }}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -206,20 +206,20 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     />
                   </div>
                   {numeroProcesso && (
-                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded border border-blue-200">
+                    <div className="flex items-center gap-2 rounded border border-primary/20 bg-primary/10 p-3">
                       <input
                         type="checkbox"
                         id={`anexarAoProcesso-${tipoAnexo}`}
                         checked={anexarAoProcesso}
                         onChange={(e) => setAnexarAoProcesso(e.target.checked)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
                       />
                       <Label 
                         htmlFor={`anexarAoProcesso-${tipoAnexo}`} 
-                        className="text-sm font-medium text-blue-900 cursor-pointer flex-1"
+                        className="flex-1 cursor-pointer text-sm font-medium text-foreground"
                       >
                         Anexar ao processo inteiro
-                        <span className="block text-xs font-normal text-blue-700 mt-0.5">
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
                           Este anexo ficará disponível em todas as {anexos.filter(a => a.numeroProcesso === numeroProcesso).length || 'outras'} solicitações do processo {numeroProcesso}
                         </span>
                       </Label>
@@ -244,7 +244,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     <button
                       onClick={handleUpload}
                       disabled={isUploading}
-                      className="flex-1 px-3 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                      className="flex-1 rounded-xl border border-primary/20 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                     >
                       {isUploading ? 'Enviando...' : 'Enviar Anexo'}
                     </button>
@@ -254,7 +254,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                         setFileDescricao('')
                       }}
                       disabled={isUploading}
-                      className="px-3 py-2 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
+                      className="rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
                     >
                       Cancelar
                     </button>
@@ -269,7 +269,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
         <div className="space-y-3">
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : anexos.length === 0 ? (
             <NoFilesFound
@@ -280,7 +280,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
             anexos.map((anexo) => (
               <div
                 key={anexo.id}
-                className="flex flex-col p-3 border border-gray-200 rounded-md hover:border-gray-300 transition-colors"
+                className="flex flex-col rounded-md border border-border/60 bg-background/55 p-3 transition-colors hover:border-border"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -296,16 +296,16 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="truncate text-sm font-medium text-foreground">
                           {anexo.nomeOriginal}
                         </p>
                         {anexo.tipoVinculo === 'processo' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
+                          <span className="inline-flex flex-shrink-0 items-center rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                             Processo
                           </span>
                         )}
                         {anexo.tipoVinculo === 'solicitacao' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0">
+                          <span className="inline-flex flex-shrink-0 items-center rounded border border-border/70 bg-muted/35 px-2 py-0.5 text-xs font-medium text-foreground/85">
                             Solicitação
                           </span>
                         )}
@@ -335,11 +335,11 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                       ) : (
                         <>
                           {anexo.descricao ? (
-                            <p className="text-sm text-gray-700 mt-0.5">
+                            <p className="mt-0.5 text-sm text-foreground/90">
                               {anexo.descricao}
                             </p>
                           ) : null}
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="mt-1 text-xs text-muted-foreground">
                             Enviado por {anexo.usuario?.nome || 'Usuário'} em{' '}
                             {new Date(anexo.createdAt).toLocaleString('pt-BR')}
                           </p>
@@ -351,7 +351,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     {onView && (anexo.tipoMime.startsWith('image/') || anexo.tipoMime === 'application/pdf') && (
                       <button
                         onClick={() => onView(anexo)}
-                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                         title="Visualizar"
                       >
                         <Eye className="h-4 w-4" />
@@ -360,7 +360,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     {canEdit && onUpdateDescricao && editingAnexoId !== anexo.id && (
                       <button
                         onClick={() => handleStartEdit(anexo)}
-                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-600"
                         title="Editar descrição"
                       >
                         <Edit2 className="h-4 w-4" />
@@ -368,7 +368,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     )}
                     <button
                       onClick={() => onDownload(anexo.id)}
-                      className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded"
+                      className="rounded p-2 text-muted-foreground transition-colors hover:bg-green-500/10 hover:text-green-600"
                       title="Baixar"
                     >
                       <Download className="h-4 w-4" />
@@ -376,7 +376,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     {canEdit && (
                       <button
                         onClick={() => handleDeleteClick(anexo.id)}
-                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
                         title="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />

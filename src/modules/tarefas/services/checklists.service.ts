@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Checklist } from '../entities/checklist.entity';
-import { ItemChecklist } from '../entities/item-checklist.entity';
-import { Tarefa } from '../entities/tarefa.entity';
-import { CreateChecklistDto, CreateItemChecklistDto, UpdateItemChecklistDto } from '../dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Checklist } from "../entities/checklist.entity";
+import { ItemChecklist } from "../entities/item-checklist.entity";
+import { Tarefa } from "../entities/tarefa.entity";
+import {
+  CreateChecklistDto,
+  CreateItemChecklistDto,
+  UpdateItemChecklistDto,
+} from "../dto";
 
 @Injectable()
 export class ChecklistsService {
@@ -17,10 +21,13 @@ export class ChecklistsService {
     private readonly tarefaRepo: Repository<Tarefa>,
   ) {}
 
-  async create(tarefaId: number, createDto: CreateChecklistDto): Promise<Checklist> {
+  async create(
+    tarefaId: number,
+    createDto: CreateChecklistDto,
+  ): Promise<Checklist> {
     const tarefa = await this.tarefaRepo.findOne({ where: { id: tarefaId } });
     if (!tarefa) {
-      throw new NotFoundException('Tarefa não encontrada');
+      throw new NotFoundException("Tarefa não encontrada");
     }
 
     const checklist = this.checklistRepo.create({
@@ -34,11 +41,11 @@ export class ChecklistsService {
   async findAllByTask(tarefaId: number): Promise<Checklist[]> {
     return this.checklistRepo.find({
       where: { tarefaId },
-      relations: ['itens', 'itens.concluidoPor'],
+      relations: ["itens", "itens.concluidoPor"],
       order: {
-        createdAt: 'ASC',
+        createdAt: "ASC",
         itens: {
-          ordem: 'ASC',
+          ordem: "ASC",
         },
       },
     });
@@ -47,18 +54,21 @@ export class ChecklistsService {
   async remove(id: number): Promise<void> {
     const result = await this.checklistRepo.delete(id);
     if (result.affected === 0) {
-      throw new NotFoundException('Checklist não encontrado');
+      throw new NotFoundException("Checklist não encontrado");
     }
   }
 
-  async addItem(checklistId: number, createDto: CreateItemChecklistDto): Promise<ItemChecklist> {
-    const checklist = await this.checklistRepo.findOne({ 
+  async addItem(
+    checklistId: number,
+    createDto: CreateItemChecklistDto,
+  ): Promise<ItemChecklist> {
+    const checklist = await this.checklistRepo.findOne({
       where: { id: checklistId },
-      relations: ['itens']
+      relations: ["itens"],
     });
-    
+
     if (!checklist) {
-      throw new NotFoundException('Checklist não encontrado');
+      throw new NotFoundException("Checklist não encontrado");
     }
 
     const ordem = checklist.getNextOrdem();
@@ -73,10 +83,16 @@ export class ChecklistsService {
     return this.itemChecklistRepo.save(item);
   }
 
-  async updateItem(itemId: number, updateDto: UpdateItemChecklistDto, userId: number): Promise<ItemChecklist> {
-    const item = await this.itemChecklistRepo.findOne({ where: { id: itemId } });
+  async updateItem(
+    itemId: number,
+    updateDto: UpdateItemChecklistDto,
+    userId: number,
+  ): Promise<ItemChecklist> {
+    const item = await this.itemChecklistRepo.findOne({
+      where: { id: itemId },
+    });
     if (!item) {
-      throw new NotFoundException('Item não encontrado');
+      throw new NotFoundException("Item não encontrado");
     }
 
     if (updateDto.texto !== undefined) {
@@ -97,7 +113,7 @@ export class ChecklistsService {
   async removeItem(itemId: number): Promise<void> {
     const result = await this.itemChecklistRepo.delete(itemId);
     if (result.affected === 0) {
-      throw new NotFoundException('Item não encontrado');
+      throw new NotFoundException("Item não encontrado");
     }
   }
 }

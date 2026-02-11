@@ -64,10 +64,13 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
 
   if (isLoading) {
     return (
-      <Card className="glass shadow-modern-lg border border-border/50">
+      <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+              <Calendar className="h-4 w-4 text-primary" />
+            </span>
             Calendário de Prazos
           </CardTitle>
         </CardHeader>
@@ -86,11 +89,14 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
   }
 
   return (
-    <Card className="glass shadow-modern-lg border border-border/50">
+    <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+              <Calendar className="h-4 w-4 text-primary" />
+            </span>
             Calendário de Prazos
           </CardTitle>
           <div className="flex items-center gap-2">

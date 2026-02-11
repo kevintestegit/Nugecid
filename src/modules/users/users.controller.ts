@@ -25,7 +25,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiBearerAuth,
   ApiQuery,
   ApiConsumes,
 } from "@nestjs/swagger";
@@ -57,7 +56,6 @@ import { UpdateUserPreferenceDto } from "./dto/user-preference.dto";
 import { UserPreferencesService } from "./services/user-preferences.service";
 
 // Guards and Decorators
-import { SessionAuthGuard } from "../auth/guards/session-auth.guard";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";

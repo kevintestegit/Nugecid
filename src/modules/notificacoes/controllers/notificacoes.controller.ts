@@ -187,15 +187,12 @@ export class NotificacoesController {
       try {
         const payload = this.jwtService.verify(token);
         userId = payload.sub;
-        console.log(`📡 Token validado via query string - User ID: ${userId}`);
       } catch (error) {
         throw new UnauthorizedException("Token inválido ou expirado");
       }
     } else {
       throw new UnauthorizedException("Token não fornecido");
     }
-
-    console.log(`📡 Cliente conectado ao SSE - User ID: ${userId}`);
 
     return interval(5000).pipe(
       switchMap(async () => {

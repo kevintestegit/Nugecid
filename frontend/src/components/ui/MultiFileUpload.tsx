@@ -37,7 +37,7 @@ export const MultiFileUpload: React.FC<MultiFileUploadProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const validateFile = (file: File): string | null => {
+  const validateFile = useCallback((file: File): string | null => {
     // Validar tamanho
     const sizeInMB = file.size / (1024 * 1024);
     if (sizeInMB > maxSize) {
@@ -63,79 +63,9 @@ export const MultiFileUpload: React.FC<MultiFileUploadProps> = ({
     }
 
     return null;
-  };
+  }, [accept, maxSize]);
 
-  const handleFiles = useCallback((files: FileList | File[]) => {
-    setError(null);
-    const fileArray = Array.from(files);
-
-    // Validar número de arquivos
-    if (selectedFiles.length + fileArray.length > maxFiles) {
-      setError(`Máximo de ${maxFiles} arquivos permitidos`);
-      return;
-    }
-
-    // Validar cada arquivo
-    const validFiles: File[] = [];
-    for (const file of fileArray) {
-      const validationError = validateFile(file);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-      validFiles.push(file);
-    }
-
-    const newFiles = [...selectedFiles, ...validFiles];
-    setSelectedFiles(newFiles);
-    onFilesSelect(newFiles);
-
-    // Upload automático se habilitado
-    if (autoUpload && onUpload) {
-      handleUpload(newFiles);
-    }
-  }, [selectedFiles, maxFiles, maxSize, accept, autoUpload, onUpload, onFilesSelect]);
-
-  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFiles(e.dataTransfer.files);
-    }
-  }, [handleFiles]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      handleFiles(e.target.files);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    setSelectedFiles(newFiles);
-    onFilesSelect(newFiles);
-  };
-
-  const handleUpload = async (filesToUpload: File[] = selectedFiles) => {
+  const handleUpload = useCallback(async (filesToUpload: File[] = selectedFiles) => {
     if (!onUpload || filesToUpload.length === 0) return;
 
     setIsUploading(true);
@@ -186,6 +116,76 @@ export const MultiFileUpload: React.FC<MultiFileUploadProps> = ({
     } finally {
       setIsUploading(false);
     }
+  }, [onUpload, selectedFiles]);
+
+  const handleFiles = useCallback((files: FileList | File[]) => {
+    setError(null);
+    const fileArray = Array.from(files);
+
+    // Validar número de arquivos
+    if (selectedFiles.length + fileArray.length > maxFiles) {
+      setError(`Máximo de ${maxFiles} arquivos permitidos`);
+      return;
+    }
+
+    // Validar cada arquivo
+    const validFiles: File[] = [];
+    for (const file of fileArray) {
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      validFiles.push(file);
+    }
+
+    const newFiles = [...selectedFiles, ...validFiles];
+    setSelectedFiles(newFiles);
+    onFilesSelect(newFiles);
+
+    // Upload automático se habilitado
+    if (autoUpload && onUpload) {
+      handleUpload(newFiles);
+    }
+  }, [autoUpload, handleUpload, maxFiles, onFilesSelect, onUpload, selectedFiles, validateFile]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }, [handleFiles]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index);
+    setSelectedFiles(newFiles);
+    onFilesSelect(newFiles);
   };
 
   const borderStyle = isDragging

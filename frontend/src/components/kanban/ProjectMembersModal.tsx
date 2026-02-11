@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useCallback } from 'react'
 import { UserPlus, Shield, X, Loader2, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/Dialog'
 import { Input } from '../ui/Input'
@@ -37,8 +37,10 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
   onClose,
   onChanged,
 }) => {
-  const normalizeMembers = (list: any): MembroProjeto[] =>
-    Array.isArray(list) ? list : [];
+  const normalizeMembers = useCallback(
+    (list: any): MembroProjeto[] => (Array.isArray(list) ? list : []),
+    [],
+  );
 
   const [members, setMembers] = useState<MembroProjeto[]>(normalizeMembers(initialMembers))
   const [searchTerm, setSearchTerm] = useState('')
@@ -48,7 +50,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
 
   useEffect(() => {
     setMembers(normalizeMembers(initialMembers));
-  }, [initialMembers]);
+  }, [initialMembers, normalizeMembers]);
 
   useEffect(() => {
     if (!open) return
@@ -58,14 +60,13 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
         const data = await kanbanService.getProjetoMembros(projetoId)
         setMembers(normalizeMembers(data))
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Erro ao carregar membros do projeto', error)
       } finally {
         setLoading(false)
       }
     }
     loadMembers()
-  }, [open, projetoId])
+  }, [normalizeMembers, open, projetoId])
 
   useEffect(() => {
     let active = true
@@ -81,7 +82,6 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
         )
         if (active) setSuggestions(data)
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Erro ao buscar usuários', error)
       }
     }
@@ -103,14 +103,13 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
       setSuggestions([])
       await onChanged?.()
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Erro ao adicionar membro', error)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleRoleChange = async (membro: MembroProjeto, papel: PapelMembro) => {
+  const handleRoleChange = useCallback(async (membro: MembroProjeto, papel: PapelMembro) => {
     setSaving(true)
     try {
       const atualizado = await kanbanService.updateProjetoMembro(
@@ -123,26 +122,24 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
       )
       await onChanged?.()
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Erro ao alterar papel', error)
     } finally {
       setSaving(false)
     }
-  }
+  }, [onChanged, projetoId])
 
-  const handleRemove = async (membro: MembroProjeto) => {
+  const handleRemove = useCallback(async (membro: MembroProjeto) => {
     setSaving(true)
     try {
       await kanbanService.removeProjetoMembro(projetoId, membro.id)
       setMembers((prev) => prev.filter((m) => m.id !== membro.id))
       await onChanged?.()
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Erro ao remover membro', error)
     } finally {
       setSaving(false)
     }
-  }
+  }, [onChanged, projetoId])
 
   const memberCards = useMemo(
     () =>
@@ -187,7 +184,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
           </div>
         </div>
       )),
-    [members, saving],
+    [handleRemove, handleRoleChange, members, normalizeMembers, saving],
   )
 
   return (

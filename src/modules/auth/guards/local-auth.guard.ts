@@ -11,7 +11,7 @@ export class LocalAuthGuard extends AuthGuard("local") {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, info: any) {
+  handleRequest(err: any, user: any, _info: any) {
     if (err || !user) {
       throw err || new UnauthorizedException("Credenciais inválidas");
     }

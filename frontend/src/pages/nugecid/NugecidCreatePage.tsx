@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus } from 'lucide-react'
 import { CreateDesarquivamentoDto } from '@/types'
-import { useDesarquivamentos } from '@/hooks/useDesarquivamentos'
+import { useCreateDesarquivamento } from '@/hooks/useDesarquivamentos'
 import { Button } from '@/components/ui/Button'
 import DesarquivamentoForm from '@/components/nugecid/DesarquivamentoForm'
 import { toast } from 'sonner'
@@ -14,18 +14,23 @@ interface NugecidCreatePageProps {
 
 const NugecidCreatePage: React.FC<NugecidCreatePageProps> = ({ className }) => {
   const navigate = useNavigate()
-  const { createDesarquivamento } = useDesarquivamentos()
+  const createDesarquivamento = useCreateDesarquivamento()
 
   const handleSubmit = async (data: CreateDesarquivamentoDto) => {
     try {
-      const result = await createDesarquivamento.mutateAsync(data)
+      const result = await createDesarquivamento.mutateAsync(data as CreateDesarquivamentoDto)
+      const created = result.data
       
       toast.success('Registro criado com sucesso!', {
-        description: `Código: ${result.codigoBarras}`
+        description: `Código: ${created?.codigoBarras || created?.id || 'novo registro'}`
       })
       
       // Redirecionar para a página de detalhes do registro criado
-      navigate(`/nugecid/${result.id}`)
+      if (created?.id) {
+        navigate(`/nugecid/${created.id}`)
+      } else {
+        navigate('/nugecid')
+      }
     } catch (error: any) {
       console.error('Erro ao criar registro:', error)
       
@@ -102,7 +107,7 @@ const NugecidCreatePage: React.FC<NugecidCreatePageProps> = ({ className }) => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6">
           <DesarquivamentoForm
-            onSubmit={handleSubmit}
+            onSubmit={(data) => handleSubmit(data as CreateDesarquivamentoDto)}
             onCancel={handleCancel}
             isLoading={createDesarquivamento.isPending}
           />

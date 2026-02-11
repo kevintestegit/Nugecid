@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -73,11 +73,7 @@ export const IpMonitoring: React.FC = () => {
   const [blockDuration, setBlockDuration] = useState<string>('24');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  useEffect(() => {
-    loadData();
-  }, [days]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [statsResponse, blockedResponse] = await Promise.all([
@@ -98,7 +94,11 @@ export const IpMonitoring: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleBlockIp = async () => {
     if (!selectedIp) return;
@@ -197,8 +197,8 @@ export const IpMonitoring: React.FC = () => {
       <Card>
         <CardContent className="py-8">
           <div className="flex items-center justify-center">
-            <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
-            <span className="ml-2 text-gray-500">Carregando...</span>
+            <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-muted-foreground">Carregando...</span>
           </div>
         </CardContent>
       </Card>
@@ -222,7 +222,7 @@ export const IpMonitoring: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-32 border-border/80 bg-background/70 text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -246,44 +246,44 @@ export const IpMonitoring: React.FC = () => {
           <div className="space-y-4">
             {/* Resumo */}
             <div className="grid grid-cols-4 gap-4 mb-6">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <div className="text-2xl font-bold">{ipStats.length}</div>
-                <div className="text-sm text-gray-500">IPs únicos</div>
+              <div className="rounded-lg border border-border/70 bg-card/60 p-4">
+                <div className="text-2xl font-bold text-foreground">{ipStats.length}</div>
+                <div className="text-sm text-muted-foreground">IPs únicos</div>
               </div>
-              <div className="p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">
+              <div className="rounded-lg border border-red-200/70 bg-red-50/70 p-4 dark:border-red-500/25 dark:bg-red-950/30">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-300">
                   {ipStats.filter((s) => getThreatLevel(s) === 'high').length}
                 </div>
-                <div className="text-sm text-gray-500">Alto risco</div>
+                <div className="text-sm text-red-700/90 dark:text-red-200/80">Alto risco</div>
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{blockedIps.length}</div>
-                <div className="text-sm text-gray-500">Bloqueados</div>
+              <div className="rounded-lg border border-blue-200/70 bg-blue-50/70 p-4 dark:border-blue-500/25 dark:bg-blue-950/30">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{blockedIps.length}</div>
+                <div className="text-sm text-blue-700/90 dark:text-blue-200/80">Bloqueados</div>
               </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="rounded-lg border border-green-200/70 bg-green-50/70 p-4 dark:border-green-500/25 dark:bg-green-950/30">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-300">
                   {ipStats.reduce((sum, s) => sum + s.successfulLogins, 0)}
                 </div>
-                <div className="text-sm text-gray-500">Logins bem-sucedidos</div>
+                <div className="text-sm text-green-700/90 dark:text-green-200/80">Logins bem-sucedidos</div>
               </div>
             </div>
 
             {/* Tabela de IPs */}
-            <div className="border rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="rounded-lg border border-border/70 bg-card/50">
+              <table className="min-w-full divide-y divide-border/60">
+                <thead className="bg-muted/35">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Endereço IP
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Tentativas
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Sucesso / Falha
                     </th>
                     <th
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                      className="cursor-pointer select-none px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted/60"
                       onClick={handleSortByLastAccess}
                     >
                       <div className="flex items-center gap-2">
@@ -295,27 +295,27 @@ export const IpMonitoring: React.FC = () => {
                         )}
                       </div>
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Risco
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       Ações
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-border/60 bg-card/35">
                   {sortedIpStats.slice(0, 20).map((stat) => (
-                    <tr key={stat.ipAddress} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-mono">
+                    <tr key={stat.ipAddress} className="transition-colors hover:bg-muted/35">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-mono text-foreground">
                         {stat.ipAddress}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-foreground">
                         {stat.totalAttempts}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
                         <span className="text-green-600 font-medium">
                           {stat.successfulLogins}
                         </span>
@@ -324,13 +324,13 @@ export const IpMonitoring: React.FC = () => {
                           {stat.failedLogins}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground">
                         {new Date(stat.lastAttempt).toLocaleString('pt-BR')}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-3">
                         {getThreatBadge(getThreatLevel(stat))}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="whitespace-nowrap px-4 py-3">
                         {stat.isBlocked ? (
                           <Badge className="bg-red-100 text-red-800">
                             <Ban className="h-3 w-3 mr-1" />
@@ -343,7 +343,7 @@ export const IpMonitoring: React.FC = () => {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-sm font-medium">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             variant="ghost"
@@ -445,11 +445,11 @@ export const IpMonitoring: React.FC = () => {
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-sm text-gray-500">Total de tentativas</Label>
+                <Label className="text-sm text-muted-foreground">Total de tentativas</Label>
                 <div className="text-lg font-semibold">{selectedIp?.totalAttempts}</div>
               </div>
               <div>
-                <Label className="text-sm text-gray-500">Taxa de falha</Label>
+                <Label className="text-sm text-muted-foreground">Taxa de falha</Label>
                 <div className="text-lg font-semibold">
                   {selectedIp
                     ? ((selectedIp.failedLogins / selectedIp.totalAttempts) * 100).toFixed(1)
@@ -459,10 +459,10 @@ export const IpMonitoring: React.FC = () => {
               </div>
             </div>
             <div>
-              <Label className="text-sm text-gray-500">User Agents</Label>
+              <Label className="text-sm text-muted-foreground">User Agents</Label>
               <ul className="mt-2 space-y-1">
                 {selectedIp?.userAgents.slice(0, 3).map((ua, i) => (
-                  <li key={i} className="text-xs text-gray-600 truncate">
+                  <li key={i} className="truncate text-xs text-muted-foreground">
                     {ua}
                   </li>
                 ))}

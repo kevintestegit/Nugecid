@@ -11,14 +11,15 @@ import {
  * - Date objects
  */
 export function IsFlexibleDate(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: "isFlexibleDate",
-      target: object.constructor,
+      target: (object as { constructor: new (...args: any[]) => unknown })
+        .constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: any, _args: ValidationArguments) {
           if (value === null || value === undefined) {
             return true; // Permite valores vazios (use @IsNotEmpty se obrigatório)
           }

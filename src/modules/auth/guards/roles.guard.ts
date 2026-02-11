@@ -5,7 +5,6 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { User } from "../../users/entities/user.entity";
 import { IS_PUBLIC_KEY } from "../../../common/decorators/is-public.decorator";
 
 @Injectable()

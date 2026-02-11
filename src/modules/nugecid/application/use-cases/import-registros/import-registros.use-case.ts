@@ -287,7 +287,7 @@ export class ImportRegistrosUseCase {
 
   private async saveRegistro(
     dto: ImportRegistroDto,
-    userId: number,
+    _userId: number,
   ): Promise<void> {
     // Aqui você integraria com o repositório para salvar o registro
     // Por enquanto, apenas simula o salvamento

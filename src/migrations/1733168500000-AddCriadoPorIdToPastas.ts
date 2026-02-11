@@ -33,7 +33,11 @@ export class AddCriadoPorIdToPastas1733168500000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_pastas_criado_por_id"`);
-    await queryRunner.query(`ALTER TABLE "pastas" DROP CONSTRAINT IF EXISTS "FK_pastas_criado_por"`);
-    await queryRunner.query(`ALTER TABLE "pastas" DROP COLUMN IF EXISTS "criado_por_id"`);
+    await queryRunner.query(
+      `ALTER TABLE "pastas" DROP CONSTRAINT IF EXISTS "FK_pastas_criado_por"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "pastas" DROP COLUMN IF EXISTS "criado_por_id"`,
+    );
   }
 }

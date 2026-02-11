@@ -7,6 +7,7 @@ import { DesarquivamentoTypeOrmEntity } from "./modules/nugecid/infrastructure/e
 import { StatusDesarquivamentoEnum } from "./modules/nugecid/domain/enums/status-desarquivamento.enum";
 import { Tarefa } from "./modules/tarefas/entities/tarefa.entity";
 import { Projeto } from "./modules/tarefas/entities/projeto.entity";
+import { Pasta } from "./modules/pastas/entities/pasta.entity";
 
 @Injectable()
 export class AppService {
@@ -21,6 +22,8 @@ export class AppService {
     private readonly tarefaRepository: Repository<Tarefa>,
     @InjectRepository(Projeto)
     private readonly projetoRepository: Repository<Projeto>,
+    @InjectRepository(Pasta)
+    private readonly pastaRepository: Repository<Pasta>,
   ) {}
 
   async getDashboardData(user: any) {
@@ -31,10 +34,7 @@ export class AppService {
     startOfWeek.setHours(0, 0, 0, 0);
 
     // Otimizado: usar Promise.all para executar queries em paralelo
-    const [
-      statsResult,
-      ultimosDesarquivamentos,
-    ] = await Promise.all([
+    const [statsResult, ultimosDesarquivamentos] = await Promise.all([
       // Uma única query para todas as estatísticas
       this.desarquivamentoRepository
         .createQueryBuilder("d")
@@ -178,7 +178,10 @@ export class AppService {
             });
           })
           .catch((error) => {
-            this.logger.error("Erro ao buscar desarquivamentos:", error.message);
+            this.logger.error(
+              "Erro ao buscar desarquivamentos:",
+              error.message,
+            );
           }),
       );
     }
@@ -311,6 +314,53 @@ export class AppService {
           })
           .catch((error) => {
             this.logger.error("Erro ao buscar projetos:", error.message);
+          }),
+      );
+    }
+
+    // Buscar Pastas (Arquivo)
+    if (!types || types.includes("pasta")) {
+      searchPromises.push(
+        this.pastaRepository
+          .createQueryBuilder("pasta")
+          .select([
+            "pasta.id",
+            "pasta.nome",
+            "pasta.descricao",
+            "pasta.tags",
+            "pasta.imagens",
+            "pasta.planilhas",
+          ])
+          .where(
+            '(LOWER("pasta"."nome") LIKE LOWER(:searchTerm) OR ' +
+              'LOWER("pasta"."descricao") LIKE LOWER(:searchTerm) OR ' +
+              'LOWER("pasta"."tags") LIKE LOWER(:searchTerm))',
+            { searchTerm },
+          )
+          .orderBy("pasta.nome", "ASC")
+          .take(limit)
+          .skip(offset)
+          .getMany()
+          .then((pastas) => {
+            typesCounts["pasta"] = pastas.length;
+            pastas.forEach((pasta) => {
+              results.push({
+                id: pasta.id,
+                type: "pasta",
+                title: pasta.nome, // Ex: "Prateleira 15"
+                subtitle: pasta.tags?.join(", ") || "",
+                description: pasta.descricao || "",
+                url: `/arquivo?pastaId=${pasta.id}`, // Navega para a pasta no arquivo
+                metadata: {
+                  imagens: pasta.imagens,
+                  planilhas: pasta.planilhas,
+                  descricao: pasta.descricao,
+                },
+              });
+            });
+          })
+          .catch((error) => {
+            this.logger.error("Erro ao buscar pastas:", error.message);
           }),
       );
     }

@@ -7,7 +7,7 @@ import 'yet-another-react-lightbox/styles.css'
 import 'yet-another-react-lightbox/plugins/captions.css'
 import { DesarquivamentoAnexo } from '@/hooks/useDesarquivamentosAnexos'
 
-export type PreviewAttachment = Partial<DesarquivamentoAnexo> & {
+export type PreviewAttachment = Omit<Partial<DesarquivamentoAnexo>, 'id'> & {
   id: number | string
   nomeOriginal: string
   previewUrl?: string

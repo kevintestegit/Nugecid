@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { User, LoginDto, UserRole } from '@/types'
 import { apiService } from '@/services/api'
 
@@ -22,7 +22,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [refreshTimer, setRefreshTimer] = useState<NodeJS.Timeout | null>(null)
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const isAuthenticated = !!user
 
@@ -36,32 +36,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [])
 
-  useEffect(() => {
-    checkAuthStatus()
-    
-    // Cleanup timer on unmount
-    return () => {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer)
-      }
-    }
+  const clearRefreshTimer = useCallback(() => {
+    if (!refreshTimerRef.current) return
+    clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = null
   }, [])
 
-  const scheduleTokenRefresh = () => {
-    // Clear existing timer
-    if (refreshTimer) {
-      clearTimeout(refreshTimer)
-    }
-
-    // Schedule refresh 5 minutes before token expires (45 minutes)
-    const timer = setTimeout(() => {
-      refreshTokens()
-    }, 45 * 60 * 1000) // 45 minutes
-
-    setRefreshTimer(timer)
-  }
-
-  const refreshTokens = async () => {
+  const refreshTokens = useCallback(async () => {
     try {
       const refreshToken = localStorage.getItem('refreshToken')
       if (!refreshToken) {
@@ -75,7 +56,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.setItem('accessToken', accessToken)
 
         // Schedule next refresh
-        scheduleTokenRefresh()
+        clearRefreshTimer()
+        refreshTimerRef.current = setTimeout(() => {
+          void refreshTokens()
+        }, 45 * 60 * 1000)
       } else {
         throw new Error('Failed to refresh token')
       }
@@ -84,7 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error.code === 'ERR_NETWORK' || error.message?.includes('fetch')) {
         // Reagendar tentativa de refresh em 30 segundos
         setTimeout(() => {
-          refreshTokens()
+          void refreshTokens()
         }, 30000)
         return
       }
@@ -96,14 +80,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       updateUser(null)
 
       // Clear refresh timer
-      if (refreshTimer) {
-        clearTimeout(refreshTimer)
-        setRefreshTimer(null)
-      }
+      clearRefreshTimer()
     }
-  }
+  }, [clearRefreshTimer, updateUser])
 
-  const checkAuthStatus = async () => {
+  const scheduleTokenRefresh = useCallback(() => {
+    clearRefreshTimer()
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshTokens()
+    }, 45 * 60 * 1000) // 45 minutes
+  }, [clearRefreshTimer, refreshTokens])
+
+  const checkAuthStatus = useCallback(async () => {
     try {
       const accessToken = localStorage.getItem('accessToken')
       const refreshToken = localStorage.getItem('refreshToken')
@@ -148,7 +136,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [refreshTokens, scheduleTokenRefresh, updateUser])
+
+  useEffect(() => {
+    void checkAuthStatus()
+
+    // Cleanup timer on unmount
+    return () => {
+      clearRefreshTimer()
+    }
+  }, [checkAuthStatus, clearRefreshTimer])
 
   const login = async (credentials: LoginDto) => {
     try {
@@ -185,10 +182,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       updateUser(null)
 
       // Clear refresh timer
-      if (refreshTimer) {
-        clearTimeout(refreshTimer)
-        setRefreshTimer(null)
-      }
+      clearRefreshTimer()
     }
   }
 

@@ -34,12 +34,6 @@ import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarqui
 import { DesarquivamentoCommentTypeOrmEntity } from "./infrastructure/entities/desarquivamento-comment.typeorm-entity";
 import { DesarquivamentoAnexoTypeOrmEntity } from "./infrastructure/entities/desarquivamento-anexo.typeorm-entity";
 
-// Domain Interface
-import { IDesarquivamentoRepository } from "./domain/interfaces/desarquivamento.repository.interface";
-
-// Token para injeção de dependência
-import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "./domain/nugecid.constants";
-
 // Legacy entities (for compatibility) - using proper infrastructure entities
 // import { Desarquivamento } from './entities/desarquivamento.entity'; // REMOVED - legacy entity
 import { User } from "../users/entities/user.entity";

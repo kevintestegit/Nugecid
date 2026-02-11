@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Edit } from 'lucide-react'
 import { useUser, useUpdateUser } from '@/hooks/useUsers'
-import { UpdateUserDto } from '@/types'
+import { UpdateUserDto, UserRole } from '@/types'
 import UsuarioForm from './UsuarioForm'
 
 interface EditUserModalProps {
@@ -124,7 +124,7 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ userId, onClose, onSucces
               nome: user.nome,
               usuario: user.usuario,
               matricula: user.matricula,
-              role: user.role,
+              role: roleToUserRole(user.role?.name),
               ativo: user.ativo
             }}
             onSubmit={handleSubmit}
@@ -141,3 +141,9 @@ const EditUserModal: React.FC<EditUserModalProps> = ({ userId, onClose, onSucces
 }
 
 export default EditUserModal
+const roleToUserRole = (roleName?: string): UserRole => {
+  if (roleName === UserRole.ADMIN) return UserRole.ADMIN
+  if (roleName === UserRole.COORDENADOR) return UserRole.COORDENADOR
+  if (roleName === UserRole.NUGECID_OPERATOR) return UserRole.NUGECID_OPERATOR
+  return UserRole.USUARIO
+}

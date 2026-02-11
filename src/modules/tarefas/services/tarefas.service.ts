@@ -91,7 +91,10 @@ export class TarefasService {
     }
 
     const responsavelIds = this.normalizeResponsavelIds(createTarefaDto);
-    const responsaveis = await this.resolveResponsaveis(responsavelIds, projeto);
+    const responsaveis = await this.resolveResponsaveis(
+      responsavelIds,
+      projeto,
+    );
 
     // Executar criação dentro de transação
     const savedTarefa = await this.dataSource.transaction(async (manager) => {
@@ -112,7 +115,9 @@ export class TarefasService {
         );
       }
 
-      const { responsavelId, responsavelIds: _, ...payload } = createTarefaDto;
+      const payload = { ...createTarefaDto };
+      delete (payload as Partial<CreateTarefaDto>).responsavelId;
+      delete (payload as Partial<CreateTarefaDto>).responsavelIds;
       const tarefa = manager.create(Tarefa, {
         ...payload,
         criadorId,
@@ -442,12 +447,11 @@ export class TarefasService {
       );
       novoResponsavelId = novosResponsaveis[0]?.id ?? null;
 
-      const responsaveisAtuais =
-        tarefa.responsaveis?.length
-          ? tarefa.responsaveis
-          : tarefa.responsavel
-            ? [tarefa.responsavel]
-            : [];
+      const responsaveisAtuais = tarefa.responsaveis?.length
+        ? tarefa.responsaveis
+        : tarefa.responsavel
+          ? [tarefa.responsavel]
+          : [];
       const nomesAtuais =
         responsaveisAtuais.map((usuario) => usuario.nome).join(", ") || null;
       const nomesNovos =
@@ -486,7 +490,9 @@ export class TarefasService {
       changes.push("Prazo alterado");
     }
 
-    const { responsavelId, responsavelIds: _, ...payload } = updateTarefaDto;
+    const payload = { ...updateTarefaDto };
+    delete (payload as Partial<UpdateTarefaDto>).responsavelId;
+    delete (payload as Partial<UpdateTarefaDto>).responsavelIds;
     Object.assign(tarefa, payload);
     if (shouldUpdateResponsaveis && novosResponsaveis) {
       tarefa.responsaveis = novosResponsaveis;
@@ -564,8 +570,6 @@ export class TarefasService {
 
     const colunaAnterior = tarefa.coluna;
     const colunaIdAnterior = tarefa.colunaId;
-    const ordemAnterior = tarefa.ordem;
-
     // Executar movimentação dentro de transação
     await this.dataSource.transaction(async (manager) => {
       // Se mudou de coluna
@@ -666,7 +670,7 @@ export class TarefasService {
   }
 
   async getHistorico(id: number, userId: number): Promise<HistoricoTarefa[]> {
-    const tarefa = await this.findOne(id, userId);
+    await this.findOne(id, userId);
 
     return this.historicoRepository.find({
       where: { tarefaId: id },
@@ -675,7 +679,7 @@ export class TarefasService {
     });
   }
 
-  async debugTarefa(id: number, userId: number): Promise<any> {
+  async debugTarefa(id: number, _userId: number): Promise<any> {
     const tarefa = await this.tarefaRepository.findOne({
       where: { id },
       relations: ["coluna", "projeto"],

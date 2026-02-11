@@ -1,52 +1,59 @@
-import React from 'react';
-import { Usuario } from '../../types/kanban.types';
-import { getInitials, getAvatarColor } from '../../utils/kanbanHelpers';
+import React from "react";
+import { Usuario } from "../../types/kanban.types";
+import { getInitials, getAvatarColor } from "../../utils/kanbanHelpers";
 
 interface AvatarProps {
   usuario?: Usuario;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: "xs" | "sm" | "md" | "lg";
   showTooltip?: boolean;
+  className?: string;
 }
 
 const sizeClasses = {
-  xs: 'w-6 h-6 text-xs',
-  sm: 'w-8 h-8 text-sm',
-  md: 'w-10 h-10 text-base',
-  lg: 'w-12 h-12 text-lg',
+  xs: "w-6 h-6 text-xs",
+  sm: "w-8 h-8 text-sm",
+  md: "w-10 h-10 text-base",
+  lg: "w-12 h-12 text-lg",
 };
 
-export const Avatar: React.FC<AvatarProps> = ({ 
-  usuario, 
-  size = 'sm',
+export const Avatar: React.FC<AvatarProps> = ({
+  usuario,
+  size = "sm",
   showTooltip = true,
+  className,
 }) => {
   if (!usuario) {
     return (
-      <div 
+      <div
         className={`${sizeClasses[size]} rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-semibold`}
-        title={showTooltip ? 'Sem responsável' : undefined}
+        title={showTooltip ? "Sem responsável" : undefined}
       >
         <svg className="w-2/3 h-2/3" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          <path
+            fillRule="evenodd"
+            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+            clipRule="evenodd"
+          />
         </svg>
       </div>
     );
   }
 
-  const avatarColor = getAvatarColor(usuario.nome);
-  const initials = getInitials(usuario.nome);
+  const displayName = usuario.nome ?? usuario.usuario ?? "Usuario";
+  const avatarColor = getAvatarColor(displayName);
+  const initials = getInitials(displayName);
   const avatarSrc = usuario.avatarUrl ?? usuario.avatar;
 
   return (
-    <div 
-      className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-white font-semibold shadow-sm`}
+    <div
+      className={`${sizeClasses[size]} rounded-full flex items-center justify-center text-white font-semibold shadow-sm ${className ?? ""}`}
       style={{ backgroundColor: avatarColor }}
-      title={showTooltip ? usuario.nome : undefined}
+      title={showTooltip ? displayName : undefined}
     >
       {avatarSrc ? (
-        <img 
-          src={avatarSrc} 
-          alt={usuario.nome}
+        <img
+          src={avatarSrc}
+          alt={displayName}
           className="w-full h-full rounded-full object-cover"
         />
       ) : (
@@ -59,13 +66,13 @@ export const Avatar: React.FC<AvatarProps> = ({
 interface AvatarGroupProps {
   usuarios: Usuario[];
   max?: number;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  size?: "xs" | "sm" | "md" | "lg";
 }
 
-export const AvatarGroup: React.FC<AvatarGroupProps> = ({ 
-  usuarios, 
+export const AvatarGroup: React.FC<AvatarGroupProps> = ({
+  usuarios,
   max = 3,
-  size = 'sm',
+  size = "sm",
 }) => {
   const visibleUsuarios = usuarios.slice(0, max);
   const remainingCount = usuarios.length - max;
@@ -78,7 +85,7 @@ export const AvatarGroup: React.FC<AvatarGroupProps> = ({
         </div>
       ))}
       {remainingCount > 0 && (
-        <div 
+        <div
           className={`${sizeClasses[size]} rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-semibold ring-2 ring-white`}
           title={`+${remainingCount} outros`}
         >

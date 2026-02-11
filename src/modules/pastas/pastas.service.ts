@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, ForbiddenException } from "@nestjs/common";
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  ForbiddenException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { randomUUID } from "crypto";
@@ -157,18 +162,26 @@ export class PastasService {
         "pasta.imagens",
         "pasta.arquivos",
         "arquivosImagem",
-        (qb) => qb.where("arquivosImagem.tipo = :img", { img: PastaArquivoTipo.IMAGEM }),
+        (qb) =>
+          qb.where("arquivosImagem.tipo = :img", {
+            img: PastaArquivoTipo.IMAGEM,
+          }),
       )
       .loadRelationCountAndMap(
         "pasta.planilhas",
         "pasta.arquivos",
         "arquivosPlanilha",
-        (qb) => qb.where("arquivosPlanilha.tipo = :planilha", { planilha: PastaArquivoTipo.PLANILHA }),
+        (qb) =>
+          qb.where("arquivosPlanilha.tipo = :planilha", {
+            planilha: PastaArquivoTipo.PLANILHA,
+          }),
       );
 
     // Filtrar por usuário se não for admin/coordenador
     if (userId) {
-      queryBuilder = queryBuilder.andWhere("pasta.criadoPorId = :userId", { userId });
+      queryBuilder = queryBuilder.andWhere("pasta.criadoPorId = :userId", {
+        userId,
+      });
     }
 
     const pastas = await queryBuilder.getMany();
@@ -189,7 +202,11 @@ export class PastasService {
     return this.mapToResponse(pasta);
   }
 
-  async update(id: string, updatePastaDto: UpdatePastaDto, userId?: number): Promise<any> {
+  async update(
+    id: string,
+    updatePastaDto: UpdatePastaDto,
+    userId?: number,
+  ): Promise<any> {
     await this.ensureSchema();
     await this.findOne(id, userId); // valida acesso
     const payload: Partial<Pasta> = { ...updatePastaDto };
@@ -215,7 +232,11 @@ export class PastasService {
     await this.pastasRepository.delete(id);
   }
 
-  async adicionarArquivos(id: string, files?: PastaFilesPayload, userId?: number): Promise<any> {
+  async adicionarArquivos(
+    id: string,
+    files?: PastaFilesPayload,
+    userId?: number,
+  ): Promise<any> {
     await this.ensureSchema();
     const pasta = await this.pastasRepository.findOne({
       where: { id },
@@ -247,7 +268,10 @@ export class PastasService {
     );
   }
 
-  async listarItens(pastaId: string, userId?: number): Promise<{
+  async listarItens(
+    pastaId: string,
+    userId?: number,
+  ): Promise<{
     pasta: any;
     totalItens: number;
     planilhas: ParsedPlanilha[];
@@ -299,12 +323,14 @@ export class PastasService {
     let queryBuilder = this.pastasRepository
       .createQueryBuilder("pasta")
       .leftJoinAndSelect("pasta.arquivos", "arquivos");
-    
+
     // Filtrar por usuário se não for admin/coordenador
     if (userId) {
-      queryBuilder = queryBuilder.andWhere("pasta.criadoPorId = :userId", { userId });
+      queryBuilder = queryBuilder.andWhere("pasta.criadoPorId = :userId", {
+        userId,
+      });
     }
-    
+
     const pastas = await queryBuilder.getMany();
 
     const itens: PastaItemRow[] = [];
@@ -372,7 +398,11 @@ export class PastasService {
     };
   }
 
-  async removerArquivo(pastaId: string, arquivoId: string, userId?: number): Promise<any> {
+  async removerArquivo(
+    pastaId: string,
+    arquivoId: string,
+    userId?: number,
+  ): Promise<any> {
     await this.ensureSchema();
     const pasta = await this.pastasRepository.findOne({
       where: { id: pastaId },
@@ -802,7 +832,7 @@ export class PastasService {
     }
   }
 
-  private async recalcularContagensArquivos(pastaId: string): Promise<void> {
+  private async recalcularContagensArquivos(_pastaId: string): Promise<void> {
     // Não é mais necessário atualizar os campos imagens/planilhas no banco
     // pois as contagens são calculadas dinamicamente em mapToResponse()
     // Mantido como método vazio para compatibilidade com código existente
@@ -810,8 +840,8 @@ export class PastasService {
 
   // Versão com EntityManager para uso em transações
   private async recalcularContagensArquivosWithManager(
-    manager: any,
-    pastaId: string,
+    _manager: any,
+    _pastaId: string,
   ): Promise<void> {
     // Não é mais necessário atualizar os campos imagens/planilhas no banco
     // pois as contagens são calculadas dinamicamente em mapToResponse()

@@ -150,7 +150,7 @@ export class NugecidImportService {
    */
   private async validarEPreparar(
     data: any[][],
-    currentUser: User,
+    _currentUser: User,
   ): Promise<{
     registrosValidos: CreateDesarquivamentoDto[];
     erros: Array<{ row: number; details: any }>;
@@ -177,7 +177,6 @@ export class NugecidImportService {
         const setorRaw = this.getCell(row, 8); // Setor Demandante
         const servidorRaw = this.getCell(row, 9); // Servidor Responsável
         const finalidadeRaw = this.getCell(row, 10); // Finalidade
-        const prorrogacaoRaw = this.getCell(row, 11); // Solicitação de Prorrogação
 
         // Log detalhado para debug (apenas primeira e última linha para não poluir)
         if (i === 0 || i === rows.length - 1) {

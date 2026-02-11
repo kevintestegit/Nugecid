@@ -4,6 +4,11 @@ import { join } from "path";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from "@nestjs/typeorm";
 import { DataSource, DataSourceOptions } from "typeorm";
+import { neonConfig, Pool as NeonPool } from "@neondatabase/serverless";
+import * as ws from "ws";
+
+// Configura WebSocket para o driver Neon (funciona na porta 443, contornando firewalls)
+neonConfig.webSocketConstructor = ws;
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -57,6 +62,13 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       logger: "simple-console",
     };
 
+    // Verifica se deve usar driver Neon (WebSocket na porta 443)
+    const useNeon = env("DATABASE_USE_NEON") === "true";
+
+    if (useNeon) {
+      this.logger.log("Usando driver Neon Serverless (WebSocket/HTTPS)");
+    }
+
     const config = {
       ...baseConfig,
       type: "postgres",
@@ -76,6 +88,8 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         max: 10,
         min: 2,
       },
+      // Usa driver Neon para conexão via WebSocket (porta 443)
+      ...(useNeon && { driver: NeonPool }),
     } as TypeOrmModuleOptions;
 
     this.logger.log(`Configuração do banco pronta.`);

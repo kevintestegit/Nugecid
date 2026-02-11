@@ -62,6 +62,13 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
     responsaveis?: Tarefa['responsaveis'];
   };
 
+  type LegacyProjeto = Partial<Projeto> & {
+    createdAt?: string;
+    updatedAt?: string;
+    created_at?: string;
+    updated_at?: string;
+  };
+
   const normalizePriority = (value?: string): Tarefa['prioridade'] => {
     if (!value) return 'media';
     const normalized = value.toLowerCase();
@@ -108,6 +115,26 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
     };
   }, [projetoId]);
 
+  const normalizeProjeto = useCallback((p: LegacyProjeto): Projeto => {
+    return {
+      id: p.id ?? projetoId,
+      nome: p.nome ?? '',
+      descricao: p.descricao ?? '',
+      cor: p.cor,
+      data_criacao:
+        p.data_criacao ??
+        p.createdAt ??
+        p.created_at ??
+        new Date().toISOString(),
+      data_atualizacao:
+        p.data_atualizacao ??
+        p.updatedAt ??
+        p.updated_at ??
+        new Date().toISOString(),
+      membros: p.membros,
+    };
+  }, [projetoId]);
+
   // Carregar dados iniciais
   const loadData = useCallback(async () => {
     if (!isAuthenticated) {
@@ -128,7 +155,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
         kanbanService.getTarefas(projetoId),
       ]);
 
-      setProjeto(projetoData);
+      setProjeto(normalizeProjeto(projetoData as LegacyProjeto));
       setColunas(Array.isArray(colunasData) ? colunasData.map(normalizeColuna) : []);
       const tarefasArray = Array.isArray(tarefasData) ? tarefasData : [];
       setTarefas(tarefasArray.map(normalizeTarefa));
@@ -139,7 +166,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, projetoId, normalizeColuna, normalizeTarefa]);
+  }, [isAuthenticated, projetoId, normalizeColuna, normalizeProjeto, normalizeTarefa]);
 
   useEffect(() => {
     loadData();
@@ -149,14 +176,14 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
   const updateProjeto = useCallback(async (data: Partial<Projeto>) => {
     try {
       const updatedProjeto = await kanbanService.updateProjeto(projetoId, data);
-      setProjeto(updatedProjeto);
+      setProjeto(normalizeProjeto(updatedProjeto as LegacyProjeto));
       toast.success('Projeto atualizado com sucesso!');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao atualizar projeto';
       toast.error(message);
       throw err;
     }
-  }, [projetoId]);
+  }, [normalizeProjeto, projetoId]);
 
   // Colunas
   const createColuna = useCallback(async (data: Omit<Coluna, 'id' | 'projeto_id' | 'ordem'>) => {
@@ -200,7 +227,7 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
     try {
       await kanbanService.deleteColuna(id);
       setColunas(prev => prev.filter(col => col.id !== id));
-      setTarefas(prev => prev.filter(tarefa => tarefa.coluna_id !== id));
+      setTarefas(prev => prev.filter(tarefa => tarefa.colunaId !== id));
       toast.success('Coluna excluída com sucesso!');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao excluir coluna';
@@ -490,7 +517,6 @@ export const useKanban = ({ projetoId }: UseKanbanProps): UseKanbanReturn => {
     deleteTarefa,
     moveTarefa,
     reorderTarefas,
-    updateTarefaStatus,
     refresh,
   };
 };

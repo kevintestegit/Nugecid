@@ -52,14 +52,14 @@ export class EstatisticasService {
 
       // Query builder para total com filtros opcionais
       let totalQuery = this.desarquivamentoRepo.createQueryBuilder("d");
-      
+
       // Filtro por usuário (para usuários comuns, mostrar apenas os próprios registros)
       if (filtros?.userId) {
         totalQuery = totalQuery.andWhere("d.criadoPorId = :userId", {
           userId: filtros.userId,
         });
       }
-      
+
       if (filtros?.dataInicio || filtros?.dataFim) {
         if (filtros.dataInicio) {
           totalQuery = totalQuery.andWhere("d.dataSolicitacao >= :dataInicio", {
@@ -78,7 +78,7 @@ export class EstatisticasService {
         .createQueryBuilder("d")
         .where("d.dataSolicitacao >= :start", { start: startOfMonth })
         .andWhere("d.dataSolicitacao <= :end", { end: endOfMonth });
-      
+
       // Filtro por usuário para requisições do mês
       if (filtros?.userId) {
         esteMesQuery = esteMesQuery.andWhere("d.criadoPorId = :userId", {
@@ -89,8 +89,10 @@ export class EstatisticasService {
       // Query para pendentes com filtro de usuário
       let pendentesQuery = this.desarquivamentoRepo
         .createQueryBuilder("d")
-        .where("d.status = :status", { status: StatusDesarquivamentoEnum.SOLICITADO });
-      
+        .where("d.status = :status", {
+          status: StatusDesarquivamentoEnum.SOLICITADO,
+        });
+
       if (filtros?.userId) {
         pendentesQuery = pendentesQuery.andWhere("d.criadoPorId = :userId", {
           userId: filtros.userId,
@@ -103,13 +105,18 @@ export class EstatisticasService {
       cincoDiasAtras.setDate(cincoDiasAtras.getDate() - 5);
       let pendentesAtrasadosQuery = this.desarquivamentoRepo
         .createQueryBuilder("d")
-        .where("d.status = :status", { status: StatusDesarquivamentoEnum.SOLICITADO })
+        .where("d.status = :status", {
+          status: StatusDesarquivamentoEnum.SOLICITADO,
+        })
         .andWhere("d.dataSolicitacao <= :limite", { limite: cincoDiasAtras });
 
       if (filtros?.userId) {
-        pendentesAtrasadosQuery = pendentesAtrasadosQuery.andWhere("d.criadoPorId = :userId", {
-          userId: filtros.userId,
-        });
+        pendentesAtrasadosQuery = pendentesAtrasadosQuery.andWhere(
+          "d.criadoPorId = :userId",
+          {
+            userId: filtros.userId,
+          },
+        );
       }
 
       // Query para recentes com filtro de usuário
@@ -119,7 +126,7 @@ export class EstatisticasService {
         .leftJoinAndSelect("d.responsavel", "responsavel")
         .orderBy("d.dataSolicitacao", "DESC")
         .take(10);
-      
+
       if (filtros?.userId) {
         recentesQuery = recentesQuery.andWhere("d.criadoPorId = :userId", {
           userId: filtros.userId,
@@ -127,49 +134,77 @@ export class EstatisticasService {
       }
 
       // Cálculo do Mês Anterior
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      const startOfLastMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() - 1,
+        1,
+      );
+      const endOfLastMonth = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
 
       // Total Mês Anterior
       let totalMesAnteriorQuery = this.desarquivamentoRepo
         .createQueryBuilder("d")
         .where("d.dataSolicitacao >= :start", { start: startOfLastMonth })
         .andWhere("d.dataSolicitacao <= :end", { end: endOfLastMonth });
-      
+
       if (filtros?.userId) {
-        totalMesAnteriorQuery = totalMesAnteriorQuery.andWhere("d.criadoPorId = :userId", {
-          userId: filtros.userId,
-        });
+        totalMesAnteriorQuery = totalMesAnteriorQuery.andWhere(
+          "d.criadoPorId = :userId",
+          {
+            userId: filtros.userId,
+          },
+        );
       }
 
       // Pendentes Mês Anterior (considerando status SOLICITADO e dataSolicitacao no mês passado)
-      // Nota: Isso conta quantas solicitações feitas no mês passado ainda estão pendentes hoje, 
-      // ou quantas ESTAVAM pendentes no final do mês passado? 
+      // Nota: Isso conta quantas solicitações feitas no mês passado ainda estão pendentes hoje,
+      // ou quantas ESTAVAM pendentes no final do mês passado?
       // Para tendência estatística simples, vamos comparar o volume de solicitações do mês passado vs este mês (total)
       // E para pendentes, talvez seja melhor comparar o "backlog" gerado naquele mês.
       // Mas para manter simples e comparável com "pendentes atuais", vamos contar quantas solicitações do mês passado foram feitas
       // que ainda estão pendentes (ou seja, backlog gerado no mês anterior).
-      
+
       let pendentesMesAnteriorQuery = this.desarquivamentoRepo
         .createQueryBuilder("d")
-        .where("d.status = :status", { status: StatusDesarquivamentoEnum.SOLICITADO })
+        .where("d.status = :status", {
+          status: StatusDesarquivamentoEnum.SOLICITADO,
+        })
         .andWhere("d.dataSolicitacao >= :start", { start: startOfLastMonth })
         .andWhere("d.dataSolicitacao <= :end", { end: endOfLastMonth });
 
       if (filtros?.userId) {
-        pendentesMesAnteriorQuery = pendentesMesAnteriorQuery.andWhere("d.criadoPorId = :userId", {
-          userId: filtros.userId,
-        });
+        pendentesMesAnteriorQuery = pendentesMesAnteriorQuery.andWhere(
+          "d.criadoPorId = :userId",
+          {
+            userId: filtros.userId,
+          },
+        );
       }
 
-      const [total, pendentes, pendentesAtrasados, esteMes, recentes, totalMesAnterior, pendentesMesAnterior] = await Promise.all([
+      const [
+        total,
+        pendentes,
+        pendentesAtrasados,
+        esteMes,
+        recentes,
+        totalMesAnterior,
+        pendentesMesAnterior,
+      ] = await Promise.all([
         totalQuery.getCount(),
         pendentesQuery.getCount(),
         pendentesAtrasadosQuery.getCount(),
         esteMesQuery.getCount(),
         recentesQuery.getMany(),
         totalMesAnteriorQuery.getCount(),
-        pendentesMesAnteriorQuery.getCount()
+        pendentesMesAnteriorQuery.getCount(),
       ]);
 
       return {
@@ -188,7 +223,7 @@ export class EstatisticasService {
         // Não, "totalMesAnterior" geralmente implica "Volume do mês anterior".
         // O frontend provavelmente quer comparar o volume de criação.
         // Vamos manter o cálculo do volume do mês anterior aqui.
-        totalMesAnterior, 
+        totalMesAnterior,
         pendentesMesAnterior,
         recentes: recentes.map((item) => ({
           id: item.id,
@@ -239,8 +274,12 @@ export class EstatisticasService {
   }): Promise<ChartData[]> {
     try {
       const now = new Date();
-      const start = filtros?.dataInicio || new Date(now.getFullYear(), now.getMonth() - 11, 1);
-      const end = filtros?.dataFim || new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      const start =
+        filtros?.dataInicio ||
+        new Date(now.getFullYear(), now.getMonth() - 11, 1);
+      const end =
+        filtros?.dataFim ||
+        new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
       // Buscar todos os desarquivamentos no período usando dataSolicitacao
       let query = this.desarquivamentoRepo
@@ -491,9 +530,10 @@ export class EstatisticasService {
     const css = this.getRelatorioPrintCSS();
 
     // Informações sobre período do relatório
-    const periodoInfo = filtros?.dataInicio || filtros?.dataFim
-      ? `<div class="periodo-info">Período: ${filtros.dataInicio ? new Date(filtros.dataInicio).toLocaleDateString("pt-BR") : "Início"} até ${filtros.dataFim ? new Date(filtros.dataFim).toLocaleDateString("pt-BR") : "Hoje"}</div>`
-      : "";
+    const periodoInfo =
+      filtros?.dataInicio || filtros?.dataFim
+        ? `<div class="periodo-info">Período: ${filtros.dataInicio ? new Date(filtros.dataInicio).toLocaleDateString("pt-BR") : "Início"} até ${filtros.dataFim ? new Date(filtros.dataFim).toLocaleDateString("pt-BR") : "Hoje"}</div>`
+        : "";
 
     // Criar dados para o gráfico de barras
     const maxValue = Math.max(...requisicoesPorMes.map((d) => d.total || 0));
@@ -1010,10 +1050,14 @@ export class EstatisticasService {
           <div class="card-title">Solicitantes Diferentes</div>
           <div class="card-value">${solicitantesMap.size}</div>
         </div>
-        ${paginacaoInfo ? `<div class="card">
+        ${
+          paginacaoInfo
+            ? `<div class="card">
           <div class="card-title">Total Geral no Mês</div>
           <div class="card-value">${paginacaoInfo.total}</div>
-        </div>` : ""}
+        </div>`
+            : ""
+        }
       </div>
 
       <!-- Detalhes por Solicitante -->

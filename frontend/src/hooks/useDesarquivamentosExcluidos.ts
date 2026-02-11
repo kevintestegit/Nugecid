@@ -37,7 +37,7 @@ interface UseDesarquivamentosExcluidosReturn {
   error: string | null;
   refetch: () => Promise<void>;
   restoreDesarquivamento: (id: number) => Promise<void>;
-  restoreMultiple: (ids: number[]) => Promise<void>;
+  restoreMultiple: (ids: number[]) => Promise<{ success: boolean; restoredCount: number }>;
 }
 
 export const useDesarquivamentosExcluidos = (

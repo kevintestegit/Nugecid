@@ -15,6 +15,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { useDesarquivamentosExcluidos } from '../../hooks/useDesarquivamentosExcluidos';
 import { formatDate } from '../../utils/date';
 import { toast } from 'sonner';
+import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
 
 interface FilterState {
   search: string;
@@ -308,7 +309,7 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                         <td>
                           <Checkbox
                             checked={selectedIds.includes(item.id)}
-                            onCheckedChange={(checked) => handleSelectItem(item.id, checked)}
+                            onCheckedChange={(checked) => handleSelectItem(item.id, checked === true)}
                           />
                         </td>
                         <td className="font-mono text-sm">{item.codigo}</td>
@@ -341,6 +342,8 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                 <Pagination
                   currentPage={currentPage}
                   totalPages={data.totalPages}
+                  totalItems={data.total}
+                  itemsPerPage={itemsPerPage}
                   onPageChange={setCurrentPage}
                 />
               )}
@@ -363,19 +366,17 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
       </Card>
 
       {/* Confirmation Dialog */}
-      <AlertDialog
-        open={showConfirmDialog}
-        onOpenChange={setShowConfirmDialog}
-        title="Confirmar Restauração"
+      <EnhancedConfirmDialog
+        isOpen={showConfirmDialog}
+        onClose={() => setShowConfirmDialog(false)}
+        onConfirm={handleRestoreSelected}
+        title="Confirmar restauração"
         description={
           selectedIds.length === 1
-            ? 'Tem certeza que deseja restaurar este desarquivamento? Ele voltará a aparecer na lista principal.'
-            : `Tem certeza que deseja restaurar ${selectedIds.length} desarquivamentos? Eles voltarão a aparecer na lista principal.`
+            ? 'Tem certeza que deseja restaurar este desarquivamento?'
+            : `Tem certeza que deseja restaurar ${selectedIds.length} desarquivamentos?`
         }
-        confirmText="Restaurar"
-        cancelText="Cancelar"
-        onConfirm={handleRestoreSelected}
-        variant="default"
+        variant="warning"
       />
     </div>
   );

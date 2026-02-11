@@ -28,4 +28,3 @@ export class AddNumeroOficioToDesarquivamentos1766000000000
     await queryRunner.dropColumn("desarquivamentos", "numero_oficio");
   }
 }
-

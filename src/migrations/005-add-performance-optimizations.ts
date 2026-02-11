@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner, TableIndex } from "typeorm";
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AddPerformanceOptimizations1700000005000
   implements MigrationInterface

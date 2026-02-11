@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { nugecidService } from '@/services/nugecidService';
-import { ImportResultDto } from '@/modules/nugecid/dto/import-result.dto';
+import { useState } from "react";
+import { nugecidService } from "@/services/nugecidService";
+import type { ImportResultDto } from "@/types";
 
 export const useNugecidImport = (onImportSuccess?: () => void) => {
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [importResult, setImportResult] = useState<ImportResultDto | null>(null);
+  const [importResult, setImportResult] = useState<ImportResultDto | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const handleFileImport = async (file: File) => {
@@ -20,7 +22,10 @@ export const useNugecidImport = (onImportSuccess?: () => void) => {
         onImportSuccess();
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ocorreu um erro ao importar a planilha.');
+      setError(
+        err.response?.data?.message ||
+          "Ocorreu um erro ao importar a planilha.",
+      );
     } finally {
       setIsLoading(false);
     }

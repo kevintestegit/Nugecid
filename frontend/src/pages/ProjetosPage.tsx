@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -94,7 +94,7 @@ const ProjetosPage: React.FC = () => {
     favorito?: boolean;
   };
 
-  const loadProjetos = async () => {
+  const loadProjetos = useCallback(async () => {
     if (!isAuthenticated) {
       setState(prev => ({ ...prev, projetos: [], loading: false, error: null }));
       return;
@@ -107,8 +107,8 @@ const ProjetosPage: React.FC = () => {
       const projetos = Array.isArray(response) ? (response as unknown as ProjetoApi[]) : [];
       const normalized = projetos.map((p) => ({
         ...p,
-        data_criacao: p.data_criacao || p.created_at || p.createdAt || null,
-        data_atualizacao: p.data_atualizacao || p.updated_at || p.updatedAt || null,
+        data_criacao: p.data_criacao || p.created_at || p.createdAt || undefined,
+        data_atualizacao: p.data_atualizacao || p.updated_at || p.updatedAt || undefined,
         ativo: p.ativo !== undefined ? p.ativo : true,
       }));
 
@@ -125,11 +125,11 @@ const ProjetosPage: React.FC = () => {
         loading: false
       }));
     }
-  };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     loadProjetos();
-  }, [isAuthenticated]);
+  }, [loadProjetos]);
 
   // Filtrar projetos
   const filteredProjetos = state.projetos.filter(projeto => {

@@ -63,8 +63,11 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
           )}
 
           {importResult && (
-            <Alert variant={importResult.errors.length > 0 ? 'default' : 'default'}>
-              {importResult.errors.length === 0 ? <CheckCircle className="h-4 w-4 text-green-500" /> : <FileWarning className="h-4 w-4 text-yellow-500" />}
+            (() => {
+              const importErrors = importResult.errors ?? []
+              return (
+            <Alert variant={importErrors.length > 0 ? 'default' : 'default'}>
+              {importErrors.length === 0 ? <CheckCircle className="h-4 w-4 text-green-500" /> : <FileWarning className="h-4 w-4 text-yellow-500" />}
               <AlertTitle>Relatório de Importação</AlertTitle>
               <AlertDescription>
                 <p><strong>Arquivo:</strong> {importResult.fileName}</p>
@@ -72,11 +75,11 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
                 <p className='text-green-600'><strong>Sucessos:</strong> {importResult.successCount}</p>
                 <p className='text-red-600'><strong>Falhas:</strong> {importResult.errorCount}</p>
                 <p><strong>Tempo de Processamento:</strong> {importResult.processingTime}</p>
-                {importResult.errors.length > 0 && (
+                {importErrors.length > 0 && (
                   <div className="mt-2">
                     <h4 className="font-bold">Detalhes dos Erros:</h4>
                     <ul className="list-disc pl-5 mt-1 max-h-40 overflow-y-auto">
-                      {importResult.errors.map((err, index) => (
+                      {importErrors.map((err, index) => (
                         <li key={index}><strong>Linha {err.line}:</strong> {err.error}</li>
                       ))}
                     </ul>
@@ -84,6 +87,8 @@ export const ImportModal = ({ isOpen, onClose, onImportSuccess }: ImportModalPro
                 )}
               </AlertDescription>
             </Alert>
+              )
+            })()
           )}
 
         </div>

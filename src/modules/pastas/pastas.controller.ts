@@ -71,7 +71,11 @@ export class PastasController {
         ? parsedLimit
         : undefined;
 
-    return this.pastasService.buscarItens(query, safeLimit, isAdmin ? undefined : user?.id);
+    return this.pastasService.buscarItens(
+      query,
+      safeLimit,
+      isAdmin ? undefined : user?.id,
+    );
   }
 
   @Get(":id")
@@ -92,7 +96,11 @@ export class PastasController {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
-    return this.pastasService.update(id, updatePastaDto, isAdmin ? undefined : user?.id);
+    return this.pastasService.update(
+      id,
+      updatePastaDto,
+      isAdmin ? undefined : user?.id,
+    );
   }
 
   @Post(":id/arquivos")
@@ -114,7 +122,11 @@ export class PastasController {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
-    return this.pastasService.adicionarArquivos(id, files, isAdmin ? undefined : user?.id);
+    return this.pastasService.adicionarArquivos(
+      id,
+      files,
+      isAdmin ? undefined : user?.id,
+    );
   }
 
   @Get(":id/arquivos")
@@ -122,7 +134,10 @@ export class PastasController {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
-    return this.pastasService.listarArquivos(id, isAdmin ? undefined : user?.id);
+    return this.pastasService.listarArquivos(
+      id,
+      isAdmin ? undefined : user?.id,
+    );
   }
 
   @Get(":id/itens")
@@ -165,7 +180,11 @@ export class PastasController {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
-    return this.pastasService.removerArquivo(id, arquivoId, isAdmin ? undefined : user?.id);
+    return this.pastasService.removerArquivo(
+      id,
+      arquivoId,
+      isAdmin ? undefined : user?.id,
+    );
   }
 
   @Delete(":id")

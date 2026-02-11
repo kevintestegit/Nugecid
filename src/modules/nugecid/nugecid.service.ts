@@ -6,23 +6,15 @@ import {
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Like, Between, In, FindManyOptions } from "typeorm";
-import * as XLSX from "xlsx";
-import * as fs from "fs";
-import * as path from "path";
+import { Repository } from "typeorm";
 
 import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 import { DesarquivamentoCommentTypeOrmEntity } from "./infrastructure/entities/desarquivamento-comment.typeorm-entity";
 import { TipoDesarquivamentoEnum } from "./domain/enums/tipo-desarquivamento.enum";
 import { User } from "../users/entities/user.entity";
-import { Auditoria } from "../audit/entities/auditoria.entity";
 import { CreateDesarquivamentoDto } from "./dto/create-desarquivamento.dto";
 import { UpdateDesarquivamentoDto } from "./dto/update-desarquivamento.dto";
 import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
-import { ImportResultDto } from "./dto/import-result.dto";
-import { ImportDesarquivamentoDto } from "./dto/import-desarquivamento.dto";
-import { ImportRegistroDto } from "./dto/import-registro.dto";
-import { validate } from "class-validator";
 import { StatusDesarquivamentoEnum } from "./domain/enums/status-desarquivamento.enum";
 
 export interface PaginatedDesarquivamentos {

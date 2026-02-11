@@ -1,9 +1,8 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { UnauthorizedException, BadRequestException } from "@nestjs/common";
-import * as bcrypt from "bcryptjs";
+import { UnauthorizedException } from "@nestjs/common";
 
 import { AuthService } from "./auth.service";
 import { User } from "../users/entities/user.entity";
@@ -13,9 +12,6 @@ import { LoginDto } from "./dto/login.dto";
 
 describe("AuthService", () => {
   let service: AuthService;
-  let userRepository: Repository<User>;
-  let roleRepository: Repository<Role>;
-  let auditoriaRepository: Repository<Auditoria>;
   let jwtService: JwtService;
 
   const mockUser = {
@@ -51,6 +47,18 @@ describe("AuthService", () => {
     sign: jest.fn().mockReturnValue("mock-jwt-token"),
   };
 
+  const mockConfigService = {
+    get: jest.fn((key: string, defaultValue?: string) => {
+      const values: Record<string, string> = {
+        "auth.jwt.expiresIn": "50m",
+        "auth.jwt.refreshExpiresIn": "7d",
+        "auth.jwt.secret": "test-secret",
+        "auth.jwt.refreshSecret": "test-refresh-secret",
+      };
+      return values[key] ?? defaultValue;
+    }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -71,17 +79,16 @@ describe("AuthService", () => {
           provide: JwtService,
           useValue: mockJwtService,
         },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     jest.spyOn(service["logger"], "error").mockImplementation(() => {});
     jest.spyOn(service["logger"], "warn").mockImplementation(() => {});
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    roleRepository = module.get<Repository<Role>>(getRepositoryToken(Role));
-    auditoriaRepository = module.get<Repository<Auditoria>>(
-      getRepositoryToken(Auditoria),
-    );
     jwtService = module.get<JwtService>(JwtService);
   });
 
@@ -113,7 +120,7 @@ describe("AuthService", () => {
           usuario: mockUser.usuario,
           role: mockUser.role.name,
         },
-        { expiresIn: "50m" },
+        expect.objectContaining({ expiresIn: "50m" }),
       );
     });
 
@@ -158,7 +165,7 @@ describe("AuthService", () => {
           usuario: mockUser.usuario,
           role: mockUser.role.name,
         },
-        { expiresIn: "50m" },
+        expect.objectContaining({ expiresIn: "50m" }),
       );
     });
 
@@ -204,7 +211,7 @@ describe("AuthService", () => {
 
       expect(result).toEqual(mockUser);
       expect(mockUserRepository.findOne).toHaveBeenCalledWith({
-        where: { usuario: "testuser" },
+        where: { usuario: "test@itep.rn.gov.br" },
         relations: ["role"],
       });
     });

@@ -32,9 +32,10 @@ export function useUsers(params?: UsersQueryParams) {
 // Hook para obter um usuário específico
 export function useUser(id: number) {
   const validId = parseNumericId(id);
+  const queryId = validId ?? 0;
   
   return useQuery({
-    queryKey: QUERY_KEYS.user(validId),
+    queryKey: QUERY_KEYS.user(queryId),
     queryFn: () => {
       if (!validId || !isValidUserIdFormat(validId)) {
         throw new Error('ID de usuário inválido. Esperado um número inteiro.');

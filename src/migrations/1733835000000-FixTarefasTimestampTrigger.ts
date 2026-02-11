@@ -55,7 +55,9 @@ export class FixTarefasTimestampTrigger1733835000000
     await queryRunner.query(
       `DROP TRIGGER IF EXISTS tarefas_sync_timestamps ON tarefas;`,
     );
-    await queryRunner.query(`DROP FUNCTION IF EXISTS sync_tarefas_timestamps();`);
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS sync_tarefas_timestamps();`,
+    );
 
     // Não removemos colunas para evitar perda de dados; apenas limpamos defaults.
     await queryRunner.query(`

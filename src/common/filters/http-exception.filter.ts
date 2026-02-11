@@ -19,7 +19,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = "Erro interno do servidor";
-    let error = "Internal Server Error";
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -28,14 +27,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
       if (typeof exceptionResponse === "object" && exceptionResponse !== null) {
         const responseObj = exceptionResponse as any;
         message = responseObj.message || exception.message;
-        error = responseObj.error || exception.name;
       } else {
         message = exceptionResponse as string;
-        error = exception.name;
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      error = exception.name;
     }
 
     // Log do erro

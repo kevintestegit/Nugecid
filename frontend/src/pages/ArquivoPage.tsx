@@ -137,7 +137,10 @@ const ArquivoPage: React.FC = () => {
     updatePasta,
     isUpdatingPasta,
   } = usePastas();
-  const safePastas: Pasta[] = Array.isArray(pastas) ? pastas : [];
+  const safePastas = useMemo<Pasta[]>(
+    () => (Array.isArray(pastas) ? pastas : []),
+    [pastas],
+  );
   const [caixas] = useState<Caixa[]>([]);
 
   const totalPastas = safePastas.length;
@@ -340,12 +343,22 @@ const ArquivoPage: React.FC = () => {
   }, [caixas, normalizedSearchTerm]);
 
   return (
-    <div className="space-y-6 text-sm">
-      <div className="border-b border-border pb-6">
+    <div className="relative space-y-6 text-sm">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_8%_10%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0))] dark:bg-[radial-gradient(120%_80%_at_8%_10%,rgba(14,116,144,0.24),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+      </div>
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground flex items-center gap-3">
-              <FolderOpen className="h-8 w-8 text-primary" />
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/45">
+              arquivo operacional
+            </p>
+            <h1 className="text-2xl font-semibold text-foreground flex items-center gap-3 md:text-3xl">
+              <span className="rounded-xl bg-primary/10 p-2 ring-1 ring-white/70 shadow-sm backdrop-blur">
+                <FolderOpen className="h-6 w-6 text-primary" />
+              </span>
               Arquivo - NUGECID/SAG
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -365,14 +378,14 @@ const ArquivoPage: React.FC = () => {
                   ? undefined
                   : 'Apenas administradores ou coordenadores podem criar pastas'
               }
-              className="flex items-center gap-2 text-sm"
+              className="flex items-center gap-2 text-sm bg-primary/90"
             >
               <Plus className="h-4 w-4" />
               Nova Pasta
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 text-sm">
+                <Button variant="outline" className="flex items-center gap-2 text-sm border-border/60 bg-background/70 backdrop-blur">
                   <Filter className="h-4 w-4" />
                   Filtros
                 </Button>
@@ -396,9 +409,9 @@ const ArquivoPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="text-sm">
+        <Card className="text-sm border border-border/60 bg-card/85 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.7)]">
           <CardContent className="pt-5 space-y-2">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <span>Total de Pastas</span>
               <FolderOpen className="h-4 w-4" />
             </div>
@@ -407,9 +420,9 @@ const ArquivoPage: React.FC = () => {
             </p>
           </CardContent>
         </Card>
-        <Card className="text-sm">
+        <Card className="text-sm border border-border/60 bg-card/85 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.7)]">
           <CardContent className="pt-5 space-y-2">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <span>Fotos Registradas</span>
               <Image className="h-4 w-4" />
             </div>
@@ -418,9 +431,9 @@ const ArquivoPage: React.FC = () => {
             </p>
           </CardContent>
         </Card>
-        <Card className="text-sm">
+        <Card className="text-sm border border-border/60 bg-card/85 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.7)]">
           <CardContent className="pt-5 space-y-2">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               <span>Planilhas Anexadas</span>
               <FileSpreadsheet className="h-4 w-4" />
             </div>
@@ -436,18 +449,21 @@ const ArquivoPage: React.FC = () => {
           <Button
             variant={activeTab === 'pastas' ? 'default' : 'outline'}
             onClick={() => setActiveTab('pastas')}
+            className={cn(activeTab === 'pastas' ? 'bg-primary/90' : 'border-border/60 bg-background/70 backdrop-blur', 'text-[11px] font-semibold uppercase tracking-[0.08em]')}
           >
             Pastas
           </Button>
           <Button
             variant={activeTab === 'planilhas' ? 'default' : 'outline'}
             onClick={() => setActiveTab('planilhas')}
+            className={cn(activeTab === 'planilhas' ? 'bg-primary/90' : 'border-border/60 bg-background/70 backdrop-blur', 'text-[11px] font-semibold uppercase tracking-[0.08em]')}
           >
             Planilhas
           </Button>
           <Button
             variant={activeTab === 'caixas' ? 'default' : 'outline'}
             onClick={() => setActiveTab('caixas')}
+            className={cn(activeTab === 'caixas' ? 'bg-primary/90' : 'border-border/60 bg-background/70 backdrop-blur', 'text-[11px] font-semibold uppercase tracking-[0.08em]')}
           >
             Caixas Documentais
           </Button>
@@ -504,7 +520,7 @@ const ArquivoPage: React.FC = () => {
                     navigate(`/arquivo/${pasta.id}`);
                   }
                 }}
-                className="cursor-pointer border border-border/40 shadow-sm transition-all hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                className="cursor-pointer border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] transition-all hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
               >
                 <CardHeader className="space-y-2">
                   <div className="flex items-start justify-between gap-3">
@@ -512,7 +528,7 @@ const ArquivoPage: React.FC = () => {
                       <CardTitle className="text-base font-semibold text-foreground">
                         {pasta.nome}
                       </CardTitle>
-                      <CardDescription className="mt-1 text-xs text-muted-foreground">
+                      <CardDescription className="mt-1 text-[11px] text-muted-foreground">
                         {pasta.descricao}
                       </CardDescription>
                     </div>

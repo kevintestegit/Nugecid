@@ -58,9 +58,7 @@ export class DatabaseHealthService {
       }
 
       // Teste de conectividade simples
-      const queryResult = await this.dataSource.query(
-        "SELECT 1 as status, NOW() as current_time",
-      );
+      await this.dataSource.query("SELECT 1 as status, NOW() as current_time");
       const responseTime = Date.now() - startTime;
 
       this.logger.log(
@@ -87,7 +85,6 @@ export class DatabaseHealthService {
       this.lastHealthCheck = healthStatus;
       return healthStatus;
     } catch (error: any) {
-      const responseTime = Date.now() - startTime;
       this.logger.error(
         `❌ [HEALTH_CHECK] Erro na conexão com banco: ${error.message}`,
       );

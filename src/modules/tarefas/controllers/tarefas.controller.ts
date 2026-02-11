@@ -292,7 +292,7 @@ export class TarefasController {
   })
   async buscarComFiltros(
     @Query() filtros: FiltrosTarefasDto,
-    @Request() req: any,
+    @Request() _req: any,
   ) {
     return this.tarefasService.buscarComFiltros(filtros);
   }
@@ -305,7 +305,7 @@ export class TarefasController {
   })
   async getEstatisticasFiltros(
     @Query() filtros: FiltrosTarefasDto,
-    @Request() req: any,
+    @Request() _req: any,
   ) {
     return this.tarefasService.getEstatisticas(filtros);
   }

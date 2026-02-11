@@ -222,7 +222,7 @@ export class GenerateTermoEntregaUseCase {
     // Aqui seria implementada a geração do PDF usando uma biblioteca como puppeteer, jsPDF, ou PDFKit
     // Por simplicidade, vou retornar um buffer simulado
 
-    const htmlContent = this.generateHTMLTemplate(termoData, templateOptions);
+    this.generateHTMLTemplate(termoData, templateOptions);
 
     // Simulação da geração do PDF
     // Em uma implementação real, você usaria:

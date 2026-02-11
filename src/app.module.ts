@@ -7,7 +7,6 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { MulterModule } from "@nestjs/platform-express";
-import { APP_GUARD } from "@nestjs/core";
 import { join } from "path";
 import * as redisStore from "cache-manager-redis-store";
 
@@ -39,20 +38,16 @@ import { AnnouncementsModule } from "./modules/announcements/announcements.modul
 import { VestigiosModule } from "./modules/vestigios/vestigios.module";
 import { EscavadorSeirnModule } from "./modules/escavador-seirn/escavador-seirn.module";
 
-// Guards
-import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
-
 // Controllers and Services
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
 // Entities
 import { User } from "./modules/users/entities/user.entity";
-import { Role } from "./modules/users/entities/role.entity";
-import { Auditoria } from "./modules/audit/entities/auditoria.entity";
 import { DesarquivamentoTypeOrmEntity } from "./modules/nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
 import { Tarefa } from "./modules/tarefas/entities/tarefa.entity";
 import { Projeto } from "./modules/tarefas/entities/projeto.entity";
+import { Pasta } from "./modules/pastas/entities/pasta.entity";
 
 @Module({
   imports: [
@@ -70,6 +65,7 @@ import { Projeto } from "./modules/tarefas/entities/projeto.entity";
       DesarquivamentoTypeOrmEntity,
       Tarefa,
       Projeto,
+      Pasta,
     ]),
 
     // Database

@@ -77,7 +77,12 @@ export const useTarefas = (initialParams?: QueryTarefaDto): UseTarefasReturn => 
       if (params?.colunaId) queryParams.append('colunaId', params.colunaId.toString())
       if (params?.responsavelId) queryParams.append('responsavelId', params.responsavelId.toString())
       if (params?.criadorId) queryParams.append('criadorId', params.criadorId.toString())
-      if (params?.prioridade) queryParams.append('prioridade', params.prioridade)
+      if (params?.prioridade) {
+        const prioridadeValue = Array.isArray(params.prioridade)
+          ? params.prioridade.join(',')
+          : params.prioridade
+        queryParams.append('prioridade', prioridadeValue)
+      }
       if (params?.search) queryParams.append('search', params.search)
       if (params?.page) queryParams.append('page', params.page.toString())
       if (params?.limit) queryParams.append('limit', params.limit.toString())
@@ -334,17 +339,17 @@ export const useTarefas = (initialParams?: QueryTarefaDto): UseTarefasReturn => 
     }
 
     tarefas.forEach(tarefa => {
-      switch (tarefa.status) {
-        case 'PENDENTE':
+      switch (String(tarefa.status || '').toLowerCase()) {
+        case 'pendente':
           stats.pendentes++
           break
-        case 'EM_ANDAMENTO':
+        case 'em_andamento':
           stats.em_andamento++
           break
-        case 'CONCLUIDA':
+        case 'concluida':
           stats.concluidas++
           break
-        case 'CANCELADA':
+        case 'cancelada':
           stats.canceladas++
           break
       }
@@ -358,7 +363,7 @@ export const useTarefas = (initialParams?: QueryTarefaDto): UseTarefasReturn => 
     if (initialParams && isAuthenticated && user) {
       fetchTarefas(initialParams)
     }
-  }, [isAuthenticated, user]) // Only depend on auth state, not fetchTarefas to avoid infinite loop
+  }, [fetchTarefas, initialParams, isAuthenticated, user])
 
   return {
     tarefas,

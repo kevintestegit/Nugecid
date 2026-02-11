@@ -3,7 +3,6 @@ import {
   StatusDesarquivamento,
   StatusDesarquivamentoEnum,
 } from "../value-objects";
-import { TipoDesarquivamentoEnum } from "../enums/tipo-desarquivamento.enum";
 
 export interface DesarquivamentoDomainProps {
   id?: DesarquivamentoId;
@@ -510,7 +509,7 @@ export class DesarquivamentoDomain {
   }
 
   // Cancela o desarquivamento
-  cancel(motivo?: string): void {
+  cancel(_motivo?: string): void {
     if (!this._status.canBeCancelled()) {
       throw new Error(
         "Desarquivamento nÃ£o pode ser cancelado no status atual",

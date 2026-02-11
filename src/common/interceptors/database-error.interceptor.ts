@@ -253,7 +253,7 @@ export class DatabaseErrorInterceptor implements NestInterceptor {
   }
 
   private provideDiagnosticSuggestions(error: DatabaseErrorDetails) {
-    const { type, code, message } = error;
+    const { type, code } = error;
 
     this.logger.error(`🔧 [DB_DIAGNOSTIC] Sugestões de diagnóstico:`);
 

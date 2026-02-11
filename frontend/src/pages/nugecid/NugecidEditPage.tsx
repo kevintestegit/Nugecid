@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Edit, Loader2 } from 'lucide-react'
 import { UpdateDesarquivamentoDto } from '@/types'
-import { useDesarquivamentos } from '@/hooks/useDesarquivamentos'
+import { useDesarquivamento, useUpdateDesarquivamento } from '@/hooks/useDesarquivamentos'
 import { Button } from '@/components/ui/Button'
 import DesarquivamentoForm from '@/components/nugecid/DesarquivamentoForm'
 import { PageLoading } from '@/components/ui'
@@ -16,13 +16,14 @@ interface NugecidEditPageProps {
 const NugecidEditPage: React.FC<NugecidEditPageProps> = ({ className }) => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { getDesarquivamento, updateDesarquivamento } = useDesarquivamentos()
+  const updateDesarquivamento = useUpdateDesarquivamento()
 
   const {
-    data: desarquivamento,
+    data: response,
     isLoading,
     error
-  } = getDesarquivamento(id!)
+  } = useDesarquivamento(id)
+  const desarquivamento = response?.data
 
   const handleSubmit = async (data: UpdateDesarquivamentoDto) => {
     try {
@@ -30,9 +31,10 @@ const NugecidEditPage: React.FC<NugecidEditPageProps> = ({ className }) => {
         id: id!,
         data
       })
+      const updated = result.data
       
       toast.success('Registro atualizado com sucesso!', {
-        description: `Código: ${result.codigoBarras}`
+        description: `Código: ${updated?.codigoBarras || updated?.id || id}`
       })
       
       // Redirecionar para a página de detalhes
@@ -58,7 +60,7 @@ const NugecidEditPage: React.FC<NugecidEditPageProps> = ({ className }) => {
 
   // Loading state
   if (isLoading) {
-    return <PageLoading message="Carregando registro..." />
+    return <PageLoading />
   }
 
   // Error state
@@ -230,7 +232,7 @@ const NugecidEditPage: React.FC<NugecidEditPageProps> = ({ className }) => {
         <div className="p-6">
           <DesarquivamentoForm
             initialData={desarquivamento}
-            onSubmit={handleSubmit}
+            onSubmit={(data) => handleSubmit(data as UpdateDesarquivamentoDto)}
             onCancel={handleCancel}
             isLoading={updateDesarquivamento.isPending}
             isEdit={true}

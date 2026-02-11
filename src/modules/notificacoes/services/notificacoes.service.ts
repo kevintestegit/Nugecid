@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan, In } from "typeorm";
 import {
@@ -207,7 +202,7 @@ export class NotificacoesService {
   }
 
   async delete(id: number, usuarioId: number): Promise<void> {
-    const notificacao = await this.findOne(id, usuarioId);
+    await this.findOne(id, usuarioId);
 
     await this.notificacaoRepository.softDelete(id);
   }
@@ -226,7 +221,10 @@ export class NotificacoesService {
         .createQueryBuilder("n")
         .select("COUNT(*)", "total")
         .addSelect("SUM(CASE WHEN n.lida = true THEN 1 ELSE 0 END)", "lidas")
-        .addSelect("SUM(CASE WHEN n.lida = false THEN 1 ELSE 0 END)", "naoLidas")
+        .addSelect(
+          "SUM(CASE WHEN n.lida = false THEN 1 ELSE 0 END)",
+          "naoLidas",
+        )
         .where("n.usuarioId = :usuarioId", { usuarioId })
         .andWhere("n.deletedAt IS NULL")
         .getRawOne(),
@@ -369,15 +367,18 @@ export class NotificacoesService {
     const desarquivamentoIds = desarquivamentosPendentes.map((d) => d.id);
 
     // Buscar todas as notificações existentes de uma vez (evita N+1)
-    const notificacoesExistentes = desarquivamentoIds.length > 0
-      ? await this.notificacaoRepository
-          .createQueryBuilder("n")
-          .select(["n.processoId", "n.usuarioId"])
-          .where("n.tipo = :tipo", { tipo: TipoNotificacao.SOLICITACAO_PENDENTE })
-          .andWhere("n.processoId IN (:...ids)", { ids: desarquivamentoIds })
-          .andWhere("n.lida = false")
-          .getRawMany()
-      : [];
+    const notificacoesExistentes =
+      desarquivamentoIds.length > 0
+        ? await this.notificacaoRepository
+            .createQueryBuilder("n")
+            .select(["n.processoId", "n.usuarioId"])
+            .where("n.tipo = :tipo", {
+              tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
+            })
+            .andWhere("n.processoId IN (:...ids)", { ids: desarquivamentoIds })
+            .andWhere("n.lida = false")
+            .getRawMany()
+        : [];
 
     // Criar um Set para lookup rápido
     const notificacoesExistentesSet = new Set(
@@ -423,12 +424,13 @@ export class NotificacoesService {
     }
 
     // Buscar todos os usuários válidos de uma vez
-    const usuariosValidos = usuariosIdsParaValidar.size > 0
-      ? await this.userRepository.find({
-          where: { id: In(Array.from(usuariosIdsParaValidar)) },
-          select: ["id"],
-        })
-      : [];
+    const usuariosValidos =
+      usuariosIdsParaValidar.size > 0
+        ? await this.userRepository.find({
+            where: { id: In(Array.from(usuariosIdsParaValidar)) },
+            select: ["id"],
+          })
+        : [];
 
     const usuariosValidosSet = new Set(usuariosValidos.map((u) => u.id));
 
@@ -439,10 +441,16 @@ export class NotificacoesService {
       );
 
       const destinatarios = new Set<number>(gestoresIds);
-      if (desarquivamento.criadoPorId && usuariosValidosSet.has(desarquivamento.criadoPorId)) {
+      if (
+        desarquivamento.criadoPorId &&
+        usuariosValidosSet.has(desarquivamento.criadoPorId)
+      ) {
         destinatarios.add(desarquivamento.criadoPorId);
       }
-      if (desarquivamento.responsavelId && usuariosValidosSet.has(desarquivamento.responsavelId)) {
+      if (
+        desarquivamento.responsavelId &&
+        usuariosValidosSet.has(desarquivamento.responsavelId)
+      ) {
         destinatarios.add(desarquivamento.responsavelId);
       }
 
@@ -451,13 +459,21 @@ export class NotificacoesService {
 
         const chave = `${desarquivamento.id}-${usuarioId}`;
         if (!notificacoesExistentesSet.has(chave)) {
-          notificacoesParaCriar.push({ usuarioId, desarquivamento, diasPendentes });
+          notificacoesParaCriar.push({
+            usuarioId,
+            desarquivamento,
+            diasPendentes,
+          });
         }
       }
     }
 
     // Criar notificações em lote
-    for (const { usuarioId, desarquivamento, diasPendentes } of notificacoesParaCriar) {
+    for (const {
+      usuarioId,
+      desarquivamento,
+      diasPendentes,
+    } of notificacoesParaCriar) {
       const notificacao = await this.criarNotificacaoArquivoSolicitado(
         usuarioId,
         desarquivamento,
@@ -468,15 +484,18 @@ export class NotificacoesService {
 
     // Buscar notificações existentes para tarefas de uma vez
     const tarefaIds = solicitacoesPendentes.map((s) => s.id);
-    const notificacoesTarefasExistentes = tarefaIds.length > 0
-      ? await this.notificacaoRepository
-          .createQueryBuilder("n")
-          .select("n.solicitacaoId")
-          .where("n.tipo = :tipo", { tipo: TipoNotificacao.SOLICITACAO_PENDENTE })
-          .andWhere("n.solicitacaoId IN (:...ids)", { ids: tarefaIds })
-          .andWhere("n.lida = false")
-          .getRawMany()
-      : [];
+    const notificacoesTarefasExistentes =
+      tarefaIds.length > 0
+        ? await this.notificacaoRepository
+            .createQueryBuilder("n")
+            .select("n.solicitacaoId")
+            .where("n.tipo = :tipo", {
+              tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
+            })
+            .andWhere("n.solicitacaoId IN (:...ids)", { ids: tarefaIds })
+            .andWhere("n.lida = false")
+            .getRawMany()
+        : [];
 
     const tarefasComNotificacao = new Set(
       notificacoesTarefasExistentes.map((n) => n.n_solicitacaoId),
@@ -488,8 +507,7 @@ export class NotificacoesService {
       }
 
       const diasPendentes = Math.floor(
-        (Date.now() - solicitacao.updatedAt.getTime()) /
-          (1000 * 60 * 60 * 24),
+        (Date.now() - solicitacao.updatedAt.getTime()) / (1000 * 60 * 60 * 24),
       );
 
       const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;

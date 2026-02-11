@@ -96,7 +96,6 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
   const {
     register,
     handleSubmit,
-    setValue,
     watch,
     control,
     formState: { errors },
@@ -106,12 +105,6 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
   })
 
   const onFormSubmit = async (data: DesarquivamentoFormData) => {
-    // Debug: log dados do formulário
-    console.log('[DesarquivamentoForm] Dados do formulário:', {
-      dadosAdicionais: data.dadosAdicionais,
-      solicitacaoProrrogacaoTexto: data.solicitacaoProrrogacaoTexto,
-      numeroOficio: data.numeroOficio,
-    })
     // Converter datas para ISO string antes de enviar
     const formattedData = {
       ...data,
@@ -120,21 +113,23 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
       dataDesarquivamentoSAG: data.dataDesarquivamentoSAG?.toISOString(),
       dataDevolucaoSetor: data.dataDevolucaoSetor?.toISOString(),
     }
-    console.log('[DesarquivamentoForm] Dados formatados para envio:', {
-      dadosAdicionais: formattedData.dadosAdicionais,
-    })
     await onSubmit(formattedData as unknown as CreateDesarquivamentoDto)
   }
 
   return (
-    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
-      <Card>
+    <form
+      onSubmit={handleSubmit(onFormSubmit)}
+      className="space-y-6 [&_label]:text-[10px] [&_label]:font-semibold [&_label]:uppercase [&_label]:tracking-[0.12em] [&_label]:text-muted-foreground"
+    >
+      <Card className="glass-panel">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight">
+            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+              <FileText className="h-4 w-4 text-primary" />
+            </span>
             Detalhes da Solicitação
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             Preencha as informações principais do desarquivamento.
           </CardDescription>
         </CardHeader>
@@ -262,9 +257,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="glass-panel">
         <CardHeader>
-          <CardTitle>Informações Adicionais</CardTitle>
+          <CardTitle className="text-base font-semibold tracking-tight">Informações Adicionais</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -349,9 +344,9 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="glass-panel">
         <CardHeader>
-          <CardTitle>Justificativa e Prazos</CardTitle>
+          <CardTitle className="text-base font-semibold tracking-tight">Justificativa e Prazos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

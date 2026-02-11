@@ -27,6 +27,18 @@ interface DashboardStatsData {
   totalEsteMes?: number; // Adicionado para calcular tendência de fluxo
 }
 
+interface StatsCard {
+  title: string;
+  value: number;
+  icon: typeof FileText;
+  color: string;
+  titleColor: string;
+  bgColor: string;
+  tendencia: { porcentagem: number; tipo: 'alta' | 'baixa' | 'neutro' };
+  link: string;
+  destaque?: boolean;
+}
+
 interface DashboardStatsProps {
   data: DashboardStatsData
   isLoading?: boolean
@@ -60,14 +72,14 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
 
   const urgentesCount = data?.urgentes || 0
 
-  const statsCards = [
+  const statsCards: StatsCard[] = [
     {
       title: 'Total de Solicitações',
       value: data?.total || 0,
       icon: FileText,
       color: 'text-blue-600',
+      titleColor: 'text-blue-500',
       bgColor: 'bg-blue-50 dark:bg-blue-950/30',
-      borderColor: 'border-l-blue-500',
       tendencia: tendenciaTotal,
       link: '/desarquivamentos'
     },
@@ -76,10 +88,9 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
       value: data?.pendentes || 0,
       icon: Clock,
       color: 'text-red-600',
+      titleColor: 'text-red-500',
       bgColor: 'bg-red-50 dark:bg-red-950/30',
-      borderColor: 'border-l-red-500',
       tendencia: tendenciaPendentes,
-      destaque: (data?.pendentes || 0) > 0,
       link: `/desarquivamentos?status=${StatusDesarquivamento.SOLICITADO}`
     },
   ]
@@ -118,46 +129,49 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
             <Link key={index} to={stat.link}>
               <Card
                 className={cn(
-                  "hover:shadow-lg transition-all duration-200 border-l-4 cursor-pointer",
-                  stat.borderColor,
-                  stat.destaque && "ring-2 ring-red-200 shadow-lg"
+                  "relative h-[198px] overflow-hidden cursor-pointer rounded-[1.25rem] border border-border/60 bg-card/85 backdrop-blur-xl shadow-[0_16px_34px_-28px_rgba(15,23,42,0.55)]"
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={cn("p-2.5 rounded-lg", stat.bgColor)}>
-                    <Icon className={cn("h-5 w-5", stat.color)} />
+                <Icon className={cn("pointer-events-none absolute -right-6 -bottom-6 h-24 w-24 opacity-[0.10]", stat.color)} />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/60 to-transparent dark:from-white/5" />
+                <CardHeader className="items-center pb-1 text-center pt-4">
+                  <div className="flex h-8 items-center justify-center">
+                    <CardTitle className={cn("text-[9px] font-bold uppercase tracking-[0.14em]", stat.titleColor)}>
+                      {stat.title}
+                    </CardTitle>
+                  </div>
+                  <div className={cn("mt-1 rounded-lg p-1.5 ring-1 ring-white/60 shadow-sm backdrop-blur", stat.bgColor)}>
+                    <Icon className={cn("h-3.5 w-3.5", stat.color)} />
                   </div>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center text-center pt-0">
-                  <div className="text-4xl font-bold text-foreground mb-2">
+                <CardContent className="flex flex-col items-center justify-center pt-0 pb-4 text-center">
+                  <div className="mb-1.5 text-[2.25rem] leading-none font-black tracking-tight text-foreground">
                     {(stat.value ?? 0).toLocaleString()}
                   </div>
-                  
-                  {/* Indicador de tendência */}
+
                   {stat.tendencia.porcentagem !== 0 && (
-                    <div className={cn(
-                      "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full",
-                      stat.tendencia.tipo === 'alta' && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
-                      stat.tendencia.tipo === 'baixa' && "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400",
-                      stat.tendencia.tipo === 'neutro' && "bg-gray-100 text-gray-700 dark:bg-gray-950/30 dark:text-gray-400"
-                    )}>
+                    <div
+                      className={cn(
+                        "mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1",
+                        stat.tendencia.tipo === 'alta' && "bg-green-100/80 text-green-700 ring-green-200 dark:bg-green-950/40 dark:text-green-400 dark:ring-green-800",
+                        stat.tendencia.tipo === 'baixa' && "bg-red-100/80 text-red-700 ring-red-200 dark:bg-red-950/40 dark:text-red-400 dark:ring-red-800",
+                        stat.tendencia.tipo === 'neutro' && "bg-gray-100/80 text-gray-700 ring-gray-200 dark:bg-gray-950/40 dark:text-gray-400 dark:ring-gray-800"
+                      )}
+                    >
                       <TrendIcon className="h-3 w-3" />
                       <span>{Math.abs(stat.tendencia.porcentagem)}%</span>
                     </div>
                   )}
-                  
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {stat.tendencia.tipo === 'alta' && `↗️ ${stat.tendencia.porcentagem}% em relação ao mês anterior`}
-                    {stat.tendencia.tipo === 'baixa' && `↘️ ${stat.tendencia.porcentagem}% em relação ao mês anterior`}
-                    {stat.tendencia.tipo === 'neutro' && '→ Sem mudanças significativas'}
+
+                  <p className="text-[11px] text-muted-foreground">
+                    {stat.tendencia.tipo === 'alta' && `${stat.tendencia.porcentagem}% em relação ao mês anterior`}
+                    {stat.tendencia.tipo === 'baixa' && `${stat.tendencia.porcentagem}% em relação ao mês anterior`}
+                    {stat.tendencia.tipo === 'neutro' && 'Sem mudanças significativas'}
                   </p>
 
                   {stat.destaque && stat.value === 0 && (
-                    <p className="text-sm text-green-600 dark:text-green-400 mt-2 font-medium">
-                      ✓ Tudo em dia
+                    <p className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">
+                      Tudo em dia
                     </p>
                   )}
                 </CardContent>
@@ -170,11 +184,12 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
       {/* Urgentes - Destaque especial */}
       {urgentesCount > 0 && (
         <Link to="/desarquivamentos?urgente=true">
-          <Card className="border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-950/20 hover:shadow-lg transition-all cursor-pointer">
+          <Card className="group relative overflow-hidden cursor-pointer border-l-4 border-l-red-500 bg-red-50/50 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_48px_-34px_rgba(239,68,68,0.7)] dark:bg-red-950/20">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-red-500/10 to-transparent" />
             <CardContent className="py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-950/50">
+                  <div className="rounded-lg bg-red-100 p-2 ring-1 ring-red-200 dark:bg-red-950/50 dark:ring-red-700/30">
                     <AlertTriangle className="h-5 w-5 text-red-600" />
                   </div>
                   <div>
@@ -207,12 +222,12 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ data, isLoading = false
                                      instituto === 'IML' ? 'Instituto de Medicina Legal' : instituto
                 
                 return (
-                  <div key={instituto} className="space-y-1">
+                  <div key={instituto} className="space-y-1 rounded-xl border border-border/40 bg-background/45 p-3">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{instituteName}</span>
                       <span className="text-muted-foreground">{count} ({percentage}%)</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div className="w-full bg-gray-200/80 rounded-full h-2.5 dark:bg-gray-800/60">
                       <div 
                         className={cn(
                           "h-2.5 rounded-full transition-all",

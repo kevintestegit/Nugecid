@@ -87,11 +87,6 @@ export class NugecidAnexosService implements OnModuleInit {
     tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
     anexarAoProcesso: boolean = false,
   ): Promise<any> {
-    // DEBUG: Log para verificar o valor recebido
-    this.logger.log(
-      `[DEBUG] uploadAnexo - desarquivamentoId: ${desarquivamentoId}, tipoAnexo: ${tipoAnexo}, anexarAoProcesso: ${anexarAoProcesso} (type: ${typeof anexarAoProcesso})`,
-    );
-
     // Verificar se o desarquivamento existe
     const desarquivamento = await this.desarquivamentoRepository.findOne({
       where: { id: desarquivamentoId },

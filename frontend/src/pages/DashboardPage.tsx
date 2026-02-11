@@ -183,9 +183,13 @@ const DashboardPage: React.FC = () => {
       
       case 'online-users':
         return (
-          <div key="online-users" className="glass rounded-2xl p-6 shadow-modern-lg border border-border/50">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center relative">
+          <div
+            key="online-users"
+            className="group relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_20px_55px_-42px_rgba(15,23,42,0.8)] backdrop-blur"
+          >
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-emerald-500/10 to-transparent" />
+            <div className="relative mb-6 flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10 ring-1 ring-green-500/25">
                 <Users className="h-5 w-5 text-green-600" />
                 {onlineUsers && onlineUsers.length > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 w-4">
@@ -196,7 +200,10 @@ const DashboardPage: React.FC = () => {
                   </span>
                 )}
               </div>
-              <h3 className="text-lg font-bold text-foreground">Usuários Online</h3>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Usuários Online</h3>
+                <p className="text-xs text-foreground/60">Presença da equipe em tempo real</p>
+              </div>
             </div>
 
             {loadingOnline ? (
@@ -209,7 +216,10 @@ const DashboardPage: React.FC = () => {
             ) : onlineUsers && onlineUsers.length > 0 ? (
               <div className="space-y-3">
                 {onlineUsers.slice(0, 5).map((onlineUser) => (
-                  <div key={onlineUser.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors duration-200">
+                  <div
+                    key={onlineUser.id}
+                    className="flex items-start gap-3 rounded-xl border border-border/35 bg-background/65 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted/45"
+                  >
                     <div className="relative">
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center overflow-hidden">
                         {onlineUser.avatarUrl || onlineUser.avatar ? (
@@ -239,7 +249,7 @@ const DashboardPage: React.FC = () => {
                         {getTimeAgo(onlineUser.lastActivity)}
                       </p>
                     </div>
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary capitalize shrink-0">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-semibold bg-primary/10 text-primary capitalize shrink-0 ring-1 ring-primary/20">
                       {onlineUser.role}
                     </span>
                   </div>
@@ -267,30 +277,42 @@ const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="relative space-y-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-80 overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-0 bg-[radial-gradient(140%_95%_at_10%_8%,rgba(56,189,248,0.24),transparent_55%),radial-gradient(120%_85%_at_90%_12%,rgba(249,115,22,0.16),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.7),rgba(255,255,255,0))] dark:bg-[radial-gradient(140%_95%_at_10%_8%,rgba(14,116,144,0.28),transparent_55%),radial-gradient(120%_85%_at_90%_12%,rgba(194,65,12,0.2),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+      </div>
+
       {/* Header */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-              <GreetingIcon className="h-6 w-6 text-primary" />
-            </div>
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">
-                {greeting.text}, {user?.nome}!
-              </h1>
-              <p className="text-foreground/70 text-sm">
-                Bem-vindo ao Sistema de Gerenciamento de Desarquivamentos
-              </p>
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.8)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2.5">
+            <span className="inline-flex items-center px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-foreground/45">
+              painel operacional
+            </span>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center ring-1 ring-primary/20">
+                <GreetingIcon className="h-6 w-6 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <h1 className="text-2xl font-extrabold text-foreground tracking-tight md:text-3xl">
+                  {greeting.text}, {user?.nome}!
+                </h1>
+                <p className="text-foreground/70 text-sm md:text-base">
+                  Bem-vindo ao Sistema de Gerenciamento de Desarquivamentos
+                </p>
+              </div>
             </div>
           </div>
-          
+
           <button
             onClick={() => setIsCustomizing(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors font-medium text-sm"
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
           >
             <Settings2 className="h-4 w-4" />
-            Personalizar
+            Personalizar painel
           </button>
         </div>
       </div>
@@ -312,12 +334,20 @@ const DashboardPage: React.FC = () => {
         <div className="space-y-6 md:col-span-3">
           {visibleCards
             .filter((card) => !['quick-actions', 'calendar', 'online-users'].includes(card.type))
-            .map((card) => renderCard(card.type))}
+            .map((card) => (
+              <div key={card.id} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                {renderCard(card.type)}
+              </div>
+            ))}
         </div>
         <div className="space-y-6 md:col-span-2">
           {visibleCards
             .filter((card) => ['quick-actions', 'calendar', 'online-users'].includes(card.type))
-            .map((card) => renderCard(card.type))}
+            .map((card) => (
+              <div key={card.id} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+                {renderCard(card.type)}
+              </div>
+            ))}
         </div>
       </div>
 

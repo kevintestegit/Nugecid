@@ -10,10 +10,14 @@ import {
   Request,
   ParseIntPipe,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { ChecklistsService } from "../services/checklists.service";
-import { CreateChecklistDto, CreateItemChecklistDto, UpdateItemChecklistDto } from "../dto";
+import {
+  CreateChecklistDto,
+  CreateItemChecklistDto,
+  UpdateItemChecklistDto,
+} from "../dto";
 
 @ApiTags("checklists")
 @Controller("")
@@ -26,7 +30,7 @@ export class ChecklistsController {
   @ApiOperation({ summary: "Criar um novo checklist na tarefa" })
   async createChecklist(
     @Param("tarefaId", ParseIntPipe) tarefaId: number,
-    @Body() createDto: CreateChecklistDto
+    @Body() createDto: CreateChecklistDto,
   ) {
     return this.checklistsService.create(tarefaId, createDto);
   }
@@ -47,7 +51,7 @@ export class ChecklistsController {
   @ApiOperation({ summary: "Adicionar item ao checklist" })
   async addItem(
     @Param("checklistId", ParseIntPipe) checklistId: number,
-    @Body() createDto: CreateItemChecklistDto
+    @Body() createDto: CreateItemChecklistDto,
   ) {
     return this.checklistsService.addItem(checklistId, createDto);
   }
@@ -57,7 +61,7 @@ export class ChecklistsController {
   async updateItem(
     @Param("itemId", ParseIntPipe) itemId: number,
     @Body() updateDto: UpdateItemChecklistDto,
-    @Request() req: any
+    @Request() req: any,
   ) {
     return this.checklistsService.updateItem(itemId, updateDto, req.user.id);
   }

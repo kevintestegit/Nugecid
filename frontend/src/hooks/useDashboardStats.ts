@@ -12,8 +12,10 @@ export interface DashboardStatsData {
   urgentes?: number;
   porTipo?: Record<string, number>;
   porStatus?: Record<string, number>;
+  porInstituto?: Record<string, number>;
   totalMesAnterior?: number;
   pendentesMesAnterior?: number;
+  requisicoesEsteMes?: number;
 }
 
 export interface DashboardStatsResponse {

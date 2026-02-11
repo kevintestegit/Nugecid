@@ -1,7 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { JwtService } from "@nestjs/jwt";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
 import { UnauthorizedException } from "@nestjs/common";
 
 import { AuthController } from "./auth.controller";
@@ -19,25 +18,6 @@ import {
 
 describe("AuthController", () => {
   let controller: AuthController;
-  let userRepository: Repository<User>;
-  let roleRepository: Repository<Role>;
-  let auditoriaRepository: Repository<Auditoria>;
-  let jwtService: JwtService;
-
-  const mockUser = {
-    id: 1,
-    nome: TEST_USERS.REGULAR.nome,
-    usuario: TEST_USERS.REGULAR.email,
-    senha: "hashedPassword",
-    ativo: true,
-    role: {
-      id: 1,
-      name: "user",
-    },
-    validatePassword: jest.fn().mockResolvedValue(true),
-    isBlocked: jest.fn().mockReturnValue(false),
-    isAdmin: jest.fn().mockReturnValue(false),
-  };
 
   const mockUserRepository = {
     findOne: jest.fn(),
@@ -94,12 +74,6 @@ describe("AuthController", () => {
 
     controller = module.get<AuthController>(AuthController);
     jest.spyOn(controller["logger"], "error").mockImplementation(() => {});
-    userRepository = module.get<Repository<User>>(getRepositoryToken(User));
-    roleRepository = module.get<Repository<Role>>(getRepositoryToken(Role));
-    auditoriaRepository = module.get<Repository<Auditoria>>(
-      getRepositoryToken(Auditoria),
-    );
-    jwtService = module.get<JwtService>(JwtService);
   });
 
   afterEach(() => {

@@ -94,7 +94,7 @@ export class UpdateDesarquivamentoUseCase {
       `[NUGECID] Iniciando atualização de desarquivamento ID: ${request.id} por usuário ${request.userId}`,
     );
     this.logger.log(
-      `[NUGECID] dadosAdicionais recebido no use case: ${request.dadosAdicionais || 'VAZIO'}`,
+      `[NUGECID] dadosAdicionais recebido no use case: ${request.dadosAdicionais || "VAZIO"}`,
     );
     this.logger.log(
       `[NUGECID] Campos instituto/requerente: instituto=${request.instituto}, requerente=${request.requerente}`,
@@ -267,9 +267,7 @@ export class UpdateDesarquivamentoUseCase {
     }
 
     if (request.dadosAdicionais !== undefined) {
-      console.log("[UseCase] Aplicando dadosAdicionais:", request.dadosAdicionais);
       (desarquivamento as any)._dadosAdicionais = request.dadosAdicionais;
-      console.log("[UseCase] Após aplicar, domínio tem:", (desarquivamento as any)._dadosAdicionais);
     }
 
     if (request.urgente !== undefined) {
@@ -413,7 +411,7 @@ export class UpdateDesarquivamentoUseCase {
   }
 
   private requiresReconstruction(
-    request: UpdateDesarquivamentoRequest,
+    _request: UpdateDesarquivamentoRequest,
   ): boolean {
     // For simplified structure, we don't need reconstruction
     // All updates can be done through domain methods

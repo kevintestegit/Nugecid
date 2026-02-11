@@ -102,8 +102,8 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({ userId, onClose, onSu
                   <div className="flex justify-between">
                     <span className="text-sm font-medium text-gray-600">Papel:</span>
                     <span className="text-sm text-gray-900">
-                      {user.role === 'admin' ? 'Administrador' :
-                      user.role === 'coordenador' ? 'Coordenador' : 'Usuário'}
+                      {user.role?.name === 'admin' ? 'Administrador' :
+                      user.role?.name === 'coordenador' ? 'Coordenador' : 'Usuário'}
                     </span>
                   </div>
                 </div>

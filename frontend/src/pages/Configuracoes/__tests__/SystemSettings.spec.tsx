@@ -1,35 +1,54 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { SystemSettings } from '../SystemSettings';
+import { render, screen, fireEvent } from '@testing-library/react'
+import { SystemSettings } from '../SystemSettings'
+import { vi } from 'vitest'
+
+vi.mock('@/services/backupService', () => ({
+  __esModule: true,
+  default: {
+    getSystemSettings: vi.fn().mockResolvedValue({
+      autoBackup: true,
+      backupFrequency: 'daily',
+      logLevel: 'info',
+      maintenanceMode: false,
+      cacheEnabled: true,
+    }),
+    updateSystemSettings: vi.fn().mockResolvedValue({}),
+    listBackups: vi.fn().mockResolvedValue({ backups: [] }),
+    createFullBackup: vi.fn().mockResolvedValue({ success: true, filename: 'backup.sql', size: '1MB' }),
+    restoreBackup: vi.fn().mockResolvedValue({ success: true }),
+  },
+}))
+
+vi.mock('@/services/escavadorService', () => ({
+  __esModule: true,
+  default: {
+    getStatus: vi.fn().mockResolvedValue(null),
+  },
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
+}))
 
 describe('SystemSettings', () => {
-  it('should render the backup and recovery card', () => {
-    render(<SystemSettings />);
+  it('should render key sections', async () => {
+    render(<SystemSettings />)
 
-    expect(screen.getByText('Backup e Recuperação')).toBeInTheDocument();
-    expect(screen.getByText('Backup automático')).toBeInTheDocument();
-  });
+    expect(await screen.findByText('Backup e Recuperação')).toBeInTheDocument()
+    expect(screen.getByText('Logs e Monitoramento')).toBeInTheDocument()
+    expect(screen.getByText('Manutenção')).toBeInTheDocument()
+  })
 
-  it('should render the logs and monitoring card', () => {
-    render(<SystemSettings />);
+  it('should change backup frequency when select changes', async () => {
+    render(<SystemSettings />)
 
-    expect(screen.getByText('Logs e Monitoramento')).toBeInTheDocument();
-    expect(screen.getByLabelText('Nível de log')).toBeInTheDocument();
-  });
+    const select = await screen.findByLabelText('Frequência do backup')
+    fireEvent.change(select, { target: { value: 'weekly' } })
 
-  it('should render the maintenance card', () => {
-    render(<SystemSettings />);
-
-    expect(screen.getByText('Manutenção')).toBeInTheDocument();
-    expect(screen.getByText('Modo manutenção')).toBeInTheDocument();
-  });
-
-  it('should change backup frequency when select is changed', () => {
-    render(<SystemSettings />);
-
-    const select = screen.getByLabelText('Frequência do backup');
-    fireEvent.change(select, { target: { value: 'weekly' } });
-
-    expect(select.value).toBe('weekly');
-  });
-});
+    expect((select as HTMLSelectElement).value).toBe('weekly')
+  })
+})

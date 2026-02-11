@@ -203,7 +203,7 @@ const KanbanPageContent: React.FC<KanbanPageContentProps> = ({ projectId }) => {
       return;
     }
     // Usuários comuns só podem editar suas próprias tarefas
-    if (user?.role?.name === 'usuario' && tarefa.criado_por_id !== user.id) {
+    if (user?.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
       toast.error('Você só pode editar suas próprias tarefas');
       return;
     }
@@ -219,7 +219,7 @@ const KanbanPageContent: React.FC<KanbanPageContentProps> = ({ projectId }) => {
       return;
     }
     // Usuários comuns só podem excluir suas próprias tarefas
-    if (user?.role?.name === 'usuario' && tarefa.criado_por_id !== user.id) {
+    if (user?.role?.name === 'usuario' && tarefa.criadorId !== user.id) {
       toast.error('Você só pode excluir suas próprias tarefas');
       return;
     }
@@ -306,11 +306,17 @@ const KanbanPageContent: React.FC<KanbanPageContentProps> = ({ projectId }) => {
         onReorderTasks={handleReorderTasks}
         onAddColumn={handleAddColumn}
         onEditColumn={handleEditColumn}
-        onDeleteColumn={handleDeleteColumn}
+        onDeleteColumn={(colunaId) => {
+          const coluna = kanban.colunas.find((c) => c.id === colunaId)
+          handleDeleteColumn(colunaId, coluna?.nome ?? 'Coluna')
+        }}
         onAddTask={handleAddTask}
         onTaskClick={handleTaskClick}
         onTaskEdit={handleTaskEdit}
-        onTaskDelete={handleTaskDelete}
+        onTaskDelete={(tarefaId) => {
+          const tarefa = kanban.tarefas.find((t) => t.id === tarefaId)
+          handleTaskDelete(tarefaId, tarefa?.titulo ?? 'Tarefa')
+        }}
         onProjectSettings={handleProjectSettings}
         onProjectMembers={handleProjectMembers}
         onProjectReports={() => toast.info('Funcionalidade de relatórios em desenvolvimento')}
@@ -375,7 +381,7 @@ const KanbanPageContent: React.FC<KanbanPageContentProps> = ({ projectId }) => {
         open={modals.projectMembers}
         onClose={() => closeModal('projectMembers')}
         projetoId={projectId!}
-        initialMembers={kanban.projeto?.membros}
+        initialMembers={kanban.projeto?.membros as { id: number; papel: "admin" | "editor" | "viewer"; usuario?: import('@/types/kanban.types').Usuario }[] | undefined}
         onChanged={kanban.refresh}
       />
       

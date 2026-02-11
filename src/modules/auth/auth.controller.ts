@@ -25,16 +25,14 @@ import {
   Response as ExpressResponse,
 } from "express";
 
-import { AuthService, LoginResponse } from "./auth.service";
+import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
-import { LocalAuthGuard } from "./guards/local-auth.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { SessionAuthGuard } from "./guards/session-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { IsPublic } from "../../common/decorators/is-public.decorator";
-import { Public } from "../../common/decorators/public.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { User } from "../users/entities/user.entity";
 
@@ -202,11 +200,6 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Não autorizado" })
   async getProfile(@CurrentUser() currentUser: User) {
     try {
-      this.logger.debug(`[AuthController] Endpoint /auth/profile chamado`);
-      this.logger.debug(
-        `[AuthController] CurrentUser recebido: ${JSON.stringify(currentUser ? { id: currentUser.id, usuario: currentUser.usuario } : "null")}`,
-      );
-
       if (!currentUser) {
         this.logger.error(
           `[AuthController] CurrentUser é null/undefined no endpoint /auth/profile`,
@@ -223,16 +216,8 @@ export class AuthController {
         throw new UnauthorizedException("ID do usuário não encontrado");
       }
 
-      this.logger.debug(
-        `[AuthController] Buscando dados completos do usuário ID: ${currentUser.id}`,
-      );
-
       // Busca uma instância completa do usuário para garantir que todas as relações estejam carregadas
       const user = await this.authService.findUserById(currentUser.id);
-
-      this.logger.debug(
-        `[AuthController] Usuário encontrado: ${JSON.stringify({ id: user.id, usuario: user.usuario, role: user.role?.name, avatarUrl: user.avatarUrl })}`,
-      );
 
       const response = {
         id: user.id,
@@ -252,20 +237,12 @@ export class AuthController {
         ultimoLogin: user.ultimoLogin,
         criadoEm: user.createdAt,
       };
-
-      this.logger.debug(
-        `[AuthController] Retornando perfil com avatarUrl: ${response.avatarUrl || "null"}`,
-      );
       return response;
     } catch (error) {
       this.logger.error(
         `[AuthController] Erro no endpoint /auth/profile: ${error.message}`,
         error.stack,
       );
-
-      // Re-throw the original error so the real stack trace/status is visible
-      // during debugging. This is temporary and can be adjusted after
-      // the root cause is identified.
       throw error;
     }
   }
@@ -401,15 +378,14 @@ export class AuthController {
   @ApiResponse({ status: 401, description: "Não autorizado" })
   async getOnlineUsers(@Request() req: ExpressRequest) {
     try {
-      const requestUser = req.user as { id?: number; userId?: number } | undefined;
+      const requestUser = req.user as
+        | { id?: number; userId?: number }
+        | undefined;
       const userId = requestUser?.id ?? requestUser?.userId;
       if (userId) {
         await this.authService.updateUserActivity(userId);
       }
       const onlineUsers = await this.authService.getOnlineUsers();
-      this.logger.debug(
-        `[ONLINE-USERS] Retornando ${onlineUsers.length} usuários online`,
-      );
       return onlineUsers;
     } catch (error) {
       this.logger.error(
@@ -448,10 +424,11 @@ export class AuthController {
         mapSize: (this.authService as any).onlineUsers?.size || 0,
       };
 
-      this.logger.debug(`[DEBUG] Informações de debug:`, debugInfo);
       return debugInfo;
     } catch (error) {
-      this.logger.error(`[DEBUG] Erro no endpoint de debug: ${error.message}`);
+      this.logger.error(
+        `[ONLINE-USERS/DEBUG] Erro no endpoint de debug: ${error.message}`,
+      );
       throw error;
     }
   }

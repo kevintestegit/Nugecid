@@ -107,7 +107,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
   }
 
   // Só mostra para administradores
-  if (user?.role !== 'admin') {
+  if (user?.role?.name !== 'admin') {
     return null
   }
 
