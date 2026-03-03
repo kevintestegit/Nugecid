@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
 import { Button } from "@/components/ui";
 import { Badge } from "@/components/ui";
@@ -53,13 +53,17 @@ const DetalheTarefaPage: React.FC = () => {
   const [loadingTarefa, setLoadingTarefa] = useState(true);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const tarefaId = id && /^\d+$/.test(id) ? Number.parseInt(id, 10) : null;
 
   const loadTarefa = useCallback(async () => {
-    if (!id) return;
+    if (!tarefaId) {
+      setLoadingTarefa(false);
+      return;
+    }
 
     try {
       setLoadingTarefa(true);
-      const tarefaData = await getTarefa(parseInt(id));
+      const tarefaData = await getTarefa(tarefaId);
       setTarefa(tarefaData);
     } catch (error) {
       console.error("Erro ao carregar tarefa:", error);
@@ -68,20 +72,21 @@ const DetalheTarefaPage: React.FC = () => {
     } finally {
       setLoadingTarefa(false);
     }
-  }, [getTarefa, id, navigate]);
+  }, [getTarefa, navigate, tarefaId]);
 
   useEffect(() => {
-    if (id) {
-      loadTarefa();
-    }
-  }, [id, loadTarefa]);
+    loadTarefa();
+  }, [loadTarefa]);
 
   const loadHistorico = async () => {
-    if (!id) return;
+    if (!tarefaId) {
+      setHistorico([]);
+      return;
+    }
 
     try {
       setLoadingHistorico(true);
-      const historicoData = await getHistoricoTarefa(parseInt(id));
+      const historicoData = await getHistoricoTarefa(tarefaId);
       setHistorico(historicoData);
     } catch (error) {
       console.error("Erro ao carregar histórico:", error);
@@ -187,6 +192,10 @@ const DetalheTarefaPage: React.FC = () => {
   const formatDate = (date: string | Date) => {
     return format(new Date(date), "dd/MM/yyyy HH:mm", { locale: ptBR });
   };
+
+  if (!tarefaId) {
+    return <Navigate to="/404" replace />;
+  }
 
   if (loadingTarefa) {
     return (

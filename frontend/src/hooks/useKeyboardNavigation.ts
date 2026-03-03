@@ -1,4 +1,4 @@
-import { useEffect, useCallback, RefObject } from 'react';
+import { useEffect, useCallback, RefObject } from "react";
 
 interface UseKeyboardNavigationOptions {
   onEscape?: () => void;
@@ -16,7 +16,7 @@ interface UseKeyboardNavigationOptions {
  */
 export const useKeyboardNavigation = (
   ref: RefObject<HTMLElement>,
-  options: UseKeyboardNavigationOptions = {}
+  options: UseKeyboardNavigationOptions = {},
 ) => {
   const {
     onEscape,
@@ -33,37 +33,37 @@ export const useKeyboardNavigation = (
       if (!enabled) return;
 
       switch (event.key) {
-        case 'Escape':
+        case "Escape":
           if (onEscape) {
             event.preventDefault();
             onEscape();
           }
           break;
-        case 'Enter':
+        case "Enter":
           if (onEnter) {
             event.preventDefault();
             onEnter();
           }
           break;
-        case 'ArrowUp':
+        case "ArrowUp":
           if (onArrowUp) {
             event.preventDefault();
             onArrowUp();
           }
           break;
-        case 'ArrowDown':
+        case "ArrowDown":
           if (onArrowDown) {
             event.preventDefault();
             onArrowDown();
           }
           break;
-        case 'ArrowLeft':
+        case "ArrowLeft":
           if (onArrowLeft) {
             event.preventDefault();
             onArrowLeft();
           }
           break;
-        case 'ArrowRight':
+        case "ArrowRight":
           if (onArrowRight) {
             event.preventDefault();
             onArrowRight();
@@ -71,16 +71,24 @@ export const useKeyboardNavigation = (
           break;
       }
     },
-    [enabled, onEscape, onEnter, onArrowUp, onArrowDown, onArrowLeft, onArrowRight]
+    [
+      enabled,
+      onEscape,
+      onEnter,
+      onArrowUp,
+      onArrowDown,
+      onArrowLeft,
+      onArrowRight,
+    ],
   );
 
   useEffect(() => {
     const element = ref.current;
     if (!element || !enabled) return;
 
-    element.addEventListener('keydown', handleKeyDown);
+    element.addEventListener("keydown", handleKeyDown);
     return () => {
-      element.removeEventListener('keydown', handleKeyDown);
+      element.removeEventListener("keydown", handleKeyDown);
     };
   }, [ref, handleKeyDown, enabled]);
 };
@@ -89,7 +97,10 @@ export const useKeyboardNavigation = (
  * Hook para gerenciar foco em modais e dialogs
  * Previne que o foco escape do modal durante navegação por teclado
  */
-export const useFocusTrap = (ref: RefObject<HTMLElement>, isActive: boolean) => {
+export const useFocusTrap = (
+  ref: RefObject<HTMLElement>,
+  isActive: boolean,
+) => {
   useEffect(() => {
     if (!isActive) return;
 
@@ -101,7 +112,7 @@ export const useFocusTrap = (ref: RefObject<HTMLElement>, isActive: boolean) => 
 
     // Focar no primeiro elemento focável dentro do modal
     const focusableElements = element.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     const firstFocusable = focusableElements[0];
     const lastFocusable = focusableElements[focusableElements.length - 1];
@@ -112,7 +123,7 @@ export const useFocusTrap = (ref: RefObject<HTMLElement>, isActive: boolean) => 
 
     // Prevenir foco de sair do modal
     const handleTabKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
+      if (event.key !== "Tab") return;
 
       if (event.shiftKey) {
         // Shift + Tab
@@ -129,11 +140,11 @@ export const useFocusTrap = (ref: RefObject<HTMLElement>, isActive: boolean) => 
       }
     };
 
-    element.addEventListener('keydown', handleTabKey);
+    element.addEventListener("keydown", handleTabKey);
 
     // Restaurar foco ao desmontar
     return () => {
-      element.removeEventListener('keydown', handleTabKey);
+      element.removeEventListener("keydown", handleTabKey);
       if (previouslyFocusedElement) {
         previouslyFocusedElement.focus();
       }
@@ -145,20 +156,23 @@ export const useFocusTrap = (ref: RefObject<HTMLElement>, isActive: boolean) => 
  * Hook para anunciar mudanças dinamicamente para screen readers
  */
 export const useAnnounce = () => {
-  const announce = useCallback((message: string, priority: 'polite' | 'assertive' = 'polite') => {
-    const announcer = document.createElement('div');
-    announcer.setAttribute('role', 'status');
-    announcer.setAttribute('aria-live', priority);
-    announcer.setAttribute('aria-atomic', 'true');
-    announcer.className = 'sr-only';
-    announcer.textContent = message;
+  const announce = useCallback(
+    (message: string, priority: "polite" | "assertive" = "polite") => {
+      const announcer = document.createElement("div");
+      announcer.setAttribute("role", "status");
+      announcer.setAttribute("aria-live", priority);
+      announcer.setAttribute("aria-atomic", "true");
+      announcer.className = "sr-only";
+      announcer.textContent = message;
 
-    document.body.appendChild(announcer);
+      document.body.appendChild(announcer);
 
-    setTimeout(() => {
-      document.body.removeChild(announcer);
-    }, 1000);
-  }, []);
+      setTimeout(() => {
+        document.body.removeChild(announcer);
+      }, 1000);
+    },
+    [],
+  );
 
   return announce;
 };

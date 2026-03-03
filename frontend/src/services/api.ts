@@ -23,6 +23,7 @@ import {
   SearchResponse,
   RoleSettings,
   DesarquivamentoAnexo,
+  AnexoOcrAnalysis,
   IpAccessStat,
   IpAccessDetail,
   BlockedIp,
@@ -36,6 +37,21 @@ import {
   ImportResultDto,
 } from "@/types";
 import { createLogger } from "@/utils/logger";
+import { dispatchAuthRequired } from "@/lib/navigation/navigationEvents";
+
+export interface WebPushConfig {
+  enabled: boolean;
+  publicKey?: string;
+}
+
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+}
 
 const apiLogger = createLogger("ApiService");
 const apiLogWarn = (...args: unknown[]) => {
@@ -98,11 +114,14 @@ function isSearchResponse(value: unknown): value is SearchResponse {
 
 export class ApiService {
   private api: AxiosInstance;
+  private static readonly SKIP_AUTH_REDIRECT_HEADER = "X-Skip-Auth-Redirect";
+  private static readonly CSRF_COOKIE_NAME = "XSRF-TOKEN";
+  private static readonly CSRF_HEADER_NAME = "X-CSRF-Token";
 
   constructor() {
     this.api = axios.create({
       baseURL: "/api",
-      timeout: 10000,
+      timeout: 30000,
       withCredentials: true,
       headers: {
         Accept: "application/json",
@@ -115,7 +134,18 @@ export class ApiService {
   private setupInterceptors() {
     // Request interceptor — cookies handle auth; no Bearer header needed
     this.api.interceptors.request.use(
-      (config) => config,
+      (config) => {
+        const method = config.method?.toUpperCase();
+        if (method && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+          const csrfToken = this.getCookie(ApiService.CSRF_COOKIE_NAME);
+          if (csrfToken) {
+            config.headers = config.headers ?? {};
+            config.headers[ApiService.CSRF_HEADER_NAME] = csrfToken;
+          }
+        }
+
+        return config;
+      },
       (error) => Promise.reject(error),
     );
 
@@ -124,6 +154,9 @@ export class ApiService {
       (response) => response,
       async (error) => {
         const originalRequest = error.config;
+        const requestUrl =
+          typeof originalRequest?.url === "string" ? originalRequest.url : "";
+        const normalizedRequestUrl = requestUrl.split("?")[0];
 
         // Verificar se é erro de conectividade (backend indisponível)
         if (
@@ -136,15 +169,23 @@ export class ApiService {
         }
 
         // Não fazer logout em caso de falha no login
-        if (originalRequest.url === "/auth/login") {
+        if (normalizedRequestUrl === "/auth/login") {
           return Promise.reject(error);
         }
 
-        // Não fazer logout em caso de falha no refresh
-        if (originalRequest.url === "/auth/refresh") {
-          apiLogWarn("Falha no refresh token - redirecionando para login");
-          clearAuth();
-          window.location.href = "/login";
+        if (normalizedRequestUrl === "/auth/refresh") {
+          apiLogWarn("Falha no refresh token");
+          return Promise.reject(error);
+        }
+
+        // A checagem inicial de sessão usa /auth/profile e pode retornar 401
+        // quando não há cookie JWT (usuário deslogado). Não devemos
+        // redirecionar à força nesse caso para evitar loop de recarregamento.
+        if (
+          normalizedRequestUrl === "/auth/profile" &&
+          originalRequest?.headers?.[ApiService.SKIP_AUTH_REDIRECT_HEADER] ===
+            "true"
+        ) {
           return Promise.reject(error);
         }
 
@@ -152,13 +193,33 @@ export class ApiService {
         // Token refresh is handled by AuthContext (which holds the
         // refresh token in memory), not here.
         if (error.response?.status === 401) {
+          if (window.location.pathname === "/login") {
+            return Promise.reject(error);
+          }
           clearAuth();
-          window.location.href = "/login";
+          dispatchAuthRequired({ redirectTo: "/login" });
         }
 
         return Promise.reject(error);
       },
     );
+  }
+
+  private getCookie(name: string): string | undefined {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const cookie = document.cookie
+      .split(";")
+      .map((item) => item.trim())
+      .find((item) => item.startsWith(`${name}=`));
+
+    if (!cookie) {
+      return undefined;
+    }
+
+    return decodeURIComponent(cookie.slice(name.length + 1));
   }
 
   // Métodos genéricos
@@ -195,21 +256,32 @@ export class ApiService {
     await this.api.post("/auth/logout");
   }
 
-  async getCurrentUser(): Promise<ApiResponse<User>> {
-    const response: AxiosResponse<ApiResponse<User>> =
-      await this.api.get("/auth/profile");
+  async getCurrentUser(options?: {
+    skipAuthRedirect?: boolean;
+  }): Promise<ApiResponse<User>> {
+    const response: AxiosResponse<ApiResponse<User>> = await this.api.get(
+      "/auth/profile",
+      {
+        headers: options?.skipAuthRedirect
+          ? {
+              [ApiService.SKIP_AUTH_REDIRECT_HEADER]: "true",
+            }
+          : undefined,
+      },
+    );
     return response.data;
   }
 
-  async refreshToken(
-    refreshToken: string,
-  ): Promise<ApiResponse<{ accessToken: string; expiresIn: string }>> {
-    const response: AxiosResponse<{ accessToken: string; expiresIn: string }> =
-      await this.api.post("/auth/refresh", { refreshToken });
-    return {
-      success: true,
-      data: response.data,
-    };
+  async refreshToken(): Promise<ApiResponse<{ expiresIn: string }>> {
+    const response: AxiosResponse<ApiResponse<{ expiresIn: string }>> =
+      await this.api.post("/auth/refresh");
+    return response.data;
+  }
+
+  async getOnlineUsers(): Promise<ApiResponse<User[]>> {
+    const response: AxiosResponse<ApiResponse<User[]>> =
+      await this.api.get("/auth/online-users");
+    return response.data;
   }
 
   // Dashboard endpoints
@@ -228,25 +300,14 @@ export class ApiService {
         await this.api.get("/nugecid", { params });
       return response.data;
     } catch (error: unknown) {
-      // Log for debugging and return a safe fallback so UI can render gracefully
-      // without showing the generic error screen when transient caching/network
-      // issues occur (304/Not Modified handled by proxy/browser can surface
-      // as errors in some setups).
-      // eslint-disable-next-line no-console
-      apiLogError(" getDesarquivamentos error:", extractErrorMessage(error));
-
-      return {
-        success: false,
-        data: [],
-        meta: {
-          total: 0,
-          page: params?.page || 1,
-          limit: params?.limit || 10,
-          totalPages: 0,
-          hasNext: false,
-          hasPrev: false,
-        },
-      } as PaginatedResponse<Desarquivamento>;
+      const errorInfo = extractAxiosErrorInfo(error);
+      apiLogError("getDesarquivamentos error", {
+        status: errorInfo.status,
+        data: errorInfo.data,
+        message: errorInfo.message,
+        params,
+      });
+      throw error;
     }
   }
 
@@ -289,6 +350,19 @@ export class ApiService {
         responseType: "blob",
         headers: {
           Accept: "application/pdf",
+        },
+      },
+    );
+    return response.data;
+  }
+
+  async getTermoDeEntregaPreviewHtml(id: number): Promise<string> {
+    const response: AxiosResponse<string> = await this.api.get(
+      `/nugecid/${id}/termo-preview`,
+      {
+        responseType: "text",
+        headers: {
+          Accept: "text/html",
         },
       },
     );
@@ -441,25 +515,10 @@ export class ApiService {
       );
       return response.data;
     } catch (error: unknown) {
-      // Log for debugging and return a safe fallback so UI can render gracefully
-      // without showing the generic error screen when transient caching/network
-      // issues occur (304/Not Modified handled by proxy/browser can surface
-      // as errors in some setups).
-      // eslint-disable-next-line no-console
       apiLogError(" getUsers error:", extractErrorMessage(error));
-
-      return {
-        success: false,
-        data: [],
-        meta: {
-          total: 0,
-          page: params?.page || 1,
-          limit: params?.limit || 10,
-          totalPages: 0,
-          hasNext: false,
-          hasPrev: false,
-        },
-      } as UsersResponse;
+      // Re-throw so the UI can display a proper error state instead of
+      // silently showing an empty list.
+      throw error;
     }
   }
 
@@ -487,10 +546,18 @@ export class ApiService {
   }
 
   async deleteUser(id: number): Promise<DeleteResponse> {
-    const response: AxiosResponse<DeleteResponse> = await this.api.delete(
-      `/users/${id}`,
-    );
-    return response.data;
+    const response: AxiosResponse<DeleteResponse | undefined> =
+      await this.api.delete(
+        `/users/${id}`,
+      );
+    if (response.data && typeof response.data === "object") {
+      return response.data;
+    }
+
+    return {
+      success: true,
+      message: "Usuário desativado com sucesso!",
+    };
   }
 
   async reactivateUser(id: number): Promise<UserResponse> {
@@ -637,6 +704,26 @@ export class ApiService {
       );
       throw error;
     }
+  }
+
+  async getDesarquivamentoAnexoOcrAnalysis(
+    desarquivamentoId: number,
+    anexoId: number,
+  ): Promise<ApiResponse<AnexoOcrAnalysis>> {
+    const response: AxiosResponse<ApiResponse<AnexoOcrAnalysis>> =
+      await this.api.get(`/nugecid/${desarquivamentoId}/anexos/${anexoId}/ocr`);
+    return response.data;
+  }
+
+  async getProcessoAnexoOcrAnalysis(
+    numeroProcesso: string,
+    anexoId: number,
+  ): Promise<ApiResponse<AnexoOcrAnalysis>> {
+    const response: AxiosResponse<ApiResponse<AnexoOcrAnalysis>> =
+      await this.api.get(
+        `/nugecid/processo/${encodeURIComponent(numeroProcesso)}/anexos/${anexoId}/ocr`,
+      );
+    return response.data;
   }
 
   async uploadDesarquivamentoAnexo(
@@ -946,6 +1033,8 @@ export class ApiService {
 
   async updateNotificationPreferences(preferences: {
     inAppEnabled?: boolean;
+    desktopEnabled?: boolean;
+    pushEnabled?: boolean;
     soundEnabled?: boolean;
     enabledTypes?: Record<string, boolean>;
   }): Promise<ApiResponse<NotificationPreferences>> {
@@ -959,6 +1048,39 @@ export class ApiService {
   > {
     const response: AxiosResponse<ApiResponse<NotificationPreferences>> =
       await this.api.post("/notificacoes/preferences/reset");
+    return response.data;
+  }
+
+  async getWebPushConfig(): Promise<ApiResponse<WebPushConfig>> {
+    const response: AxiosResponse<ApiResponse<WebPushConfig>> =
+      await this.api.get("/notificacoes/push/config");
+    return response.data;
+  }
+
+  async savePushSubscription(
+    subscription: PushSubscriptionPayload,
+  ): Promise<ApiResponse<unknown>> {
+    const response: AxiosResponse<ApiResponse<unknown>> = await this.api.post(
+      "/notificacoes/push/subscriptions",
+      subscription,
+    );
+    return response.data;
+  }
+
+  async deletePushSubscription(endpoint: string): Promise<ApiResponse<void>> {
+    const response: AxiosResponse<ApiResponse<void>> = await this.api.delete(
+      "/notificacoes/push/subscriptions",
+      {
+        data: { endpoint },
+      },
+    );
+    return response.data;
+  }
+
+  async sendTestNotification(): Promise<ApiResponse<unknown>> {
+    const response: AxiosResponse<ApiResponse<unknown>> = await this.api.post(
+      "/notificacoes/teste",
+    );
     return response.data;
   }
 

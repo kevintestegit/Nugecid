@@ -45,6 +45,10 @@ import { RedisModule } from "./modules/redis/redis.module";
 import { QueuesModule } from "./modules/queues/queues.module";
 import { SyncModule } from "./modules/sync/sync.module";
 import { ObservabilityModule } from "./modules/observability/observability.module";
+import { StorageModule } from "./modules/storage/storage.module";
+import { SeedingModule } from "./modules/seeding/seeding.module";
+import { SearchModule } from "./modules/search/search.module";
+import { SeiModule } from "./modules/sei/sei.module";
 
 // Controllers and Services
 import { AppController } from "./app.controller";
@@ -78,6 +82,8 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
       cache: true,
     }),
 
+    StorageModule,
+
     // TypeOrm para entidades usadas em AppService
     TypeOrmModule.forFeature([
       User,
@@ -96,6 +102,8 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
       useClass: DatabaseConfig,
       inject: [ConfigService],
     }),
+
+    SearchModule,
 
     // Cache (Redis - opcional)
     CacheModule.registerAsync({
@@ -168,6 +176,7 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
 
     // Application Modules
     ObservabilityModule,
+    SeedingModule,
     SyncModule,
     RedisModule,
     AuthModule,
@@ -181,6 +190,7 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
     NotificacoesModule,
     PastasModule,
     PlanilhasModule,
+    SeiModule,
     BackupModule,
     SecurityModule,
     // WebscrapingModule,  // TEMPORARIAMENTE DESABILITADO

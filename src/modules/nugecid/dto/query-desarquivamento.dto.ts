@@ -241,6 +241,22 @@ export class QueryDesarquivamentoDto {
   vencidos?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      "Filtrar solicitações que exigem atenção necessária (SOLICITADO há mais de 5 dias)",
+    example: true,
+    type: "boolean",
+  })
+  @IsOptional()
+  @IsBoolean({ message: "Atenção necessária deve ser um valor booleano" })
+  @Transform(({ value }) => {
+    if (typeof value === "string") {
+      return value.toLowerCase() === "true" || value === "1";
+    }
+    return Boolean(value);
+  })
+  atencaoNecessaria?: boolean;
+
+  @ApiPropertyOptional({
     description: "Campo para ordenação",
     example: "createdAt",
     enum: [

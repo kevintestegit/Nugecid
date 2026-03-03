@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import { NotificationPreferences } from "../entities/notification-preferences.entity";
+import {
+  NotificationChannel,
+  NotificationPreferences,
+} from "../entities/notification-preferences.entity";
 import { UpdateNotificationPreferencesDto } from "../dto";
 import { User } from "../../users/entities/user.entity";
 
@@ -36,6 +39,8 @@ export class NotificationPreferencesService {
       preferences = this.preferencesRepository.create({
         userId,
         inAppEnabled: true,
+        desktopEnabled: false,
+        pushEnabled: false,
         soundEnabled: true,
         enabledTypes: {
           solicitacao_pendente: true,
@@ -80,6 +85,14 @@ export class NotificationPreferencesService {
       preferences.inAppEnabled = updateDto.inAppEnabled;
     }
 
+    if (updateDto.desktopEnabled !== undefined) {
+      preferences.desktopEnabled = updateDto.desktopEnabled;
+    }
+
+    if (updateDto.pushEnabled !== undefined) {
+      preferences.pushEnabled = updateDto.pushEnabled;
+    }
+
     if (updateDto.soundEnabled !== undefined) {
       preferences.soundEnabled = updateDto.soundEnabled;
     }
@@ -100,7 +113,7 @@ export class NotificationPreferencesService {
   async canReceiveNotification(
     userId: number,
     notificationType: string,
-    channel: "in_app" = "in_app",
+    channel: NotificationChannel = "in_app",
   ): Promise<boolean> {
     const preferences = await this.getOrCreatePreferences(userId);
     return preferences.canReceiveNotification(notificationType, channel);
@@ -137,6 +150,8 @@ export class NotificationPreferencesService {
     const preferences = await this.getOrCreatePreferences(userId);
 
     preferences.inAppEnabled = true;
+    preferences.desktopEnabled = false;
+    preferences.pushEnabled = false;
     preferences.soundEnabled = true;
     preferences.enabledTypes = {
       solicitacao_pendente: true,

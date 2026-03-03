@@ -36,6 +36,7 @@ export const useDesarquivamentos = (
     endDate?: string;
     instituto?: string;
     requerente?: string;
+    atencaoNecessaria?: boolean;
   } = {},
 ): UseQueryResult<PaginatedResponse<Desarquivamento>> => {
   // A API suporta até 100 por página; usar 100 para listar tudo
@@ -311,6 +312,21 @@ export const useDownloadTermoPdf = () => {
         throw new Error(await extractTermoErrorMessage(error));
       }
     },
+  });
+};
+
+export const useTermoPreviewHtml = (id?: number) => {
+  return useQuery({
+    queryKey: ["desarquivamento-termo-preview", id],
+    enabled: Number.isFinite(id) && Number(id) > 0,
+    queryFn: async () => {
+      try {
+        return await apiService.getTermoDeEntregaPreviewHtml(Number(id));
+      } catch (error: unknown) {
+        throw new Error(await extractTermoErrorMessage(error));
+      }
+    },
+    staleTime: 1000 * 60,
   });
 };
 

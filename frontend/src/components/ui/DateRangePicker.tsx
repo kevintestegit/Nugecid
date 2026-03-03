@@ -1,12 +1,12 @@
-import React, { useMemo } from 'react';
-import { DateRange as DayPickerRange } from 'react-day-picker';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { CalendarIcon, X } from 'lucide-react';
-import { Button } from './Button';
-import { Popover, PopoverContent, PopoverTrigger } from './Popover';
-import { Calendar } from './Calendar';
-import { cn } from '@/utils/cn';
+import React, { useMemo } from "react";
+import { DateRange as DayPickerRange } from "react-day-picker";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CalendarIcon, X } from "lucide-react";
+import { Button } from "./Button";
+import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
+import { Calendar } from "./Calendar";
+import { cn } from "@/utils/cn";
 
 export interface DateRange {
   startDate: Date | null;
@@ -21,13 +21,13 @@ interface DateRangePickerProps {
 }
 
 const formatDisplayDate = (date: Date | null) =>
-  date ? format(date, 'dd/MM/yyyy', { locale: ptBR }) : '';
+  date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "";
 
 export function DateRangePicker({
   value,
   onChange,
-  placeholder = 'Selecionar periodo',
-  className = '',
+  placeholder = "Selecionar periodo",
+  className = "",
 }: DateRangePickerProps) {
   const selectedRange = useMemo<DayPickerRange | undefined>(() => {
     if (value.startDate || value.endDate) {
@@ -65,21 +65,25 @@ export function DateRangePicker({
   };
 
   return (
-    <div className={cn('flex w-full', className)}>
+    <div className={cn("flex w-full", className)}>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
             className={cn(
-              'w-full justify-start text-left font-normal',
-              !value.startDate && !value.endDate && 'text-muted-foreground',
+              "w-full justify-start text-left font-normal",
+              !value.startDate && !value.endDate && "text-muted-foreground",
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {label}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 max-w-[240px]" align="start" side="bottom">
+        <PopoverContent
+          className="w-auto p-0 max-w-[240px]"
+          align="start"
+          side="bottom"
+        >
           <Calendar
             mode="range"
             numberOfMonths={1}
@@ -101,9 +105,13 @@ export function DateRangePicker({
             </Button>
             {(value.startDate || value.endDate) && (
               <span className="text-[0.65rem] text-muted-foreground">
-                {value.startDate ? formatDisplayDate(value.startDate) : 'Inicio indefinido'}
-                {' - '}
-                {value.endDate ? formatDisplayDate(value.endDate) : 'Sem data final'}
+                {value.startDate
+                  ? formatDisplayDate(value.startDate)
+                  : "Inicio indefinido"}
+                {" - "}
+                {value.endDate
+                  ? formatDisplayDate(value.endDate)
+                  : "Sem data final"}
               </span>
             )}
           </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useDeferredValue, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/Button";
@@ -19,27 +19,10 @@ import { ProjectCard } from "../components/kanban/ProjectCard";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Plus, Star, Archive, Filter, Loader2 } from "lucide-react";
 import { SearchInput } from "@/components/ui/SearchInput";
-import { kanbanService } from "../services/kanbanService";
 import { toast } from "sonner";
-
-interface Projeto {
-  id: number;
-  nome: string;
-  descricao?: string;
-  cor?: string;
-  data_criacao?: string;
-  data_atualizacao?: string;
-  ativo: boolean;
-  favorito?: boolean;
-  total_tarefas?: number;
-  total_membros?: number;
-  progresso?: number;
-}
+import { ProjetoKanban, useProjetosKanban } from "@/hooks/useProjetosKanban";
 
 interface ProjetosPageState {
-  projetos: Projeto[];
-  loading: boolean;
-  error: string | null;
   searchTerm: string;
   filterStatus: "todos" | "ativos" | "arquivados" | "favoritos";
 }
@@ -66,105 +49,67 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
 const ProjetosPage: React.FC = () => {
   const navigate = useNavigate();
   const { checkPermission, isAuthenticated } = useAuth();
+  const {
+    projetos,
+    isLoading,
+    isFetching,
+    error,
+    refetch,
+    createProjeto,
+    updateProjeto,
+    deleteProjeto: deleteProjetoMutation,
+  } = useProjetosKanban(isAuthenticated);
 
   const [state, setState] = useState<ProjetosPageState>({
-    projetos: [],
-    loading: true,
-    error: null,
     searchTerm: "",
     filterStatus: "todos",
   });
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Projeto | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjetoKanban | null>(
+    null,
+  );
   const [showEditModal, setShowEditModal] = useState(false);
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const [isUpdatingProject, setIsUpdatingProject] = useState(false);
-  const [deleteProject, setDeleteProject] = useState<Projeto | null>(null);
-  const [archiveProject, setArchiveProject] = useState<Projeto | null>(null);
-
-  // Carregar projetos
-  type ProjetoApi = Projeto & {
-    created_at?: string;
-    updated_at?: string;
-    createdAt?: string;
-    updatedAt?: string;
-    data_criacao?: string;
-    data_atualizacao?: string;
-    ativo?: boolean;
-    favorito?: boolean;
-  };
-
-  const loadProjetos = useCallback(async () => {
-    if (!isAuthenticated) {
-      setState((prev) => ({
-        ...prev,
-        projetos: [],
-        loading: false,
-        error: null,
-      }));
-      return;
-    }
-
-    try {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
-
-      const response = await kanbanService.getProjetos();
-      const projetos = Array.isArray(response)
-        ? (response as unknown as ProjetoApi[])
-        : [];
-      const normalized = projetos.map((p) => ({
-        ...p,
-        data_criacao:
-          p.data_criacao || p.created_at || p.createdAt || undefined,
-        data_atualizacao:
-          p.data_atualizacao || p.updated_at || p.updatedAt || undefined,
-        ativo: p.ativo !== undefined ? p.ativo : true,
-      }));
-
-      setState((prev) => ({
-        ...prev,
-        projetos: normalized,
-        loading: false,
-      }));
-    } catch (error) {
-      console.error("Erro ao carregar projetos:", error);
-      setState((prev) => ({
-        ...prev,
-        error: getApiErrorMessage(error, "Erro ao carregar projetos"),
-        loading: false,
-      }));
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    loadProjetos();
-  }, [loadProjetos]);
+  const [deleteProject, setDeleteProject] = useState<ProjetoKanban | null>(
+    null,
+  );
+  const [archiveProject, setArchiveProject] = useState<ProjetoKanban | null>(
+    null,
+  );
+  const showInitialLoading = isLoading && projetos.length === 0;
+  const isRefreshingProjects = isFetching && projetos.length > 0;
+  const deferredSearchTerm = useDeferredValue(state.searchTerm);
 
   // Filtrar projetos
-  const filteredProjetos = state.projetos.filter((projeto) => {
-    const matchesSearch =
-      projeto.nome.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-      projeto.descricao
-        ?.toLowerCase()
-        .includes(state.searchTerm.toLowerCase()) ||
-      false;
+  const filteredProjetos = useMemo(
+    () =>
+      projetos.filter((projeto) => {
+        const matchesSearch =
+          projeto.nome
+            .toLowerCase()
+            .includes(deferredSearchTerm.toLowerCase()) ||
+          projeto.descricao
+            ?.toLowerCase()
+            .includes(deferredSearchTerm.toLowerCase()) ||
+          false;
 
-    const matchesFilter = (() => {
-      switch (state.filterStatus) {
-        case "ativos":
-          return projeto.ativo;
-        case "arquivados":
-          return !projeto.ativo;
-        case "favoritos":
-          return projeto.favorito;
-        default:
-          return true;
-      }
-    })();
+        const matchesFilter = (() => {
+          switch (state.filterStatus) {
+            case "ativos":
+              return projeto.ativo;
+            case "arquivados":
+              return !projeto.ativo;
+            case "favoritos":
+              return projeto.favorito;
+            default:
+              return true;
+          }
+        })();
 
-    return matchesSearch && matchesFilter;
-  });
+        return matchesSearch && matchesFilter;
+      }),
+    [deferredSearchTerm, projetos, state.filterStatus],
+  );
 
   // Handlers
   const handleCreateProject = () => {
@@ -175,7 +120,7 @@ const ProjetosPage: React.FC = () => {
     setShowCreateModal(true);
   };
 
-  const handleEditProject = (projeto: Projeto) => {
+  const handleEditProject = (projeto: ProjetoKanban) => {
     if (!checkPermission("update", "projetos")) {
       toast.error("Você não tem permissão para editar projetos");
       return;
@@ -185,21 +130,17 @@ const ProjetosPage: React.FC = () => {
   };
 
   const handleCreateProjectSubmit = async (values: ProjectFormValues) => {
-    setIsCreatingProject(true);
     try {
       const payload = {
         nome: values.nome.trim(),
         descricao: values.descricao?.trim() || undefined,
       };
-      await kanbanService.createProjeto(payload);
+      await createProjeto.mutateAsync(payload);
       toast.success("Projeto criado com sucesso");
       setShowCreateModal(false);
-      await loadProjetos();
     } catch (error) {
       console.error("Erro ao criar projeto:", error);
       toast.error(getApiErrorMessage(error, "Erro ao criar projeto"));
-    } finally {
-      setIsCreatingProject(false);
     }
   };
 
@@ -207,22 +148,21 @@ const ProjetosPage: React.FC = () => {
     if (!selectedProject) {
       return;
     }
-    setIsUpdatingProject(true);
     try {
       const payload = {
         nome: values.nome.trim(),
         descricao: values.descricao?.trim() || undefined,
       };
-      await kanbanService.updateProjeto(selectedProject.id, payload);
+      await updateProjeto.mutateAsync({
+        id: selectedProject.id,
+        data: payload,
+      });
       toast.success("Projeto atualizado com sucesso");
       setShowEditModal(false);
       setSelectedProject(null);
-      await loadProjetos();
     } catch (error) {
       console.error("Erro ao atualizar projeto:", error);
       toast.error(getApiErrorMessage(error, "Erro ao atualizar projeto"));
-    } finally {
-      setIsUpdatingProject(false);
     }
   };
 
@@ -230,7 +170,7 @@ const ProjetosPage: React.FC = () => {
     setShowEditModal(false);
     setSelectedProject(null);
   };
-  const handleDeleteProject = (projeto: Projeto) => {
+  const handleDeleteProject = (projeto: ProjetoKanban) => {
     if (!checkPermission("delete", "projetos")) {
       toast.error("Você não tem permissão para excluir projetos");
       return;
@@ -242,17 +182,16 @@ const ProjetosPage: React.FC = () => {
     if (!deleteProject) return;
 
     try {
-      await kanbanService.deleteProjeto(deleteProject.id);
+      await deleteProjetoMutation.mutateAsync(deleteProject.id);
       toast.success("Projeto excluído com sucesso");
       setDeleteProject(null);
-      loadProjetos();
     } catch (error) {
       console.error("Erro ao excluir projeto:", error);
       toast.error(getApiErrorMessage(error, "Erro ao excluir projeto"));
     }
   };
 
-  const handleToggleFavorite = async (projeto: Projeto) => {
+  const handleToggleFavorite = async (projeto: ProjetoKanban) => {
     try {
       // Implementar toggle favorito quando a API estiver disponível
       toast.info("Funcionalidade em desenvolvimento");
@@ -262,7 +201,7 @@ const ProjetosPage: React.FC = () => {
     }
   };
 
-  const handleArchiveProject = (projeto: Projeto) => {
+  const handleArchiveProject = (projeto: ProjetoKanban) => {
     setArchiveProject(projeto);
   };
 
@@ -279,15 +218,15 @@ const ProjetosPage: React.FC = () => {
     }
   };
 
-  const handleOpenProject = (projeto: Projeto) => {
+  const handleOpenProject = (projeto: ProjetoKanban) => {
     navigate(`/projetos/${projeto.id}`);
   };
 
-  const handleOpenBoard = (projeto: Projeto) => {
+  const handleOpenBoard = (projeto: ProjetoKanban) => {
     navigate(`/kanban/${projeto.id}`);
   };
 
-  if (state.loading) {
+  if (showInitialLoading) {
     return (
       <div className="relative space-y-6">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
@@ -329,7 +268,7 @@ const ProjetosPage: React.FC = () => {
     );
   }
 
-  if (state.error) {
+  if (error) {
     return (
       <div className="relative space-y-6">
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
@@ -337,9 +276,9 @@ const ProjetosPage: React.FC = () => {
         </div>
         <Alert variant="destructive">
           <h3 className="font-semibold">Erro ao carregar projetos</h3>
-          <p>{state.error}</p>
+          <p>{getApiErrorMessage(error, "Erro ao carregar projetos")}</p>
           <div className="mt-4">
-            <Button onClick={loadProjetos}>Tentar Novamente</Button>
+            <Button onClick={() => void refetch()}>Tentar Novamente</Button>
           </div>
         </Alert>
       </div>
@@ -359,7 +298,15 @@ const ProjetosPage: React.FC = () => {
         <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Projetos</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground">Projetos</h1>
+              {isRefreshingProjects ? (
+                <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Atualizando
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-muted-foreground">
               Gerencie seus projetos Kanban e acompanhe o progresso
             </p>
@@ -438,16 +385,16 @@ const ProjetosPage: React.FC = () => {
             <Filter className="w-8 h-8" />
           </div>
           <h3 className="text-lg font-medium text-foreground mb-2">
-            {state.searchTerm || state.filterStatus !== "todos"
+            {deferredSearchTerm || state.filterStatus !== "todos"
               ? "Nenhum projeto encontrado"
               : "Comece sua jornada"}
           </h3>
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            {state.searchTerm || state.filterStatus !== "todos"
+            {deferredSearchTerm || state.filterStatus !== "todos"
               ? "Não encontramos projetos com os filtros atuais. Tente buscar por outro termo."
               : "Crie seu primeiro projeto para organizar tarefas e colaborar com sua equipe."}
           </p>
-          {!state.searchTerm && state.filterStatus === "todos" && (
+          {!deferredSearchTerm && state.filterStatus === "todos" && (
             <Button onClick={handleCreateProject} className="gap-2">
               <Plus className="w-4 h-4" />
               Criar Primeiro Projeto
@@ -492,7 +439,7 @@ const ProjetosPage: React.FC = () => {
         title="Novo projeto"
         description="Defina o nome e descrição do novo projeto."
         submitLabel="Criar projeto"
-        loading={isCreatingProject}
+        loading={createProjeto.isPending}
         onClose={() => setShowCreateModal(false)}
         onSubmit={handleCreateProjectSubmit}
       />
@@ -501,7 +448,7 @@ const ProjetosPage: React.FC = () => {
         title="Editar projeto"
         description="Atualize as informações do projeto selecionado."
         submitLabel="Salvar alterações"
-        loading={isUpdatingProject}
+        loading={updateProjeto.isPending}
         initialData={
           selectedProject
             ? {

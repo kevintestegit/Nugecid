@@ -7,18 +7,34 @@ import {
   Query,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Request, Response } from "express";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 
 import { AppService } from "./app.service";
+import { RolesGuard } from "./modules/auth/guards/roles.guard";
 import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
-import { SessionAuthGuard } from "./modules/auth/guards/session-auth.guard";
+import { WebAuthGuard } from "./modules/auth/guards/web-auth.guard";
+import { Roles } from "./common/decorators/roles.decorator";
 import { User } from "./modules/users/entities/user.entity";
 
 @ApiTags("app")
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private buildFrontendUrl(pathname = "/") {
+    return new URL(
+      pathname,
+      this.configService.get<string>(
+        "app.frontendUrl",
+        "http://localhost:3001",
+      ),
+    ).toString();
+  }
 
   @Get()
   @ApiOperation({ summary: "Rota raiz da API" })
@@ -27,56 +43,34 @@ export class AppController {
     description: "Informações da API retornadas com sucesso",
   })
   getRoot(@Res() res: Response) {
-    // Redireciona para o frontend
-    return res.redirect("http://localhost:3001");
+    return res.redirect(this.buildFrontendUrl("/"));
   }
 
   @Get("dashboard")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(WebAuthGuard)
   @ApiOperation({ summary: "Dados do dashboard" })
   @ApiResponse({
     status: 200,
     description: "Dados do dashboard retornados com sucesso",
   })
-  async getDashboard(@Req() req: Request) {
-    const user = req.user;
-    const dashboardData = await this.appService.getDashboardData(user);
-
-    return {
-      title: "Dashboard - SGC-ITEP",
-      user,
-      ...dashboardData,
-    };
+  getDashboard(@Res() res: Response) {
+    return res.redirect(this.buildFrontendUrl("/"));
   }
 
   @Get("sobre")
-  @UseGuards(SessionAuthGuard)
+  @UseGuards(WebAuthGuard)
   @ApiOperation({ summary: "Informações sobre o sistema" })
   @ApiResponse({
     status: 200,
     description: "Informações sobre o sistema retornadas com sucesso",
   })
-  getSobre(@Req() req: Request) {
-    return {
-      title: "Sobre - SGC-ITEP",
-      version: "1.0",
-      description: "Sistema de Gestão de Conteúdo do ITEP",
-      user: req.user,
-    };
-  }
-
-  @Get("health")
-  @ApiOperation({ summary: "Health check da aplicação" })
-  @ApiResponse({
-    status: 200,
-    description: "Aplicação funcionando corretamente",
-  })
-  getHealth() {
-    return this.appService.getHealth();
+  getSobre(@Res() res: Response) {
+    return res.redirect(this.buildFrontendUrl("/sobre"));
   }
 
   @Get("test-search")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @ApiOperation({ summary: "Teste simples de busca" })
   async testSearch() {
     return {
@@ -86,7 +80,8 @@ export class AppController {
   }
 
   @Get("search")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin", "coordenador", "usuario")
   @ApiOperation({ summary: "Busca global no sistema" })
   @ApiQuery({
     name: "query",

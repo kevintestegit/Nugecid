@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate } from "react-router-dom";
 import {
   KanbanBoard,
   Projeto,
@@ -484,20 +484,7 @@ const KanbanPage: React.FC<KanbanPageProps> = ({
     resolvedId > 0;
 
   if (!isValidId) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Alert>
-          <h3 className="font-semibold">Projeto inválido</h3>
-          <p>O ID do projeto não foi encontrado ou é inválido.</p>
-          <div className="mt-4">
-            <Button variant="outline" onClick={() => navigate("/projetos")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar aos Projetos
-            </Button>
-          </div>
-        </Alert>
-      </div>
-    );
+    return <Navigate to="/404" replace />;
   }
 
   return <KanbanPageContent projectId={resolvedId} />;

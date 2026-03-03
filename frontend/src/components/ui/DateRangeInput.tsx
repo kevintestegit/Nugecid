@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Input } from './Input';
-import { Calendar, X } from 'lucide-react';
-import { Button } from './Button';
-import { Popover, PopoverContent, PopoverTrigger } from './Popover';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import React, { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Calendar, X } from "lucide-react";
+import { Button } from "./Button";
+import { Input } from "./Input";
+import { Popover, PopoverContent, PopoverTrigger } from "./Popover";
 
 export interface DateRange {
   startDate: Date | null;
@@ -18,61 +18,164 @@ interface DateRangeInputProps {
   placeholder?: string;
 }
 
-const dateToInputValue = (date: Date | null): string => {
-  if (!date) return '';
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const inputValueToDate = (value: string): Date | null => {
-  if (!value) return null;
-  // Parse YYYY-MM-DD como data local (sem conversão de timezone)
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return null;
-  const date = new Date(year, month - 1, day);
-  return isNaN(date.getTime()) ? null : date;
-};
-
 const formatDisplayDate = (date: Date | null) =>
-  date ? format(date, 'dd/MM/yyyy', { locale: ptBR }) : '';
+  date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "";
+
+const formatEditableDate = (date: Date | null) =>
+  date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "";
+
+const applyDateMask = (
+  rawValue: string,
+  previousValue: string = "",
+): string => {
+  // Extract only digits from the raw value
+  let digits = rawValue.replace(/\D/g, "");
+
+  // If the user is typing and we have more than 8 digits, keep only the last 8
+  // This handles cases where user edits in the middle of the year
+  if (digits.length > 8) {
+    // Keep the first 4 digits (day + month) and the last 4 digits (year)
+    const dayMonth = digits.slice(0, 4);
+    const year = digits.slice(-4);
+    digits = dayMonth + year;
+  }
+
+  digits = digits.slice(0, 8);
+
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+
+  if (digits.length <= 2) return day;
+  if (digits.length <= 4) return `${day}/${month}`;
+  return `${day}/${month}/${year}`;
+};
+
+const parseInputValueToDate = (value: string): Date | null => {
+  if (!value) return null;
+  if (value.length !== 10) return null;
+
+  const [dayPart, monthPart, yearPart] = value.split("/");
+  const day = Number(dayPart);
+  const month = Number(monthPart);
+  const year = Number(yearPart);
+
+  if (!day || !month || !year) return null;
+
+  const parsedDate = new Date(year, month - 1, day);
+  const isValidDate =
+    parsedDate.getFullYear() === year &&
+    parsedDate.getMonth() === month - 1 &&
+    parsedDate.getDate() === day;
+
+  return isValidDate ? parsedDate : null;
+};
+
+const hasIncompleteDate = (value: string) =>
+  value.length > 0 && value.length < 10;
+
+const hasInvalidCompleteDate = (value: string) =>
+  value.length === 10 && parseInputValueToDate(value) === null;
 
 export function DateRangeInput({
   value,
   onChange,
-  className = '',
-  placeholder = 'Selecione o período'
+  className = "",
+  placeholder = "Selecione o período",
 }: DateRangeInputProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [startInputValue, setStartInputValue] = useState(
+    formatEditableDate(value.startDate),
+  );
+  const [endInputValue, setEndInputValue] = useState(
+    formatEditableDate(value.endDate),
+  );
 
-  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = inputValueToDate(e.target.value);
-    onChange({ ...value, startDate: newDate });
-  };
+  useEffect(() => {
+    if (!isOpen) {
+      setStartInputValue(formatEditableDate(value.startDate));
+      setEndInputValue(formatEditableDate(value.endDate));
+    }
+  }, [isOpen, value.endDate, value.startDate]);
 
-  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDate = inputValueToDate(e.target.value);
-    onChange({ ...value, endDate: newDate });
-  };
+  const startDateHasError = hasInvalidCompleteDate(startInputValue);
+  const endDateHasError = hasInvalidCompleteDate(endInputValue);
+  const hasIncompleteValue =
+    hasIncompleteDate(startInputValue) || hasIncompleteDate(endInputValue);
+  const hasInvalidValue = startDateHasError || endDateHasError;
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange({ startDate: null, endDate: null });
-  };
+  const canApply = !hasIncompleteValue && !hasInvalidValue;
+
+  const displayText = useMemo(() => {
+    const hasValue = value.startDate || value.endDate;
+
+    if (!hasValue) return placeholder;
+
+    return `${formatDisplayDate(value.startDate) || "..."} - ${
+      formatDisplayDate(value.endDate) || "..."
+    }`;
+  }, [placeholder, value.endDate, value.startDate]);
 
   const hasValue = value.startDate || value.endDate;
 
-  const displayText = hasValue
-    ? `${formatDisplayDate(value.startDate) || '...'} - ${formatDisplayDate(value.endDate) || '...'}`
-    : placeholder;
+  const handleStartChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = applyDateMask(event.target.value);
+    setStartInputValue(nextValue);
+
+    if (!nextValue) {
+      onChange({ ...value, startDate: null });
+      return;
+    }
+
+    const parsedDate = parseInputValueToDate(nextValue);
+    if (parsedDate) {
+      onChange({ ...value, startDate: parsedDate });
+    }
+  };
+
+  const handleEndChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = applyDateMask(event.target.value);
+    setEndInputValue(nextValue);
+
+    if (!nextValue) {
+      onChange({ ...value, endDate: null });
+      return;
+    }
+
+    const parsedDate = parseInputValueToDate(nextValue);
+    if (parsedDate) {
+      onChange({ ...value, endDate: parsedDate });
+    }
+  };
+
+  const handleClear = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setStartInputValue("");
+    setEndInputValue("");
+    onChange({ startDate: null, endDate: null });
+  };
+
+  const resetDraftValues = () => {
+    setStartInputValue(formatEditableDate(value.startDate));
+    setEndInputValue(formatEditableDate(value.endDate));
+  };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+
+    if (!open) {
+      resetDraftValues();
+    }
+  };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className={`w-full justify-between text-left font-normal ${!hasValue && 'text-muted-foreground'} ${className}`}
+          className={`w-full justify-between text-left font-normal ${
+            !hasValue && "text-muted-foreground"
+          } ${className}`}
         >
           <span className="flex items-center gap-2 truncate">
             <Calendar className="h-4 w-4 shrink-0" />
@@ -89,32 +192,59 @@ export function DateRangeInput({
       <PopoverContent className="w-80 p-4" align="start" side="bottom">
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Data inicial</label>
+            <label htmlFor="date-range-start" className="text-sm font-medium">
+              Data inicial
+            </label>
             <Input
-              type="date"
-              value={dateToInputValue(value.startDate)}
+              id="date-range-start"
+              type="text"
+              inputMode="numeric"
+              placeholder="dd/mm/aaaa"
+              value={startInputValue}
               onChange={handleStartChange}
               className="w-full"
+              maxLength={10}
+              aria-invalid={startDateHasError}
             />
+            <p className="text-xs text-muted-foreground">
+              Digite a data no formato dd/mm/aaaa.
+            </p>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Data final</label>
+            <label htmlFor="date-range-end" className="text-sm font-medium">
+              Data final
+            </label>
             <Input
-              type="date"
-              value={dateToInputValue(value.endDate)}
+              id="date-range-end"
+              type="text"
+              inputMode="numeric"
+              placeholder="dd/mm/aaaa"
+              value={endInputValue}
               onChange={handleEndChange}
               className="w-full"
+              maxLength={10}
+              aria-invalid={endDateHasError}
             />
+            <p className="text-xs text-muted-foreground">
+              Digite a data no formato dd/mm/aaaa.
+            </p>
           </div>
-          <div className="flex justify-between items-center pt-2 border-t">
+          {(hasIncompleteValue || hasInvalidValue) && (
+            <p className="text-xs text-destructive">
+              Preencha as datas com um valor valido antes de aplicar o filtro.
+            </p>
+          )}
+          <div className="flex items-center justify-between border-t pt-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => {
+                setStartInputValue("");
+                setEndInputValue("");
                 onChange({ startDate: null, endDate: null });
               }}
-              disabled={!hasValue}
+              disabled={!hasValue && !startInputValue && !endInputValue}
             >
               Limpar
             </Button>
@@ -122,6 +252,7 @@ export function DateRangeInput({
               type="button"
               size="sm"
               onClick={() => setIsOpen(false)}
+              disabled={!canApply}
             >
               Aplicar
             </Button>

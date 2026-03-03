@@ -1,10 +1,24 @@
 import axios from "axios";
 import { api } from "./api";
 
+const BACKUP_OPERATION_TIMEOUT_MS = 10 * 60 * 1000;
+const BACKUP_RESTORE_TIMEOUT_MS = 15 * 60 * 1000;
+
+function getBackupErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.message || error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 export interface BackupResult {
   success: boolean;
   filename?: string;
-  filepath?: string;
   size?: string;
   timestamp?: string;
   error?: string;
@@ -27,7 +41,6 @@ export interface SystemSettings {
 
 export interface BackupListItem {
   filename: string;
-  filepath: string;
   size: string;
   sizeBytes: number;
   created: string;
@@ -47,15 +60,13 @@ class BackupService {
    */
   async createFullBackup(): Promise<BackupResult> {
     try {
-      const response = await api.post<BackupResult>("/backup/full");
+      const response = await api.post<BackupResult>("/backup/full", undefined, {
+        timeout: BACKUP_OPERATION_TIMEOUT_MS,
+      });
       return response.data;
     } catch (error: unknown) {
       throw new Error(
-        axios.isAxiosError(error)
-          ? error.response?.data?.message || error.message
-          : error instanceof Error
-            ? error.message
-            : "Erro ao criar backup completo",
+        getBackupErrorMessage(error, "Erro ao criar backup completo"),
       );
     }
   }
@@ -65,15 +76,20 @@ class BackupService {
    */
   async createDesarquivamentoBackup(): Promise<BackupResult> {
     try {
-      const response = await api.post<BackupResult>("/backup/desarquivamentos");
+      const response = await api.post<BackupResult>(
+        "/backup/desarquivamentos",
+        undefined,
+        {
+          timeout: BACKUP_OPERATION_TIMEOUT_MS,
+        },
+      );
       return response.data;
     } catch (error: unknown) {
       throw new Error(
-        axios.isAxiosError(error)
-          ? error.response?.data?.message || error.message
-          : error instanceof Error
-            ? error.message
-            : "Erro ao criar backup de desarquivamentos",
+        getBackupErrorMessage(
+          error,
+          "Erro ao criar backup de desarquivamentos",
+        ),
       );
     }
   }
@@ -103,16 +119,14 @@ class BackupService {
     try {
       const response = await api.post<BackupResult>(
         `/backup/restore/${filename}`,
+        undefined,
+        {
+          timeout: BACKUP_RESTORE_TIMEOUT_MS,
+        },
       );
       return response.data;
     } catch (error: unknown) {
-      throw new Error(
-        axios.isAxiosError(error)
-          ? error.response?.data?.message || error.message
-          : error instanceof Error
-            ? error.message
-            : "Erro ao restaurar backup",
-      );
+      throw new Error(getBackupErrorMessage(error, "Erro ao restaurar backup"));
     }
   }
 
@@ -129,15 +143,13 @@ class BackupService {
         success: boolean;
         deletedCount: number;
         message: string;
-      }>("/backup/clean");
+      }>("/backup/clean", undefined, {
+        timeout: BACKUP_OPERATION_TIMEOUT_MS,
+      });
       return response.data;
     } catch (error: unknown) {
       throw new Error(
-        axios.isAxiosError(error)
-          ? error.response?.data?.message || error.message
-          : error instanceof Error
-            ? error.message
-            : "Erro ao limpar backups antigos",
+        getBackupErrorMessage(error, "Erro ao limpar backups antigos"),
       );
     }
   }

@@ -36,13 +36,17 @@ import { Roles } from "../../../common/decorators/roles.decorator";
 import { AnnouncementsService } from "../services";
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from "../dto";
 import { FileValidator } from "../../../common/utils/file-validator";
+import { AntivirusService } from "../../security/antivirus.service";
 
 @ApiTags("announcements")
 @Controller("announcements")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class AnnouncementsController {
-  constructor(private readonly announcementsService: AnnouncementsService) {}
+  constructor(
+    private readonly announcementsService: AnnouncementsService,
+    private readonly antivirusService: AntivirusService,
+  ) {}
 
   @Post()
   @Roles("admin")
@@ -140,6 +144,10 @@ export class AnnouncementsController {
 
     // Validar conteúdo real do arquivo por magic bytes
     await FileValidator.validateImage(file.buffer);
+    await this.antivirusService.scanBuffer(file.buffer, {
+      fileName: file.originalname,
+      source: "announcements.upload-image",
+    });
 
     // Criar diretório se não existir
     const uploadPath = path.join(process.cwd(), "uploads", "announcements");

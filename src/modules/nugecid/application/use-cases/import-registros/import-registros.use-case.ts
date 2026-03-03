@@ -1,11 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { validate } from "class-validator";
-import * as XLSX from "xlsx";
 import {
   ImportRegistroDto,
   TipoDesarquivamento,
   StatusDesarquivamento,
 } from "../../../dto/import-registro.dto";
+import { readSpreadsheetObjects } from "../../../../../common/utils/spreadsheet.util";
 
 export interface ImportRegistrosRequest {
   file: Express.Multer.File;
@@ -45,13 +45,10 @@ export class ImportRegistrosUseCase {
     await this.validateFile(request.file);
 
     // Processar planilha
-    const workbook = XLSX.read(request.file.buffer, {
-      type: "buffer",
-      cellDates: true,
-    });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet);
+    const { rows: data } = await readSpreadsheetObjects(
+      request.file.buffer,
+      request.file.originalname,
+    );
 
     const totalRows = data.length;
     let successCount = 0;
@@ -134,14 +131,11 @@ export class ImportRegistrosUseCase {
 
     const allowedMimeTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-      "application/vnd.ms-excel", // .xls
       "text/csv", // .csv
     ];
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
-      throw new Error(
-        "Formato de arquivo não suportado. Use .xlsx, .xls ou .csv",
-      );
+      throw new Error("Formato de arquivo não suportado. Use .xlsx ou .csv");
     }
 
     // Validar tamanho do arquivo (máximo 10MB)

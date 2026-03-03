@@ -247,10 +247,14 @@ export const isActionHistoricoEntry = (item: HistoricoItem): boolean => {
   return !isBusinessHistoricoEntry(item);
 };
 
-export const buildHistoricoMessage = (item: HistoricoItem): HistoricoMessage => {
+export const buildHistoricoMessage = (
+  item: HistoricoItem,
+): HistoricoMessage => {
   const changes = extractChanges(item);
   const statusChange = changes.find((change) => change.field === "status");
-  const nonStatusChanges = changes.filter((change) => change.field !== "status");
+  const nonStatusChanges = changes.filter(
+    (change) => change.field !== "status",
+  );
 
   if (statusChange) {
     const newStatusLabel = toStatusLabel(statusChange.to);
@@ -332,7 +336,10 @@ export const buildHistoricoMessage = (item: HistoricoItem): HistoricoMessage => 
   }
 
   if (changes.length > 1) {
-    const preview = changes.slice(0, 3).map(buildFieldChangeSentence).join("; ");
+    const preview = changes
+      .slice(0, 3)
+      .map(buildFieldChangeSentence)
+      .join("; ");
     const overflow =
       changes.length > 3 ? ` (+${changes.length - 3} campos adicionais)` : "";
 

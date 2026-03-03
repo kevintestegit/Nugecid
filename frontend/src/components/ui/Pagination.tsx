@@ -1,23 +1,23 @@
-import React from 'react'
-import { Button } from '@/components/ui/Button'
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
+import React from "react";
+import { Button } from "@/components/ui/Button";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
   ChevronsRight,
-  MoreHorizontal
-} from 'lucide-react'
-import { cn } from '@/utils/cn'
+  MoreHorizontal,
+} from "lucide-react";
+import { cn } from "@/utils/cn";
 
 interface PaginationProps {
-  currentPage: number
-  totalPages: number
-  totalItems: number
-  itemsPerPage: number
-  onPageChange: (page: number) => void
-  onItemsPerPageChange?: (itemsPerPage: number) => void
-  showItemsPerPage?: boolean
-  className?: string
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  onPageChange: (page: number) => void;
+  onItemsPerPageChange?: (itemsPerPage: number) => void;
+  showItemsPerPage?: boolean;
+  className?: string;
 }
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -28,67 +28,72 @@ const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   onItemsPerPageChange,
   showItemsPerPage = true,
-  className
+  className,
 }) => {
-  const startItem = (currentPage - 1) * itemsPerPage + 1
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems)
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
   const getVisiblePages = () => {
-    const delta = 2
-    const range = []
-    const rangeWithDots = []
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
 
     for (
       let i = Math.max(2, currentPage - delta);
       i <= Math.min(totalPages - 1, currentPage + delta);
       i++
     ) {
-      range.push(i)
+      range.push(i);
     }
 
     if (currentPage - delta > 2) {
-      rangeWithDots.push(1, 'dots1')
+      rangeWithDots.push(1, "dots1");
     } else {
-      rangeWithDots.push(1)
+      rangeWithDots.push(1);
     }
 
-    rangeWithDots.push(...range)
+    rangeWithDots.push(...range);
 
     if (currentPage + delta < totalPages - 1) {
-      rangeWithDots.push('dots2', totalPages)
+      rangeWithDots.push("dots2", totalPages);
     } else {
-      rangeWithDots.push(totalPages)
+      rangeWithDots.push(totalPages);
     }
 
-    return rangeWithDots
-  }
+    return rangeWithDots;
+  };
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      onPageChange(page)
+      onPageChange(page);
     }
-  }
+  };
 
   const handleItemsPerPageChange = (newItemsPerPage: number) => {
     if (onItemsPerPageChange) {
-      onItemsPerPageChange(newItemsPerPage)
+      onItemsPerPageChange(newItemsPerPage);
     }
-  }
+  };
 
   if (totalPages <= 1) {
-    return null
+    return null;
   }
 
-  const visiblePages = getVisiblePages()
+  const visiblePages = getVisiblePages();
 
   return (
-    <div className={cn("flex flex-col sm:flex-row items-center justify-between gap-4 px-2", className)}>
+    <div
+      className={cn(
+        "flex flex-col sm:flex-row items-center justify-between gap-4 px-2",
+        className,
+      )}
+    >
       {/* Items info */}
       <div className="flex items-center gap-4 text-sm text-gray-600">
         <span>
           Mostrando {startItem} a {endItem} de {totalItems} resultados
         </span>
-        
+
         {showItemsPerPage && onItemsPerPageChange && (
           <div className="flex items-center gap-2">
             <span>Itens por página:</span>
@@ -133,12 +138,15 @@ const Pagination: React.FC<PaginationProps> = ({
         {/* Page numbers */}
         <div className="flex items-center gap-1">
           {visiblePages.map((page, index) => {
-            if (page === 'dots1' || page === 'dots2') {
+            if (page === "dots1" || page === "dots2") {
               return (
-                <div key={`dots-${index}`} className="flex items-center justify-center h-8 w-8">
+                <div
+                  key={`dots-${index}`}
+                  className="flex items-center justify-center h-8 w-8"
+                >
                   <MoreHorizontal className="h-4 w-4 text-gray-400" />
                 </div>
-              )
+              );
             }
 
             return (
@@ -149,12 +157,13 @@ const Pagination: React.FC<PaginationProps> = ({
                 onClick={() => handlePageChange(page as number)}
                 className={cn(
                   "h-8 w-8 p-0",
-                  currentPage === page && "bg-blue-600 text-white hover:bg-blue-700"
+                  currentPage === page &&
+                    "bg-blue-600 text-white hover:bg-blue-700",
                 )}
               >
                 {page}
               </Button>
-            )
+            );
           })}
         </div>
 
@@ -181,9 +190,9 @@ const Pagination: React.FC<PaginationProps> = ({
         </Button>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Pagination
-export { Pagination }
-export type { PaginationProps }
+export default Pagination;
+export { Pagination };
+export type { PaginationProps };

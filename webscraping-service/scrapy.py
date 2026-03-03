@@ -43,6 +43,8 @@ import os
 import shutil
 import time
 import json
+import hmac
+import hashlib
 import urllib.request
 import urllib.error
 
@@ -107,13 +109,28 @@ def _send_webhook(numero, titulo, link):
     payload = {"numero": numero, "titulo": titulo, "link": link}
     if usuario_id:
         payload["usuarioId"] = int(usuario_id)
+    timestamp = str(int(time.time()))
+    canonical = "\n".join([
+        "v1",
+        timestamp,
+        str(payload.get("numero", "")).strip(),
+        str(payload.get("titulo", "")).strip(),
+        str(payload.get("link", "") or "").strip(),
+        str(payload.get("usuarioId", "") or ""),
+    ])
+    signature = hmac.new(
+        token.encode("utf-8"),
+        canonical.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         webhook_url,
         data=data,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
+            "X-Escavador-Timestamp": timestamp,
+            "X-Escavador-Signature": signature,
         },
         method="POST",
     )
@@ -158,8 +175,8 @@ try:
 
     # Preencher usuário e senha (ajuste ou use variáveis de ambiente)
     try:
-        usuario = os.getenv("SEI_USUARIO", "70020194498")
-        senha = os.getenv("SEI_SENHA", "@Sanfona1")
+        usuario = os.getenv("SEI_USUARIO", "")
+        senha = os.getenv("SEI_SENHA", "")
         driver.find_element(By.ID, "txtUsuario").clear()
         driver.find_element(By.ID, "txtUsuario").send_keys(usuario)
         driver.find_element(By.ID, "pwdSenha").clear()

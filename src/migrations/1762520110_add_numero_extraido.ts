@@ -14,7 +14,7 @@ export class AddNumeroExtraido1730988000000 implements MigrationInterface {
       await queryRunner.query(
         `DROP INDEX IF EXISTS "IDX_numero_nic_laudo_auto"`,
       );
-    } catch (error) {
+    } catch {
       // Ignorar se não existir
     }
 

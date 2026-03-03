@@ -34,19 +34,35 @@ describe("NotificationPreferencesService", () => {
     id: 1,
     userId: 1,
     inAppEnabled: true,
+    desktopEnabled: false,
+    pushEnabled: false,
     soundEnabled: true,
     enabledTypes: { ...defaultEnabledTypes },
     canReceiveNotification: jest
       .fn()
-      .mockImplementation((type: string, channel: "in_app") => {
-        if (channel === "in_app") {
-          return (
-            mockPreferences.inAppEnabled &&
-            (mockPreferences.enabledTypes[type] ?? false)
-          );
-        }
-        return false;
-      }),
+      .mockImplementation(
+        (type: string, channel: "in_app" | "desktop" | "push") => {
+          if (channel === "in_app") {
+            return (
+              mockPreferences.inAppEnabled &&
+              (mockPreferences.enabledTypes[type] ?? false)
+            );
+          }
+          if (channel === "desktop") {
+            return (
+              mockPreferences.desktopEnabled &&
+              (mockPreferences.enabledTypes[type] ?? false)
+            );
+          }
+          if (channel === "push") {
+            return (
+              mockPreferences.pushEnabled &&
+              (mockPreferences.enabledTypes[type] ?? false)
+            );
+          }
+          return false;
+        },
+      ),
     enableType: jest.fn(),
     disableType: jest.fn(),
   };
@@ -109,6 +125,8 @@ describe("NotificationPreferencesService", () => {
         expect.objectContaining({
           userId: 1,
           inAppEnabled: true,
+          desktopEnabled: false,
+          pushEnabled: false,
           soundEnabled: true,
         }),
       );
@@ -165,6 +183,40 @@ describe("NotificationPreferencesService", () => {
         }),
       );
     });
+
+    it("should update desktopEnabled", async () => {
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockPreferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+      });
+      mockPreferencesRepository.save.mockResolvedValue({
+        ...mockPreferences,
+        desktopEnabled: true,
+      });
+
+      const result = await service.updatePreferences(1, {
+        desktopEnabled: true,
+      });
+
+      expect(result.desktopEnabled).toBe(true);
+    });
+
+    it("should update pushEnabled", async () => {
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockPreferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+      });
+      mockPreferencesRepository.save.mockResolvedValue({
+        ...mockPreferences,
+        pushEnabled: true,
+      });
+
+      const result = await service.updatePreferences(1, {
+        pushEnabled: true,
+      });
+
+      expect(result.pushEnabled).toBe(true);
+    });
   });
 
   describe("canReceiveNotification", () => {
@@ -200,6 +252,8 @@ describe("NotificationPreferencesService", () => {
       const prefs = {
         ...mockPreferences,
         inAppEnabled: false,
+        desktopEnabled: true,
+        pushEnabled: true,
         soundEnabled: false,
         enabledTypes: { solicitacao_pendente: false },
       };
@@ -212,6 +266,8 @@ describe("NotificationPreferencesService", () => {
       const result = await service.resetToDefaults(1);
 
       expect(result.inAppEnabled).toBe(true);
+      expect(result.desktopEnabled).toBe(false);
+      expect(result.pushEnabled).toBe(false);
       expect(result.soundEnabled).toBe(true);
       expect(result.enabledTypes).toEqual(defaultEnabledTypes);
     });

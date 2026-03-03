@@ -19,13 +19,19 @@ import {
   Loader2,
   Eye,
   Edit2,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { DesarquivamentoAnexo } from "@/hooks/useDesarquivamentosAnexos";
+import {
+  DesarquivamentoAnexo,
+  useAnalyzeDesarquivamentoAnexoOcr,
+} from "@/hooks/useDesarquivamentosAnexos";
 import { ImageThumbnail } from "./ImageThumbnail";
 import { LinearProgress } from "@/components/ui/ProgressBar";
 import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
 import { NoFilesFound } from "@/components/ui/EmptyState";
+import AnexoOcrAnalysisDialog from "./AnexoOcrAnalysisDialog";
+import type { AnexoOcrAnalysis } from "@/types";
 
 interface AnexosSectionProps {
   title: string;
@@ -69,9 +75,12 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
   const [editDescricao, setEditDescricao] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null);
-  const uploadProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-    null,
-  );
+  const [ocrDialogOpen, setOcrDialogOpen] = useState(false);
+  const [ocrAnalysis, setOcrAnalysis] = useState<AnexoOcrAnalysis | null>(null);
+  const uploadProgressIntervalRef = useRef<ReturnType<
+    typeof setInterval
+  > | null>(null);
+  const analyzeOcrMutation = useAnalyzeDesarquivamentoAnexoOcr();
 
   const clearUploadProgressInterval = () => {
     if (uploadProgressIntervalRef.current) {
@@ -180,6 +189,25 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
         : error instanceof Error
           ? error.message
           : "Erro ao atualizar descrição";
+      toast.error(message);
+    }
+  };
+
+  const handleOpenOcrAnalysis = async (anexo: DesarquivamentoAnexo) => {
+    try {
+      const result = await analyzeOcrMutation.mutateAsync(anexo);
+      setOcrAnalysis(result ?? null);
+      setOcrDialogOpen(true);
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? (((error.response?.data as Record<string, unknown>)
+            ?.message as string) ??
+          (error instanceof Error
+            ? error.message
+            : "Erro ao analisar OCR do anexo"))
+        : error instanceof Error
+          ? error.message
+          : "Erro ao analisar OCR do anexo";
       toast.error(message);
     }
   };
@@ -406,6 +434,15 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                           <Eye className="h-4 w-4" />
                         </button>
                       )}
+                    {(anexo.tipoMime === "application/pdf" || anexo.ocr) && (
+                      <button
+                        onClick={() => handleOpenOcrAnalysis(anexo)}
+                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-amber-500/10 hover:text-amber-600"
+                        title="Analisar OCR e assinaturas"
+                      >
+                        <Search className="h-4 w-4" />
+                      </button>
+                    )}
                     {canEdit &&
                       onUpdateDescricao &&
                       editingAnexoId !== anexo.id && (
@@ -455,6 +492,12 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
             "Esta ação não pode ser desfeita",
             "O arquivo será apagado do servidor",
           ]}
+        />
+        <AnexoOcrAnalysisDialog
+          open={ocrDialogOpen}
+          onOpenChange={setOcrDialogOpen}
+          analysis={ocrAnalysis}
+          isLoading={analyzeOcrMutation.isPending}
         />
       </CardContent>
     </Card>

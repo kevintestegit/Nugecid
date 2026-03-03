@@ -2,15 +2,15 @@
 set -euo pipefail
 
 BASE_URL="${PERF_BASE_URL:-http://127.0.0.1:8080}"
-USERNAME="${PERF_USERNAME:-kevin}"
-PASSWORD="${PERF_PASSWORD:-@Sanfona1}"
+USERNAME="${PERF_USERNAME:-__MUST_BE_SET__}"
+PASSWORD="${PERF_PASSWORD:-__MUST_BE_SET__}"
 REQUESTS="${PERF_REQUESTS:-200}"
 CONCURRENCY="${PERF_CONCURRENCY:-20}"
 TIMEOUT_SECONDS="${PERF_TIMEOUT_SECONDS:-15}"
-LOGIN_FORWARDED_FOR="${PERF_LOGIN_FORWARDED_FOR:-10.250.0.10}"
+LOGIN_FORWARDED_FOR="${PERF_LOGIN_FORWARDED_FOR:-127.0.0.1}"
 
 SCENARIOS=(
-  "health|/api/health"
+  "health|/health"
   "nugecid-list|/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC"
   "pastas-list|/api/pastas"
   "notificacoes-list|/api/notificacoes?page=1&limit=20"

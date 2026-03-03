@@ -64,19 +64,25 @@ export class SecurityController {
   async getIpAccessDetails(
     @Param("ipAddress") ipAddress: string,
     @Query("days") days: string = "30",
+    @Query("skip") skip: string = "0",
+    @Query("take") take: string = "100",
   ) {
-    const details = await this.securityService.getIpAccessDetails(
+    const result = await this.securityService.getIpAccessDetails(
       ipAddress,
       parseInt(days),
+      parseInt(skip),
+      parseInt(take),
     );
 
     return {
       success: true,
-      data: details,
+      data: result.data,
       meta: {
         ipAddress,
         days: parseInt(days),
-        total: details.length,
+        total: result.total,
+        skip: parseInt(skip),
+        take: parseInt(take),
       },
     };
   }

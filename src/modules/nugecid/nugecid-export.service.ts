@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { NugecidService } from "./nugecid.service";
 import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
 import { User } from "../users/entities/user.entity";
+import { writeSpreadsheetBuffer } from "../../common/utils/spreadsheet.util";
 
 @Injectable()
 export class NugecidExportService {
@@ -13,7 +14,6 @@ export class NugecidExportService {
     queryDto: QueryDesarquivamentoDto,
     currentUser: User,
   ): Promise<Buffer> {
-    const XLSX = this.getXlsx();
     const result = await this.nugecidService.findAll({
       ...queryDto,
       limit: 10000, // Export all matching records
@@ -48,22 +48,15 @@ export class NugecidExportService {
       "Criado em": new Date(item.createdAt).toISOString(),
       "Atualizado em": new Date(item.updatedAt).toISOString(),
     }));
-
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Desarquivamentos");
-
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    const buffer = await writeSpreadsheetBuffer({
+      sheetName: "Desarquivamentos",
+      rows: worksheetData,
+    });
 
     this.logger.log(
       `Exportação realizada por ${currentUser.usuario}: ${result.total} registros`,
     );
 
     return buffer;
-  }
-
-  private getXlsx(): typeof import("xlsx") {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require("xlsx") as typeof import("xlsx");
   }
 }

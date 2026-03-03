@@ -14,7 +14,6 @@ import { DesarquivamentoMapper } from "../mappers/desarquivamento.mapper";
 import { DesarquivamentoId } from "../../domain/value-objects";
 import { StatusDesarquivamentoEnum } from "../../domain/enums/status-desarquivamento.enum";
 import { TipoDesarquivamentoEnum } from "../../domain/enums/tipo-desarquivamento.enum";
-import { SyncRealtimeService } from "../../../sync/sync-realtime.service";
 
 @Injectable()
 export class DesarquivamentoTypeOrmRepository
@@ -53,7 +52,6 @@ export class DesarquivamentoTypeOrmRepository
     @InjectRepository(DesarquivamentoTypeOrmEntity)
     private readonly repository: Repository<DesarquivamentoTypeOrmEntity>,
     private readonly mapper: DesarquivamentoMapper,
-    private readonly syncRealtimeService: SyncRealtimeService,
   ) {}
 
   async create(
@@ -76,22 +74,6 @@ export class DesarquivamentoTypeOrmRepository
     );
     const savedEntity = await this.repository.save(entity);
 
-    this.syncRealtimeService.emitDomainChange({
-      scope: "desarquivamentos",
-      action: "created",
-      entityId: savedEntity.id,
-      entityType: "desarquivamento",
-      metadata: {
-        status: savedEntity.status,
-      },
-    });
-    this.syncRealtimeService.emitDomainChange({
-      scope: "dashboard",
-      action: "updated",
-      entityType: "dashboard",
-      metadata: { section: "desarquivamentos" },
-    });
-
     return this.mapper.toDomain(savedEntity);
   }
 
@@ -100,22 +82,6 @@ export class DesarquivamentoTypeOrmRepository
   ): Promise<DesarquivamentoDomain> {
     const entity = this.mapper.toTypeOrm(desarquivamento);
     const savedEntity = await this.repository.save(entity);
-
-    this.syncRealtimeService.emitDomainChange({
-      scope: "desarquivamentos",
-      action: "updated",
-      entityId: savedEntity.id,
-      entityType: "desarquivamento",
-      metadata: {
-        status: savedEntity.status,
-      },
-    });
-    this.syncRealtimeService.emitDomainChange({
-      scope: "dashboard",
-      action: "updated",
-      entityType: "dashboard",
-      metadata: { section: "desarquivamentos" },
-    });
 
     return this.mapper.toDomain(savedEntity);
   }
@@ -196,19 +162,6 @@ export class DesarquivamentoTypeOrmRepository
 
   async delete(id: DesarquivamentoId): Promise<void> {
     await this.repository.delete(id.value);
-
-    this.syncRealtimeService.emitDomainChange({
-      scope: "desarquivamentos",
-      action: "deleted",
-      entityId: id.value,
-      entityType: "desarquivamento",
-    });
-    this.syncRealtimeService.emitDomainChange({
-      scope: "dashboard",
-      action: "updated",
-      entityType: "dashboard",
-      metadata: { section: "desarquivamentos" },
-    });
   }
 
   async softDelete(id: DesarquivamentoId): Promise<void> {
@@ -266,19 +219,6 @@ export class DesarquivamentoTypeOrmRepository
       this.logger.log(
         `[REPOSITORY] ✅ SUCESSO: Soft delete concluído para ID ${id.value}`,
       );
-
-      this.syncRealtimeService.emitDomainChange({
-        scope: "desarquivamentos",
-        action: "deleted",
-        entityId: id.value,
-        entityType: "desarquivamento",
-      });
-      this.syncRealtimeService.emitDomainChange({
-        scope: "dashboard",
-        action: "updated",
-        entityType: "dashboard",
-        metadata: { section: "desarquivamentos" },
-      });
     } catch (error) {
       this.logger.error(
         `[REPOSITORY] ❌ ERRO durante soft delete para ID ${id.value}: ${error.message}`,
@@ -289,19 +229,6 @@ export class DesarquivamentoTypeOrmRepository
 
   async restore(id: DesarquivamentoId): Promise<void> {
     await this.repository.restore(id.value);
-
-    this.syncRealtimeService.emitDomainChange({
-      scope: "desarquivamentos",
-      action: "restored",
-      entityId: id.value,
-      entityType: "desarquivamento",
-    });
-    this.syncRealtimeService.emitDomainChange({
-      scope: "dashboard",
-      action: "updated",
-      entityType: "dashboard",
-      metadata: { section: "desarquivamentos" },
-    });
   }
 
   async findByNumeroNicLaudoAuto(
@@ -590,21 +517,6 @@ export class DesarquivamentoTypeOrmRepository
     const entities = desarquivamentos.map((d) => this.mapper.toTypeOrm(d));
     const saved = await this.repository.save(entities);
 
-    if (saved.length) {
-      this.syncRealtimeService.emitDomainChange({
-        scope: "desarquivamentos",
-        action: "bulk",
-        entityType: "desarquivamento",
-        metadata: { count: saved.length, operation: "createMany" },
-      });
-      this.syncRealtimeService.emitDomainChange({
-        scope: "dashboard",
-        action: "updated",
-        entityType: "dashboard",
-        metadata: { section: "desarquivamentos" },
-      });
-    }
-
     return saved.map((e) => this.mapper.toDomain(e));
   }
 
@@ -613,21 +525,6 @@ export class DesarquivamentoTypeOrmRepository
   ): Promise<DesarquivamentoDomain[]> {
     const entities = desarquivamentos.map((d) => this.mapper.toTypeOrm(d));
     const saved = await this.repository.save(entities);
-
-    if (saved.length) {
-      this.syncRealtimeService.emitDomainChange({
-        scope: "desarquivamentos",
-        action: "bulk",
-        entityType: "desarquivamento",
-        metadata: { count: saved.length, operation: "updateMany" },
-      });
-      this.syncRealtimeService.emitDomainChange({
-        scope: "dashboard",
-        action: "updated",
-        entityType: "dashboard",
-        metadata: { section: "desarquivamentos" },
-      });
-    }
 
     return saved.map((e) => this.mapper.toDomain(e));
   }

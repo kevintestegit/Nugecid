@@ -1,102 +1,108 @@
-import React, { useMemo, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
-import { 
-  CheckSquare, 
-  AlertCircle,
-  ArrowRight,
-  Calendar
-} from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { cn } from '@/utils/cn'
-import { UserTask } from '@/hooks/useUserTasks'
-import { Avatar, AvatarGroup } from '@/components/kanban/Avatar'
-import { useAuth } from '@/contexts/AuthContext'
+import React, { useMemo, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { CheckSquare, AlertCircle, ArrowRight, Calendar } from "lucide-react";
+import { Link } from "react-router-dom";
+import { cn } from "@/utils/cn";
+import { UserTask } from "@/hooks/useUserTasks";
+import { Avatar, AvatarGroup } from "@/components/kanban/Avatar";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserTasksProps {
-  tasks: UserTask[]
-  isLoading?: boolean
+  tasks: UserTask[];
+  isLoading?: boolean;
 }
 
 const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
-  const [activeTab, setActiveTab] = useState<'all' | 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA'>('all')
-  const { user } = useAuth()
+  const [activeTab, setActiveTab] = useState<
+    "all" | "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA"
+  >("all");
+  const { user } = useAuth();
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      'PENDENTE': 'Pendente',
-      'EM_ANDAMENTO': 'Em andamento',
-      'CONCLUIDA': 'Concluída',
-      'CANCELADA': 'Cancelada'
-    }
-    return labels[status] || status
-  }
+      PENDENTE: "Pendente",
+      EM_ANDAMENTO: "Em andamento",
+      CONCLUIDA: "Concluída",
+      CANCELADA: "Cancelada",
+    };
+    return labels[status] || status;
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDENTE':
-        return 'bg-amber-50 text-amber-700 border-amber-200'
-      case 'EM_ANDAMENTO':
-        return 'bg-blue-50 text-blue-700 border-blue-200'
-      case 'CONCLUIDA':
-        return 'bg-green-50 text-green-700 border-green-200'
-      case 'CANCELADA':
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+      case "PENDENTE":
+        return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/60";
+      case "EM_ANDAMENTO":
+        return "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/60 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800/60";
+      case "CONCLUIDA":
+        return "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-300 dark:border-green-800/60";
+      case "CANCELADA":
+        return "bg-gray-100 text-gray-800 border-border";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200'
+        return "bg-gray-100 text-gray-800 border-border";
     }
-  }
+  };
 
   const getPrioridadeColor = (prioridade: string) => {
     switch (prioridade) {
-      case 'URGENTE':
-        return 'bg-red-50 text-red-700'
-      case 'ALTA':
-        return 'bg-orange-50 text-orange-700'
-      case 'MEDIA':
-        return 'bg-yellow-50 text-yellow-700'
-      case 'BAIXA':
-        return 'bg-green-50 text-green-700'
+      case "URGENTE":
+        return "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 dark:bg-red-950/30 dark:text-red-300";
+      case "ALTA":
+        return "bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:bg-orange-950/30 dark:text-orange-300";
+      case "MEDIA":
+        return "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300 dark:bg-yellow-950/30 dark:text-yellow-300";
+      case "BAIXA":
+        return "bg-green-50 text-green-700";
       default:
-        return 'bg-gray-100 text-gray-800'
+        return "bg-gray-100 text-gray-800";
     }
-  }
+  };
 
   const getPrioridadeLabel = (prioridade: string) => {
     const labels: Record<string, string> = {
-      'URGENTE': 'Urgente',
-      'ALTA': 'Alta',
-      'MEDIA': 'Média',
-      'BAIXA': 'Baixa'
-    }
-    return labels[prioridade] || prioridade
-  }
+      URGENTE: "Urgente",
+      ALTA: "Alta",
+      MEDIA: "Média",
+      BAIXA: "Baixa",
+    };
+    return labels[prioridade] || prioridade;
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-  }
+    return new Date(dateString).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
   const isPastDue = (prazo: string) => {
-    return new Date(prazo) < new Date()
-  }
+    return new Date(prazo) < new Date();
+  };
 
-  const visibleTasks = useMemo(() => tasks.filter(t => t.status !== 'CANCELADA'), [tasks])
+  const visibleTasks = useMemo(
+    () => tasks.filter((t) => t.status !== "CANCELADA"),
+    [tasks],
+  );
   const activeTasks = useMemo(
-    () => visibleTasks.filter(t => t.status !== 'CONCLUIDA'),
-    [visibleTasks]
-  )
+    () => visibleTasks.filter((t) => t.status !== "CONCLUIDA"),
+    [visibleTasks],
+  );
   const filteredTasks = useMemo(() => {
-    if (activeTab === 'all') {
-      return activeTasks
+    if (activeTab === "all") {
+      return activeTasks;
     }
-    return visibleTasks.filter(task => task.status === activeTab)
-  }, [activeTab, activeTasks, visibleTasks])
+    return visibleTasks.filter((task) => task.status === activeTab);
+  }, [activeTab, activeTasks, visibleTasks]);
 
-  const hasAnyTasks = visibleTasks.length > 0
+  const hasAnyTasks = visibleTasks.length > 0;
 
   if (isLoading) {
     return (
@@ -104,7 +110,7 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
         <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/10 dark:ring-white/5 shadow-sm backdrop-blur">
               <CheckSquare className="h-4 w-4 text-primary" />
             </span>
             Minhas Tarefas
@@ -116,19 +122,22 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
         <CardContent>
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="flex items-start justify-between gap-3 p-4 border rounded-xl animate-pulse bg-white">
+              <div
+                key={index}
+                className="flex items-start justify-between gap-3 p-4 border rounded-xl animate-pulse bg-background"
+              >
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                  <div className="h-4 bg-muted/40 rounded w-2/3"></div>
+                  <div className="h-3 bg-muted/40 rounded w-1/2"></div>
+                  <div className="h-3 bg-muted/40 rounded w-1/3"></div>
                 </div>
-                <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
+                <div className="h-8 w-8 bg-muted/40 rounded-full"></div>
               </div>
             ))}
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -138,17 +147,21 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
         <div className="flex items-center justify-between">
           <div className="flex flex-col space-y-1.5">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+              <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/10 dark:ring-white/5 shadow-sm backdrop-blur">
                 <CheckSquare className="h-4 w-4 text-primary" />
               </span>
               Minhas Tarefas
             </CardTitle>
             <CardDescription className="text-sm text-muted-foreground/80">
-              {activeTasks.length} {activeTasks.length === 1 ? 'tarefa ativa' : 'tarefas ativas'}
+              {activeTasks.length}{" "}
+              {activeTasks.length === 1 ? "tarefa ativa" : "tarefas ativas"}
             </CardDescription>
           </div>
           <Button variant="ghost" size="sm" asChild>
-            <Link to="/tarefas" className="flex items-center gap-2 text-blue-600 hover:text-blue-700">
+            <Link
+              to="/tarefas"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700"
+            >
               Ver todas
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -156,20 +169,20 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
         </div>
         <div className="flex gap-4 border-b border-border/50 pt-3 text-xs font-medium text-muted-foreground">
           {[
-            { key: 'all', label: 'Todas' },
-            { key: 'PENDENTE', label: 'A Fazer' },
-            { key: 'EM_ANDAMENTO', label: 'Em Progresso' },
-            { key: 'CONCLUIDA', label: 'Concluídas' },
+            { key: "all", label: "Todas" },
+            { key: "PENDENTE", label: "A Fazer" },
+            { key: "EM_ANDAMENTO", label: "Em Progresso" },
+            { key: "CONCLUIDA", label: "Concluídas" },
           ].map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key as typeof activeTab)}
               className={cn(
-                'pb-3 transition-colors',
+                "pb-3 transition-colors",
                 activeTab === tab.key
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {tab.label}
@@ -191,12 +204,17 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
           <div className="space-y-3">
             {filteredTasks.slice(0, 5).map((task) => (
               <div
-                key={task.id} 
+                key={task.id}
                 className="flex items-center justify-between gap-4 rounded-xl border border-border/45 bg-background/70 p-4 transition-colors hover:border-border/70 hover:bg-muted/35"
               >
                 <div className="min-w-0 space-y-2">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Badge className={cn('rounded-full px-2 py-0.5 text-[10px] uppercase', getPrioridadeColor(task.prioridade))}>
+                    <Badge
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] uppercase",
+                        getPrioridadeColor(task.prioridade),
+                      )}
+                    >
                       {getPrioridadeLabel(task.prioridade)}
                     </Badge>
                     <span className="flex items-center gap-1">
@@ -225,26 +243,40 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
                         : task.responsavel
                           ? [task.responsavel]
                           : user
-                            ? [{ id: user.id, nome: user.nome, avatar: user.avatar ?? undefined, avatarUrl: user.avatarUrl }]
-                            : []
-                      if (!responsaveis.length) return null
+                            ? [
+                                {
+                                  id: user.id,
+                                  nome: user.nome,
+                                  avatar: user.avatar ?? undefined,
+                                  avatarUrl: user.avatarUrl,
+                                },
+                              ]
+                            : [];
+                      if (!responsaveis.length) return null;
                       const normalized = responsaveis.map((responsavel) => ({
                         ...responsavel,
                         usuario: responsavel.nome,
-                      }))
+                      }));
                       return responsaveis.length > 1 ? (
                         <AvatarGroup usuarios={normalized} size="xs" max={3} />
                       ) : (
                         <span className="flex h-7 w-7 items-center justify-center rounded-full ring-1 ring-border/70">
-                          <Avatar usuario={normalized[0]} size="xs" showTooltip={false} />
+                          <Avatar
+                            usuario={normalized[0]}
+                            size="xs"
+                            showTooltip={false}
+                          />
                         </span>
-                      )
+                      );
                     })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to={`/tarefas/${task.id}`} className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-border">
+                    <Link
+                      to={`/tarefas/${task.id}`}
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 transition-colors hover:border-border"
+                    >
                       <ArrowRight className="h-4 w-4 text-muted-foreground" />
                     </Link>
                   </Button>
@@ -253,11 +285,14 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
             ))}
           </div>
         )}
-        
+
         {filteredTasks.length > 5 && (
           <div className="mt-4 border-t border-border/60 pt-4">
             <Button variant="outline" className="w-full" asChild>
-              <Link to="/tarefas" className="flex items-center justify-center gap-2">
+              <Link
+                to="/tarefas"
+                className="flex items-center justify-center gap-2"
+              >
                 Ver todas as tarefas ({filteredTasks.length})
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -266,7 +301,7 @@ const UserTasks: React.FC<UserTasksProps> = ({ tasks, isLoading = false }) => {
         )}
       </CardContent>
     </Card>
-  )
-}
+  );
+};
 
-export default UserTasks
+export default UserTasks;

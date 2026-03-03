@@ -11,6 +11,7 @@ import {
 import { User } from "../../users/entities/user.entity";
 import { Tarefa } from "../../tarefas/entities/tarefa.entity";
 import { DesarquivamentoTypeOrmEntity } from "../../nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
+import { PushNotificationsService } from "./push-notifications.service";
 
 describe("NotificacoesService", () => {
   let service: NotificacoesService;
@@ -41,6 +42,8 @@ describe("NotificacoesService", () => {
     id: 1,
     userId: 1,
     inAppEnabled: true,
+    desktopEnabled: false,
+    pushEnabled: false,
     soundEnabled: true,
     enabledTypes: {
       solicitacao_pendente: true,
@@ -55,7 +58,6 @@ describe("NotificacoesService", () => {
       pasta_criada: true,
       evento_auditoria: false,
     },
-    canReceiveNotification: jest.fn(),
   };
 
   const mockNotificacaoRepository = {
@@ -82,7 +84,12 @@ describe("NotificacoesService", () => {
   };
 
   const mockPreferencesRepository = {
+    find: jest.fn(),
     findOne: jest.fn(),
+  };
+
+  const mockPushNotificationsService = {
+    sendToUser: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(async () => {
@@ -109,6 +116,10 @@ describe("NotificacoesService", () => {
           provide: getRepositoryToken(NotificationPreferences),
           useValue: mockPreferencesRepository,
         },
+        {
+          provide: PushNotificationsService,
+          useValue: mockPushNotificationsService,
+        },
       ],
     }).compile();
 
@@ -132,42 +143,103 @@ describe("NotificacoesService", () => {
     it("should create a notification when user exists and preferences allow", async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
       mockPreferencesRepository.findOne.mockResolvedValue(mockPreferences);
-      mockPreferences.canReceiveNotification.mockReturnValue(true);
+      mockPreferencesRepository.find.mockResolvedValue([mockPreferences]);
       mockNotificacaoRepository.create.mockReturnValue(mockNotificacao);
       mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
 
       const result = await service.create(createDto);
 
       expect(result).toEqual(mockNotificacao);
-      expect(mockPreferencesRepository.findOne).toHaveBeenCalledWith({
-        where: { userId: 1 },
+      expect(mockPreferencesRepository.find).toHaveBeenCalledWith({
+        where: { userId: expect.anything() },
       });
-      expect(mockPreferences.canReceiveNotification).toHaveBeenCalledWith(
-        TipoNotificacao.SOLICITACAO_PENDENTE,
-        "in_app",
-      );
+      expect(mockPushNotificationsService.sendToUser).not.toHaveBeenCalled();
     });
 
-    it("should return null when user preferences block the notification", async () => {
+    it("should persist the notification even when all channels are disabled", async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockPreferencesRepository.findOne.mockResolvedValue(mockPreferences);
-      mockPreferences.canReceiveNotification.mockReturnValue(false);
+      mockPreferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+        inAppEnabled: false,
+        desktopEnabled: false,
+      });
+      mockPreferencesRepository.find.mockResolvedValue([
+        {
+          ...mockPreferences,
+          inAppEnabled: false,
+          desktopEnabled: false,
+        },
+      ]);
+      mockNotificacaoRepository.create.mockReturnValue(mockNotificacao);
+      mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
 
       const result = await service.create(createDto);
 
-      expect(result).toBeNull();
-      expect(mockNotificacaoRepository.save).not.toHaveBeenCalled();
+      expect(result).toEqual(mockNotificacao);
+      expect(mockNotificacaoRepository.save).toHaveBeenCalled();
+      expect(mockPushNotificationsService.sendToUser).not.toHaveBeenCalled();
     });
 
     it("should create notification when no preferences exist (default allow)", async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
       mockPreferencesRepository.findOne.mockResolvedValue(null);
+      mockPreferencesRepository.find.mockResolvedValue([]);
       mockNotificacaoRepository.create.mockReturnValue(mockNotificacao);
       mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
 
       const result = await service.create(createDto);
 
       expect(result).toEqual(mockNotificacao);
+    });
+
+    it("should create notification when in-app is disabled but push is enabled", async () => {
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockPreferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+        inAppEnabled: false,
+        pushEnabled: true,
+      });
+      mockPreferencesRepository.find.mockResolvedValue([
+        {
+          ...mockPreferences,
+          inAppEnabled: false,
+          pushEnabled: true,
+        },
+      ]);
+      mockNotificacaoRepository.create.mockReturnValue(mockNotificacao);
+      mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
+
+      const result = await service.create(createDto);
+
+      expect(result).toEqual(mockNotificacao);
+      expect(mockPushNotificationsService.sendToUser).toHaveBeenCalledWith(
+        1,
+        mockNotificacao,
+      );
+    });
+
+    it("should not send push when only desktop is enabled", async () => {
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockPreferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+        inAppEnabled: false,
+        desktopEnabled: true,
+        pushEnabled: false,
+      });
+      mockPreferencesRepository.find.mockResolvedValue([
+        {
+          ...mockPreferences,
+          inAppEnabled: false,
+          desktopEnabled: true,
+          pushEnabled: false,
+        },
+      ]);
+      mockNotificacaoRepository.create.mockReturnValue(mockNotificacao);
+      mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
+
+      await service.create(createDto);
+
+      expect(mockPushNotificationsService.sendToUser).not.toHaveBeenCalled();
     });
 
     it("should throw NotFoundException when user does not exist", async () => {
@@ -180,15 +252,24 @@ describe("NotificacoesService", () => {
 
     it("should allow notification when preferences check fails (fail-open)", async () => {
       mockUserRepository.findOne.mockResolvedValue(mockUser);
-      mockPreferencesRepository.findOne.mockRejectedValue(
-        new Error("DB error"),
-      );
+      mockPreferencesRepository.find.mockResolvedValue([]);
       mockNotificacaoRepository.create.mockReturnValue(mockNotificacao);
       mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
 
       const result = await service.create(createDto);
 
       expect(result).toEqual(mockNotificacao);
+    });
+
+    it("should return the existing notification when a duplicate is detected", async () => {
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockPreferencesRepository.find.mockResolvedValue([]);
+      mockNotificacaoRepository.findOne.mockResolvedValue(mockNotificacao);
+
+      const result = await service.create(createDto);
+
+      expect(result).toEqual(mockNotificacao);
+      expect(mockNotificacaoRepository.save).not.toHaveBeenCalled();
     });
   });
 
@@ -343,19 +424,15 @@ describe("NotificacoesService", () => {
   });
 
   describe("notificarMencao", () => {
-    it("should return null when preferences block the notification", async () => {
-      mockPreferencesRepository.findOne.mockResolvedValue(mockPreferences);
-      mockPreferences.canReceiveNotification.mockReturnValue(false);
-
-      const result = await service.notificarMencao(1, 2, 1, "test comment");
-
-      expect(result).toBeNull();
-      expect(mockNotificacaoRepository.save).not.toHaveBeenCalled();
-    });
-
-    it("should create a mention notification when allowed", async () => {
-      mockPreferencesRepository.findOne.mockResolvedValue(mockPreferences);
-      mockPreferences.canReceiveNotification.mockReturnValue(true);
+    it("should create a mention notification even when channels are disabled", async () => {
+      mockPreferencesRepository.find.mockResolvedValue([
+        {
+          ...mockPreferences,
+          inAppEnabled: false,
+          desktopEnabled: false,
+          pushEnabled: false,
+        },
+      ]);
       mockTarefaRepository.findOne.mockResolvedValue({
         id: 1,
         titulo: "Test Task",
@@ -368,6 +445,7 @@ describe("NotificacoesService", () => {
       const result = await service.notificarMencao(1, 2, 1, "test comment");
 
       expect(result).toEqual(mockNotificacao);
+      expect(mockPushNotificationsService.sendToUser).not.toHaveBeenCalled();
     });
   });
 });

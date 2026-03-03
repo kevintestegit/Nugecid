@@ -60,6 +60,8 @@ import {
   CACHE_VERSION_KEYS,
 } from "../../common/constants/cache-version.constants";
 import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
+import { SearchService } from "../search/search.service";
+import { DesarquivamentoEffectsPublisher } from "./application/services/desarquivamento-effects.publisher";
 
 @Injectable()
 export class NugecidService {
@@ -75,6 +77,8 @@ export class NugecidService {
     private readonly userRepository: Repository<User>,
     private readonly nugecidAuditService: NugecidAuditService,
     private readonly notificacoesService: NotificacoesService,
+    private readonly desarquivamentoEffectsPublisher: DesarquivamentoEffectsPublisher,
+    @Optional() private readonly searchService?: SearchService,
     @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     @Optional()
     private readonly runtimeMetricsService?: RuntimeMetricsService,
@@ -139,6 +143,11 @@ export class NugecidService {
     this.logger.log(
       `Desarquivamento criado: ${saved.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
+    this.desarquivamentoEffectsPublisher.publishEntityChange({
+      action: "created",
+      entityId: saved.id,
+      status: saved.status,
+    });
 
     if (!options.manager) {
       await this.bumpPerformanceCacheVersions();
@@ -255,6 +264,7 @@ export class NugecidService {
       startDate,
       endDate,
       vencidos,
+      atencaoNecessaria,
       urgente,
       instituto,
       requerente,
@@ -332,6 +342,19 @@ export class NugecidService {
       );
       queryBuilder.andWhere("desarquivamento.status != :finalizado", {
         finalizado: StatusDesarquivamentoEnum.FINALIZADO,
+      });
+    }
+
+    if (atencaoNecessaria) {
+      const fiveDaysAgo = new Date();
+      fiveDaysAgo.setHours(0, 0, 0, 0);
+      fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
+      queryBuilder.andWhere("desarquivamento.status = :statusSolicitado", {
+        statusSolicitado: StatusDesarquivamentoEnum.SOLICITADO,
+      });
+      queryBuilder.andWhere("desarquivamento.dataSolicitacao <= :fiveDaysAgo", {
+        fiveDaysAgo,
       });
     }
 
@@ -544,6 +567,11 @@ export class NugecidService {
     this.logger.log(
       `Desarquivamento atualizado: ${updated.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
+    this.desarquivamentoEffectsPublisher.publishEntityChange({
+      action: "updated",
+      entityId: updated.id,
+      status: updated.status,
+    });
 
     await this.bumpPerformanceCacheVersions();
 
@@ -591,6 +619,10 @@ export class NugecidService {
     );
 
     await this.bumpPerformanceCacheVersions();
+    this.desarquivamentoEffectsPublisher.publishEntityChange({
+      action: "deleted",
+      entityId: id,
+    });
   }
 
   /**
@@ -706,6 +738,11 @@ export class NugecidService {
     this.logger.log(
       `Desarquivamento restaurado: ${desarquivamento.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
+    this.desarquivamentoEffectsPublisher.publishEntityChange({
+      action: "restored",
+      entityId: id,
+      status: desarquivamento.status,
+    });
 
     await this.bumpPerformanceCacheVersions();
   }
@@ -810,6 +847,7 @@ export class NugecidService {
       startDate: queryDto.startDate ?? null,
       endDate: queryDto.endDate ?? null,
       vencidos: Boolean(queryDto.vencidos),
+      atencaoNecessaria: Boolean(queryDto.atencaoNecessaria),
       urgente:
         queryDto.urgente === undefined ? null : Boolean(queryDto.urgente),
       instituto: queryDto.instituto?.trim() || "",

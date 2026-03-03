@@ -11,6 +11,17 @@ interface NotificacoesState {
   naoLidas: Notificacao[];
   totalNaoLidas: number;
   estatisticas: EstatisticasNotificacoes | null;
+  recentes: Notificacao[];
+  recentesFetchedAt: number | null;
+  historico: Notificacao[];
+  historicoTotal: number;
+  historicoPage: number;
+  historicoLimit: number;
+  historicoTotalPages: number;
+  historicoLoading: boolean;
+  historicoRefreshing: boolean;
+  historicoError: string | null;
+  latestRealtimeNotification: Notificacao | null;
 
   // --- SSE connection ---
   sseConnected: boolean;
@@ -46,6 +57,12 @@ interface NotificacoesState {
     tipo?: string;
     prioridade?: string;
   }) => Promise<NotificacoesResponse>;
+  upsertHistorico: (notificacao: Notificacao) => void;
+  fetchRecentes: (options?: {
+    limit?: number;
+    force?: boolean;
+    maxAgeMs?: number;
+  }) => Promise<Notificacao[]>;
 
   /** Fetch statistics. */
   fetchEstatisticas: () => Promise<void>;
@@ -62,6 +79,17 @@ export const useNotificacoesStore = create<NotificacoesState>((set, get) => ({
   naoLidas: [],
   totalNaoLidas: 0,
   estatisticas: null,
+  recentes: [],
+  recentesFetchedAt: null,
+  historico: [],
+  historicoTotal: 0,
+  historicoPage: 1,
+  historicoLimit: 20,
+  historicoTotalPages: 1,
+  historicoLoading: false,
+  historicoRefreshing: false,
+  historicoError: null,
+  latestRealtimeNotification: null,
   sseConnected: false,
   loading: false,
   error: null,
@@ -79,9 +107,14 @@ export const useNotificacoesStore = create<NotificacoesState>((set, get) => ({
         return state;
       }
       const updated = [notificacao, ...state.naoLidas];
+      const recentes = state.recentes.some((n) => n.id === notificacao.id)
+        ? state.recentes
+        : [notificacao, ...state.recentes].slice(0, 50);
       return {
         naoLidas: updated,
         totalNaoLidas: state.totalNaoLidas + 1,
+        recentes,
+        latestRealtimeNotification: notificacao,
       };
     });
   },
@@ -90,6 +123,12 @@ export const useNotificacoesStore = create<NotificacoesState>((set, get) => ({
     // Optimistic update
     set((state) => ({
       naoLidas: state.naoLidas.filter((n) => n.id !== id),
+      recentes: state.recentes.map((n) =>
+        n.id === id ? { ...n, lida: true } : n,
+      ),
+      historico: state.historico.map((n) =>
+        n.id === id ? { ...n, lida: true } : n,
+      ),
       totalNaoLidas: Math.max(0, state.totalNaoLidas - 1),
       estatisticas: state.estatisticas
         ? {
@@ -114,6 +153,8 @@ export const useNotificacoesStore = create<NotificacoesState>((set, get) => ({
     set((state) => ({
       naoLidas: [],
       totalNaoLidas: 0,
+      recentes: state.recentes.map((n) => ({ ...n, lida: true })),
+      historico: state.historico.map((n) => ({ ...n, lida: true })),
       estatisticas: state.estatisticas
         ? {
             ...state.estatisticas,
@@ -136,6 +177,8 @@ export const useNotificacoesStore = create<NotificacoesState>((set, get) => ({
     // Optimistic
     set((state) => ({
       naoLidas: state.naoLidas.filter((n) => n.id !== id),
+      recentes: state.recentes.filter((n) => n.id !== id),
+      historico: state.historico.filter((n) => n.id !== id),
       totalNaoLidas: wasUnread
         ? Math.max(0, state.totalNaoLidas - 1)
         : state.totalNaoLidas,
@@ -172,8 +215,74 @@ export const useNotificacoesStore = create<NotificacoesState>((set, get) => ({
   },
 
   fetchNotificacoes: async (params) => {
-    const response = await notificacoesService.buscarNotificacoes(params);
-    return response;
+    const state = get();
+    const shouldKeepContentVisible = state.historico.length > 0;
+
+    set({
+      historicoLoading: !shouldKeepContentVisible,
+      historicoRefreshing: shouldKeepContentVisible,
+      historicoError: null,
+    });
+
+    try {
+      const response = await notificacoesService.buscarNotificacoes(params);
+      set({
+        historico: Array.isArray(response.data) ? response.data : [],
+        historicoTotal: response.total,
+        historicoPage: response.page,
+        historicoLimit: response.limit,
+        historicoTotalPages: response.totalPages,
+        historicoLoading: false,
+        historicoRefreshing: false,
+        historicoError: null,
+      });
+      return response;
+    } catch (error) {
+      set({
+        historicoLoading: false,
+        historicoRefreshing: false,
+        historicoError: "Erro ao carregar notificações",
+      });
+      throw error;
+    }
+  },
+
+  upsertHistorico: (notificacao) => {
+    set((state) => {
+      if (state.historico.some((item) => item.id === notificacao.id)) {
+        return {
+          historico: state.historico.map((item) =>
+            item.id === notificacao.id ? notificacao : item,
+          ),
+        };
+      }
+
+      return {
+        historico: [notificacao, ...state.historico],
+        historicoTotal: state.historicoTotal + 1,
+      };
+    });
+  },
+
+  fetchRecentes: async (options) => {
+    const limit = options?.limit ?? 50;
+    const maxAgeMs = options?.maxAgeMs ?? 60000;
+    const now = Date.now();
+    const state = get();
+
+    if (
+      !options?.force &&
+      state.recentes.length > 0 &&
+      state.recentesFetchedAt &&
+      now - state.recentesFetchedAt < maxAgeMs
+    ) {
+      return state.recentes;
+    }
+
+    const response = await notificacoesService.buscarNotificacoes({ limit });
+    const recentes = Array.isArray(response.data) ? response.data : [];
+    set({ recentes, recentesFetchedAt: now });
+    return recentes;
   },
 
   fetchEstatisticas: async () => {

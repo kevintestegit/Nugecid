@@ -1,20 +1,20 @@
-import * as React from "react"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
-import { Calendar as CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/Button"
-import { Calendar } from "@/components/ui/Calendar"
+import * as React from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { Calendar } from "@/components/ui/Calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/Popover"
+} from "@/components/ui/Popover";
 
 interface DatePickerProps {
-  date?: Date
-  setDate: (date?: Date) => void
-  disabled?: boolean
+  date?: Date;
+  setDate: (date?: Date) => void;
+  disabled?: boolean;
 }
 
 export function DatePicker({ date, setDate, disabled }: DatePickerProps) {
@@ -27,11 +27,15 @@ export function DatePicker({ date, setDate, disabled }: DatePickerProps) {
           className={cn(
             "w-full justify-start text-left font-normal",
             !date && "text-muted-foreground",
-            disabled && "cursor-not-allowed opacity-50"
+            disabled && "cursor-not-allowed opacity-50",
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+          {date ? (
+            format(date, "PPP", { locale: ptBR })
+          ) : (
+            <span>Selecione uma data</span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
@@ -44,5 +48,5 @@ export function DatePicker({ date, setDate, disabled }: DatePickerProps) {
         />
       </PopoverContent>
     </Popover>
-  )
+  );
 }

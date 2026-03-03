@@ -8,9 +8,15 @@ const MIN_GLOBAL_SYNC_GAP_MS = 5000;
 
 const DASHBOARD_QUERY_KEY = ["dashboardStats"] as const;
 const DESARQUIVAMENTOS_QUERY_KEY = ["desarquivamentos"] as const;
-const DESARQUIVAMENTOS_LIXEIRA_QUERY_KEY = ["desarquivamentos-lixeira"] as const;
-const DESARQUIVAMENTO_COMMENTS_QUERY_KEY = ["desarquivamento-comments"] as const;
-const DESARQUIVAMENTO_HISTORICO_QUERY_KEY = ["desarquivamento-historico"] as const;
+const DESARQUIVAMENTOS_LIXEIRA_QUERY_KEY = [
+  "desarquivamentos-lixeira",
+] as const;
+const DESARQUIVAMENTO_COMMENTS_QUERY_KEY = [
+  "desarquivamento-comments",
+] as const;
+const DESARQUIVAMENTO_HISTORICO_QUERY_KEY = [
+  "desarquivamento-historico",
+] as const;
 const USER_TASKS_QUERY_KEY = ["userTasks"] as const;
 const TAREFAS_QUERY_KEY = ["tarefas"] as const;
 const PROJETOS_QUERY_KEY = ["projetos"] as const;
@@ -21,6 +27,11 @@ const PLANILHAS_QUERY_KEY = ["planilhas-controle"] as const;
 const PLANILHAS_GERAL_QUERY_KEY = ["planilhas-controle", "geral"] as const;
 const USERS_QUERY_KEY = ["users"] as const;
 const GLOBAL_SEARCH_QUERY_KEY = ["global-search"] as const;
+const CORE_SYNC_QUERY_KEYS = [
+  DASHBOARD_QUERY_KEY,
+  USER_TASKS_QUERY_KEY,
+  ONLINE_USERS_QUERY_KEY,
+] as const;
 
 interface RealtimeNotificationEventDetail {
   notificacao?: Notificacao;
@@ -82,7 +93,9 @@ const mapNotificationToQueryKeys = (notificacao: Notificacao): QueryKey[] => {
   return keys;
 };
 
-const mapDomainEventToQueryKeys = (event: DomainSyncEventDetail): QueryKey[] => {
+const mapDomainEventToQueryKeys = (
+  event: DomainSyncEventDetail,
+): QueryKey[] => {
   const keys: QueryKey[] = [DASHBOARD_QUERY_KEY];
   const scope = normalizeScope(event.scope);
 
@@ -147,7 +160,10 @@ export const useRealtimeSync = () => {
   const refetchActiveQueries = useCallback(
     (force = false) => {
       const now = Date.now();
-      if (!force && now - lastGlobalSyncAtRef.current < MIN_GLOBAL_SYNC_GAP_MS) {
+      if (
+        !force &&
+        now - lastGlobalSyncAtRef.current < MIN_GLOBAL_SYNC_GAP_MS
+      ) {
         return;
       }
       if (typeof document !== "undefined" && document.hidden) {
@@ -162,9 +178,11 @@ export const useRealtimeSync = () => {
       }
 
       lastGlobalSyncAtRef.current = now;
-      queryClient.refetchQueries({ type: "active" });
+      CORE_SYNC_QUERY_KEYS.forEach((queryKey) => {
+        invalidateAndRefetch(queryKey);
+      });
     },
-    [queryClient],
+    [invalidateAndRefetch],
   );
 
   useEffect(() => {

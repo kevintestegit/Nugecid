@@ -15,6 +15,7 @@ import {
   HttpCode,
   Res,
   Query,
+  BadRequestException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -31,6 +32,14 @@ import { Response } from "express";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { NugecidAnexosService } from "../nugecid-anexos.service";
 import { DesarquivamentoAnexoTypeOrmEntity } from "../infrastructure/entities/desarquivamento-anexo.typeorm-entity";
+
+function pipeArquivo(
+  res: Response,
+  arquivo: { stream: NodeJS.ReadableStream; size: number },
+): void {
+  res.setHeader("Content-Length", arquivo.size.toString());
+  arquivo.stream.pipe(res);
+}
 
 @ApiTags("Anexos de Desarquivamentos")
 @Controller("nugecid/:desarquivamentoId/anexos")
@@ -137,6 +146,25 @@ export class AnexosController {
     };
   }
 
+  @Get(":id/ocr")
+  @ApiOperation({
+    summary:
+      "Obter análise OCR de um anexo com detecção heurística de assinaturas",
+  })
+  async getAnexoOcrAnalysis(
+    @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
+    @Param("id", ParseIntPipe) id: number,
+  ): Promise<{ success: boolean; data: any }> {
+    const data = await this.anexosService.getAnexoOcrAnalysisByDesarquivamento(
+      id,
+      desarquivamentoId,
+    );
+    return {
+      success: true,
+      data,
+    };
+  }
+
   @Patch(":id")
   @ApiOperation({ summary: "Atualizar descrição de um anexo" })
   @ApiBody({
@@ -172,11 +200,13 @@ export class AnexosController {
     @Body("descricao") descricao: string,
     @Request() req: any,
   ): Promise<{ success: boolean; data: any }> {
-    const anexo = await this.anexosService.updateAnexoDescricao(
-      id,
-      descricao,
-      req.user,
-    );
+    const anexo =
+      await this.anexosService.updateAnexoDescricaoByDesarquivamento(
+        id,
+        desarquivamentoId,
+        descricao,
+        req.user,
+      );
     return {
       success: true,
       data: anexo,
@@ -196,20 +226,20 @@ export class AnexosController {
   async downloadAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
-    @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { caminhoArquivo, anexo } =
-      await this.anexosService.downloadAnexo(id);
+    const { arquivo, anexo } =
+      await this.anexosService.streamAnexoByDesarquivamento(
+        id,
+        desarquivamentoId,
+      );
 
-    res.setHeader("Content-Type", anexo.tipoMime);
+    res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${anexo.nomeOriginal}"`,
     );
-    res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
-
-    res.sendFile(caminhoArquivo);
+    pipeArquivo(res, arquivo);
   }
 
   @Get(":id/view")
@@ -229,11 +259,13 @@ export class AnexosController {
   async viewAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
-    @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { caminhoArquivo, anexo } =
-      await this.anexosService.downloadAnexo(id);
+    const { arquivo, anexo } =
+      await this.anexosService.streamAnexoByDesarquivamento(
+        id,
+        desarquivamentoId,
+      );
 
     // Verificar se é um tipo suportado para visualização inline
     if (!anexo.canPreview()) {
@@ -244,11 +276,10 @@ export class AnexosController {
       return;
     }
 
-    res.setHeader("Content-Type", anexo.tipoMime);
-    res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
+    res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
     // Para visualização inline, não usar Content-Disposition attachment
 
-    res.sendFile(caminhoArquivo);
+    pipeArquivo(res, arquivo);
   }
 
   @Delete(":id")
@@ -271,7 +302,11 @@ export class AnexosController {
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
     @Request() req: any,
   ): Promise<void> {
-    return this.anexosService.deleteAnexo(id, req.user);
+    return this.anexosService.deleteAnexoByDesarquivamento(
+      id,
+      desarquivamentoId,
+      req.user,
+    );
   }
 }
 
@@ -309,6 +344,25 @@ export class AnexosProcessoController {
     };
   }
 
+  @Get(":id/ocr")
+  @ApiOperation({
+    summary:
+      "Obter análise OCR de um anexo do processo com detecção heurística de assinaturas",
+  })
+  async getAnexoOcrAnalysis(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("numeroProcesso") numeroProcesso: string,
+  ): Promise<{ success: boolean; data: any }> {
+    const data = await this.anexosService.getAnexoOcrAnalysisByProcesso(
+      id,
+      numeroProcesso,
+    );
+    return {
+      success: true,
+      data,
+    };
+  }
+
   @Get(":id/download")
   @ApiOperation({ summary: "Fazer download de um anexo do processo" })
   @ApiResponse({
@@ -325,17 +379,17 @@ export class AnexosProcessoController {
     @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { caminhoArquivo, anexo } =
-      await this.anexosService.downloadAnexo(id);
+    const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
+      id,
+      numeroProcesso,
+    );
 
-    res.setHeader("Content-Type", anexo.tipoMime);
+    res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${anexo.nomeOriginal}"`,
     );
-    res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
-
-    res.sendFile(caminhoArquivo);
+    pipeArquivo(res, arquivo);
   }
 
   @Get(":id/view")
@@ -360,8 +414,10 @@ export class AnexosProcessoController {
     @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { caminhoArquivo, anexo } =
-      await this.anexosService.downloadAnexo(id);
+    const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
+      id,
+      numeroProcesso,
+    );
 
     if (!anexo.canPreview()) {
       res.status(HttpStatus.BAD_REQUEST).json({
@@ -371,9 +427,109 @@ export class AnexosProcessoController {
       return;
     }
 
-    res.setHeader("Content-Type", anexo.tipoMime);
-    res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
+    res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
+    pipeArquivo(res, arquivo);
+  }
+}
 
-    res.sendFile(caminhoArquivo);
+@ApiTags("Anexos de Processo")
+@Controller("nugecid/processo/anexos")
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+export class AnexosProcessoQueryController {
+  constructor(private readonly anexosService: NugecidAnexosService) {}
+
+  private getNumeroProcesso(numeroProcesso?: string): string {
+    const normalized = numeroProcesso?.trim();
+    if (!normalized) {
+      throw new BadRequestException("numeroProcesso é obrigatório");
+    }
+
+    return normalized;
+  }
+
+  @Get()
+  @ApiOperation({ summary: "Listar anexos de um processo via query string" })
+  async findAnexosByProcesso(
+    @Query("numeroProcesso") numeroProcesso?: string,
+    @Query("tipo") tipo?: "desarquivamento" | "rearquivamento",
+  ): Promise<{ success: boolean; data: any[] }> {
+    const anexos = await this.anexosService.findAnexosByProcesso(
+      this.getNumeroProcesso(numeroProcesso),
+      tipo,
+    );
+
+    return {
+      success: true,
+      data: anexos,
+    };
+  }
+
+  @Get(":id/ocr")
+  @ApiOperation({
+    summary:
+      "Obter análise OCR de um anexo do processo via query string com heurística de assinaturas",
+  })
+  async getAnexoOcrAnalysis(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("numeroProcesso") numeroProcesso?: string,
+  ): Promise<{ success: boolean; data: any }> {
+    const data = await this.anexosService.getAnexoOcrAnalysisByProcesso(
+      id,
+      this.getNumeroProcesso(numeroProcesso),
+    );
+
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Get(":id/download")
+  @ApiOperation({
+    summary: "Fazer download de um anexo do processo via query string",
+  })
+  async downloadAnexo(
+    @Param("id", ParseIntPipe) id: number,
+    @Res() res: Response,
+    @Query("numeroProcesso") numeroProcesso?: string,
+  ): Promise<void> {
+    const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
+      id,
+      this.getNumeroProcesso(numeroProcesso),
+    );
+
+    res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${anexo.nomeOriginal}"`,
+    );
+    pipeArquivo(res, arquivo);
+  }
+
+  @Get(":id/view")
+  @ApiOperation({
+    summary: "Visualizar um anexo do processo via query string",
+  })
+  async viewAnexo(
+    @Param("id", ParseIntPipe) id: number,
+    @Res() res: Response,
+    @Query("numeroProcesso") numeroProcesso?: string,
+  ): Promise<void> {
+    const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
+      id,
+      this.getNumeroProcesso(numeroProcesso),
+    );
+
+    if (!anexo.canPreview()) {
+      res.status(HttpStatus.BAD_REQUEST).json({
+        message:
+          "Este tipo de arquivo não pode ser visualizado inline. Use o download.",
+      });
+      return;
+    }
+
+    res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
+    pipeArquivo(res, arquivo);
   }
 }

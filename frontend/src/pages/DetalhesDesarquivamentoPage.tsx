@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, Navigate } from "react-router-dom";
 import {
   useDesarquivamento,
   useDownloadTermoPdf,
@@ -221,6 +221,15 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     fallbackCopy();
   };
 
+  const buildProcessoAnexoUrl = (
+    numeroProcesso: string,
+    anexoId: number,
+    action: "download" | "view",
+  ) =>
+    `/api/nugecid/processo/${encodeURIComponent(
+      numeroProcesso,
+    )}/anexos/${anexoId}/${action}`;
+
   const handleDownloadTermo = (format: "pdf" | "docx") => {
     if (!id || isNaN(Number(id))) {
       toast.error("Identificador invalido para o termo.");
@@ -287,9 +296,8 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         });
       } else if (anexo.numeroProcesso) {
         // Anexo de processo
-        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso);
         const response = await fetch(
-          `/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/download`,
+          buildProcessoAnexoUrl(anexo.numeroProcesso, anexoId, "download"),
           {
             credentials: "include",
           },
@@ -343,9 +351,8 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         });
       } else if (anexo.numeroProcesso) {
         // Anexo de processo
-        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso);
         const response = await fetch(
-          `/api/nugecid/processo/${encodedProcesso}/anexos/${anexo.id}/view`,
+          buildProcessoAnexoUrl(anexo.numeroProcesso, anexo.id, "view"),
           {
             credentials: "include",
           },
@@ -533,26 +540,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   }
 
   if (!isIdValid) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="mb-2 text-lg font-semibold text-foreground">
-            ID Inválido
-          </h3>
-          <p className="mb-4 text-muted-foreground">
-            O ID fornecido na URL é inválido.
-          </p>
-          <Button
-            onClick={() => navigate("/desarquivamentos")}
-            variant="outline"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para lista
-          </Button>
-        </div>
-      </div>
-    );
+    return <Navigate to="/404" replace />;
   }
 
   if (error || !desarquivamento) {
@@ -644,6 +632,22 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                     <Edit className="h-4 w-4 mr-2" />
                     Editar
                   </Link>
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    navigate(`/desarquivamentos/${id}/termo/visualizar`)
+                  }
+                  title={
+                    !canGerarTermo
+                      ? "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
+                      : undefined
+                  }
+                  disabled={!canGerarTermo}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Visualizar termo
                 </Button>
                 <Button
                   variant="outline"

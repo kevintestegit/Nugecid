@@ -11,6 +11,7 @@ import {
   BeforeInsert,
   BeforeUpdate,
 } from "typeorm";
+import { Exclude } from "class-transformer";
 import * as bcrypt from "bcryptjs";
 
 import { Role } from "./role.entity";
@@ -30,6 +31,7 @@ export class User {
   @Column({ name: "matricula", length: 50, nullable: true })
   matricula?: string | null;
 
+  @Exclude()
   @Column({ length: 255, nullable: false })
   senha: string;
 

@@ -3,14 +3,12 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { randomUUID } from "crypto";
 import { basename, extname, join, resolve, sep } from "path";
-import * as fs from "fs/promises";
-import { existsSync } from "fs";
-import * as XLSX from "xlsx";
 import { PlanilhaControle } from "./entities/planilha-controle.entity";
 import {
   PastasService,
@@ -19,8 +17,15 @@ import {
 } from "../pastas/pastas.service";
 import { FileValidator } from "../../common/utils/file-validator";
 import { SyncRealtimeService } from "../sync/sync-realtime.service";
+import { AntivirusService } from "../security/antivirus.service";
+import {
+  inferContentTypeFromFilename,
+  StorageService,
+} from "../storage/storage.service";
+import { SearchService } from "../search/search.service";
+import { readSpreadsheetMatrix } from "../../common/utils/spreadsheet.util";
 
-const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".csv"]);
 const ALLOWED_SPREADSHEET_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
@@ -66,7 +71,12 @@ export interface PlanilhaGeralResumo {
 @Injectable()
 export class PlanilhasService {
   private readonly logger = new Logger(PlanilhasService.name);
-  private readonly uploadDir = join(process.cwd(), "uploads", "planilhas");
+  private readonly legacyUploadDir = join(
+    process.cwd(),
+    "uploads",
+    "planilhas",
+  );
+  private readonly storagePrefix = "planilhas";
   private schemaReady: Promise<void> | null = null;
 
   constructor(
@@ -75,6 +85,9 @@ export class PlanilhasService {
     private readonly dataSource: DataSource,
     private readonly pastasService: PastasService,
     private readonly syncRealtimeService: SyncRealtimeService,
+    private readonly antivirusService: AntivirusService,
+    private readonly storageService: StorageService,
+    @Optional() private readonly searchService?: SearchService,
   ) {}
 
   private async ensureSchema(): Promise<void> {
@@ -115,18 +128,23 @@ export class PlanilhasService {
     }
 
     await this.validateUploadedSpreadsheet(file);
+    await this.antivirusService.scanBuffer(file.buffer, {
+      fileName: file.originalname,
+      source: "planilhas.upload",
+    });
     await this.ensureSchema();
-    await fs.mkdir(this.uploadDir, { recursive: true });
 
     const safeOriginalName = this.sanitizeOriginalFilename(file.originalname);
     const filename = this.buildStoredFilename(safeOriginalName);
-    const destino = this.resolveUploadPath(filename);
+    const storageKey = this.buildStorageKey(filename);
 
-    await fs.writeFile(destino, file.buffer);
+    await this.storageService.putObject(storageKey, file.buffer, {
+      contentType: inferContentTypeFromFilename(safeOriginalName),
+    });
 
     const planilha = this.planilhasRepository.create({
       nomeOriginal: safeOriginalName,
-      caminho: filename,
+      caminho: storageKey,
       tamanhoBytes: file.size.toString(),
     });
 
@@ -149,6 +167,7 @@ export class PlanilhasService {
       entityType: "dashboard",
       metadata: { section: "planilhas" },
     });
+    this.searchService?.requestSyncPlanilha(planilha.id);
 
     return this.mapToResponse(planilha);
   }
@@ -190,15 +209,17 @@ export class PlanilhasService {
     }
 
     await this.planilhasRepository.delete(planilha.id);
-
-    const caminhoAbsoluto = this.resolveUploadPath(planilha.caminho);
-    if (existsSync(caminhoAbsoluto)) {
-      await fs.unlink(caminhoAbsoluto).catch((err) => {
+    await this.storageService
+      .deleteObject(this.normalizeStoredPath(planilha.caminho), {
+        legacyAbsolutePath: this.resolveLegacyUploadPath(planilha.caminho),
+      })
+      .catch((error: unknown) => {
         this.logger.warn(
-          `Nao foi possivel remover o arquivo fisico da planilha ${id}: ${err.message}`,
+          `Nao foi possivel remover o arquivo persistido da planilha ${id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
         );
       });
-    }
 
     this.syncRealtimeService.emitDomainChange({
       scope: "planilhas",
@@ -213,11 +234,17 @@ export class PlanilhasService {
       entityType: "dashboard",
       metadata: { section: "planilhas" },
     });
+    this.searchService?.requestRemovePlanilha(planilha.id);
   }
 
-  async obterArquivo(
-    id: string,
-  ): Promise<{ registro: PlanilhaControle; caminhoAbsoluto: string }> {
+  async obterArquivo(id: string): Promise<{
+    registro: PlanilhaControle;
+    arquivo: {
+      buffer: Buffer;
+      size: number;
+      contentType?: string;
+    };
+  }> {
     await this.ensureSchema();
     const registro = await this.planilhasRepository.findOne({
       where: { id },
@@ -227,14 +254,15 @@ export class PlanilhasService {
       throw new NotFoundException("Planilha nao encontrada.");
     }
 
-    const caminhoAbsoluto = this.resolveUploadPath(registro.caminho);
-    if (!existsSync(caminhoAbsoluto)) {
-      throw new NotFoundException(
-        "Arquivo fisico da planilha nao foi localizado.",
-      );
-    }
+    const arquivo = await this.storageService.getObject(
+      this.normalizeStoredPath(registro.caminho),
+      {
+        legacyAbsolutePath: this.resolveLegacyUploadPath(registro.caminho),
+        contentType: inferContentTypeFromFilename(registro.nomeOriginal),
+      },
+    );
 
-    return { registro, caminhoAbsoluto };
+    return { registro, arquivo };
   }
 
   async obterPlanilhaGeral(): Promise<PlanilhaGeralResumo> {
@@ -404,37 +432,29 @@ export class PlanilhasService {
       return null;
     }
 
-    const caminhoAbsoluto = this.resolveUploadPath(registro.caminho);
-    if (!existsSync(caminhoAbsoluto)) {
-      this.logger.warn(
-        `Arquivo da planilha de controle nao encontrado: ${caminhoAbsoluto}`,
-      );
+    const buffer = await this.storageService
+      .getObject(this.normalizeStoredPath(registro.caminho), {
+        legacyAbsolutePath: this.resolveLegacyUploadPath(registro.caminho),
+        contentType: inferContentTypeFromFilename(registro.nomeOriginal),
+      })
+      .then((arquivo) => arquivo.buffer)
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Arquivo da planilha de controle nao encontrado: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return null;
+      });
+
+    if (!buffer) {
       return null;
     }
 
-    const buffer = await fs.readFile(caminhoAbsoluto);
-    const workbook = XLSX.read(buffer, {
-      type: "buffer",
-      cellDates: false,
-    });
-
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) {
-      return null;
-    }
-
-    const worksheet = workbook.Sheets[sheetName];
-    if (!worksheet) {
-      return null;
-    }
-
-    const rawRows = XLSX.utils.sheet_to_json(worksheet, {
-      header: 1,
-      defval: "",
-      blankrows: false,
-      raw: false,
-    }) as any[][];
-
+    const { sheetName, rows: rawRows } = await readSpreadsheetMatrix(
+      buffer,
+      registro.nomeOriginal,
+    );
     if (!rawRows.length) {
       return null;
     }
@@ -670,7 +690,7 @@ export class PlanilhasService {
     const extension = extname(file.originalname || "").toLowerCase();
     if (!ALLOWED_SPREADSHEET_EXTENSIONS.has(extension)) {
       throw new BadRequestException(
-        "Formato de planilha inválido. Use .xlsx, .xls ou .csv.",
+        "Formato de planilha inválido. Use .xlsx ou .csv.",
       );
     }
 
@@ -724,15 +744,33 @@ export class PlanilhasService {
     return `${Date.now()}-${randomUUID()}${extension}`;
   }
 
-  private resolveUploadPath(relativePath: string): string {
-    const uploadRoot = resolve(this.uploadDir);
-    const normalizedRelativePath = relativePath
+  private buildStorageKey(fileName: string): string {
+    return `${this.storagePrefix}/${fileName}`;
+  }
+
+  private normalizeStoredPath(storedPath: string): string {
+    const normalizedRelativePath = storedPath
       .replace(/\\/g, "/")
       .replace(/^\/+/, "");
     if (!normalizedRelativePath) {
       throw new BadRequestException("Caminho de planilha inválido.");
     }
-    const absolutePath = resolve(uploadRoot, normalizedRelativePath);
+    return normalizedRelativePath.includes("/")
+      ? normalizedRelativePath
+      : this.buildStorageKey(normalizedRelativePath);
+  }
+
+  private resolveLegacyUploadPath(storedPath: string): string {
+    const normalizedRelativePath = storedPath
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    const legacyRelativePath = normalizedRelativePath.startsWith(
+      `${this.storagePrefix}/`,
+    )
+      ? normalizedRelativePath.slice(`${this.storagePrefix}/`.length)
+      : normalizedRelativePath;
+    const uploadRoot = resolve(this.legacyUploadDir);
+    const absolutePath = resolve(uploadRoot, legacyRelativePath);
 
     if (
       absolutePath !== uploadRoot &&

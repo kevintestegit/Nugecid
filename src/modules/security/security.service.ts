@@ -170,7 +170,10 @@ export class SecurityService {
   }
 
   /**
-   * Obtém estatísticas de acesso por IP (com usuários associados)
+   * Obtém estatísticas de acesso por IP.
+   *
+   * PERFORMANCE: uses SQL GROUP BY to aggregate at the database level instead
+   * of loading all audit rows into application memory.
    */
   async getIpAccessStats(
     days: number = 7,
@@ -179,15 +182,37 @@ export class SecurityService {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    // Busca todos os acessos desde a data especificada COM relação de usuário
-    const audits = await this.auditoriaRepository.find({
-      where: {
-        action: AuditAction.LOGIN,
-        timestamp: MoreThan(since),
-      },
-      relations: ["user"],
-      order: { timestamp: "DESC" },
-    });
+    // Aggregate IP-level stats in the database
+    const ipAggregates: Array<{
+      ip_address: string;
+      total_attempts: string;
+      successful_logins: string;
+      failed_logins: string;
+      last_attempt: string;
+      first_attempt: string;
+    }> = await this.auditoriaRepository
+      .createQueryBuilder("a")
+      .select("a.ipAddress", "ip_address")
+      .addSelect("COUNT(*)", "total_attempts")
+      .addSelect(
+        "SUM(CASE WHEN a.success = true THEN 1 ELSE 0 END)",
+        "successful_logins",
+      )
+      .addSelect(
+        "SUM(CASE WHEN a.success = false THEN 1 ELSE 0 END)",
+        "failed_logins",
+      )
+      .addSelect("MAX(a.timestamp)", "last_attempt")
+      .addSelect("MIN(a.timestamp)", "first_attempt")
+      .where("a.action = :action", { action: AuditAction.LOGIN })
+      .andWhere("a.timestamp > :since", { since })
+      .andWhere("a.ipAddress IS NOT NULL")
+      .groupBy("a.ipAddress")
+      .orderBy("total_attempts", "DESC")
+      .limit(limit)
+      .getRawMany();
+
+    if (ipAggregates.length === 0) return [];
 
     // Busca IPs bloqueados
     const blockedIps = await this.listBlockedIps(false);
@@ -195,104 +220,100 @@ export class SecurityService {
       blockedIps.map((b) => [b.ipAddress, b.reason || "Não especificado"]),
     );
 
-    // Agrupa por IP
-    const ipMap = new Map<string, IpAccessStats>();
-    // Mapa auxiliar para rastrear usuários por IP
-    const ipUsersMap = new Map<string, Map<number, IpUserInfo>>();
+    // Fetch user-level details only for the top IPs (bounded query)
+    const topIpAddresses = ipAggregates.map((r) => r.ip_address);
+    const userDetails = await this.auditoriaRepository
+      .createQueryBuilder("a")
+      .innerJoin("a.user", "u")
+      .select("a.ipAddress", "ip_address")
+      .addSelect("a.userId", "user_id")
+      .addSelect("u.usuario", "usuario")
+      .addSelect("u.nome", "nome")
+      .addSelect(
+        "SUM(CASE WHEN a.success = true THEN 1 ELSE 0 END)",
+        "successful_logins",
+      )
+      .addSelect(
+        "SUM(CASE WHEN a.success = false THEN 1 ELSE 0 END)",
+        "failed_logins",
+      )
+      .addSelect("MAX(a.timestamp)", "last_attempt")
+      .where("a.action = :action", { action: AuditAction.LOGIN })
+      .andWhere("a.timestamp > :since", { since })
+      .andWhere("a.ipAddress IN (:...ips)", { ips: topIpAddresses })
+      .andWhere("a.userId IS NOT NULL")
+      .groupBy("a.ipAddress")
+      .addGroupBy("a.userId")
+      .addGroupBy("u.usuario")
+      .addGroupBy("u.nome")
+      .getRawMany();
 
-    for (const audit of audits) {
-      if (!audit.ipAddress) continue;
-
-      if (!ipMap.has(audit.ipAddress)) {
-        ipMap.set(audit.ipAddress, {
-          ipAddress: audit.ipAddress,
-          totalAttempts: 0,
-          successfulLogins: 0,
-          failedLogins: 0,
-          lastAttempt: audit.timestamp,
-          firstAttempt: audit.timestamp,
-          userAgents: [],
-          users: [],
-          isBlocked: blockedIpsMap.has(audit.ipAddress),
-          blockedReason: blockedIpsMap.get(audit.ipAddress),
-        });
-        ipUsersMap.set(audit.ipAddress, new Map<number, IpUserInfo>());
-      }
-
-      const stats = ipMap.get(audit.ipAddress)!;
-      stats.totalAttempts++;
-
-      if (audit.success) {
-        stats.successfulLogins++;
-      } else {
-        stats.failedLogins++;
-      }
-
-      if (audit.timestamp > stats.lastAttempt) {
-        stats.lastAttempt = audit.timestamp;
-      }
-
-      if (audit.timestamp < stats.firstAttempt) {
-        stats.firstAttempt = audit.timestamp;
-      }
-
-      if (audit.userAgent && !stats.userAgents.includes(audit.userAgent)) {
-        stats.userAgents.push(audit.userAgent);
-      }
-
-      // Agrupa info do usuário
-      if (audit.userId && audit.user) {
-        const usersMap = ipUsersMap.get(audit.ipAddress)!;
-        if (!usersMap.has(audit.userId)) {
-          usersMap.set(audit.userId, {
-            id: audit.userId,
-            usuario: audit.user.usuario,
-            nome: audit.user.nome,
-            successfulLogins: 0,
-            failedLogins: 0,
-            lastAttempt: audit.timestamp,
-          });
-        }
-
-        const userInfo = usersMap.get(audit.userId)!;
-        if (audit.success) {
-          userInfo.successfulLogins++;
-        } else {
-          userInfo.failedLogins++;
-        }
-        if (audit.timestamp > userInfo.lastAttempt) {
-          userInfo.lastAttempt = audit.timestamp;
-        }
-      }
+    // Build user map per IP
+    const ipUsersMap = new Map<string, IpUserInfo[]>();
+    for (const row of userDetails) {
+      const users = ipUsersMap.get(row.ip_address) ?? [];
+      users.push({
+        id: parseInt(row.user_id, 10),
+        usuario: row.usuario,
+        nome: row.nome,
+        successfulLogins: parseInt(row.successful_logins, 10) || 0,
+        failedLogins: parseInt(row.failed_logins, 10) || 0,
+        lastAttempt: new Date(row.last_attempt),
+      });
+      ipUsersMap.set(row.ip_address, users);
     }
 
-    // Monta o array de usuários em cada IP stat
-    for (const [ip, usersMap] of ipUsersMap.entries()) {
-      const stats = ipMap.get(ip)!;
-      stats.users = Array.from(usersMap.values()).sort(
+    // Fetch distinct user agents per IP (lightweight query)
+    const userAgentRows: Array<{ ip_address: string; user_agent: string }> =
+      await this.auditoriaRepository
+        .createQueryBuilder("a")
+        .select("DISTINCT a.ipAddress", "ip_address")
+        .addSelect("a.userAgent", "user_agent")
+        .where("a.action = :action", { action: AuditAction.LOGIN })
+        .andWhere("a.timestamp > :since", { since })
+        .andWhere("a.ipAddress IN (:...ips)", { ips: topIpAddresses })
+        .andWhere("a.userAgent IS NOT NULL")
+        .getRawMany();
+
+    const ipAgentsMap = new Map<string, string[]>();
+    for (const row of userAgentRows) {
+      const agents = ipAgentsMap.get(row.ip_address) ?? [];
+      if (!agents.includes(row.user_agent)) {
+        agents.push(row.user_agent);
+      }
+      ipAgentsMap.set(row.ip_address, agents);
+    }
+
+    // Assemble results
+    return ipAggregates.map((row) => ({
+      ipAddress: row.ip_address,
+      totalAttempts: parseInt(row.total_attempts, 10) || 0,
+      successfulLogins: parseInt(row.successful_logins, 10) || 0,
+      failedLogins: parseInt(row.failed_logins, 10) || 0,
+      lastAttempt: new Date(row.last_attempt),
+      firstAttempt: new Date(row.first_attempt),
+      userAgents: ipAgentsMap.get(row.ip_address) ?? [],
+      users: (ipUsersMap.get(row.ip_address) ?? []).sort(
         (a, b) => b.lastAttempt.getTime() - a.lastAttempt.getTime(),
-      );
-    }
-
-    // Converte para array e ordena por total de tentativas
-    const result = Array.from(ipMap.values())
-      .sort((a, b) => b.totalAttempts - a.totalAttempts)
-      .slice(0, limit);
-
-    return result;
+      ),
+      isBlocked: blockedIpsMap.has(row.ip_address),
+      blockedReason: blockedIpsMap.get(row.ip_address),
+    }));
   }
 
   /**
-   * Obtém detalhes de acessos de um IP específico
+   * Obtém detalhes de acessos de um IP específico (com paginação).
    */
   async getIpAccessDetails(
     ipAddress: string,
     days: number = 30,
-  ): Promise<Auditoria[]> {
+    skip: number = 0,
+    take: number = 100,
+  ): Promise<{ data: Auditoria[]; total: number }> {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    return this.auditoriaRepository.find({
+    const [data, total] = await this.auditoriaRepository.findAndCount({
       where: {
         ipAddress,
         action: AuditAction.LOGIN,
@@ -300,7 +321,11 @@ export class SecurityService {
       },
       relations: ["user"],
       order: { timestamp: "DESC" },
+      skip,
+      take,
     });
+
+    return { data, total };
   }
 
   /**

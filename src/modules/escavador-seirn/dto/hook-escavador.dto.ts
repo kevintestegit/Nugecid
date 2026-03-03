@@ -19,11 +19,6 @@ export class HookEscavadorDto {
   link?: string;
 
   @IsOptional()
-  @IsString()
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
-  token?: string;
-
-  @IsOptional()
   @IsNumber()
   usuarioId?: number;
 }

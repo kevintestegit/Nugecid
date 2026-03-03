@@ -109,6 +109,7 @@ export const SystemSettings: React.FC = () => {
     () => sanitizeHttpUrl(escavadorStatus?.lastLink),
     [escavadorStatus?.lastLink],
   );
+  const hasRestoreError = restoreSteps.some((step) => step.status === "error");
 
   // Carregar configurações ao montar o componente
   useEffect(() => {
@@ -196,10 +197,11 @@ export const SystemSettings: React.FC = () => {
     setIsCreatingBackup(true);
     setBackupProgress(0);
     setBackupError(null);
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
 
     try {
       // Simular progresso enquanto o backup está sendo criado
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setBackupProgress((prev) => {
           if (prev >= 90) return prev;
           return prev + 10;
@@ -209,6 +211,7 @@ export const SystemSettings: React.FC = () => {
       const result = await backupService.createFullBackup();
 
       clearInterval(progressInterval);
+      progressInterval = undefined;
       setBackupProgress(100);
 
       if (result.success) {
@@ -232,6 +235,9 @@ export const SystemSettings: React.FC = () => {
       });
       setBackupProgress(0);
     } finally {
+      if (progressInterval !== undefined) {
+        clearInterval(progressInterval);
+      }
       setIsCreatingBackup(false);
     }
   };
@@ -282,9 +288,13 @@ export const SystemSettings: React.FC = () => {
 
     setIsRestoring(true);
     setBackupError(null);
+    let activeStepIndex = -1;
 
     // Função para atualizar o status de um passo
     const updateStepStatus = (stepIndex: number, status: RestoreStepStatus) => {
+      if (status === "current") {
+        activeStepIndex = stepIndex;
+      }
       setRestoreSteps((prev) =>
         prev.map((step, idx) =>
           idx === stepIndex ? { ...step, status } : step,
@@ -331,11 +341,8 @@ export const SystemSettings: React.FC = () => {
       setShowRestoreDialog(false);
     } catch (error: unknown) {
       // Marcar o passo atual como erro
-      const currentStepIndex = restoreSteps.findIndex(
-        (step) => step.status === "current",
-      );
-      if (currentStepIndex >= 0) {
-        updateStepStatus(currentStepIndex, "error");
+      if (activeStepIndex >= 0) {
+        updateStepStatus(activeStepIndex, "error");
       }
 
       setBackupError(error);
@@ -737,14 +744,14 @@ export const SystemSettings: React.FC = () => {
           )}
 
           {/* Multi-Step Progress para Restauração */}
-          {isRestoring && (
+          {(isRestoring || hasRestoreError) && (
             <div className="pt-4 border-t border-border">
               <MultiStepProgress steps={restoreSteps} />
             </div>
           )}
 
           {/* Mensagem de erro na restauração */}
-          {backupError != null && isRestoring && (
+          {backupError != null && (isRestoring || hasRestoreError) && (
             <div className="pt-4 border-t border-border">
               <ErrorMessage
                 {...getErrorMessage(backupError)}

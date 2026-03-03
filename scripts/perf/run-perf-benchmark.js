@@ -5,10 +5,10 @@ const fs = require("fs");
 const path = require("path");
 
 const BASE_URL = process.env.PERF_BASE_URL || "http://127.0.0.1:8080";
-const USERNAME = process.env.PERF_USERNAME || "kevin";
-const PASSWORD = process.env.PERF_PASSWORD || "";
+const USERNAME = process.env.PERF_USERNAME || "__MUST_BE_SET__";
+const PASSWORD = process.env.PERF_PASSWORD || "__MUST_BE_SET__";
 const LOGIN_FORWARDED_FOR =
-  process.env.PERF_LOGIN_FORWARDED_FOR || "10.199.0.1";
+  process.env.PERF_LOGIN_FORWARDED_FOR || "127.0.0.1";
 const CONCURRENCY = Number(process.env.PERF_CONCURRENCY || 20);
 const REQUESTS_PER_SCENARIO = Number(process.env.PERF_REQUESTS || 300);
 const TIMEOUT_MS = Number(process.env.PERF_TIMEOUT_MS || 10000);
@@ -216,7 +216,7 @@ async function main() {
   const scenarios = [
     {
       name: "health",
-      pathname: "/api/health",
+      pathname: "/health",
     },
     {
       name: "nugecid-list",

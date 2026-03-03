@@ -34,8 +34,6 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Loader2, RefreshCw, Plus, Columns, Users } from "lucide-react";
 import { toast } from "sonner";
-import tarefasService from "@/services/tarefasService";
-import { kanbanService } from "@/services/kanbanService";
 import { useAuth } from "@/contexts/AuthContext";
 import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
 import { SkeletonKanbanCard, Skeleton } from "@/components/ui/Skeleton";
@@ -44,185 +42,15 @@ import type {
   Tarefa as KanbanDomainTask,
   Usuario as KanbanDomainUser,
 } from "@/types/kanban.types";
-import { PrioridadeTarefa } from "@/types/kanban.types";
+import { BoardTask, useTarefasBoardData } from "@/hooks/useTarefasBoardData";
+import { useTarefasBoardActions } from "@/hooks/useTarefasBoardActions";
 import { cn } from "@/utils/cn";
-
-interface ProjetoResumo {
-  id: number;
-  nome: string;
-  descricao?: string;
-  cor?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  data_criacao?: string;
-  data_atualizacao?: string;
-  membros?: { usuario?: KanbanDomainUser }[];
-}
-
-interface ColunaResponse {
-  id: number;
-  nome: string;
-  cor?: string;
-  ordem?: number;
-  projetoId?: number;
-  projeto_id?: number;
-  ativa?: boolean;
-  limiteWip?: number;
-  limite_wip?: number;
-}
-
-interface TarefaResponse {
-  id: number;
-  titulo: string;
-  descricao?: string;
-  prioridade?: string;
-  prazo?: string;
-  ordem?: number;
-  colunaId?: number;
-  coluna_id?: number;
-  coluna?: { id: number };
-  projetoId?: number;
-  projeto_id?: number;
-  criadorId?: number;
-  criador_id?: number;
-  createdAt?: string;
-  created_at?: string;
-  updatedAt?: string;
-  updated_at?: string;
-  responsavel?: {
-    id: number;
-    nome: string;
-    avatarUrl?: string;
-    avatar?: string;
-  };
-  responsaveis?: {
-    id: number;
-    nome: string;
-    avatarUrl?: string;
-    avatar?: string;
-  }[];
-  tags?: string[];
-  comentarios?: KanbanDomainTask["comentarios"];
-}
-
-interface ProjetoDetalhado extends ProjetoResumo {
-  colunas?: ColunaResponse[];
-  tarefas?: TarefaResponse[];
-}
-
-type BoardTask = KanbanTarefa & { coluna_id: number; colunaId?: number };
 
 type ResponsibleFilter = "all" | "mine" | number;
 
 const STORAGE_KEY = "tarefas.selectedProjectId";
 const DENSITY_KEY = "tarefas.boardDensity";
 type BoardDensity = "comfortable" | "compact";
-
-const normalizePriority = (value?: string): KanbanTarefa["prioridade"] => {
-  if (!value) return PrioridadeTarefa.MEDIA;
-  const normalized = value.toLowerCase();
-  if (
-    normalized === "baixa" ||
-    normalized === "media" ||
-    normalized === "alta" ||
-    normalized === "critica"
-  ) {
-    return normalized as PrioridadeTarefa;
-  }
-  return PrioridadeTarefa.MEDIA;
-};
-
-const mapColumns = (
-  data: ColunaResponse[] | undefined,
-  fallbackProjectId: number,
-): KanbanColuna[] => {
-  if (!data) return [];
-  return data
-    .map((coluna) => ({
-      id: coluna.id,
-      nome: coluna.nome,
-      cor: coluna.cor ?? "#3B82F6",
-      ordem: coluna.ordem ?? 1,
-      projetoId: coluna.projetoId ?? coluna.projeto_id ?? fallbackProjectId,
-      projeto_id: coluna.projetoId ?? coluna.projeto_id ?? fallbackProjectId,
-      wipLimit: coluna.limiteWip ?? coluna.limite_wip,
-      limite_wip: coluna.limiteWip ?? coluna.limite_wip,
-    }))
-    .sort((a, b) => a.ordem - b.ordem);
-};
-
-const mapTasks = (
-  data: TarefaResponse[] | undefined,
-  fallbackProjectId: number,
-): BoardTask[] => {
-  if (!data) return [];
-
-  const grouped = new Map<number, BoardTask[]>();
-
-  data.forEach((item) => {
-    const columnId = item.colunaId ?? item.coluna_id ?? item.coluna?.id ?? 0;
-    if (!columnId) return;
-
-    const responsaveis =
-      item.responsaveis?.map((usuario) => ({
-        id: usuario.id,
-        nome: usuario.nome,
-        usuario: usuario.nome,
-        avatar: usuario.avatarUrl ?? usuario.avatar,
-        avatarUrl: usuario.avatarUrl,
-      })) ?? [];
-    const responsavel = item.responsavel
-      ? {
-          id: item.responsavel.id,
-          nome: item.responsavel.nome,
-          usuario: item.responsavel.nome,
-          avatar: item.responsavel.avatarUrl ?? item.responsavel.avatar,
-          avatarUrl: item.responsavel.avatarUrl,
-        }
-      : undefined;
-
-    const base: BoardTask = {
-      id: item.id,
-      titulo: item.titulo,
-      descricao: item.descricao ?? "",
-      projetoId: item.projetoId ?? item.projeto_id ?? fallbackProjectId,
-      prioridade: normalizePriority(item.prioridade),
-      prazo: item.prazo ?? undefined,
-      responsavel,
-      responsaveis: responsaveis.length
-        ? responsaveis
-        : responsavel
-          ? [responsavel]
-          : [],
-      criadorId: item.criadorId ?? item.criador_id ?? 0,
-      comentarios: Array.isArray(item.comentarios)
-        ? (item.comentarios as KanbanDomainTask["comentarios"])
-        : undefined,
-      ordem: item.ordem ?? 0,
-      tags: Array.isArray(item.tags) ? item.tags : [],
-      coluna_id: columnId,
-      colunaId: columnId,
-      createdAt: item.createdAt ?? item.created_at ?? new Date().toISOString(),
-      updatedAt: item.updatedAt ?? item.updated_at ?? new Date().toISOString(),
-    };
-
-    const list = grouped.get(columnId) ?? [];
-    list.push(base);
-    grouped.set(columnId, list);
-  });
-
-  const result: BoardTask[] = [];
-  grouped.forEach((list) => {
-    list
-      .sort((a, b) => a.ordem - b.ordem || a.id - b.id)
-      .forEach((task, index) => {
-        task.ordem = index + 1;
-        result.push(task);
-      });
-  });
-
-  return result;
-};
 
 const buildDomainUser = (
   responsavel: BoardTask["responsavel"] | undefined,
@@ -297,39 +125,64 @@ const TarefasPage: React.FC = () => {
     };
   }, []);
 
-  const [projects, setProjects] = useState<ProjetoResumo[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
-    null,
-  );
-  const [projectDetails, setProjectDetails] = useState<ProjetoDetalhado | null>(
-    null,
-  );
-  const [columns, setColumns] = useState<KanbanColuna[]>([]);
-  const [tasks, setTasks] = useState<BoardTask[]>([]);
   const [selectedResponsibleId, setSelectedResponsibleId] =
     useState<ResponsibleFilter>("all");
-  const [loadingProjects, setLoadingProjects] = useState(false);
-  const [loadingBoard, setLoadingBoard] = useState(false);
-  const [isMutating, setIsMutating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deleteColumn, setDeleteColumn] = useState<{
-    id: number;
-    nome: string;
-  } | null>(null);
-  const [deleteTask, setDeleteTask] = useState<{
-    id: number;
-    titulo: string;
-  } | null>(null);
   const [detailTask, setDetailTask] = useState<KanbanDomainTask | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [boardDensity, setBoardDensity] = useState<BoardDensity>("comfortable");
-  const [columnDialog, setColumnDialog] = useState<{
-    open: boolean;
-    mode: "add" | "edit";
-    columnId?: number;
-    initialName: string;
-  }>({ open: false, mode: "add", initialName: "" });
-  const [columnDialogName, setColumnDialogName] = useState("");
+  const {
+    selectedProjectId,
+    setSelectedProjectId,
+    projectDetails,
+    projects,
+    columns,
+    tasks,
+    loadingProjects,
+    loadingBoard,
+    error,
+    hasProjectsLoaded,
+    hasBoardContent,
+    loadProjects,
+    loadBoardData,
+  } = useTarefasBoardData({
+    isAuthenticated,
+    storageKey: STORAGE_KEY,
+  });
+  const {
+    isMutating,
+    deleteColumn,
+    setDeleteColumn,
+    deleteTask,
+    setDeleteTask,
+    columnDialog,
+    setColumnDialog,
+    columnDialogName,
+    setColumnDialogName,
+    handleMoveTask,
+    handleReorderTasks,
+    handleAddColumn,
+    handleEditColumn,
+    handleColumnDialogConfirm,
+    handleDeleteColumn,
+    handleConfirmDeleteColumn,
+    handleAddTask,
+    handleTaskEdit,
+    handleTaskDelete,
+    handleConfirmDeleteTask,
+    handleRefresh,
+    handleProjectSettings,
+  } = useTarefasBoardActions({
+    selectedProjectId,
+    tasks,
+    columns,
+    projects,
+    user,
+    checkPermission,
+    loadBoardData,
+    loadProjects,
+    hasBoardContent,
+    hasProjectsLoaded,
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem(DENSITY_KEY);
@@ -342,96 +195,9 @@ const TarefasPage: React.FC = () => {
     localStorage.setItem(DENSITY_KEY, boardDensity);
   }, [boardDensity]);
 
-  const loadProjects = useCallback(async () => {
-    if (!isAuthenticated) {
-      setProjects([]);
-      setSelectedProjectId(null);
-      setProjectDetails(null);
-      setColumns([]);
-      setTasks([]);
-      setLoadingProjects(false);
-      return;
-    }
-
-    setLoadingProjects(true);
-    try {
-      const response = await kanbanService.getProjetos();
-      const lista = (response as unknown as ProjetoResumo[]) ?? [];
-      setProjects(lista);
-
-      if (!lista.length) {
-        setSelectedProjectId(null);
-        setProjectDetails(null);
-        setColumns([]);
-        setTasks([]);
-        localStorage.removeItem(STORAGE_KEY);
-        return;
-      }
-
-      const storedId = localStorage.getItem(STORAGE_KEY);
-      let nextId: number | null = storedId ? Number(storedId) : null;
-      if (nextId && !lista.some((proj) => proj.id === nextId)) {
-        nextId = null;
-      }
-      if (!nextId) {
-        nextId = lista[0].id;
-      }
-
-      setSelectedProjectId(nextId);
-    } catch (err) {
-      console.error("Erro ao carregar projetos:", err);
-      setError("Não foi possível carregar os projetos no momento.");
-      toast.error("Não foi possível carregar os projetos.");
-    } finally {
-      setLoadingProjects(false);
-    }
-  }, [isAuthenticated]);
-
-  const loadBoardData = useCallback(
-    async (projectId: number) => {
-      if (!isAuthenticated) {
-        setProjectDetails(null);
-        setColumns([]);
-        setTasks([]);
-        setLoadingBoard(false);
-        return;
-      }
-
-      setLoadingBoard(true);
-      try {
-        setError(null);
-        const response = await kanbanService.getProjeto(projectId);
-        const project = response as unknown as ProjetoDetalhado;
-
-        setProjectDetails(project);
-        const mappedColumns = mapColumns(project.colunas, project.id);
-        const mappedTasks = mapTasks(project.tarefas, project.id);
-
-        setColumns(mappedColumns);
-        setTasks(mappedTasks);
-      } catch (err) {
-        setError("Não foi possível carregar o quadro de tarefas.");
-        toast.error("Não foi possível carregar o quadro de tarefas.");
-        setColumns([]);
-        setTasks([]);
-      } finally {
-        setLoadingBoard(false);
-      }
-    },
-    [isAuthenticated],
-  );
-
   useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
-
-  useEffect(() => {
-    if (selectedProjectId) {
-      localStorage.setItem(STORAGE_KEY, String(selectedProjectId));
-      loadBoardData(selectedProjectId);
-      setSelectedResponsibleId("all");
-    }
-  }, [selectedProjectId, loadBoardData]);
+    setSelectedResponsibleId("all");
+  }, [selectedProjectId]);
 
   const responsibleOptions = useMemo(() => {
     const unique = new Map<number, { id: number; nome: string }>();
@@ -518,10 +284,13 @@ const TarefasPage: React.FC = () => {
     return { total, overdue, upcomingWeek, priorities };
   }, [tasks]);
 
-  const handleProjectChange = useCallback((value: string) => {
-    const parsed = Number(value);
-    setSelectedProjectId(Number.isNaN(parsed) ? null : parsed);
-  }, []);
+  const handleProjectChange = useCallback(
+    (value: string) => {
+      const parsed = Number(value);
+      setSelectedProjectId(Number.isNaN(parsed) ? null : parsed);
+    },
+    [setSelectedProjectId],
+  );
 
   const handleResponsibleChange = useCallback((value: string) => {
     if (value === "all" || value === "mine") {
@@ -532,202 +301,6 @@ const TarefasPage: React.FC = () => {
     const parsed = Number(value);
     setSelectedResponsibleId(Number.isNaN(parsed) ? "all" : parsed);
   }, []);
-
-  const handleMoveTask = useCallback(
-    async (
-      taskId: number,
-      _sourceColumnId: number,
-      targetColumnId: number,
-      targetIndex: number,
-    ) => {
-      if (!selectedProjectId) return;
-
-      setIsMutating(true);
-
-      try {
-        const tarefa = tasks.find((item) => item.id === taskId);
-        if (!checkPermission("update", "tarefas")) {
-          toast.error("Você não tem permissão para mover tarefas.");
-          return;
-        }
-        if (
-          tarefa &&
-          user?.role?.name === "usuario" &&
-          tarefa.criadorId !== user.id
-        ) {
-          toast.error("Você só pode mover suas próprias tarefas.");
-          return;
-        }
-
-        await tarefasService.moveTarefa(taskId, {
-          colunaId: targetColumnId,
-          ordem: targetIndex + 1,
-        });
-
-        // Recarregar dados do servidor para garantir sincronização
-        await loadBoardData(selectedProjectId);
-
-        toast.success("Tarefa movida com sucesso!");
-      } catch (error) {
-        toast.error("Não foi possível mover a tarefa.");
-        await loadBoardData(selectedProjectId);
-      } finally {
-        setIsMutating(false);
-      }
-    },
-    [checkPermission, loadBoardData, selectedProjectId, tasks, user],
-  );
-
-  const handleReorderTasks = useCallback(
-    async (colunaId: number, orderedIds: number[], movedTaskId?: number) => {
-      if (!selectedProjectId || movedTaskId === undefined) return;
-      const newIndex = orderedIds.findIndex((id) => id === movedTaskId);
-      if (newIndex === -1) return;
-
-      setIsMutating(true);
-
-      try {
-        const tarefa = tasks.find((item) => item.id === movedTaskId);
-        if (!checkPermission("update", "tarefas")) {
-          toast.error("Você não tem permissão para reordenar tarefas.");
-          return;
-        }
-        if (
-          tarefa &&
-          user?.role?.name === "usuario" &&
-          tarefa.criadorId !== user.id
-        ) {
-          toast.error("Você só pode reordenar suas próprias tarefas.");
-          return;
-        }
-
-        await tarefasService.moveTarefa(movedTaskId, {
-          colunaId,
-          ordem: newIndex + 1,
-        });
-
-        // Recarregar dados do servidor
-        await loadBoardData(selectedProjectId);
-      } catch (error) {
-        console.error("Erro ao reordenar tarefas:", error);
-        toast.error("Não foi possível reordenar as tarefas.");
-        await loadBoardData(selectedProjectId);
-      } finally {
-        setIsMutating(false);
-      }
-    },
-    [checkPermission, loadBoardData, selectedProjectId, tasks, user],
-  );
-
-  const handleAddColumn = useCallback(async () => {
-    if (!selectedProjectId) return;
-    setColumnDialog({ open: true, mode: "add", initialName: "" });
-    setColumnDialogName("");
-  }, [selectedProjectId]);
-
-  const handleEditColumn = useCallback(
-    async (coluna: KanbanColuna) => {
-      if (!selectedProjectId) return;
-      setColumnDialog({
-        open: true,
-        mode: "edit",
-        columnId: coluna.id,
-        initialName: coluna.nome,
-      });
-      setColumnDialogName(coluna.nome);
-    },
-    [selectedProjectId],
-  );
-
-  const handleColumnDialogConfirm = useCallback(async () => {
-    const nome = columnDialogName.trim();
-    if (!nome || !selectedProjectId) return;
-
-    setColumnDialog((prev) => ({ ...prev, open: false }));
-    setIsMutating(true);
-
-    try {
-      if (columnDialog.mode === "add") {
-        await kanbanService.createColuna({
-          projetoId: selectedProjectId,
-          nome,
-          ordem: columns.length + 1,
-        });
-        toast.success("Coluna criada com sucesso!");
-      } else if (columnDialog.columnId) {
-        if (nome === columnDialog.initialName) return;
-        await kanbanService.updateColuna(columnDialog.columnId, { nome });
-        toast.success("Coluna atualizada com sucesso!");
-      }
-      await loadBoardData(selectedProjectId);
-    } catch (error) {
-      console.error(
-        columnDialog.mode === "add"
-          ? "Erro ao criar coluna:"
-          : "Erro ao atualizar coluna:",
-        error,
-      );
-      toast.error(
-        columnDialog.mode === "add"
-          ? "Não foi possível criar a coluna."
-          : "Não foi possível atualizar a coluna.",
-      );
-    } finally {
-      setIsMutating(false);
-    }
-  }, [
-    columnDialog,
-    columnDialogName,
-    columns.length,
-    loadBoardData,
-    selectedProjectId,
-  ]);
-
-  const handleDeleteColumn = useCallback(
-    (colunaId: number, colunaNome: string) => {
-      setDeleteColumn({ id: colunaId, nome: colunaNome });
-    },
-    [],
-  );
-
-  const handleConfirmDeleteColumn = useCallback(async () => {
-    if (!selectedProjectId || !deleteColumn) return;
-
-    setIsMutating(true);
-    try {
-      await kanbanService.deleteColuna(deleteColumn.id);
-      toast.success("Coluna excluída com sucesso!");
-      await loadBoardData(selectedProjectId);
-    } catch (error) {
-      console.error("Erro ao excluir coluna:", error);
-      toast.error("Não foi possível excluir a coluna.");
-      await loadBoardData(selectedProjectId);
-    } finally {
-      setIsMutating(false);
-      setDeleteColumn(null);
-    }
-  }, [loadBoardData, selectedProjectId, deleteColumn]);
-
-  const handleAddTask = useCallback(
-    (colunaId?: number) => {
-      if (!selectedProjectId) {
-        toast.error("Selecione um projeto para criar tarefas.");
-        return;
-      }
-      if (!checkPermission("create", "tarefas")) {
-        toast.error("Você não tem permissão para criar tarefas");
-        return;
-      }
-
-      navigate("/tarefas/nova", {
-        state: {
-          projetoId: selectedProjectId,
-          colunaId: colunaId ?? null,
-        },
-      });
-    },
-    [checkPermission, navigate, selectedProjectId],
-  );
 
   const handleTaskClick = useCallback(
     (tarefa: KanbanTarefa) => {
@@ -741,70 +314,6 @@ const TarefasPage: React.FC = () => {
     },
     [columns, selectedProjectId],
   );
-
-  const handleTaskEdit = useCallback(
-    (tarefa: KanbanTarefa) => {
-      if (!checkPermission("update", "tarefas")) {
-        toast.error("Você não tem permissão para editar tarefas");
-        return;
-      }
-      if (user?.role?.name === "usuario" && tarefa.criadorId !== user.id) {
-        toast.error("Você só pode editar suas próprias tarefas");
-        return;
-      }
-      navigate(`/tarefas/${tarefa.id}`);
-    },
-    [checkPermission, navigate, user],
-  );
-
-  const handleTaskDelete = useCallback(
-    (taskId: number, taskTitulo: string) => {
-      const tarefa = tasks.find((item) => item.id === taskId);
-      if (!tarefa) return;
-
-      if (!checkPermission("delete", "tarefas")) {
-        toast.error("Você não tem permissão para excluir tarefas");
-        return;
-      }
-      if (user?.role?.name === "usuario" && tarefa.criadorId !== user.id) {
-        toast.error("Você só pode excluir suas próprias tarefas");
-        return;
-      }
-
-      setDeleteTask({ id: taskId, titulo: taskTitulo });
-    },
-    [checkPermission, tasks, user],
-  );
-
-  const handleConfirmDeleteTask = useCallback(async () => {
-    if (!selectedProjectId || !deleteTask) return;
-
-    setIsMutating(true);
-    try {
-      await tarefasService.deleteTarefa(deleteTask.id);
-      toast.success("Tarefa removida com sucesso!");
-      await loadBoardData(selectedProjectId);
-    } catch (error) {
-      console.error("Erro ao excluir tarefa:", error);
-      toast.error("Não foi possível excluir a tarefa.");
-      await loadBoardData(selectedProjectId);
-    } finally {
-      setIsMutating(false);
-      setDeleteTask(null);
-    }
-  }, [loadBoardData, selectedProjectId, deleteTask]);
-
-  const handleRefresh = useCallback(() => {
-    if (selectedProjectId) {
-      loadBoardData(selectedProjectId);
-    } else {
-      loadProjects();
-    }
-  }, [loadBoardData, loadProjects, selectedProjectId]);
-
-  const handleProjectSettings = useCallback(() => {
-    navigate("/projetos");
-  }, [navigate]);
 
   const normalizeText = useCallback(
     (value: string) =>
@@ -873,7 +382,12 @@ const TarefasPage: React.FC = () => {
     toast.success("Tarefa iniciada");
   }, [detailTask, handleMoveTask, progressColumnId, selectedProjectId, tasks]);
 
+  const showInitialBoardLoading =
+    (loadingProjects && !hasProjectsLoaded) ||
+    (loadingBoard && !hasBoardContent);
   const boardLoading = loadingBoard || loadingProjects;
+  const boardRefreshing =
+    (loadingProjects && hasProjectsLoaded) || (loadingBoard && hasBoardContent);
   const disableActions = boardLoading || isMutating;
 
   const projetoResumo: KanbanProjeto = projectDetails
@@ -1023,6 +537,12 @@ const TarefasPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            {boardRefreshing && projects.length ? (
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Sincronizando quadro
+              </span>
+            ) : null}
             <div className="flex items-center gap-1">
               <Users className="h-4 w-4" />
               {responsibleOptions.length} responsável(is)
@@ -1090,7 +610,7 @@ const TarefasPage: React.FC = () => {
       </Card>
 
       {/* Board area */}
-      {loadingProjects && !projects.length ? (
+      {showInitialBoardLoading ? (
         <div className="min-h-[500px] rounded-xl border border-border/60 bg-card/85 p-4 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
           <div className="flex gap-4 overflow-x-auto">
             {Array.from({ length: 3 }).map((_, colIndex) => (
@@ -1140,7 +660,7 @@ const TarefasPage: React.FC = () => {
             }}
             onAddTask={handleAddTask}
             onTaskClick={handleTaskClick}
-            onTaskEdit={handleTaskEdit}
+            onTaskEdit={(tarefa) => handleTaskEdit(tarefa.id, tarefa.criadorId)}
             onTaskDelete={(taskId) => {
               const task = tasks.find((item) => item.id === taskId);
               handleTaskDelete(taskId, task?.titulo ?? "Tarefa");
@@ -1193,7 +713,7 @@ const TarefasPage: React.FC = () => {
         }}
         onRefresh={async () => {
           if (selectedProjectId) {
-            await loadBoardData(selectedProjectId);
+            await loadBoardData(selectedProjectId, { silent: true });
           }
         }}
         onOpenTask={(taskId) => navigate(`/tarefas/${taskId}`)}

@@ -14,8 +14,6 @@ import { DataSource, Repository } from "typeorm";
 import { randomUUID } from "crypto";
 import * as path from "path";
 import * as fs from "fs/promises";
-import { existsSync } from "fs";
-import * as XLSX from "xlsx";
 import { Pasta } from "./entities/pasta.entity";
 import {
   PastaArquivo,
@@ -31,6 +29,13 @@ import {
   CACHE_VERSION_KEYS,
 } from "../../common/constants/cache-version.constants";
 import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
+import { AntivirusService } from "../security/antivirus.service";
+import {
+  inferContentTypeFromFilename,
+  StorageService,
+} from "../storage/storage.service";
+import { SearchService } from "../search/search.service";
+import { readSpreadsheetMatrix } from "../../common/utils/spreadsheet.util";
 
 interface PastaFilesPayload {
   imagens?: Express.Multer.File[];
@@ -38,10 +43,11 @@ interface PastaFilesPayload {
   planilhas?: Express.Multer.File[];
 }
 
-const UPLOAD_ROOT = path.join(process.cwd(), "uploads", "pastas");
-const UPLOAD_ROOT_RESOLVED = path.resolve(UPLOAD_ROOT);
+const LEGACY_UPLOAD_ROOT = path.join(process.cwd(), "uploads", "pastas");
+const LEGACY_UPLOAD_ROOT_RESOLVED = path.resolve(LEGACY_UPLOAD_ROOT);
+const STORAGE_PREFIX = "pastas";
 
-const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".csv"]);
 const ALLOWED_SPREADSHEET_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.ms-excel",
@@ -93,6 +99,9 @@ export class PastasService {
     private readonly dataSource: DataSource,
     private readonly notificacoesService: NotificacoesService,
     private readonly syncRealtimeService: SyncRealtimeService,
+    private readonly antivirusService: AntivirusService,
+    private readonly storageService: StorageService,
+    @Optional() private readonly searchService?: SearchService,
     @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     @Optional()
     private readonly runtimeMetricsService?: RuntimeMetricsService,
@@ -189,6 +198,7 @@ export class PastasService {
       includePlanilhas: this.hasPlanilhaInPayload(files),
       metadata: { nome: pasta.nome },
     });
+    this.searchService?.requestSyncPasta(pasta.id);
 
     await this.bumpReadCachesVersion();
 
@@ -276,6 +286,7 @@ export class PastasService {
     this.emitPastaRealtime("updated", id, userId, {
       metadata: { nome: pastaAtualizada?.nome },
     });
+    this.searchService?.requestSyncPasta(id);
 
     await this.bumpReadCachesVersion();
 
@@ -296,7 +307,7 @@ export class PastasService {
     }
 
     await Promise.all(
-      arquivos.map((arquivo) => this.deleteArquivoDoDisco(arquivo.caminho)),
+      arquivos.map((arquivo) => this.deleteStoredObject(arquivo.caminho)),
     );
 
     await this.pastaArquivoRepository.delete({ pastaId: id });
@@ -307,6 +318,7 @@ export class PastasService {
         (arquivo) => arquivo.tipo === PastaArquivoTipo.PLANILHA,
       ),
     });
+    this.searchService?.requestRemovePasta(id);
 
     await this.bumpReadCachesVersion();
   }
@@ -330,6 +342,7 @@ export class PastasService {
     this.emitPastaRealtime("updated", id, userId, {
       includePlanilhas: this.hasPlanilhaInPayload(files),
     });
+    this.searchService?.requestSyncPasta(id);
     await this.bumpReadCachesVersion();
     return this.findOne(id, userId);
   }
@@ -454,7 +467,9 @@ export class PastasService {
     arquivoId: string,
     userId?: number,
   ): Promise<{
-    caminhoAbsoluto: string;
+    buffer: Buffer;
+    size: number;
+    contentType?: string;
     nome: string;
     tipo: PastaArquivoTipo;
   }> {
@@ -473,9 +488,18 @@ export class PastasService {
       throw new NotFoundException("Arquivo nao encontrado");
     }
 
-    const caminhoAbsoluto = this.resolveStoragePath(arquivo.caminho);
+    const stored = await this.storageService.getObject(
+      this.normalizeStoredPath(arquivo.caminho),
+      {
+        legacyAbsolutePath: this.resolveLegacyStoragePath(arquivo.caminho),
+        contentType: inferContentTypeFromFilename(arquivo.nomeOriginal),
+      },
+    );
+
     return {
-      caminhoAbsoluto,
+      buffer: stored.buffer,
+      size: stored.size,
+      contentType: stored.contentType,
       nome: arquivo.nomeOriginal,
       tipo: arquivo.tipo,
     };
@@ -505,7 +529,7 @@ export class PastasService {
       this.invalidateCachedParsedPlanilha(arquivo.id);
     }
 
-    await this.deleteArquivoDoDisco(arquivo.caminho);
+    await this.deleteStoredObject(arquivo.caminho);
     await this.pastaArquivoRepository.delete({ id: arquivoId });
 
     await this.recalcularContagensArquivos(pastaId);
@@ -514,6 +538,7 @@ export class PastasService {
       includePlanilhas: arquivo.tipo === PastaArquivoTipo.PLANILHA,
       metadata: { removedFileId: arquivoId },
     });
+    this.searchService?.requestSyncPasta(pastaId);
 
     await this.bumpReadCachesVersion();
 
@@ -557,44 +582,38 @@ export class PastasService {
     };
 
     try {
-      const caminho = this.resolveStoragePath(arquivo.caminho);
-      if (!existsSync(caminho)) {
+      const stat = await this.storageService
+        .statObject(this.normalizeStoredPath(arquivo.caminho), {
+          legacyAbsolutePath: this.resolveLegacyStoragePath(arquivo.caminho),
+        })
+        .catch(() => null);
+
+      if (!stat) {
         this.invalidateCachedParsedPlanilha(arquivo.id);
         this.logger.warn(
-          `Arquivo de planilha nao encontrado no disco: ${caminho}`,
+          `Arquivo de planilha nao encontrado no storage: ${arquivo.caminho}`,
         );
         return null;
       }
 
-      const stats = await fs.stat(caminho);
-      signature = `${stats.size}:${stats.mtimeMs}`;
+      signature = `${stat.size}:${stat.lastModified?.getTime() ?? 0}`;
       const cached = this.getCachedParsedPlanilha(arquivo.id, signature);
       if (cached !== undefined) {
         return cached;
       }
 
-      const buffer = await fs.readFile(caminho);
-      const workbook = XLSX.read(buffer, {
-        type: "buffer",
-        cellDates: false,
-      });
-
-      const sheetName = workbook.SheetNames[0];
+      const buffer = await this.storageService
+        .getObject(this.normalizeStoredPath(arquivo.caminho), {
+          legacyAbsolutePath: this.resolveLegacyStoragePath(arquivo.caminho),
+        })
+        .then((stored) => stored.buffer);
+      const { sheetName, rows: rawRows } = await readSpreadsheetMatrix(
+        buffer,
+        arquivo.nomeOriginal,
+      );
       if (!sheetName) {
         return cacheAndReturn(null);
       }
-
-      const worksheet = workbook.Sheets[sheetName];
-      if (!worksheet) {
-        return cacheAndReturn(null);
-      }
-
-      const rawRows = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: "",
-        blankrows: false,
-        raw: false,
-      }) as any[][];
 
       if (!rawRows.length) {
         return cacheAndReturn({
@@ -936,10 +955,6 @@ export class PastasService {
       return;
     }
 
-    await fs.mkdir(UPLOAD_ROOT, { recursive: true });
-    const pastaDir = path.join(UPLOAD_ROOT, pasta.id);
-    await fs.mkdir(pastaDir, { recursive: true });
-
     const arquivosParaSalvar: PastaArquivo[] = [];
 
     const salvarArquivo = async (
@@ -953,18 +968,18 @@ export class PastasService {
           file.originalname,
         );
         const filename = this.buildStoredFilename(safeOriginalName);
-        const destino = path.join(pastaDir, filename);
+        const storageKey = this.buildStorageKey(pasta.id, filename);
 
-        await this.persistUploadedFileToStorage(file, destino, buffer);
-
-        const relativePath = path.posix.join(pasta.id, filename);
+        await this.storageService.putObject(storageKey, buffer, {
+          contentType: inferContentTypeFromFilename(safeOriginalName),
+        });
 
         arquivosParaSalvar.push(
           this.pastaArquivoRepository.create({
             pastaId: pasta.id,
             tipo,
             nomeOriginal: safeOriginalName,
-            caminho: relativePath,
+            caminho: storageKey,
             tamanhoBytes: file.size.toString(),
           }),
         );
@@ -1003,10 +1018,6 @@ export class PastasService {
       return;
     }
 
-    await fs.mkdir(UPLOAD_ROOT, { recursive: true });
-    const pastaDir = path.join(UPLOAD_ROOT, pasta.id);
-    await fs.mkdir(pastaDir, { recursive: true });
-
     const arquivosParaSalvar: PastaArquivo[] = [];
 
     const salvarArquivo = async (
@@ -1020,18 +1031,18 @@ export class PastasService {
           file.originalname,
         );
         const filename = this.buildStoredFilename(safeOriginalName);
-        const destino = path.join(pastaDir, filename);
+        const storageKey = this.buildStorageKey(pasta.id, filename);
 
-        await this.persistUploadedFileToStorage(file, destino, buffer);
-
-        const relativePath = path.posix.join(pasta.id, filename);
+        await this.storageService.putObject(storageKey, buffer, {
+          contentType: inferContentTypeFromFilename(safeOriginalName),
+        });
 
         arquivosParaSalvar.push(
           manager.create(PastaArquivo, {
             pastaId: pasta.id,
             tipo,
             nomeOriginal: safeOriginalName,
-            caminho: relativePath,
+            caminho: storageKey,
             tamanhoBytes: file.size.toString(),
           }),
         );
@@ -1071,11 +1082,13 @@ export class PastasService {
     // Mantido como método vazio para compatibilidade com código existente
   }
 
-  private async deleteArquivoDoDisco(caminhoRelativo: string): Promise<void> {
-    const caminho = this.resolveStoragePath(caminhoRelativo);
-    if (existsSync(caminho)) {
-      await fs.unlink(caminho).catch(() => undefined);
-    }
+  private async deleteStoredObject(caminhoRelativo: string): Promise<void> {
+    await this.storageService.deleteObject(
+      this.normalizeStoredPath(caminhoRelativo),
+      {
+        legacyAbsolutePath: this.resolveLegacyStoragePath(caminhoRelativo),
+      },
+    );
   }
 
   private async validateIncomingFile(
@@ -1090,10 +1103,16 @@ export class PastasService {
 
     if (tipo === PastaArquivoTipo.IMAGEM) {
       await FileValidator.validateImage(buffer);
-      return;
+    } else {
+      await this.validateSpreadsheetFile(file, buffer);
     }
 
-    await this.validateSpreadsheetFile(file, buffer);
+    if (this.antivirusService) {
+      await this.antivirusService.scanBuffer(buffer, {
+        fileName: file.originalname,
+        source: `pastas.${tipo}`,
+      });
+    }
   }
 
   private async validateSpreadsheetFile(
@@ -1103,7 +1122,7 @@ export class PastasService {
     const extension = path.extname(file.originalname || "").toLowerCase();
     if (!ALLOWED_SPREADSHEET_EXTENSIONS.has(extension)) {
       throw new BadRequestException(
-        "Formato de planilha inválido. Use .xlsx, .xls ou .csv.",
+        "Formato de planilha inválido. Use .xlsx ou .csv.",
       );
     }
 
@@ -1144,33 +1163,8 @@ export class PastasService {
     throw new BadRequestException("Arquivo inválido ou vazio");
   }
 
-  private async persistUploadedFileToStorage(
-    file: Express.Multer.File,
-    destinationPath: string,
-    fallbackBuffer: Buffer,
-  ): Promise<void> {
-    if (file?.path) {
-      try {
-        await fs.rename(file.path, destinationPath);
-        return;
-      } catch (error: unknown) {
-        if ((error as { code?: string })?.code !== "EXDEV") {
-          throw error;
-        }
-        await fs.writeFile(destinationPath, fallbackBuffer);
-        await this.cleanupTempUpload(file);
-        return;
-      }
-    }
-
-    await fs.writeFile(destinationPath, fallbackBuffer);
-  }
-
   private async cleanupTempUpload(file: Express.Multer.File): Promise<void> {
     if (!file?.path) {
-      return;
-    }
-    if (!existsSync(file.path)) {
       return;
     }
     await fs.unlink(file.path).catch(() => undefined);
@@ -1209,21 +1203,39 @@ export class PastasService {
     return `${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
   }
 
-  private resolveStoragePath(relativePath: string): string {
-    const normalizedRelativePath = relativePath
+  private buildStorageKey(pastaId: string, fileName: string): string {
+    return `${STORAGE_PREFIX}/${pastaId}/${fileName}`;
+  }
+
+  private normalizeStoredPath(storedPath: string): string {
+    const normalizedRelativePath = storedPath
       .replace(/\\/g, "/")
       .replace(/^\/+/, "");
     if (!normalizedRelativePath) {
       throw new BadRequestException("Caminho de arquivo inválido");
     }
+    return normalizedRelativePath.startsWith(`${STORAGE_PREFIX}/`)
+      ? normalizedRelativePath
+      : `${STORAGE_PREFIX}/${normalizedRelativePath}`;
+  }
+
+  private resolveLegacyStoragePath(storedPath: string): string {
+    const normalizedRelativePath = storedPath
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    const legacyRelativePath = normalizedRelativePath.startsWith(
+      `${STORAGE_PREFIX}/`,
+    )
+      ? normalizedRelativePath.slice(`${STORAGE_PREFIX}/`.length)
+      : normalizedRelativePath;
     const absolutePath = path.resolve(
-      UPLOAD_ROOT_RESOLVED,
-      normalizedRelativePath,
+      LEGACY_UPLOAD_ROOT_RESOLVED,
+      legacyRelativePath,
     );
 
     if (
-      absolutePath !== UPLOAD_ROOT_RESOLVED &&
-      !absolutePath.startsWith(`${UPLOAD_ROOT_RESOLVED}${path.sep}`)
+      absolutePath !== LEGACY_UPLOAD_ROOT_RESOLVED &&
+      !absolutePath.startsWith(`${LEGACY_UPLOAD_ROOT_RESOLVED}${path.sep}`)
     ) {
       throw new BadRequestException("Caminho de arquivo inválido");
     }
@@ -1360,7 +1372,7 @@ export class PastasService {
       url: `/api/pastas/${pasta.id}/arquivos/${arquivo.id}/download`,
       previewUrl:
         arquivo.tipo === PastaArquivoTipo.IMAGEM
-          ? `/uploads/pastas/${arquivo.caminho}`
+          ? `/api/pastas/${pasta.id}/arquivos/${arquivo.id}/view`
           : undefined,
     };
   }

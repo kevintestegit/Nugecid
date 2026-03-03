@@ -4,11 +4,32 @@ import { join } from "path";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from "@nestjs/typeorm";
 import { DataSourceOptions } from "typeorm";
-import { neonConfig, Pool as NeonPool } from "@neondatabase/serverless";
-import * as ws from "ws";
 
-// Configura WebSocket para o driver Neon (funciona na porta 443, contornando firewalls)
-neonConfig.webSocketConstructor = ws;
+/**
+ * Build SSL configuration for PostgreSQL.
+ * - When DATABASE_SSL_CA is set, uses the CA cert for proper certificate validation.
+ * - Falls back to rejectUnauthorized: false only as a last resort (cloud DBs like Neon/Supabase).
+ */
+export function buildSslConfigFromEnv(): false | Record<string, unknown> {
+  if (process.env.DATABASE_SSL !== "true") return false;
+
+  const caCert = process.env.DATABASE_SSL_CA;
+  if (caCert) {
+    return { rejectUnauthorized: true, ca: caCert.replace(/\\n/g, "\n") };
+  }
+
+  if (process.env.DATABASE_SSL_ALLOW_UNAUTHORIZED === "true") {
+    return { rejectUnauthorized: false };
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "DATABASE_SSL_CA é obrigatório em produção quando DATABASE_SSL=true. Use DATABASE_SSL_ALLOW_UNAUTHORIZED=true apenas para exceção controlada.",
+    );
+  }
+
+  return { rejectUnauthorized: false };
+}
 
 @Injectable()
 export class DatabaseConfig implements TypeOrmOptionsFactory {
@@ -56,18 +77,11 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       synchronize: false,
       logging: ["error", "warn"],
       entities: [__dirname + "/../**/*.entity{.ts,.js}"],
+      autoLoadEntities: true,
       migrations: [__dirname + "/../migrations/*{.ts,.js}"],
       migrationsRun: false,
-      autoLoadEntities: true,
       logger: "simple-console",
     };
-
-    // Verifica se deve usar driver Neon (WebSocket na porta 443)
-    const useNeon = env("DATABASE_USE_NEON") === "true";
-
-    if (useNeon) {
-      this.logger.log("Usando driver Neon Serverless (WebSocket/HTTPS)");
-    }
 
     const config = {
       ...baseConfig,
@@ -77,8 +91,7 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       username: dbUser,
       password: dbPassword,
       database: dbName,
-      ssl:
-        env("DATABASE_SSL") === "true" ? { rejectUnauthorized: false } : false,
+      ssl: buildSslConfigFromEnv(),
       extra: {
         connectionLimit: 10,
         acquireTimeout: 60000,
@@ -88,8 +101,6 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
         max: 10,
         min: 2,
       },
-      // Usa driver Neon para conexão via WebSocket (porta 443)
-      ...(useNeon && { driver: NeonPool }),
     } as TypeOrmModuleOptions;
 
     this.logger.log(`Configuração do banco pronta.`);
@@ -116,10 +127,7 @@ export const buildCliDataSourceOptions = (): DataSourceOptions => {
       migrations: [__dirname + "/../migrations/*{.ts,.js}"],
       synchronize: false,
       logging: ["error", "warn"],
-      ssl:
-        process.env.DATABASE_SSL === "true"
-          ? { rejectUnauthorized: false }
-          : false,
+      ssl: buildSslConfigFromEnv(),
     } as DataSourceOptions;
   }
 };
@@ -134,8 +142,7 @@ export const databaseConfigFactory = () => ({
   username: process.env.DATABASE_USERNAME,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
-  ssl:
-    process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : false,
+  ssl: buildSslConfigFromEnv(),
   synchronize: false,
   logging: false,
 });

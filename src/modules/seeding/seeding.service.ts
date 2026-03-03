@@ -151,6 +151,23 @@ export class SeedingService implements OnModuleInit {
     }
   }
 
+  private async ensureRoleIdSequence() {
+    try {
+      await this.roleRepository.query(
+        `SELECT setval(
+          pg_get_serial_sequence('roles', 'id'),
+          COALESCE((SELECT MAX(id) FROM roles), 1),
+          true
+        )`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `[Seeding] Falha ao alinhar sequência de roles: ${err?.message || err}`,
+      );
+      throw err;
+    }
+  }
+
   private async seedRoles() {
     if (!(await this.tableExists("roles"))) {
       return;
@@ -220,6 +237,7 @@ export class SeedingService implements OnModuleInit {
 
     if (newRoles.length > 0) {
       this.logger.log(`Criando ${newRoles.length} roles faltantes...`);
+      await this.ensureRoleIdSequence();
       const roleEntities = newRoles.map((role) =>
         this.roleRepository.create(role),
       );
@@ -270,6 +288,7 @@ export class SeedingService implements OnModuleInit {
       this.logger.log("Usuário admin encontrado. Atualizando a senha...");
       adminUser.senha = hashedPassword;
       adminUser.role = adminRole;
+      adminUser.ativo = true;
       await this.userRepository.save(adminUser);
       this.logger.log("Usuário admin atualizado com sucesso.");
     } else {

@@ -33,24 +33,9 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, info: any, _context: ExecutionContext) {
+  handleRequest(err: any, user: any, _info: any, _context: ExecutionContext) {
     if (err || !user) {
-      let message = "Token JWT inválido ou expirado";
-
-      // Provide more specific error messages
-      if (info) {
-        if (info.name === "TokenExpiredError") {
-          message = "jwt expired";
-        } else if (info.name === "JsonWebTokenError") {
-          message = "jwt malformed";
-        } else if (info.message) {
-          message = info.message;
-        }
-      } else if (err && err.message) {
-        message = err.message;
-      }
-
-      throw new UnauthorizedException(message);
+      throw new UnauthorizedException("Autenticação inválida ou expirada");
     }
 
     // Atualiza a atividade do usuário para cada requisição autenticada

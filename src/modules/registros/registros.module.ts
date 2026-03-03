@@ -7,12 +7,14 @@ import { RegistrosController } from "./registros.controller";
 import { RegistrosService } from "./registros.service";
 import { AuthModule } from "../auth/auth.module";
 import { NotificacoesModule } from "../notificacoes/notificacoes.module";
+import { SecurityModule } from "../security/security.module";
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Registro]),
     AuthModule,
     NotificacoesModule,
+    SecurityModule,
   ],
   controllers: [RegistrosController],
   providers: [RegistrosService],

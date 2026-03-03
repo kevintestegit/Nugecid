@@ -12,10 +12,17 @@ import {
 } from "lucide-react";
 import { useNotificacoesStore } from "@/store/notificacoesStore";
 import { Notificacao } from "@/services/notificacoesService";
+import {
+  getNotificationIconVariant,
+  normalizeNotificationPriority,
+} from "@/lib/notifications/notificationMeta";
+import { getNotificationDestination } from "@/utils/notificationNavigation";
 import { cn } from "../../utils/cn";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+
+const RECENT_NOTIFICATIONS_MAX_AGE_MS = 60000;
 
 interface NotificationBellProps {
   className?: string;
@@ -24,7 +31,6 @@ interface NotificationBellProps {
 const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -38,15 +44,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     marcarComoLida,
     marcarTodasComoLidas,
     excluirNotificacao,
-    fetchNotificacoes,
+    fetchRecentes,
+    recentes,
   } = useNotificacoesStore();
 
   const hasNotificacoes = totalNaoLidas > 0;
-
-  const normalizePriority = (prioridade?: string) =>
-    (prioridade || "").toString().trim().toLowerCase();
-  const normalizeType = (tipo?: string) =>
-    (tipo || "").toString().trim().toLowerCase();
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
@@ -63,7 +65,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Buscar todas as notificações quando abrir o dropdown com "Todas"
+  // Buscar notificações recentes quando abrir o dropdown nesse modo
   const handleToggleDropdown = async () => {
     if (!isOpen && showAll) {
       await fetchAllNotificacoes();
@@ -74,23 +76,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   const fetchAllNotificacoes = async () => {
     try {
       setLoadingAll(true);
-      const response = await fetchNotificacoes({ limit: 50 });
-      setAllNotificacoes(Array.isArray(response.data) ? response.data : []);
+      await fetchRecentes({ maxAgeMs: RECENT_NOTIFICATIONS_MAX_AGE_MS });
     } catch {
       // Silent
     } finally {
       setLoadingAll(false);
     }
-  };
-
-  const getNotificationDestination = (notificacao: Notificacao) => {
-    if (notificacao.link) return notificacao.link;
-    if (notificacao.processoId)
-      return `/desarquivamentos/${notificacao.processoId}`;
-    if (notificacao.solicitacaoId)
-      return `/desarquivamentos/${notificacao.solicitacaoId}`;
-    if (notificacao.tarefaId) return `/tarefas/${notificacao.tarefaId}`;
-    return null;
   };
 
   const handleNotificationClick = useCallback(
@@ -109,8 +100,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
   // Obter ícone baseado no tipo da notificação
   const getNotificationIcon = (tipo: string, prioridade: string) => {
-    const normalizedPriority = normalizePriority(prioridade);
-    const normalizedType = normalizeType(tipo);
+    const normalizedPriority = normalizeNotificationPriority(prioridade);
+    const iconVariant = getNotificationIconVariant(tipo);
     const iconClass = cn(
       "w-4 h-4 flex-shrink-0",
       normalizedPriority === "critica" && "text-red-500",
@@ -119,10 +110,10 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       normalizedPriority === "baixa" && "text-blue-500",
     );
 
-    switch (normalizedType) {
-      case "solicitacao_pendente":
+    switch (iconVariant) {
+      case "clock":
         return <Clock className={iconClass} />;
-      case "novo_processo":
+      case "info":
         return <Info className={iconClass} />;
       default:
         return <AlertCircle className={iconClass} />;
@@ -131,7 +122,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
   // Obter cor da prioridade
   const getPriorityColor = (prioridade: string) => {
-    switch (normalizePriority(prioridade)) {
+    switch (normalizeNotificationPriority(prioridade)) {
       case "critica":
         return "border-l-red-500 bg-red-500/10";
       case "alta":
@@ -254,7 +245,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   };
 
   const isLoading = loading || loadingAll;
-  const displayNotifications = showAll ? allNotificacoes : naoLidas;
+  const displayNotifications = showAll ? recentes : naoLidas;
 
   return (
     <div className={cn("relative", className)} ref={dropdownRef}>
@@ -311,7 +302,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               </div>
             </div>
 
-            {/* Toggle entre não lidas e todas */}
+            {/* Toggle entre não lidas e recentes */}
             <div className="flex items-center gap-4 mt-2">
               <button
                 onClick={() => setShowAll(false)}
@@ -327,8 +318,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               <button
                 onClick={() => {
                   setShowAll(true);
-                  if (!allNotificacoes.length) {
-                    fetchAllNotificacoes();
+                  if (!recentes.length) {
+                    void fetchAllNotificacoes();
                   }
                 }}
                 className={cn(
@@ -338,7 +329,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                Todas
+                Recentes
               </button>
             </div>
           </div>
@@ -364,7 +355,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                 <Bell className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
                 <p className="text-sm font-medium mb-1">
                   {showAll
-                    ? "Nenhuma notificação"
+                    ? "Nenhuma notificação recente"
                     : "Nenhuma notificação não lida"}
                 </p>
                 <p className="text-xs text-muted-foreground/80">

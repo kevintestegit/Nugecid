@@ -145,6 +145,29 @@ describe("AuthService", () => {
         service.login(loginDto, "127.0.0.1", "test-agent"),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it("should reject SQL injection payloads in login without authenticating", async () => {
+      const maliciousLoginDto: LoginDto = {
+        usuario: "' OR 1=1 --",
+        senha: "' OR '1'='1",
+      };
+
+      mockUserRepository.findOne.mockResolvedValue(null);
+      mockAuditoriaRepository.create.mockReturnValue({});
+      mockAuditoriaRepository.save.mockResolvedValue({});
+
+      await expect(
+        service.login(maliciousLoginDto, "127.0.0.1", "test-agent"),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(mockUserRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { usuario: maliciousLoginDto.usuario },
+          relations: ["role"],
+        }),
+      );
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
   });
 
   describe("loginV2", () => {
@@ -237,6 +260,19 @@ describe("AuthService", () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    it("should not bypass validation with SQL injection-like username input", async () => {
+      const maliciousUsuario = "' OR 1=1 --";
+      mockUserRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.validateUser(maliciousUsuario, "qualquer");
+
+      expect(result).toBeNull();
+      expect(mockUserRepository.findOne).toHaveBeenCalledWith({
+        where: { usuario: maliciousUsuario },
+        relations: ["role"],
+      });
     });
 
     it("should throw UnauthorizedException for inactive user", async () => {

@@ -25,6 +25,8 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
     let objectUrl: string | null = null;
     let isActive = true;
     const controller = new AbortController();
+    const buildProcessoPreviewUrl = (numero: string, id: number) =>
+      `/api/nugecid/processo/${encodeURIComponent(numero)}/anexos/${id}/view`;
 
     const loadImage = async () => {
       try {
@@ -55,9 +57,8 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
           blob = await response.blob();
         } else if (numeroProcesso) {
           // Anexo de processo - usar rota de processo
-          const encodedProcesso = encodeURIComponent(numeroProcesso);
           const response = await fetch(
-            `/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/view`,
+            buildProcessoPreviewUrl(numeroProcesso, anexoId),
             {
               credentials: "include",
               signal: controller.signal,

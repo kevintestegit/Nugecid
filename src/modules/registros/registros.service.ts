@@ -3,11 +3,11 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { validate } from "class-validator";
-import * as XLSX from "xlsx";
 
 import { Registro } from "./entities/registro.entity";
 import { ImportRegistroDto } from "./dto/import-registro.dto";
 import { NotificacoesService } from "../notificacoes/services";
+import { readSpreadsheetObjects } from "../../common/utils/spreadsheet.util";
 
 @Injectable()
 export class RegistrosService {
@@ -20,13 +20,10 @@ export class RegistrosService {
   ) {}
 
   async importFromXlsx(file: Express.Multer.File, userId?: number) {
-    const workbook = XLSX.read(file.buffer, {
-      type: "buffer",
-      cellDates: true,
-    });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(sheet);
+    const { rows: data } = await readSpreadsheetObjects(
+      file.buffer,
+      file.originalname,
+    );
 
     const totalRows = data.length;
     let successCount = 0;
@@ -43,7 +40,9 @@ export class RegistrosService {
       registroDto.nome_vitima = row["nome_vitima"];
       registroDto.data_fato = new Date(row["data_fato"]);
       registroDto.investigador_responsavel = row["investigador_responsavel"];
-      registroDto.idade_vitima = row["idade_vitima"];
+      registroDto.idade_vitima = row["idade_vitima"]
+        ? Number(row["idade_vitima"])
+        : undefined;
 
       const validationErrors = await validate(registroDto);
 

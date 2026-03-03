@@ -160,7 +160,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
       normalizeMembers(members).map((membro) => (
         <div
           key={membro.id}
-          className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2"
+          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2"
         >
           <div className="flex items-center gap-3">
             <Avatar usuario={membro.usuario} size="sm" />
@@ -170,7 +170,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                   membro.usuario?.usuario ||
                   `#${membro.usuarioId}`}
               </span>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-muted-foreground">
                 ID {membro.usuarioId}
               </span>
             </div>
@@ -218,8 +218,8 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <p className="text-sm text-gray-700 mb-3">
+          <div className="rounded-lg border border-border bg-gray-50 p-3">
+            <p className="text-sm text-foreground/90 mb-3">
               Adicione usuários ao projeto e defina o papel (Admin, Editor ou
               Viewer).
             </p>
@@ -230,7 +230,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
               {suggestions.length > 0 && (
-                <div className="border rounded-lg divide-y max-h-48 overflow-y-auto bg-white">
+                <div className="border rounded-lg divide-y max-h-48 overflow-y-auto bg-background">
                   {suggestions.map((sugestao) => {
                     const suggestionUser = {
                       id: sugestao.id,
@@ -243,7 +243,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                     return (
                       <div
                         key={sugestao.id}
-                        className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50"
+                        className="flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted"
                       >
                         <div className="flex items-center gap-2">
                           <Avatar usuario={suggestionUser} size="sm" />
@@ -254,7 +254,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                                 `#${sugestao.id}`}
                             </span>
                             {sugestao.usuario && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-muted-foreground">
                                 @{sugestao.usuario}
                               </span>
                             )}
@@ -300,11 +300,11 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                 Membros ({members.length})
               </span>
               {saving && (
-                <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               )}
             </div>
             {members.length === 0 && !loading && (
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted-foreground">
                 Nenhum membro adicionado ainda.
               </div>
             )}

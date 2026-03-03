@@ -33,6 +33,7 @@ import {
   ApiParam,
 } from "@nestjs/swagger";
 import { Response, Request } from "express";
+import { URL } from "url";
 
 // Use Cases
 import {
@@ -67,6 +68,8 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { User } from "../users/entities/user.entity";
 import { RoleType } from "../users/enums/role-type.enum";
+import { AntivirusService } from "../security/antivirus.service";
+import { ConfigService } from "@nestjs/config";
 
 type AuditFieldType = "status" | "date" | "boolean" | "number" | "text";
 
@@ -136,7 +139,19 @@ export class NugecidController {
     private readonly nugecidDocxService: NugecidDocxService,
     private readonly nugecidService: NugecidService,
     private readonly nugecidAuditService: NugecidAuditService,
+    private readonly antivirusService: AntivirusService,
+    private readonly configService: ConfigService,
   ) {}
+
+  private buildFrontendUrl(pathname: string) {
+    return new URL(
+      pathname,
+      this.configService.get<string>(
+        "app.frontendUrl",
+        "http://localhost:3001",
+      ),
+    ).toString();
+  }
 
   @Post()
   @ApiOperation({ summary: "Criar nova solicitação de desarquivamento" })
@@ -211,6 +226,10 @@ export class NugecidController {
     this.logger.log(
       `[${new Date().toISOString()}] 📁 Importando arquivo: ${file.originalname} (${file.size} bytes)`,
     );
+
+    await this.antivirusService.scanUploadedFile(file, {
+      source: "nugecid.import-desarquivamentos",
+    });
 
     const result = await this.nugecidImportService.importFromXLSX(
       file,
@@ -380,6 +399,10 @@ export class NugecidController {
       `[${new Date().toISOString()}] 📁 Importando registros: ${file.originalname} (${file.size} bytes)`,
     );
 
+    await this.antivirusService.scanUploadedFile(file, {
+      source: "nugecid.import-registros",
+    });
+
     const result = await this.nugecidImportService.importRegistrosFromXLSX(
       file,
       currentUser,
@@ -497,6 +520,25 @@ export class NugecidController {
       `inline; filename=termo_de_entrega_${id}.pdf`,
     );
     res.send(buffer);
+  }
+
+  @Get(":id/termo-preview")
+  @ApiOperation({
+    summary: "Gerar HTML do termo de entrega para pré-visualização e impressão",
+  })
+  @ApiParam({
+    name: "id",
+    description: "ID do desarquivamento",
+    type: "number",
+  })
+  @ApiBearerAuth()
+  async getTermoDeEntregaPreview(
+    @Param("id", ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    return res.redirect(
+      this.buildFrontendUrl(`/desarquivamentos/${id}/termo/visualizar`),
+    );
   }
 
   @Get()
@@ -721,7 +763,7 @@ export class NugecidController {
         );
       }
       id = parseInt(cleanId, 10);
-    } catch (error) {
+    } catch {
       throw new BadRequestException(
         "ID inválido. Deve ser um número inteiro positivo.",
       );

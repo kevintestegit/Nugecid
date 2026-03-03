@@ -13,7 +13,6 @@ import {
   Patch,
   Post,
   Query,
-  Render,
   Request,
   Response,
   UploadedFile,
@@ -69,6 +68,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { promises as fsPromises } from "fs";
 import { extname, join, resolve } from "path";
 import * as multer from "multer";
+import { URL } from "url";
 
 // Mappers
 import { UserMapper } from "./infrastructure/mappers/user.mapper";
@@ -76,6 +76,7 @@ import { RoleMapper } from "./infrastructure/mappers/role.mapper";
 
 // Utils
 import { FileValidator } from "../../common/utils/file-validator";
+import { AntivirusService } from "../security/antivirus.service";
 
 @ApiTags("Usuários")
 @Controller("users")
@@ -84,6 +85,7 @@ export class UsersController {
   private readonly logger = new Logger(UsersController.name);
   private readonly uploadRoot: string;
   private readonly avatarFolder = "avatars";
+  private readonly frontendUrl: string;
 
   constructor(
     private readonly createUserUseCase: CreateUserUseCase,
@@ -100,11 +102,28 @@ export class UsersController {
     private readonly usersRepo: Repository<User>,
     private readonly configService: ConfigService,
     private readonly userPreferencesService: UserPreferencesService,
+    private readonly antivirusService: AntivirusService,
   ) {
     this.uploadRoot = this.configService.get<string>(
       "UPLOAD_PATH",
       resolve(process.cwd(), "uploads"),
     );
+    this.frontendUrl = this.configService.get<string>(
+      "app.frontendUrl",
+      "http://localhost:3001",
+    );
+  }
+
+  private buildFrontendUrl(pathname: string, params?: Record<string, string>) {
+    const url = new URL(pathname, this.frontendUrl);
+
+    Object.entries(params ?? {}).forEach(([key, value]) => {
+      if (value) {
+        url.searchParams.set(key, value);
+      }
+    });
+
+    return url.toString();
   }
 
   @Get()
@@ -334,6 +353,10 @@ export class UsersController {
 
     // Validar conteúdo real do arquivo por magic bytes
     await FileValidator.validateImage(file.buffer);
+    await this.antivirusService.scanBuffer(file.buffer, {
+      fileName: file.originalname,
+      source: "users.avatar",
+    });
 
     const avatarDir = this.getAvatarDirectory();
     await this.ensureDirectoryExists(avatarDir);
@@ -447,14 +470,9 @@ export class UsersController {
   @Get("novo")
   @UseGuards(RolesGuard)
   @Roles("admin")
-  @Render("usuarios/novo")
   @ApiOperation({ summary: "Renderiza página de criação de usuário" })
-  async createPage() {
-    const roles = await this.getRolesUseCase.execute();
-    return {
-      title: "Novo Usuário - SGC ITEP",
-      roles: roles.map((role) => RoleMapper.toEntity(role)),
-    };
+  async createPage(@Response() res: ExpressResponse) {
+    return res.redirect(this.buildFrontendUrl("/usuarios/novo"));
   }
 
   @Post()
@@ -480,14 +498,20 @@ export class UsersController {
       }
 
       // Se for requisição web, redireciona
-      return res.redirect("/users?message=Usuário criado com sucesso");
+      return res.redirect(
+        this.buildFrontendUrl("/usuarios", {
+          message: "Usuário criado com sucesso",
+        }),
+      );
     } catch (error) {
       if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
       return res.redirect(
-        `/users/novo?error=${encodeURIComponent(error.message)}`,
+        this.buildFrontendUrl("/usuarios/novo", {
+          error: error.message,
+        }),
       );
     }
   }
@@ -533,31 +557,23 @@ export class UsersController {
   }
 
   @Get(":id/detalhe")
-  @Render("usuarios/detalhe")
   @ApiOperation({ summary: "Renderiza página de detalhes do usuário" })
-  async detailPage(@Param("id", ParseUserIdPipe) id: number) {
-    const user = await this.getUserByIdUseCase.execute(id);
-    const userEntity = UserMapper.toEntity(user);
-    return {
-      title: `${userEntity.nome} - SGC ITEP`,
-      user: userEntity,
-    };
+  async detailPage(
+    @Param("id", ParseUserIdPipe) id: number,
+    @Response() res: ExpressResponse,
+  ) {
+    return res.redirect(this.buildFrontendUrl(`/usuarios/${id}`));
   }
 
   @Get(":id/editar")
   @UseGuards(RolesGuard)
   @Roles("admin")
-  @Render("usuarios/editar")
   @ApiOperation({ summary: "Renderiza página de edição do usuário" })
-  async editPage(@Param("id", ParseUserIdPipe) id: number) {
-    const user = await this.getUserByIdUseCase.execute(id);
-    const roles = await this.getRolesUseCase.execute();
-    const userEntity = UserMapper.toEntity(user);
-    return {
-      title: `Editar ${userEntity.nome} - SGC ITEP`,
-      user: userEntity,
-      roles: roles.map((role) => RoleMapper.toEntity(role)),
-    };
+  async editPage(
+    @Param("id", ParseUserIdPipe) id: number,
+    @Response() res: ExpressResponse,
+  ) {
+    return res.redirect(this.buildFrontendUrl(`/usuarios/${id}/editar`));
   }
 
   @Patch(":id")
@@ -589,7 +605,9 @@ export class UsersController {
 
       // Se for requisição web, redireciona
       return res.redirect(
-        `/users/${id}?message=Usuário atualizado com sucesso`,
+        this.buildFrontendUrl(`/usuarios/${id}/editar`, {
+          message: "Usuário atualizado com sucesso",
+        }),
       );
     } catch (error) {
       if (req.headers.accept?.includes("application/json")) {
@@ -597,7 +615,9 @@ export class UsersController {
       }
 
       return res.redirect(
-        `/users/${id}/editar?error=${encodeURIComponent(error.message)}`,
+        this.buildFrontendUrl(`/usuarios/${id}/editar`, {
+          error: error.message,
+        }),
       );
     }
   }
@@ -625,13 +645,21 @@ export class UsersController {
       }
 
       // Se for requisição web, redireciona
-      return res.redirect("/users?message=Usuário removido com sucesso");
+      return res.redirect(
+        this.buildFrontendUrl("/usuarios", {
+          message: "Usuário removido com sucesso",
+        }),
+      );
     } catch (error) {
       if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
-      return res.redirect(`/users?error=${encodeURIComponent(error.message)}`);
+      return res.redirect(
+        this.buildFrontendUrl("/usuarios", {
+          error: error.message,
+        }),
+      );
     }
   }
 
@@ -662,27 +690,28 @@ export class UsersController {
       }
 
       // Se for requisição web, redireciona
-      return res.redirect(`/users/${id}?message=Usuário reativado com sucesso`);
+      return res.redirect(
+        this.buildFrontendUrl("/usuarios", {
+          message: "Usuário reativado com sucesso",
+        }),
+      );
     } catch (error) {
       if (req.headers.accept?.includes("application/json")) {
         return res.status(400).json({ message: error.message });
       }
 
-      return res.redirect(`/users?error=${encodeURIComponent(error.message)}`);
+      return res.redirect(
+        this.buildFrontendUrl("/usuarios", {
+          error: error.message,
+        }),
+      );
     }
   }
 
   @Get("perfil/meu")
-  @Render("usuarios/perfil")
   @ApiOperation({ summary: "Renderiza página do perfil do usuário logado" })
-  async profilePage(@CurrentUser() currentUser: User) {
-    const user = await this.getUserByIdUseCase.execute(currentUser.id);
-    const userEntity = UserMapper.toEntity(user);
-    return {
-      title: "Meu Perfil - SGC ITEP",
-      user: userEntity,
-      isOwnProfile: true,
-    };
+  async profilePage(@Response() res: ExpressResponse) {
+    return res.redirect(this.buildFrontendUrl("/configuracoes"));
   }
 
   private async ensureDirectoryExists(dir: string): Promise<void> {

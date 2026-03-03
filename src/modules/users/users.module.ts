@@ -15,6 +15,7 @@ import { User } from "./entities/user.entity";
 import { Role } from "./entities/role.entity";
 import { UserPreference } from "./entities/user-preference.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { SecurityModule } from "../security/security.module";
 
 // Services
 import { UserPreferencesService } from "./services/user-preferences.service";
@@ -41,6 +42,7 @@ import {
   imports: [
     TypeOrmModule.forFeature([User, Role, UserPreference, Auditoria]),
     AuthModule,
+    SecurityModule,
   ],
   controllers: [UsersController],
   providers: [

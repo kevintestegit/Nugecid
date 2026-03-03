@@ -1,5 +1,6 @@
 import React from "react";
 import { useForm, Controller } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
@@ -98,6 +99,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
   isEdit = false,
   initialData,
 }) => {
+  const navigate = useNavigate();
   // Converte strings de data do initialData para objetos Date, se necessário
   const defaultValues = React.useMemo((): Partial<DesarquivamentoFormData> => {
     if (!initialData) return {};
@@ -506,7 +508,7 @@ const DesarquivamentoForm: React.FC<DesarquivamentoFormProps> = ({
         <Button
           type="button"
           variant="outline"
-          onClick={() => window.history.back()}
+          onClick={() => navigate("/desarquivamentos")}
           disabled={isLoading}
         >
           Cancelar

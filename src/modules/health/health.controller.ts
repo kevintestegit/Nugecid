@@ -1,56 +1,105 @@
-import { Controller, Get, Logger } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Logger,
+  Optional,
+  ServiceUnavailableException,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import {
   DatabaseHealthService,
   DatabaseHealthStatus,
 } from "./database-health.service";
 import { IsPublic } from "../../common/decorators/is-public.decorator";
+import { Roles } from "../../common/decorators/roles.decorator";
 import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
+import { RedisService } from "../redis/redis.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { SearchService } from "../search/search.service";
 
 @ApiTags("health")
-@Controller("health")
+@Controller()
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
   constructor(
     private readonly databaseHealthService: DatabaseHealthService,
     private readonly runtimeMetricsService: RuntimeMetricsService,
+    private readonly redisService: RedisService,
+    @Optional()
+    private readonly searchService?: SearchService,
   ) {}
 
-  @Get()
+  @Get("health")
   @IsPublic()
-  @ApiOperation({ summary: "Verificação geral de saúde do sistema" })
-  @ApiResponse({ status: 200, description: "Status de saúde do sistema" })
+  @ApiOperation({ summary: "Liveness: processo HTTP está ativo" })
+  @ApiResponse({ status: 200, description: "Aplicação viva (liveness)" })
   async getHealth() {
-    this.logger.log(`🔍 [HEALTH] Verificação de saúde solicitada`);
-
-    const dbHealth = await this.databaseHealthService.checkHealth();
-
-    const health = {
-      status: dbHealth.status === "healthy" ? "ok" : "error",
+    return {
+      status: "ok",
+      type: "liveness",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      database: dbHealth,
-      memory: process.memoryUsage(),
-      runtime: this.runtimeMetricsService.getSummary(),
       version: process.version,
+    };
+  }
+
+  @Get("ready")
+  @IsPublic()
+  @ApiOperation({
+    summary: "Readiness: valida dependências críticas (DB e Redis)",
+  })
+  @ApiResponse({ status: 200, description: "Aplicação pronta para tráfego" })
+  @ApiResponse({
+    status: 503,
+    description: "Aplicação não pronta (DB e/ou Redis indisponível)",
+  })
+  async getReadiness() {
+    this.logger.log("🔍 [READY] Verificação de readiness solicitada");
+
+    const dbHealth = await this.databaseHealthService.checkHealth();
+    const redisOk = await this.redisService.ping();
+    const ready = dbHealth.status === "healthy" && redisOk;
+
+    const readiness = {
+      status: ready ? "ready" : "not_ready",
+      type: "readiness",
+      timestamp: new Date().toISOString(),
+      database: dbHealth,
+      redis: {
+        connected: redisOk,
+      },
     };
 
     this.logger.log(
-      `📊 [HEALTH] Status: ${health.status}, DB: ${dbHealth.status}`,
+      `📊 [READY] Status: ${readiness.status}, DB: ${dbHealth.status}, Redis: ${redisOk ? "up" : "down"}`,
     );
 
-    return health;
+    if (!ready) {
+      this.logger.error(
+        `❌ [READY] Dependências indisponíveis: DB=${dbHealth.status}, Redis=${redisOk ? "up" : "down"}`,
+      );
+      throw new ServiceUnavailableException(readiness);
+    }
+
+    return readiness;
   }
 
-  @Get("database")
-  @IsPublic()
+  @Get("health/database")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @ApiOperation({
     summary: "Verificação detalhada da conexão com banco de dados",
   })
   @ApiResponse({
     status: 200,
     description: "Status detalhado do banco de dados",
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Acesso restrito a administradores",
   })
   async getDatabaseHealth(): Promise<DatabaseHealthStatus> {
     this.logger.log(`🔍 [DB_HEALTH] Verificação detalhada do banco solicitada`);
@@ -64,10 +113,15 @@ export class HealthController {
     return health;
   }
 
-  @Get("database/test")
-  @IsPublic()
+  @Get("health/database/test")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @ApiOperation({ summary: "Executa testes de queries no banco de dados" })
   @ApiResponse({ status: 200, description: "Resultados dos testes de queries" })
+  @ApiResponse({
+    status: 403,
+    description: "Acesso restrito a administradores",
+  })
   async testDatabaseQueries() {
     this.logger.log(`🧪 [DB_TEST] Testes de queries solicitados`);
 
@@ -93,12 +147,17 @@ export class HealthController {
     }
   }
 
-  @Get("database/info")
-  @IsPublic()
+  @Get("health/database/info")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @ApiOperation({ summary: "Informações detalhadas do banco de dados" })
   @ApiResponse({
     status: 200,
     description: "Informações do PostgreSQL e tabelas",
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Acesso restrito a administradores",
   })
   async getDatabaseInfo() {
     this.logger.log(`📊 [DB_INFO] Informações do banco solicitadas`);
@@ -127,7 +186,7 @@ export class HealthController {
     }
   }
 
-  @Get("ping")
+  @Get("health/ping")
   @IsPublic()
   @ApiOperation({ summary: "Ping básico do sistema" })
   @ApiResponse({ status: 200, description: "Pong - sistema ativo" })
@@ -139,13 +198,44 @@ export class HealthController {
     };
   }
 
-  @Get("metrics")
-  @IsPublic()
+  @Get("health/metrics")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
   @ApiOperation({
     summary: "Métricas de runtime (event loop, GC, HTTP e cache)",
   })
   @ApiResponse({ status: 200, description: "Snapshot de métricas do backend" })
+  @ApiResponse({
+    status: 403,
+    description: "Acesso restrito a administradores",
+  })
   async getRuntimeMetrics() {
     return this.runtimeMetricsService.getSnapshot();
+  }
+
+  @Get("health/search")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Status operacional do Meilisearch usado na busca documental",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Estado atual do índice documental",
+  })
+  @ApiResponse({
+    status: 403,
+    description: "Acesso restrito a administradores",
+  })
+  async getSearchHealth() {
+    return (
+      (await this.searchService?.getHealthStatus()) ?? {
+        enabled: false,
+        status: "disabled",
+        indexUid: "global_documents",
+        failOpen: true,
+        bootstrapOnStart: false,
+      }
+    );
   }
 }

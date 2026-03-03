@@ -21,6 +21,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RoleType } from "../users/enums/role-type.enum";
 import { PlanilhasService } from "./planilhas.service";
+import { inferContentTypeFromFilename } from "../storage/storage.service";
 
 const ALLOWED_PLANILHA_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -30,7 +31,7 @@ const ALLOWED_PLANILHA_MIME_TYPES = new Set([
   "text/plain",
 ]);
 
-const ALLOWED_PLANILHA_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const ALLOWED_PLANILHA_EXTENSIONS = new Set([".xlsx", ".csv"]);
 
 const planilhaFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   const extension = extname(file.originalname || "").toLowerCase();
@@ -38,7 +39,7 @@ const planilhaFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
     !ALLOWED_PLANILHA_EXTENSIONS.has(extension) ||
     !ALLOWED_PLANILHA_MIME_TYPES.has(file.mimetype)
   ) {
-    cb(new Error("Arquivo inválido. Envie uma planilha .xlsx, .xls ou .csv."));
+    cb(new Error("Arquivo inválido. Envie uma planilha .xlsx ou .csv."));
     return;
   }
   cb(null, true);
@@ -50,6 +51,7 @@ export class PlanilhasController {
   constructor(private readonly planilhasService: PlanilhasService) {}
 
   @Get()
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   findAll(@Query("page") page?: string, @Query("limit") limit?: string) {
     return this.planilhasService.findAll({
       page: page ? parseInt(page, 10) : undefined,
@@ -58,6 +60,7 @@ export class PlanilhasController {
   }
 
   @Get("geral")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   obterPlanilhaGeral() {
     return this.planilhasService.obterPlanilhaGeral();
   }
@@ -79,16 +82,22 @@ export class PlanilhasController {
   }
 
   @Get(":id/download")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   async download(@Param("id") id: string, @Res() res: Response) {
-    const { registro, caminhoAbsoluto } =
-      await this.planilhasService.obterArquivo(id);
+    const { registro, arquivo } = await this.planilhasService.obterArquivo(id);
 
+    res.setHeader(
+      "Content-Type",
+      arquivo.contentType ||
+        inferContentTypeFromFilename(registro.nomeOriginal),
+    );
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${encodeURIComponent(registro.nomeOriginal)}"`,
     );
+    res.setHeader("Content-Length", arquivo.size.toString());
 
-    return res.sendFile(caminhoAbsoluto);
+    return res.send(arquivo.buffer);
   }
 
   @Delete(":id")

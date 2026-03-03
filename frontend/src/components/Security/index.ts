@@ -1,1 +1,1 @@
-export { IpMonitoring } from './IpMonitoring';
+export { IpMonitoring } from "./IpMonitoring";

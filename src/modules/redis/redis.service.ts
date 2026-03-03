@@ -10,27 +10,73 @@ import { Redis } from "ioredis";
 /**
  * Serviço centralizado de acesso ao Redis.
  * Exposes the underlying ioredis client and convenience helpers.
- * Falls back to an in-memory Map when Redis is unavailable.
+ * Permite fallback para memória somente em dev/test com flag explícita.
  */
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis | null = null;
   private connected = false;
+  private readonly environment: string;
+  private readonly allowMemoryFallback: boolean;
+  private usingMemoryFallback = false;
 
   /** Fallback in-memory store (usado quando Redis nao esta disponivel) */
   private memoryStore = new Map<string, string>();
   private memoryStoreTimers = new Map<string, NodeJS.Timeout>();
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly configService: ConfigService) {
+    this.environment = this.configService.get<string>(
+      "NODE_ENV",
+      "development",
+    );
+    const fallbackFlag =
+      this.configService.get<string>("ALLOW_MEMORY_SESSION_STORE", "false") ===
+      "true";
+    this.allowMemoryFallback =
+      this.environment !== "production" && fallbackFlag;
+
+    if (this.environment === "production" && fallbackFlag) {
+      this.logger.warn(
+        "ALLOW_MEMORY_SESSION_STORE=true foi ignorado em produção. Redis é obrigatório.",
+      );
+    }
+  }
+
+  private isRedisRequired(): boolean {
+    return this.environment === "production";
+  }
+
+  private async handleUnavailableRedis(reason: string): Promise<void> {
+    if (this.allowMemoryFallback) {
+      this.usingMemoryFallback = true;
+      this.logger.warn(
+        `[REDIS] ${reason}. Usando fallback em memória (apenas ${this.environment}).`,
+      );
+      return;
+    }
+
+    const message = `[REDIS] ${reason}. Redis obrigatório no ambiente ${this.environment}.`;
+    this.logger.error(message);
+    throw new Error(message);
+  }
+
+  private ensureAvailableOrFallback(): void {
+    if (this.client && this.connected) return;
+    if (this.usingMemoryFallback) return;
+
+    throw new Error(
+      "[REDIS] indisponível e fallback em memória desabilitado. Operação abortada.",
+    );
+  }
 
   async onModuleInit(): Promise<void> {
     const redisUrl = this.configService.get<string>("REDIS_URL");
     const redisHost = this.configService.get<string>("REDIS_HOST");
 
     if (!redisUrl && !redisHost) {
-      this.logger.warn(
-        "Redis not configured (REDIS_URL/REDIS_HOST). Using in-memory fallback.",
+      await this.handleUnavailableRedis(
+        "REDIS_URL/REDIS_HOST não configurados",
       );
       return;
     }
@@ -55,6 +101,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
       this.client.on("connect", () => {
         this.connected = true;
+        this.usingMemoryFallback = false;
         this.logger.log("Redis connected");
       });
 
@@ -64,28 +111,47 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
       this.client.on("close", () => {
         this.connected = false;
+        if (this.allowMemoryFallback) {
+          this.usingMemoryFallback = true;
+          this.logger.warn(
+            "Redis connection closed. Alternando para fallback em memória neste ambiente.",
+          );
+          return;
+        }
         this.logger.warn("Redis connection closed");
       });
 
       // Test connectivity
-      await this.client.ping();
+      const pong = await this.client.ping();
+      if (pong !== "PONG") {
+        throw new Error(`Redis respondeu "${pong}" no ping de inicialização`);
+      }
       this.connected = true;
+      this.usingMemoryFallback = false;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `Failed to connect to Redis, using in-memory fallback: ${message}`,
-      );
       this.client = null;
       this.connected = false;
+      await this.handleUnavailableRedis(
+        `Falha ao conectar no Redis durante bootstrap: ${message}`,
+      );
+    }
+
+    if (this.isRedisRequired() && !this.connected) {
+      throw new Error(
+        "[REDIS] conexão obrigatória não estabelecida em produção.",
+      );
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    for (const timer of this.memoryStoreTimers.values()) {
-      clearTimeout(timer);
+    if (this.memoryStoreTimers.size > 0) {
+      for (const timer of this.memoryStoreTimers.values()) {
+        clearTimeout(timer);
+      }
+      this.memoryStoreTimers.clear();
+      this.memoryStore.clear();
     }
-    this.memoryStoreTimers.clear();
-    this.memoryStore.clear();
 
     if (this.client) {
       await this.client.quit();
@@ -103,9 +169,25 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client;
   }
 
-  // ── Convenience methods with fallback ──
+  async ping(): Promise<boolean> {
+    if (!this.client || !this.connected) {
+      return false;
+    }
+
+    try {
+      const pong = await this.client.ping();
+      return pong === "PONG";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`[REDIS] ping falhou: ${message}`);
+      return false;
+    }
+  }
+
+  // ── Convenience methods with fallback control ──
 
   async get(key: string): Promise<string | null> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       return this.client.get(key);
     }
@@ -113,6 +195,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       if (ttlSeconds) {
         await this.client.set(key, value, "EX", ttlSeconds);
@@ -140,6 +223,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async del(key: string): Promise<void> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       await this.client.del(key);
       return;
@@ -153,8 +237,22 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async keys(pattern: string): Promise<string[]> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
-      return this.client.keys(pattern);
+      const matchedKeys: string[] = [];
+      let cursor = "0";
+      do {
+        const result = await this.client.scan(
+          Number(cursor),
+          "MATCH",
+          pattern,
+          "COUNT",
+          100,
+        );
+        cursor = String(result[0]);
+        matchedKeys.push(...result[1]);
+      } while (cursor !== "0");
+      return matchedKeys;
     }
     // Simple glob matching for memory fallback
     const regex = new RegExp(
@@ -164,6 +262,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async hset(key: string, field: string, value: string): Promise<void> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       await this.client.hset(key, field, value);
       return;
@@ -175,6 +274,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async hget(key: string, field: string): Promise<string | null> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       return this.client.hget(key, field);
     }
@@ -185,6 +285,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async hgetall(key: string): Promise<Record<string, string>> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       return this.client.hgetall(key);
     }
@@ -194,6 +295,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async hdel(key: string, field: string): Promise<void> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       await this.client.hdel(key, field);
       return;
@@ -206,6 +308,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async expire(key: string, ttlSeconds: number): Promise<void> {
+    this.ensureAvailableOrFallback();
     if (this.client && this.connected) {
       await this.client.expire(key, ttlSeconds);
     }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -92,8 +92,8 @@ const ProjetoDetailPage: React.FC = () => {
 
   const loadProjeto = useCallback(async () => {
     if (!projetoId) {
-      setError("ID do projeto inválido.");
       setLoading(false);
+      setProjeto(null);
       return;
     }
 
@@ -162,6 +162,10 @@ const ProjetoDetailPage: React.FC = () => {
       prioridades,
     };
   }, [members.length, projeto?.colunas, projeto?.tarefas]);
+
+  if (!projetoId) {
+    return <Navigate to="/404" replace />;
+  }
 
   if (loading) {
     return (

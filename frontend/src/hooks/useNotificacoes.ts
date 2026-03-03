@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { useNotificacoesStore } from "@/store/notificacoesStore";
 import { useNotificacoesSSE } from "./useNotificacoesSSE";
+import { useDesktopNotifications } from "./useDesktopNotifications";
+import { usePushNotifications } from "./usePushNotifications";
 
 export type { Notificacao } from "@/services/notificacoesService";
 
@@ -21,6 +23,8 @@ export const useNotificacoes = () => {
 
   // Initialize SSE connection (writes into the Zustand store)
   useNotificacoesSSE();
+  useDesktopNotifications();
+  usePushNotifications();
 
   useEffect(() => {
     isMountedRef.current = true;

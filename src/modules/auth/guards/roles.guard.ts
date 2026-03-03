@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "../../../common/decorators/is-public.decorator";
+import { expandRolesForTransition } from "../../users/enums/role.utils";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -48,16 +49,11 @@ export class RolesGuard implements CanActivate {
 
     // Verificar se o usuário tem uma das roles necessárias
     const userRoleName = user.role.name?.toLowerCase()?.trim();
-
-    const hasRole = requiredRoles.some((role) => {
-      const normalizedRequiredRole = role?.toLowerCase()?.trim();
-      return userRoleName === normalizedRequiredRole;
-    });
+    const allowedRoles = new Set(expandRolesForTransition(requiredRoles));
+    const hasRole = allowedRoles.has(userRoleName);
 
     if (!hasRole) {
-      throw new ForbiddenException(
-        `Acesso negado. Role atual: '${user.role.name}'. Roles necessárias: ${requiredRoles.join(", ")}`,
-      );
+      throw new ForbiddenException("Acesso negado para este recurso");
     }
 
     return true;

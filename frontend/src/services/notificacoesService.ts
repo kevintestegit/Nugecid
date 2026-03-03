@@ -201,44 +201,6 @@ export class NotificacoesService {
     return unwrap<{ notificacoesCriadas: number }>(response);
   }
 
-  /**
-   * Buscar notificações por tipo
-   */
-  async buscarPorTipo(
-    tipo: "SOLICITACAO_PENDENTE" | "NOVO_PROCESSO",
-    params?: {
-      page?: number;
-      limit?: number;
-    },
-  ): Promise<NotificacoesResponse> {
-    const response = await api.get<ApiResponseEnvelope<NotificacoesResponse>>(
-      `${this.baseUrl}/tipo/${tipo}`,
-      {
-        params,
-      },
-    );
-    return unwrap<NotificacoesResponse>(response);
-  }
-
-  /**
-   * Buscar notificações de solicitações pendentes
-   */
-  async buscarSolicitacoesPendentes(params?: {
-    page?: number;
-    limit?: number;
-  }): Promise<NotificacoesResponse> {
-    return this.buscarPorTipo("SOLICITACAO_PENDENTE", params);
-  }
-
-  /**
-   * Buscar notificações de novos processos
-   */
-  async buscarNovosProcessos(params?: {
-    page?: number;
-    limit?: number;
-  }): Promise<NotificacoesResponse> {
-    return this.buscarPorTipo("NOVO_PROCESSO", params);
-  }
 }
 
 // Instância singleton do serviço

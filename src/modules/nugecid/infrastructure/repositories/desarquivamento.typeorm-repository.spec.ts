@@ -4,11 +4,7 @@ describe("DesarquivamentoTypeOrmRepository normalization", () => {
   let repository: DesarquivamentoTypeOrmRepository;
 
   beforeEach(() => {
-    repository = new DesarquivamentoTypeOrmRepository(
-      {} as any,
-      {} as any,
-      {} as any,
-    );
+    repository = new DesarquivamentoTypeOrmRepository({} as any, {} as any);
   });
 
   it("normaliza termo de busca removendo acentos e padronizando para minúsculas", () => {

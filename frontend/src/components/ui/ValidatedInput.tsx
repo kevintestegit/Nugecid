@@ -1,13 +1,14 @@
-import React, { useState, useEffect, InputHTMLAttributes } from 'react';
-import { cn } from '@/utils/cn';
-import { CheckCircle, XCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, InputHTMLAttributes } from "react";
+import { cn } from "@/utils/cn";
+import { CheckCircle, XCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 type ValidationRule = {
   validate: (value: string) => boolean;
   message: string;
 };
 
-interface ValidatedInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+interface ValidatedInputProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   label?: string;
   hint?: string;
   rules?: ValidationRule[];
@@ -27,11 +28,11 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
   validateOnChange = true,
   validateOnBlur = true,
   showValidIcon = true,
-  value = '',
+  value = "",
   onChange,
   required = false,
   containerClassName,
-  type = 'text',
+  type = "text",
   className,
   disabled,
   placeholder,
@@ -51,7 +52,7 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
 
     // Required validation
     if (required && !val.trim()) {
-      validationErrors.push('Este campo é obrigatório');
+      validationErrors.push("Este campo é obrigatório");
       return validationErrors;
     }
 
@@ -88,12 +89,15 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
   };
 
   const hasErrors = touched && errors.length > 0;
-  const isValid = touched && errors.length === 0 && (inputValue.trim().length > 0 || required);
-  const showPasswordToggle = type === 'password';
-  const inputType = showPasswordToggle && showPassword ? 'text' : type;
+  const isValid =
+    touched &&
+    errors.length === 0 &&
+    (inputValue.trim().length > 0 || required);
+  const showPasswordToggle = type === "password";
+  const inputType = showPasswordToggle && showPassword ? "text" : type;
 
   return (
-    <div className={cn('space-y-2', containerClassName)}>
+    <div className={cn("space-y-2", containerClassName)}>
       {/* Label */}
       {label && (
         <label className="block text-sm font-medium text-foreground">
@@ -113,15 +117,15 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
           disabled={disabled}
           placeholder={placeholder}
           className={cn(
-            'w-full px-3 py-2 border rounded-md bg-background text-foreground transition-all',
-            'focus:outline-none focus:ring-2 focus:border-transparent',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            hasErrors && 'border-red-500 focus:ring-red-500',
-            isValid && 'border-green-500 focus:ring-green-500',
-            !hasErrors && !isValid && 'border-border focus:ring-primary',
-            (showValidIcon && (isValid || hasErrors)) && 'pr-10',
-            showPasswordToggle && 'pr-10',
-            className
+            "w-full px-3 py-2 border rounded-md bg-background text-foreground transition-all",
+            "focus:outline-none focus:ring-2 focus:border-transparent",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            hasErrors && "border-red-500 focus:ring-red-500",
+            isValid && "border-green-500 focus:ring-green-500",
+            !hasErrors && !isValid && "border-border focus:ring-primary",
+            showValidIcon && (isValid || hasErrors) && "pr-10",
+            showPasswordToggle && "pr-10",
+            className,
           )}
         />
 
@@ -162,7 +166,10 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
       {hasErrors && (
         <div className="space-y-1">
           {errors.map((error, index) => (
-            <p key={index} className="text-xs text-red-500 flex items-center gap-1">
+            <p
+              key={index}
+              className="text-xs text-red-500 flex items-center gap-1"
+            >
               <XCircle className="h-3 w-3 flex-shrink-0" />
               {error}
             </p>
@@ -177,7 +184,7 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
 export const ValidationRules = {
   email: (): ValidationRule => ({
     validate: (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-    message: 'Digite um e-mail válido',
+    message: "Digite um e-mail válido",
   }),
 
   minLength: (length: number): ValidationRule => ({
@@ -192,28 +199,31 @@ export const ValidationRules = {
 
   password: (): ValidationRule => ({
     validate: (value: string) =>
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/.test(value),
-    message: 'Senha deve ter no mínimo 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais',
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/.test(
+        value,
+      ),
+    message:
+      "Senha deve ter no mínimo 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais",
   }),
 
   numeric: (): ValidationRule => ({
     validate: (value: string) => /^\d+$/.test(value),
-    message: 'Digite apenas números',
+    message: "Digite apenas números",
   }),
 
   phone: (): ValidationRule => ({
     validate: (value: string) => /^\(\d{2}\)\s?\d{4,5}-?\d{4}$/.test(value),
-    message: 'Digite um telefone válido: (XX) XXXXX-XXXX',
+    message: "Digite um telefone válido: (XX) XXXXX-XXXX",
   }),
 
   cpf: (): ValidationRule => ({
     validate: (value: string) => {
-      const cpf = value.replace(/\D/g, '');
+      const cpf = value.replace(/\D/g, "");
       if (cpf.length !== 11) return false;
       // Validação básica de CPF
       return true; // Implementar validação completa se necessário
     },
-    message: 'Digite um CPF válido',
+    message: "Digite um CPF válido",
   }),
 
   url: (): ValidationRule => ({
@@ -225,7 +235,7 @@ export const ValidationRules = {
         return false;
       }
     },
-    message: 'Digite uma URL válida',
+    message: "Digite uma URL válida",
   }),
 
   match: (otherValue: string, fieldName: string): ValidationRule => ({
@@ -233,7 +243,10 @@ export const ValidationRules = {
     message: `Os campos ${fieldName} não coincidem`,
   }),
 
-  custom: (validator: (value: string) => boolean, message: string): ValidationRule => ({
+  custom: (
+    validator: (value: string) => boolean,
+    message: string,
+  ): ValidationRule => ({
     validate: validator,
     message,
   }),

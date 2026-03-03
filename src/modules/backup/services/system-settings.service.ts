@@ -49,23 +49,18 @@ export class SystemSettingsService {
     updateDto: UpdateSystemSettingsDto,
   ): Promise<SystemSettings> {
     const settings = await this.getSettings();
-
-    this.logger.log(
-      `Valores recebidos para atualização: ${JSON.stringify(updateDto)}`,
+    const updatedKeys = Object.keys(updateDto).filter(
+      (key) => updateDto[key as keyof UpdateSystemSettingsDto] !== undefined,
     );
-    this.logger.log(`Configurações antes: ${JSON.stringify(settings)}`);
 
     // Atualiza apenas os campos fornecidos
     Object.assign(settings, updateDto);
 
-    this.logger.log(
-      `Configurações depois de assign: ${JSON.stringify(settings)}`,
-    );
-
     const updatedSettings = await this.systemSettingsRepository.save(settings);
 
-    this.logger.log("Configurações do sistema atualizadas");
-    this.logger.log(`Configurações salvas: ${JSON.stringify(updatedSettings)}`);
+    this.logger.log(
+      `Configurações do sistema atualizadas (${updatedKeys.join(", ") || "nenhum campo informado"})`,
+    );
 
     return updatedSettings;
   }

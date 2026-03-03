@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/services/api";
+import { apiService } from "@/services/api";
 
 export interface OnlineUser {
   id: number;
@@ -19,20 +19,20 @@ export function useOnlineUsers() {
   return useQuery<OnlineUser[], Error>({
     queryKey: QUERY_KEYS.onlineUsers,
     queryFn: async (): Promise<OnlineUser[]> => {
-      try {
-        const response = await api.get("/auth/online-users");
-        // A API usa TransformInterceptor e envolve as respostas em { success, data, ... }
-        const envelope = response?.data;
-        const payload = envelope?.data ?? envelope; // fallback caso interceptor esteja desativado
-        const list = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : [];
-        return list;
-      } catch (error: unknown) {
-        throw error;
+      const response = await apiService.getOnlineUsers();
+      if (!Array.isArray(response.data)) {
+        return [];
       }
+
+      return response.data.map((user) => ({
+        id: user.id,
+        nome: user.nome,
+        usuario: user.usuario,
+        role: user.role?.name ?? "",
+        lastActivity: user.updatedAt,
+        avatarUrl: user.avatarUrl ?? null,
+        avatar: user.avatar ?? null,
+      }));
     },
     refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 15000, // Data is fresh for 15 seconds

@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/services/api';
-import { Desarquivamento } from '@/types';
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
+import { Desarquivamento } from "@/types";
 
 export interface DashboardStatsData {
   totalDesarquivamentos: number;
@@ -25,14 +25,14 @@ export interface DashboardStatsResponse {
 }
 
 export const QUERY_KEYS = {
-  dashboardStats: ['dashboardStats'] as const,
+  dashboardStats: ["dashboardStats"] as const,
 };
 
 export function useDashboardStats() {
   return useQuery<DashboardStatsResponse, Error>({
     queryKey: QUERY_KEYS.dashboardStats,
     queryFn: async () => {
-      const response = await api.get('/estatisticas/cards');
+      const response = await api.get("/estatisticas/cards");
       return response.data;
     },
     staleTime: 30000, // 30s para reduzir refetch agressivo mantendo frescor

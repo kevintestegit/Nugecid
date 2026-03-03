@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { cn } from '@/utils/cn';
+import React, { ReactNode } from "react";
+import { cn } from "@/utils/cn";
 import {
   FileX,
   FolderOpen,
@@ -8,7 +8,7 @@ import {
   Inbox,
   AlertCircle,
   LucideIcon,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface EmptyStateProps {
   icon?: LucideIcon;
@@ -23,35 +23,35 @@ interface EmptyStateProps {
     onClick: () => void;
   };
   className?: string;
-  variant?: 'default' | 'compact' | 'card';
+  variant?: "default" | "compact" | "card";
   children?: ReactNode;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
   icon: Icon = Inbox,
-  title = 'Nenhum item encontrado',
+  title = "Nenhum item encontrado",
   description,
   action,
   secondaryAction,
   className,
-  variant = 'default',
+  variant = "default",
   children,
 }) => {
   const variantStyles = {
     default: {
-      container: 'py-16',
-      iconSize: 'h-16 w-16',
-      titleSize: 'text-xl',
+      container: "py-16",
+      iconSize: "h-16 w-16",
+      titleSize: "text-xl",
     },
     compact: {
-      container: 'py-8',
-      iconSize: 'h-12 w-12',
-      titleSize: 'text-lg',
+      container: "py-8",
+      iconSize: "h-12 w-12",
+      titleSize: "text-lg",
     },
     card: {
-      container: 'py-12 px-6 border border-border rounded-lg bg-muted/30',
-      iconSize: 'h-14 w-14',
-      titleSize: 'text-lg',
+      container: "py-12 px-6 border border-border rounded-lg bg-muted/30",
+      iconSize: "h-14 w-14",
+      titleSize: "text-lg",
     },
   };
 
@@ -60,16 +60,18 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center text-center',
+        "flex flex-col items-center justify-center text-center",
         styles.container,
-        className
+        className,
       )}
     >
       <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
-        <Icon className={cn(styles.iconSize, 'text-muted-foreground')} />
+        <Icon className={cn(styles.iconSize, "text-muted-foreground")} />
       </div>
 
-      <h3 className={cn('font-semibold text-foreground mb-2', styles.titleSize)}>
+      <h3
+        className={cn("font-semibold text-foreground mb-2", styles.titleSize)}
+      >
         {title}
       </h3>
 
@@ -108,7 +110,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
 // Variantes pré-configuradas para casos comuns
 
-export const NoResultsFound: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> = (props) => (
+export const NoResultsFound: React.FC<
+  Omit<EmptyStateProps, "icon" | "title">
+> = (props) => (
   <EmptyState
     icon={Search}
     title="Nenhum resultado encontrado"
@@ -117,7 +121,9 @@ export const NoResultsFound: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> =
   />
 );
 
-export const NoDataAvailable: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> = (props) => (
+export const NoDataAvailable: React.FC<
+  Omit<EmptyStateProps, "icon" | "title">
+> = (props) => (
   <EmptyState
     icon={Database}
     title="Nenhum dado disponível"
@@ -126,7 +132,9 @@ export const NoDataAvailable: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> 
   />
 );
 
-export const NoFilesFound: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> = (props) => (
+export const NoFilesFound: React.FC<Omit<EmptyStateProps, "icon" | "title">> = (
+  props,
+) => (
   <EmptyState
     icon={FileX}
     title="Nenhum arquivo encontrado"
@@ -135,7 +143,9 @@ export const NoFilesFound: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> = (
   />
 );
 
-export const EmptyFolder: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> = (props) => (
+export const EmptyFolder: React.FC<Omit<EmptyStateProps, "icon" | "title">> = (
+  props,
+) => (
   <EmptyState
     icon={FolderOpen}
     title="Pasta vazia"
@@ -144,9 +154,9 @@ export const EmptyFolder: React.FC<Omit<EmptyStateProps, 'icon' | 'title'>> = (p
   />
 );
 
-export const ErrorState: React.FC<Omit<EmptyStateProps, 'icon' | 'title' | 'variant'>> = (
-  props
-) => (
+export const ErrorState: React.FC<
+  Omit<EmptyStateProps, "icon" | "title" | "variant">
+> = (props) => (
   <EmptyState
     icon={AlertCircle}
     title="Erro ao carregar dados"
@@ -165,7 +175,7 @@ interface EmptyStateWithLoadingProps extends EmptyStateProps {
 
 export const EmptyStateWithLoading: React.FC<EmptyStateWithLoadingProps> = ({
   isLoading,
-  loadingText = 'Carregando...',
+  loadingText = "Carregando...",
   skeletonCount = 3,
   ...emptyStateProps
 }) => {
@@ -173,10 +183,7 @@ export const EmptyStateWithLoading: React.FC<EmptyStateWithLoadingProps> = ({
     return (
       <div className="space-y-3 py-8">
         {Array.from({ length: skeletonCount }).map((_, index) => (
-          <div
-            key={index}
-            className="h-16 bg-muted rounded-lg animate-pulse"
-          />
+          <div key={index} className="h-16 bg-muted rounded-lg animate-pulse" />
         ))}
         <p className="text-center text-sm text-muted-foreground mt-4">
           {loadingText}

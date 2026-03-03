@@ -1,21 +1,34 @@
-import React, { Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { Suspense, useEffect } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Layout from "@/components/layout/Layout";
 import LoginPage from "@/pages/LoginPage";
-import { PageLoading } from "@/components/ui/Loading";
+import { PageLoading, RouteLoading } from "@/components/ui/Loading";
 import { UserRole } from "@/types";
+import {
+  APP_NAVIGATE_EVENT,
+  AUTH_REQUIRED_EVENT,
+} from "@/lib/navigation/navigationEvents";
 
 import {
   dashboardPage,
   desarquivamentosPage,
   novoDesarquivamentoPage,
   detalhesDesarquivamentoPage,
+  termoDesarquivamentoPreviewPage,
   editDesarquivamentoPage,
   usuariosPage,
   novoUsuarioPage,
+  detalheUsuarioPage,
   editarUsuarioPage,
   configuracoesPage,
+  sobrePage,
   lixeiraPage,
   tarefasPage,
   novaTarefaPage,
@@ -30,14 +43,76 @@ import {
   bancoVestigiosPage,
   relatoriosPage,
   notificacoesPage,
+  auditoriaPage,
+  notFoundPage,
 } from "@/routes/lazyPages";
+
+const renderLazyRoute = (Component: React.ComponentType<object>) => (
+  <Suspense fallback={<RouteLoading />}>
+    <Component />
+  </Suspense>
+);
+
+const AppNavigationEffects: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const handleAppNavigate = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        to: string;
+        replace?: boolean;
+      }>;
+      const target = customEvent.detail?.to;
+
+      if (!target) {
+        return;
+      }
+
+      navigate(target, { replace: customEvent.detail?.replace ?? false });
+    };
+
+    const handleAuthRequired = (event: Event) => {
+      const customEvent = event as CustomEvent<{ redirectTo?: string }>;
+      const target = customEvent.detail?.redirectTo ?? "/login";
+
+      if (location.pathname === target) {
+        return;
+      }
+
+      navigate(target, {
+        replace: true,
+        state: { from: location.pathname },
+      });
+    };
+
+    window.addEventListener(APP_NAVIGATE_EVENT, handleAppNavigate);
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+
+    return () => {
+      window.removeEventListener(APP_NAVIGATE_EVENT, handleAppNavigate);
+      window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    };
+  }, [location.pathname, navigate]);
+
+  return null;
+};
 
 const App: React.FC = () => {
   return (
-    <Suspense fallback={<PageLoading />}>
+    <>
+      <AppNavigationEffects />
       <Routes>
         {/* Rota de login */}
         <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/404"
+          element={
+            <Suspense fallback={<PageLoading />}>
+              <notFoundPage.Component />
+            </Suspense>
+          }
+        />
 
         {/* Rotas protegidas com layout */}
         <Route
@@ -49,30 +124,34 @@ const App: React.FC = () => {
           }
         >
           {/* Dashboard */}
-          <Route index element={<dashboardPage.Component />} />
+          <Route index element={renderLazyRoute(dashboardPage.Component)} />
 
           {/* Desarquivamentos */}
           <Route
             path="desarquivamentos"
-            element={<desarquivamentosPage.Component />}
+            element={renderLazyRoute(desarquivamentosPage.Component)}
           />
           <Route
             path="desarquivamentos/novo"
-            element={<novoDesarquivamentoPage.Component />}
+            element={renderLazyRoute(novoDesarquivamentoPage.Component)}
           />
           <Route
             path="desarquivamentos/:id"
-            element={<detalhesDesarquivamentoPage.Component />}
+            element={renderLazyRoute(detalhesDesarquivamentoPage.Component)}
+          />
+          <Route
+            path="desarquivamentos/:id/termo/visualizar"
+            element={renderLazyRoute(termoDesarquivamentoPreviewPage.Component)}
           />
           <Route
             path="desarquivamentos/:id/editar"
-            element={<editDesarquivamentoPage.Component />}
+            element={renderLazyRoute(editDesarquivamentoPage.Component)}
           />
 
           {/* Lixeira */}
           <Route
             path="desarquivamentos/lixeira"
-            element={<lixeiraPage.Component />}
+            element={renderLazyRoute(lixeiraPage.Component)}
           />
           <Route
             path="lixeira"
@@ -80,36 +159,57 @@ const App: React.FC = () => {
           />
 
           {/* Tarefas */}
-          <Route path="tarefas" element={<tarefasPage.Component />} />
-          <Route path="tarefas/nova" element={<novaTarefaPage.Component />} />
-          <Route path="tarefas/:id" element={<detalheTarefaPage.Component />} />
+          <Route
+            path="tarefas"
+            element={renderLazyRoute(tarefasPage.Component)}
+          />
+          <Route
+            path="tarefas/nova"
+            element={renderLazyRoute(novaTarefaPage.Component)}
+          />
+          <Route
+            path="tarefas/:id"
+            element={renderLazyRoute(detalheTarefaPage.Component)}
+          />
 
           {/* Projetos Kanban */}
-          <Route path="projetos" element={<projetosPage.Component />} />
+          <Route
+            path="projetos"
+            element={renderLazyRoute(projetosPage.Component)}
+          />
           <Route
             path="projetos/:id"
-            element={<projetoDetailPage.Component />}
+            element={renderLazyRoute(projetoDetailPage.Component)}
           />
-          <Route path="kanban/:id" element={<kanbanPage.Component />} />
+          <Route
+            path="kanban/:id"
+            element={renderLazyRoute(kanbanPage.Component)}
+          />
 
           {/* Custódia de Vestígios */}
           <Route
             path="custodia"
-            element={<custodiaVestigiosPage.Component />}
+            element={renderLazyRoute(custodiaVestigiosPage.Component)}
           />
           <Route
             path="custodia/banco-vestigios"
-            element={<bancoVestigiosPage.Component />}
+            element={renderLazyRoute(bancoVestigiosPage.Component)}
           />
 
           {/* Relatórios */}
-          <Route path="relatorios" element={<relatoriosPage.Component />} />
+          <Route
+            path="relatorios"
+            element={renderLazyRoute(relatoriosPage.Component)}
+          />
 
           {/* Arquivo */}
-          <Route path="arquivo" element={<arquivoPage.Component />} />
+          <Route
+            path="arquivo"
+            element={renderLazyRoute(arquivoPage.Component)}
+          />
           <Route
             path="arquivo/:id"
-            element={<prateleiraDetailPage.Component />}
+            element={renderLazyRoute(prateleiraDetailPage.Component)}
           />
 
           {/* Usuários - apenas para coordenadores e admins */}
@@ -117,7 +217,7 @@ const App: React.FC = () => {
             path="usuarios"
             element={
               <ProtectedRoute requiredRole={UserRole.COORDENADOR}>
-                <usuariosPage.Component />
+                {renderLazyRoute(usuariosPage.Component)}
               </ProtectedRoute>
             }
           />
@@ -125,7 +225,15 @@ const App: React.FC = () => {
             path="usuarios/novo"
             element={
               <ProtectedRoute requiredRole={UserRole.COORDENADOR}>
-                <novoUsuarioPage.Component />
+                {renderLazyRoute(novoUsuarioPage.Component)}
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="usuarios/:id"
+            element={
+              <ProtectedRoute requiredRole={UserRole.COORDENADOR}>
+                {renderLazyRoute(detalheUsuarioPage.Component)}
               </ProtectedRoute>
             }
           />
@@ -133,7 +241,7 @@ const App: React.FC = () => {
             path="usuarios/:id/editar"
             element={
               <ProtectedRoute requiredRole={UserRole.COORDENADOR}>
-                <editarUsuarioPage.Component />
+                {renderLazyRoute(editarUsuarioPage.Component)}
               </ProtectedRoute>
             }
           />
@@ -141,20 +249,35 @@ const App: React.FC = () => {
           {/* Configurações */}
           <Route
             path="configuracoes"
-            element={<configuracoesPage.Component />}
+            element={renderLazyRoute(configuracoesPage.Component)}
           />
+          <Route path="sobre" element={renderLazyRoute(sobrePage.Component)} />
 
           {/* Notificações */}
-          <Route path="notificacoes" element={<notificacoesPage.Component />} />
+          <Route
+            path="notificacoes"
+            element={renderLazyRoute(notificacoesPage.Component)}
+          />
+          <Route
+            path="auditoria"
+            element={
+              <ProtectedRoute requiredRole={UserRole.COORDENADOR}>
+                {renderLazyRoute(auditoriaPage.Component)}
+              </ProtectedRoute>
+            }
+          />
 
           {/* Teste de ícones - temporário */}
-          <Route path="test-icons" element={<searchIconTestPage.Component />} />
+          <Route
+            path="test-icons"
+            element={renderLazyRoute(searchIconTestPage.Component)}
+          />
         </Route>
 
-        {/* Redirecionar rotas não encontradas para o dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Página 404 para rotas não encontradas */}
+        <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>
-    </Suspense>
+    </>
   );
 };
 

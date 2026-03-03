@@ -355,11 +355,11 @@ export const getErrorMessage = (
   technicalDetails?: string;
   suggestion?: string;
 } => {
-  // Import inline check for axios errors
   const isAxiosLike = (
     e: unknown,
   ): e is {
     message: string;
+    code?: string;
     response?: { status: number; data?: Record<string, unknown> };
   } => typeof e === "object" && e !== null && "message" in e;
 
@@ -372,13 +372,37 @@ export const getErrorMessage = (
     };
   }
 
-  // Erro de rede
-  if (error.message === "Network Error" || !error.response) {
+  const technicalDetails =
+    error.response?.data != null
+      ? JSON.stringify(error.response.data, null, 2)
+      : error.message;
+
+  const isTimeoutError =
+    error.code === "ECONNABORTED" ||
+    /timeout of \d+ms exceeded/i.test(error.message);
+
+  if (isTimeoutError) {
+    return {
+      title: "Tempo Limite Excedido",
+      message: "O servidor demorou mais do que o esperado para responder.",
+      suggestion:
+        "Tente novamente. Operações como backup e restauração podem levar alguns minutos.",
+      technicalDetails,
+    };
+  }
+
+  const isNetworkError =
+    error.message === "Network Error" ||
+    error.code === "ERR_NETWORK" ||
+    error.message.includes("Failed to fetch") ||
+    error.message.includes("fetch");
+
+  if (isNetworkError && !error.response) {
     return {
       title: "Erro de Conexão",
       message: "Não foi possível conectar ao servidor.",
       suggestion: "Verifique sua conexão com a internet e tente novamente.",
-      technicalDetails: String(error),
+      technicalDetails,
     };
   }
 
@@ -438,13 +462,13 @@ export const getErrorMessage = (
   }
 
   // Erro 500 - Internal Server Error
-  if (status >= 500) {
+  if (typeof status === "number" && status >= 500) {
     return {
       title: "Erro no Servidor",
       message: "Ocorreu um erro interno no servidor.",
       suggestion:
         "Tente novamente mais tarde. Se o problema persistir, entre em contato com o suporte.",
-      technicalDetails: JSON.stringify(data, null, 2),
+      technicalDetails,
     };
   }
 
@@ -456,7 +480,7 @@ export const getErrorMessage = (
       error.message ||
       "Ocorreu um erro inesperado.",
     details: data?.error as string | undefined,
-    technicalDetails: JSON.stringify(data || error, null, 2),
+    technicalDetails,
   };
 };
 

@@ -78,7 +78,8 @@ const LoginPage: React.FC = () => {
               Sistema de Gerenciamento Eletrônico de Documentos - GED
             </p>
             <p className="mt-2 text-sm text-white/60">
-              Polícia Científica do Rio Grande do Norte - Setor de Gestão da Informação
+              Polícia Científica do Rio Grande do Norte - Setor de Gestão da
+              Informação
             </p>
           </div>
         </div>

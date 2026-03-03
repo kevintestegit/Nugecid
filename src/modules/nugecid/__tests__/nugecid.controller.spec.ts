@@ -21,6 +21,7 @@ import { NugecidDocxService } from "../nugecid-docx.service";
 import { NugecidService } from "../nugecid.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
+import { AntivirusService } from "../../security/antivirus.service";
 
 describe("NugecidController", () => {
   let controller: NugecidController;
@@ -46,6 +47,10 @@ describe("NugecidController", () => {
         { provide: NugecidAuditService, useValue: {} },
         { provide: NugecidDocxService, useValue: {} },
         { provide: NugecidService, useValue: {} },
+        {
+          provide: AntivirusService,
+          useValue: { scanUploadedFile: jest.fn(), scanBuffer: jest.fn() },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)

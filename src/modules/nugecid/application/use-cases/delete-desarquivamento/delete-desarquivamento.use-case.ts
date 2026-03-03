@@ -5,6 +5,7 @@ import {
   IDesarquivamentoRepository,
 } from "../../../domain";
 import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
+import { DesarquivamentoEffectsPublisher } from "../../services/desarquivamento-effects.publisher";
 
 export interface DeleteDesarquivamentoRequest {
   id: number;
@@ -26,6 +27,7 @@ export class DeleteDesarquivamentoUseCase {
   constructor(
     @Inject(DESARQUIVAMENTO_REPOSITORY_TOKEN)
     private readonly desarquivamentoRepository: IDesarquivamentoRepository,
+    private readonly desarquivamentoEffectsPublisher: DesarquivamentoEffectsPublisher,
   ) {}
 
   async execute(
@@ -258,6 +260,10 @@ export class DeleteDesarquivamentoUseCase {
       );
 
       await this.desarquivamentoRepository.softDelete(desarquivamento.id);
+      this.desarquivamentoEffectsPublisher.publishEntityChange({
+        action: "deleted",
+        entityId: desarquivamento.id.value,
+      });
 
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
@@ -324,6 +330,10 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] 🔄 Executando delete permanente via repositório...`,
       );
       await this.desarquivamentoRepository.delete(desarquivamento.id);
+      this.desarquivamentoEffectsPublisher.publishEntityChange({
+        action: "deleted",
+        entityId: desarquivamento.id.value,
+      });
 
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
@@ -377,6 +387,7 @@ export class RestoreDesarquivamentoUseCase {
   constructor(
     @Inject(DESARQUIVAMENTO_REPOSITORY_TOKEN)
     private readonly desarquivamentoRepository: IDesarquivamentoRepository,
+    private readonly desarquivamentoEffectsPublisher: DesarquivamentoEffectsPublisher,
   ) {}
 
   async execute(request: {
@@ -483,6 +494,11 @@ export class RestoreDesarquivamentoUseCase {
 
       // Restaurar registro usando o método restore do repositório TypeORM
       await this.desarquivamentoRepository.restore(desarquivamentoId);
+      this.desarquivamentoEffectsPublisher.publishEntityChange({
+        action: "restored",
+        entityId: desarquivamentoId.value,
+        status: desarquivamento.status.value,
+      });
 
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();

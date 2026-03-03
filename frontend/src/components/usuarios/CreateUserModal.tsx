@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, UserPlus } from "lucide-react";
 import { useCreateUser } from "@/hooks/useUsers";
@@ -57,25 +58,25 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
         onClick={handleBackdropClick}
       />
       <div className="fixed inset-0 z-[1000] flex items-center justify-center pointer-events-none">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4 pointer-events-auto">
+        <div className="relative bg-background rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4 pointer-events-auto">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between p-6 border-b border-border">
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                 <UserPlus className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">
+                <h3 className="text-lg font-semibold text-foreground">
                   Novo Usuário
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Preencha os dados para criar um novo usuário
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+              className="text-gray-400 hover:text-muted-foreground p-1 rounded hover:bg-gray-100 transition-colors"
               title="Fechar"
             >
               <X className="h-5 w-5" />

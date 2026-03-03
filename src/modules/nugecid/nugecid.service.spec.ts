@@ -154,6 +154,53 @@ describe("NugecidService", () => {
     expect(result.desarquivamentos).toHaveLength(1);
   });
 
+  it("deve aplicar o filtro de atenção necessária", async () => {
+    const qb = makeQueryBuilder();
+    mockDesarquivamentoRepository.createQueryBuilder.mockReturnValue(qb);
+
+    await service.findAll({
+      page: 1,
+      limit: 10,
+      atencaoNecessaria: true,
+    });
+
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      "desarquivamento.status = :statusSolicitado",
+      {
+        statusSolicitado: StatusDesarquivamentoEnum.SOLICITADO,
+      },
+    );
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      "desarquivamento.dataSolicitacao <= :fiveDaysAgo",
+      expect.objectContaining({
+        fiveDaysAgo: expect.any(Date),
+      }),
+    );
+  });
+
+  it("deve parametrizar a busca e não interpolar payload de SQL injection", async () => {
+    const qb = makeQueryBuilder();
+    mockDesarquivamentoRepository.createQueryBuilder.mockReturnValue(qb);
+    const maliciousSearch = "' OR 1=1 --";
+
+    await service.findAll({
+      page: 1,
+      limit: 10,
+      search: maliciousSearch,
+    });
+
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      expect.stringContaining("ILIKE :search"),
+      expect.objectContaining({
+        search: `%${maliciousSearch}%`,
+      }),
+    );
+    expect(qb.andWhere).not.toHaveBeenCalledWith(
+      expect.stringContaining(maliciousSearch),
+      expect.anything(),
+    );
+  });
+
   it("deve buscar um desarquivamento por id", async () => {
     const qb = makeQueryBuilder();
     mockDesarquivamentoRepository.createQueryBuilder.mockReturnValue(qb);

@@ -538,7 +538,7 @@ export async function generateDesarquivamentoDocx(
         logger.log(`Logo RN carregada de: ${logoPath}`);
         break;
       }
-    } catch (error) {
+    } catch {
       // Tentar próximo caminho
     }
   }
@@ -554,7 +554,7 @@ export async function generateDesarquivamentoDocx(
         logger.log(`Logo ITEP carregada de: ${logoPath}`);
         break;
       }
-    } catch (error) {
+    } catch {
       // Tentar próximo caminho
     }
   }
