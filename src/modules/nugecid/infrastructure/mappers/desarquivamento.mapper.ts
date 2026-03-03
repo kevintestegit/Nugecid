@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { DesarquivamentoDomain } from "../../domain/entities/desarquivamento.entity";
 import { DesarquivamentoTypeOrmEntity } from "../entities/desarquivamento.typeorm-entity";
 import {
@@ -10,6 +10,8 @@ import { TipoDesarquivamentoEnum } from "../../domain/enums/tipo-desarquivamento
 
 @Injectable()
 export class DesarquivamentoMapper {
+  private readonly logger = new Logger(DesarquivamentoMapper.name);
+
   /**
    * Converte string do banco para StatusDesarquivamentoEnum
    */
@@ -33,7 +35,7 @@ export class DesarquivamentoMapper {
         return StatusDesarquivamentoEnum.NAO_LOCALIZADO;
       default:
         // Valor padrão para casos desconhecidos
-        console.warn(
+        this.logger.warn(
           `Status desconhecido do banco: ${statusString}, usando SOLICITADO como padrão`,
         );
         return StatusDesarquivamentoEnum.SOLICITADO;

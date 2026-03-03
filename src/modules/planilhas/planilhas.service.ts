@@ -153,12 +153,30 @@ export class PlanilhasService {
     return this.mapToResponse(planilha);
   }
 
-  async findAll(): Promise<PlanilhaControleResponse[]> {
+  async findAll(options?: { page?: number; limit?: number }): Promise<{
+    data: PlanilhaControleResponse[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
     await this.ensureSchema();
-    const registros = await this.planilhasRepository.find({
+    const page = options?.page ?? 1;
+    const limit = options?.limit ?? 50;
+
+    const [registros, total] = await this.planilhasRepository.findAndCount({
       order: { dataUpload: "DESC" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-    return registros.map((planilha) => this.mapToResponse(planilha));
+
+    return {
+      data: registros.map((planilha) => this.mapToResponse(planilha)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async remove(id: string): Promise<void> {
