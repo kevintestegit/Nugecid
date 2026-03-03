@@ -29,7 +29,18 @@ export class VestigiosService {
     delegacia?: string;
     categoria?: string;
     mesReferencia?: string;
-  }): Promise<Vestigio[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    data: Vestigio[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 50;
+
     const query = this.vestigioRepository
       .createQueryBuilder("vestigio")
       .leftJoinAndSelect("vestigio.criadoPor", "criadoPor");
@@ -58,7 +69,12 @@ export class VestigiosService {
 
     query.orderBy("vestigio.createdAt", "DESC");
 
-    return await query.getMany();
+    const [data, total] = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string): Promise<Vestigio> {
@@ -111,27 +127,45 @@ export class VestigiosService {
     porCategoria: Record<string, number>;
     porDelegacia: Record<string, number>;
   }> {
-    const vestigios = await this.vestigioRepository.find();
+    const [statusRows, categoriaRows, delegaciaRows] = await Promise.all([
+      this.vestigioRepository
+        .createQueryBuilder("v")
+        .select("v.status", "key")
+        .addSelect("COUNT(v.id)", "count")
+        .groupBy("v.status")
+        .getRawMany(),
+      this.vestigioRepository
+        .createQueryBuilder("v")
+        .select("v.categoria", "key")
+        .addSelect("COUNT(v.id)", "count")
+        .where("v.categoria IS NOT NULL")
+        .groupBy("v.categoria")
+        .getRawMany(),
+      this.vestigioRepository
+        .createQueryBuilder("v")
+        .select("v.delegacia", "key")
+        .addSelect("COUNT(v.id)", "count")
+        .where("v.delegacia IS NOT NULL")
+        .groupBy("v.delegacia")
+        .getRawMany(),
+    ]);
 
-    const porStatus: Record<string, number> = {};
-    const porCategoria: Record<string, number> = {};
-    const porDelegacia: Record<string, number> = {};
+    const toRecord = (
+      rows: { key: string; count: string }[],
+    ): Record<string, number> =>
+      rows.reduce(
+        (acc, r) => ({ ...acc, [r.key]: Number(r.count) }),
+        {} as Record<string, number>,
+      );
 
-    vestigios.forEach((v) => {
-      porStatus[v.status] = (porStatus[v.status] || 0) + 1;
-      if (v.categoria) {
-        porCategoria[v.categoria] = (porCategoria[v.categoria] || 0) + 1;
-      }
-      if (v.delegacia) {
-        porDelegacia[v.delegacia] = (porDelegacia[v.delegacia] || 0) + 1;
-      }
-    });
+    const porStatus = toRecord(statusRows);
+    const total = Object.values(porStatus).reduce((sum, n) => sum + n, 0);
 
     return {
-      total: vestigios.length,
+      total,
       porStatus,
-      porCategoria,
-      porDelegacia,
+      porCategoria: toRecord(categoriaRows),
+      porDelegacia: toRecord(delegaciaRows),
     };
   }
 }

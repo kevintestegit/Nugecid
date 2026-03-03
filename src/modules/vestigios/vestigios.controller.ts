@@ -43,12 +43,16 @@ export class VestigiosController {
     @Query("delegacia") delegacia?: string,
     @Query("categoria") categoria?: string,
     @Query("mesReferencia") mesReferencia?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
   ) {
     return this.vestigiosService.findAll({
       status,
       delegacia,
       categoria,
       mesReferencia,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
     });
   }
 

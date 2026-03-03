@@ -4,6 +4,7 @@ import {
   Post,
   Delete,
   Param,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -49,8 +50,11 @@ export class PlanilhasController {
   constructor(private readonly planilhasService: PlanilhasService) {}
 
   @Get()
-  findAll() {
-    return this.planilhasService.findAll();
+  findAll(@Query("page") page?: string, @Query("limit") limit?: string) {
+    return this.planilhasService.findAll({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get("geral")

@@ -164,8 +164,8 @@ export class DesarquivamentoTypeOrmRepository
     // Filtrar entidades com IDs válidos e converter para domínio
     const validEntities = entities.filter((entity) => {
       if (!entity.id || entity.id <= 0) {
-        console.warn(
-          `[DesarquivamentoRepository] Entidade com ID inválido encontrada e filtrada: ${entity.id}`,
+        this.logger.warn(
+          `Entidade com ID inválido encontrada e filtrada: ${entity.id}`,
         );
         return false;
       }
@@ -177,9 +177,8 @@ export class DesarquivamentoTypeOrmRepository
         try {
           return this.mapper.toDomain(e);
         } catch (error) {
-          console.error(
-            `[DesarquivamentoRepository] Erro ao converter entidade para domínio (ID: ${e.id}):`,
-            error.message,
+          this.logger.error(
+            `Erro ao converter entidade para domínio (ID: ${e.id}): ${error.message}`,
           );
           return null;
         }
