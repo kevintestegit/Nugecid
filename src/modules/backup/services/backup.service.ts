@@ -553,9 +553,13 @@ export class BackupService {
 
         tempSqlFile = path.join(extractDir, sqlFile);
 
-        // 1. Restaurar banco de dados
-        this.logger.log("🔄 Restaurando banco de dados...");
+        // 1. Truncar tabelas existentes para evitar duplicação
+        this.logger.log("🗑️ Preparando banco para restauração...");
         const dbConfig = this.getDatabaseConfig();
+        await this.executePreRestoreTruncate(dbConfig);
+
+        // 2. Restaurar banco de dados
+        this.logger.log("🔄 Restaurando banco de dados...");
         const restoreCommand = this.buildRestoreCommand(dbConfig, tempSqlFile);
 
         // Executa com senha via variável de ambiente (mais seguro)
@@ -565,7 +569,7 @@ export class BackupService {
           await this.executeWithPgPassword(restoreCommand, dbConfig.password);
         }
 
-        // 2. Restaurar arquivos uploads/ se existirem
+        // 3. Restaurar arquivos uploads/ se existirem
         const uploadsInBackup = path.join(extractDir, "uploads");
         if (existsSync(uploadsInBackup)) {
           this.logger.log("📁 Restaurando arquivos uploads/...");
@@ -606,8 +610,11 @@ export class BackupService {
         await fs.rm(extractDir, { recursive: true, force: true });
       } else {
         // Backup apenas do banco de dados (.sql)
-        this.logger.log("🔄 Restaurando apenas banco de dados...");
+        this.logger.log("🗑️ Preparando banco para restauração...");
         const dbConfig = this.getDatabaseConfig();
+        await this.executePreRestoreTruncate(dbConfig);
+
+        this.logger.log("🔄 Restaurando apenas banco de dados...");
         const command = this.buildRestoreCommand(dbConfig, filepath);
 
         // Executa com senha via variável de ambiente (mais seguro)
@@ -808,16 +815,20 @@ export class BackupService {
       tables = "-t desarquivamentos -t desarquivamento_comments";
     } else {
       // Backup completo - incluir explicitamente todas as tabelas importantes
+      // IMPORTANTE: Os nomes devem corresponder EXATAMENTE aos nomes das tabelas no PostgreSQL
       const criticalTables = [
-        "users",
+        "usuarios",
         "roles",
         "user_preferences",
         "desarquivamentos",
         "desarquivamento_comments",
+        "desarquivamento_anexos",
         "pastas",
         "pasta_arquivos",
         "projetos",
         "tarefas",
+        "tarefa",
+        "tarefa_responsaveis",
         "colunas",
         "membros_projeto",
         "checklists",
@@ -834,6 +845,7 @@ export class BackupService {
         "system_settings",
         "system_announcements",
         "announcement_viewed",
+        "vestigios",
       ];
 
       tables = criticalTables.map((t) => `-t ${t}`).join(" ");
@@ -884,6 +896,81 @@ export class BackupService {
         PGPASSWORD: password,
       },
     });
+  }
+
+  /**
+   * Gera SQL para truncar todas as tabelas gerenciadas antes do restore.
+   * Usa TRUNCATE ... CASCADE para lidar com dependências de FK,
+   * evitando duplicação de dados quando o DROP TABLE do pg_dump falha
+   * silenciosamente por causa de foreign keys.
+   */
+  private buildPreRestoreTruncateSQL(): string {
+    const tables = [
+      "announcement_viewed",
+      "notification_preferences",
+      "user_preferences",
+      "historico_tarefas",
+      "itens_checklist",
+      "checklists",
+      "comentarios",
+      "anexos",
+      "tarefa_responsaveis",
+      "membros_projeto",
+      "colunas",
+      "tarefa",
+      "tarefas",
+      "desarquivamento_anexos",
+      "desarquivamento_comments",
+      "desarquivamentos",
+      "pasta_arquivos",
+      "pastas",
+      "projetos",
+      "registros",
+      "planilhas_controle",
+      "vestigios",
+      "notificacoes",
+      "auditorias",
+      "blocked_ips",
+      "system_announcements",
+      "system_settings",
+      "roles",
+      "usuarios",
+    ];
+
+    // TRUNCATE com CASCADE garante que todas as dependências sejam respeitadas
+    // Usa DO block para ignorar erros de tabelas inexistentes (não existe IF EXISTS no TRUNCATE)
+    return tables
+      .map(
+        (t) =>
+          `DO $$ BEGIN EXECUTE 'TRUNCATE TABLE ${t} CASCADE'; EXCEPTION WHEN undefined_table THEN NULL; END $$;`,
+      )
+      .join("\n");
+  }
+
+  /**
+   * Executa o truncate pré-restore no banco de dados
+   */
+  private async executePreRestoreTruncate(config: any): Promise<void> {
+    const truncateSQL = this.buildPreRestoreTruncateSQL();
+    const containerName = this.configService.get<string>(
+      "POSTGRES_CONTAINER",
+      "db",
+    );
+
+    this.logger.log(
+      "🗑️ Truncando tabelas existentes antes do restore (evitando duplicatas)...",
+    );
+
+    if (config.isDocker) {
+      // Pipe the truncate SQL via echo into psql
+      const cmd = `echo '${truncateSQL.replace(/'/g, "'\\''")}' | docker exec -i ${containerName} psql -U ${config.username} -d ${config.database}`;
+      await execAsync(cmd);
+    } else {
+      const cmd = `echo '${truncateSQL.replace(/'/g, "'\\''")}' | psql -h ${config.host} -p ${config.port} -U ${config.username} -d ${config.database}`;
+      await this.executeWithPgPassword(cmd, config.password);
+    }
+
+    this.logger.log("✅ Tabelas truncadas com sucesso");
   }
 
   /**
