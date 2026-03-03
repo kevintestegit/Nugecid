@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Bell,
   Clock,
@@ -61,38 +61,44 @@ const ProrrogacaoNotification: React.FC<ProrrogacaoNotificationProps> = ({
   const [observacoes, setObservacoes] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Filtrar desarquivamentos com solicitação de prorrogação pendente
-  const prorrogacoesPendentes = desarquivamentos
-    .filter(
-      (d) =>
-        d.solicitacaoProrrogacao &&
-        d.status !== StatusDesarquivamento.FINALIZADO &&
-        d.status !== StatusDesarquivamento.NAO_LOCALIZADO,
-    )
-    .map((d) => {
-      const solicitacaoDate = new Date(d.dataSolicitacao);
-      const today = new Date();
-      const diffTime = today.getTime() - solicitacaoDate.getTime();
-      const diasSolicitacao = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Evita recalcular filtros/sort a cada render quando a lista base não muda.
+  const prorrogacoesPendentes = useMemo(() => {
+    return desarquivamentos
+      .filter(
+        (d) =>
+          d.solicitacaoProrrogacao &&
+          d.status !== StatusDesarquivamento.FINALIZADO &&
+          d.status !== StatusDesarquivamento.NAO_LOCALIZADO,
+      )
+      .map((d) => {
+        const solicitacaoDate = new Date(d.createdAt || d.dataSolicitacao);
+        const today = new Date();
+        const diffTime = today.getTime() - solicitacaoDate.getTime();
+        const diasSolicitacao = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-      let prioridade: "alta" | "media" | "baixa" = "baixa";
-      if (diasSolicitacao > 10) prioridade = "alta";
-      else if (diasSolicitacao > 7) prioridade = "media";
+        let prioridade: "alta" | "media" | "baixa" = "baixa";
+        if (diasSolicitacao > 10) prioridade = "alta";
+        else if (diasSolicitacao > 7) prioridade = "media";
 
-      return {
-        desarquivamento: d,
-        diasSolicitacao,
-        prioridade,
-      };
-    })
-    .sort((a, b) => {
-      // Ordenar por prioridade e depois por dias de solicitação
-      const prioridadeOrder = { alta: 3, media: 2, baixa: 1 };
-      if (prioridadeOrder[a.prioridade] !== prioridadeOrder[b.prioridade]) {
-        return prioridadeOrder[b.prioridade] - prioridadeOrder[a.prioridade];
-      }
-      return b.diasSolicitacao - a.diasSolicitacao;
-    });
+        return {
+          desarquivamento: d,
+          diasSolicitacao,
+          prioridade,
+        };
+      })
+      .sort((a, b) => {
+        const prioridadeOrder = { alta: 3, media: 2, baixa: 1 };
+        if (prioridadeOrder[a.prioridade] !== prioridadeOrder[b.prioridade]) {
+          return prioridadeOrder[b.prioridade] - prioridadeOrder[a.prioridade];
+        }
+        return b.diasSolicitacao - a.diasSolicitacao;
+      });
+  }, [desarquivamentos]);
+
+  const totalAltaPrioridade = useMemo(
+    () => prorrogacoesPendentes.filter((item) => item.prioridade === "alta").length,
+    [prorrogacoesPendentes],
+  );
 
   const handleOpenDialog = (item: ProrrogacaoItem) => {
     setSelectedItem(item);
@@ -186,11 +192,7 @@ const ProrrogacaoNotification: React.FC<ProrrogacaoNotificationProps> = ({
               variant="outline"
               className="border-orange-300 text-orange-800"
             >
-              {
-                prorrogacoesPendentes.filter((p) => p.prioridade === "alta")
-                  .length
-              }{" "}
-              Alta Prioridade
+              {totalAltaPrioridade} Alta Prioridade
             </Badge>
           </div>
         </CardHeader>
@@ -250,7 +252,10 @@ const ProrrogacaoNotification: React.FC<ProrrogacaoNotificationProps> = ({
                       {prioridadeBadge.label}
                     </Badge>
                     <div className="text-xs text-gray-500">
-                      {formatDate(desarquivamento.dataSolicitacao)}
+                      {formatDate(
+                        desarquivamento.createdAt ||
+                          desarquivamento.dataSolicitacao,
+                      )}
                     </div>
                   </div>
                 </div>

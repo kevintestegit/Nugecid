@@ -58,12 +58,12 @@ export class DesarquivamentoTypeOrmEntity {
   @Column({
     name: "numero_nic_laudo_auto",
     length: 100,
-    nullable: false,
+    nullable: true,
   })
-  numeroNicLaudoAuto: string;
+  numeroNicLaudoAuto?: string | null;
 
-  @Column({ name: "numero_processo", length: 255, nullable: false })
-  numeroProcesso: string;
+  @Column({ name: "numero_processo", length: 255, nullable: true })
+  numeroProcesso?: string | null;
 
   @Column({ name: "tipo_documento", length: 100, nullable: false })
   tipoDocumento: string;
@@ -81,8 +81,8 @@ export class DesarquivamentoTypeOrmEntity {
   @Column({ name: "data_devolucao_setor", type: "timestamp", nullable: true })
   dataDevolucaoSetor?: Date;
 
-  @Column({ name: "setor_demandante", length: 255, nullable: false })
-  setorDemandante: string;
+  @Column({ name: "setor_demandante", length: 255, nullable: true })
+  setorDemandante?: string | null;
 
   @Column({ name: "servidor_responsavel", length: 255, nullable: false })
   servidorResponsavel: string;
@@ -182,13 +182,13 @@ export class DesarquivamentoTypeOrmEntity {
     entity.tipoDesarquivamento = domain.tipoDesarquivamento;
     entity.status = domain.status.value || domain.status;
     entity.nomeCompleto = domain.nomeCompleto;
-    entity.numeroNicLaudoAuto = domain.numeroNicLaudoAuto;
-    entity.numeroProcesso = domain.numeroProcesso;
+    entity.numeroNicLaudoAuto = domain.numeroNicLaudoAuto ?? null;
+    entity.numeroProcesso = domain.numeroProcesso || null;
     entity.tipoDocumento = domain.tipoDocumento;
     entity.dataSolicitacao = domain.dataSolicitacao;
     entity.dataDesarquivamentoSAG = domain.dataDesarquivamentoSAG;
     entity.dataDevolucaoSetor = domain.dataDevolucaoSetor;
-    entity.setorDemandante = domain.setorDemandante;
+    entity.setorDemandante = domain.setorDemandante || null;
     entity.servidorResponsavel = domain.servidorResponsavel;
     entity.finalidadeDesarquivamento = domain.finalidadeDesarquivamento;
     entity.solicitacaoProrrogacao = domain.solicitacaoProrrogacao;

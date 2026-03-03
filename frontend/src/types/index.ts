@@ -1,3 +1,6 @@
+// Local import for types used within this file
+import type { Tarefa, PrioridadeTarefa } from "./kanban.types";
+
 // Enums
 
 export enum StatusDesarquivamento {
@@ -30,13 +33,15 @@ export enum UserRole {
   USUARIO = "usuario",
 }
 
-export enum PrioridadeTarefa {
-  BAIXA = "baixa",
-  MEDIA = "media",
-  ALTA = "alta",
-  CRITICA = "critica",
-}
+// Re-export PrioridadeTarefa from canonical source (enum, usable as value)
+export { PrioridadeTarefa } from "./kanban.types";
 
+/**
+ * @deprecated Backend has no `status` field on tarefas.
+ * Task status is determined by the Kanban column the task belongs to.
+ * This enum is kept for backward compatibility with components that
+ * reference it, but the values are never persisted or returned by the API.
+ */
 export enum StatusTarefa {
   PENDENTE = "pendente",
   EM_ANDAMENTO = "em_andamento",
@@ -180,6 +185,7 @@ export interface QueryDesarquivamentoDto {
   dataFim?: string;
   urgente?: boolean;
   instituto?: string;
+  requerente?: string;
   vencidos?: boolean;
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
@@ -201,7 +207,7 @@ export interface PaginatedResponse<T> {
   };
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
@@ -308,109 +314,58 @@ export interface PaginationMeta {
   hasPrev: boolean;
 }
 
-// Tarefas Types
-export interface Projeto {
-  id: number;
-  nome: string;
-  descricao?: string;
-  cor: string;
-  criador_id: number;
-  data_criacao: string;
-  data_atualizacao: string;
-  ativo: boolean;
-  criador?: User;
-  colunas?: Coluna[];
-  tarefas?: Tarefa[];
-}
+// ── Tarefas/Kanban Types ────────────────────────────────────
+// Single source of truth: @/types/kanban.types.ts
+// Re-exported here for backward compatibility.
+export type {
+  Tarefa,
+  Coluna,
+  Projeto,
+  Comentario,
+  Anexo,
+  Checklist,
+  ItemChecklist,
+  HistoricoTarefa,
+  Usuario,
+  MembroProjeto,
+  PapelMembro,
+  FiltrosKanban,
+  EstatisticasKanban,
+  WipStatus,
+  PrazoStatus,
+  PrazoInfo,
+} from "./kanban.types";
 
-export interface Coluna {
-  id: number;
-  projeto_id: number;
-  nome: string;
-  cor: string;
-  ordem: number;
-  data_criacao: string;
-  data_atualizacao: string;
-  projeto?: Projeto;
-  tarefas?: Tarefa[];
-}
+// Backward-compatible aliases
+export type { Comentario as ComentarioTarefa } from "./kanban.types";
+export type { Comentario as TarefaComentario } from "./kanban.types";
+export type { Anexo as TarefaAnexo } from "./kanban.types";
+export type { Checklist as TarefaChecklist } from "./kanban.types";
 
-export interface Tarefa {
-  id: number;
-  projeto_id: number;
+// ── DTOs para Tarefas ───────────────────────────────────────
+export interface CreateTarefaDto {
   projetoId?: number;
-  coluna_id: number;
   colunaId?: number;
   titulo: string;
   descricao?: string;
-  responsavel_id?: number;
-  responsavelId?: number;
-  responsavel_ids?: number[];
-  responsavelIds?: number[];
-  criador_id: number;
-  criadorId?: number;
-  prazo?: string;
-  prioridade: PrioridadeTarefa;
-  status?: StatusTarefa;
-  statusTarefa?: StatusTarefa;
-  observacoes?: string;
-  ordem: number;
-  tags: string[];
-  data_criacao: string;
-  data_atualizacao: string;
-  createdAt?: string;
-  updatedAt?: string;
-  projeto?: Projeto;
-  coluna?: Coluna;
-  responsavel?: User;
-  responsaveis?: User[];
-  criador?: User;
-  comentarios?: ComentarioTarefa[];
-  historico?: HistoricoTarefa[];
-}
-
-export interface ComentarioTarefa {
-  id: number;
-  tarefa_id: number;
-  autor_id: number;
-  conteudo: string;
-  data_criacao: string;
-  data_atualizacao: string;
-  tarefa?: Tarefa;
-  autor?: User;
-}
-
-export interface HistoricoTarefa {
-  id: number;
-  tarefa_id: number;
-  usuario_id: number;
-  acao: string;
-  campo_alterado?: string;
-  valor_anterior?: string;
-  valor_novo?: string;
-  data_acao: string;
-  tarefa?: Tarefa;
-  usuario?: User;
-}
-
-// DTOs para Tarefas
-export interface CreateTarefaDto extends Record<string, unknown> {
-  projeto_id?: number;
-  coluna_id?: number;
-  titulo: string;
-  descricao?: string;
-  responsavel_id?: number;
-  responsavel_ids?: number[];
   responsavelId?: number;
   responsavelIds?: number[];
   prazo?: string;
   prioridade?: PrioridadeTarefa;
   tags?: string[];
+  // Legacy snake_case aliases (some callers may still use these)
+  /** @deprecated Use projetoId */
+  projeto_id?: number;
+  /** @deprecated Use colunaId */
+  coluna_id?: number;
+  /** @deprecated Use responsavelId */
+  responsavel_id?: number;
+  /** @deprecated Use responsavelIds */
+  responsavel_ids?: number[];
+  [key: string]: unknown;
 }
 
-export interface UpdateTarefaDto
-  extends Partial<CreateTarefaDto>,
-    Record<string, unknown> {
+export interface UpdateTarefaDto extends Partial<CreateTarefaDto> {
   ordem?: number;
 }
 
@@ -423,13 +378,11 @@ export interface QueryTarefaDto {
   page?: number;
   limit?: number;
   search?: string;
+  // Backend QueryTarefaDto uses projeto_id (snake) but colunaId (camel)
   projeto_id?: number;
   projetoId?: number;
-  coluna_id?: number;
   colunaId?: number;
-  responsavel_id?: number;
   responsavelId?: number;
-  criador_id?: number;
   criadorId?: number;
   prioridade?: PrioridadeTarefa | PrioridadeTarefa[];
   prazo_inicio?: string;
@@ -438,28 +391,13 @@ export interface QueryTarefaDto {
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
   incluirExcluidas?: boolean;
-}
-
-export type TarefaComentario = ComentarioTarefa;
-
-export interface TarefaChecklist {
-  id: number;
-  tarefaId: number;
-  titulo: string;
-  itens?: Array<{
-    id: number;
-    texto: string;
-    concluido: boolean;
-  }>;
-}
-
-export interface TarefaAnexo {
-  id: number;
-  tarefaId: number;
-  nomeArquivo: string;
-  caminhoArquivo?: string;
-  tipo?: string;
-  tamanho?: number;
+  // Legacy aliases
+  /** @deprecated Use colunaId */
+  coluna_id?: number;
+  /** @deprecated Use responsavelId */
+  responsavel_id?: number;
+  /** @deprecated Use criadorId */
+  criador_id?: number;
 }
 
 export interface ImportResultDto {
@@ -503,21 +441,21 @@ export interface TarefasDashboardStats {
 
 // Global Search Types
 export interface SearchResult {
-  id: number;
+  id: number | string;
   type:
     | "desarquivamento"
     | "usuario"
     | "tarefa"
     | "projeto"
-    | "custodia"
-    | "pasta";
+    | "pasta"
+    | "vestigio"
+    | "notificacao"
+    | "planilha";
   title: string;
   subtitle?: string;
   description?: string;
   url: string;
-  metadata?: Record<string, any>;
-  relevance?: number;
-  matchedFields?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface SearchParams {
@@ -533,4 +471,159 @@ export interface SearchResponse {
   query: string;
   typesCounts?: Record<string, number>;
   data?: SearchResult[];
+}
+
+// Role Settings Types
+export interface RoleSettings {
+  theme?: "light" | "dark";
+  notifications?: {
+    email?: boolean;
+    push?: boolean;
+    desktop?: boolean;
+    sound?: boolean;
+  };
+}
+
+// Anexos Types
+export interface DesarquivamentoAnexo {
+  id: number;
+  desarquivamentoId?: number | null;
+  numeroProcesso?: string | null;
+  usuarioId?: number;
+  nomeOriginal: string;
+  nomeArquivo: string;
+  caminhoArquivo: string;
+  tipoMime: string;
+  tamanho?: number;
+  tamanhoBytes?: number;
+  descricao?: string;
+  tipoAnexo?: "desarquivamento" | "rearquivamento";
+  tipoVinculo?: "processo" | "solicitacao" | "ambos";
+  url?: string;
+  previewUrl?: string;
+  createdAt: string;
+  updatedAt?: string;
+  usuario?: { id: number; nome: string; usuario: string };
+}
+
+// Security Types
+export interface IpUserInfo {
+  id: number;
+  usuario: string;
+  nome: string;
+  successfulLogins: number;
+  failedLogins: number;
+  lastAttempt: string;
+}
+
+export interface IpAccessStat {
+  ipAddress: string;
+  totalAttempts: number;
+  successfulLogins: number;
+  failedLogins: number;
+  lastAttempt: string;
+  firstAttempt: string;
+  userAgents: string[];
+  users: IpUserInfo[];
+  isBlocked: boolean;
+  blockedReason?: string;
+  /** @deprecated Use totalAttempts instead */
+  accessCount?: number;
+  /** @deprecated Use lastAttempt instead */
+  lastAccess?: string;
+  /** @deprecated Use firstAttempt instead */
+  firstAccess?: string;
+  /** @deprecated Use userAgents instead */
+  userAgent?: string;
+}
+
+export interface IpAccessDetail {
+  id: number;
+  ipAddress: string;
+  userId?: number;
+  userAgent?: string;
+  endpoint: string;
+  method: string;
+  statusCode: number;
+  createdAt: string;
+}
+
+export interface BlockedIp {
+  id: number;
+  ipAddress: string;
+  reason: string | null;
+  blockedAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+  attemptsCount: number;
+  lastAttemptAt: string | null;
+  /** @deprecated Use isActive instead */
+  active?: boolean;
+}
+
+export interface BlockedUser {
+  id: number;
+  usuario: string;
+  nome: string;
+  bloqueadoAte: string;
+  tentativasLogin: number;
+}
+
+export interface UnblockedUser {
+  id: number;
+  usuario: string;
+  nome: string;
+}
+
+// Notification Preferences Types
+export interface NotificationPreferences {
+  id: number;
+  userId: number;
+  inAppEnabled: boolean;
+  soundEnabled: boolean;
+  enabledTypes: Record<string, boolean>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Announcement Types
+export interface Announcement {
+  id: number;
+  title: string;
+  content: string;
+  imageUrl?: string | null;
+  priority: "low" | "medium" | "high" | "critical";
+  startDate: string;
+  endDate: string;
+  active: boolean;
+  targetRoles?: string[] | null;
+  createdBy?: number | { id: number; nome: string };
+  viewCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAnnouncementDto {
+  title: string;
+  content: string;
+  imageUrl?: string;
+  priority: "low" | "medium" | "high" | "critical";
+  startDate: string;
+  endDate: string;
+  active?: boolean;
+  targetRoles?: string[];
+}
+
+export interface AnnouncementStats {
+  totalViews: number;
+  uniqueViews: number;
+  viewsByDate: Record<string, number>;
+}
+
+export interface AnnouncementImageUpload {
+  filename: string;
+  originalName: string;
+  size: number;
+  mimetype: string;
+  url: string;
 }

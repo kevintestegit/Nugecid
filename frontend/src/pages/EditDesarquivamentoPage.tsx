@@ -120,7 +120,9 @@ const EditDesarquivamentoPage: React.FC = () => {
     }
 
     // Aplica normalização completa antes de enviar
-    const normalizedPayload = normalizeDesarquivamentoData(payload);
+    const normalizedPayload = normalizeDesarquivamentoData(
+      payload as unknown as Record<string, unknown>,
+    );
 
     try {
       await updateDesarquivamento.mutateAsync({
@@ -129,10 +131,14 @@ const EditDesarquivamentoPage: React.FC = () => {
       });
       toast.success("Solicita\u00e7\u00e3o atualizada com sucesso!");
       navigate(`/desarquivamentos/${id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const axiosErr = error as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
       const message =
-        error?.response?.data?.message ||
-        error?.message ||
+        axiosErr?.response?.data?.message ||
+        axiosErr?.message ||
         "Erro ao atualizar solicita\u00e7\u00e3o";
       toast.error(message);
       throw error;
@@ -147,11 +153,11 @@ const EditDesarquivamentoPage: React.FC = () => {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">
             Solicitação não encontrada
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted-foreground mb-4">
             A solicitação que você está tentando editar não existe ou foi
             removida.
           </p>
@@ -169,23 +175,29 @@ const EditDesarquivamentoPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(`/desarquivamentos/${id}`)}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Editar Solicitação #{desarquivamento?.numeroSolicitacao}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Modifique os dados da solicitação de desarquivamento
-          </p>
+      {/* Header glassmorphism */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
+
+        <div className="relative flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/desarquivamentos/${id}`)}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Voltar
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Editar Solicitação #{desarquivamento?.numeroSolicitacao}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Modifique os dados da solicitação de desarquivamento
+            </p>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { ImagePreviewModal, PreviewAttachment } from '@/components/desarquivamentos/ImagePreviewModal';
 import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
+import { getAuthHeader } from '@/utils/tokenStorage';
 
 const PrateleiraDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -42,6 +43,8 @@ const PrateleiraDetailPage: React.FC = () => {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [selectedPlanilhas, setSelectedPlanilhas] = useState<File[]>([]);
   const [previewImageId, setPreviewImageId] = useState<string | null>(null);
+  const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
+  const imageObjectUrlsRef = useRef<string[]>([]);
   const [deleteArquivoItem, setDeleteArquivoItem] = useState<{ id: string; nome: string } | null>(null);
   const ensureManagePermission = () => {
     if (canManageArquivos) {
@@ -67,6 +70,94 @@ const PrateleiraDetailPage: React.FC = () => {
     () => arquivos.filter(arquivo => arquivo.tipo === 'IMAGEM'),
     [arquivos],
   );
+
+  useEffect(() => {
+    let isActive = true;
+    const controllers: AbortController[] = [];
+    const nextObjectUrls: string[] = [];
+
+    const loadProtectedPreviews = async () => {
+      if (!imagens.length) {
+        imageObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        imageObjectUrlsRef.current = [];
+        if (isActive) {
+          setResolvedImageUrls({});
+        }
+        return;
+      }
+
+      const loadedEntries = await Promise.all(
+        imagens.map(async imagem => {
+          const sourceUrl = imagem.previewUrl ?? imagem.url;
+          if (!sourceUrl) {
+            return null;
+          }
+
+          const controller = new AbortController();
+          controllers.push(controller);
+
+          try {
+            const response = await fetch(sourceUrl, {
+              headers: {
+                ...getAuthHeader(),
+              },
+              signal: controller.signal,
+            });
+            if (!response.ok) {
+              return null;
+            }
+
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            nextObjectUrls.push(objectUrl);
+
+            return [imagem.id, objectUrl] as const;
+          } catch (error) {
+            if ((error as { name?: string })?.name === 'AbortError') {
+              return null;
+            }
+            return null;
+          }
+        }),
+      );
+
+      if (!isActive) {
+        nextObjectUrls.forEach(url => URL.revokeObjectURL(url));
+        return;
+      }
+
+      imageObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      imageObjectUrlsRef.current = nextObjectUrls;
+
+      const nextResolvedMap = loadedEntries.reduce<Record<string, string>>(
+        (acc, entry) => {
+          if (entry) {
+            acc[entry[0]] = entry[1];
+          }
+          return acc;
+        },
+        {},
+      );
+
+      setResolvedImageUrls(nextResolvedMap);
+    };
+
+    void loadProtectedPreviews();
+
+    return () => {
+      isActive = false;
+      controllers.forEach(controller => controller.abort());
+    };
+  }, [imagens]);
+
+  useEffect(
+    () => () => {
+      imageObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      imageObjectUrlsRef.current = [];
+    },
+    [],
+  );
+
   const imagemEmPreview = useMemo<PreviewAttachment | null>(() => {
     const imagem = imagens.find(item => item.id === previewImageId);
     if (!imagem) {
@@ -76,12 +167,12 @@ const PrateleiraDetailPage: React.FC = () => {
     return {
       id: imagem.id,
       nomeOriginal: imagem.nomeOriginal,
-      previewUrl: imagem.previewUrl,
+      previewUrl: resolvedImageUrls[imagem.id] ?? imagem.previewUrl,
       url: imagem.url,
       tamanhoBytes: imagem.tamanhoBytes,
       createdAt: imagem.dataUpload,
     };
-  }, [imagens, previewImageId]);
+  }, [imagens, previewImageId, resolvedImageUrls]);
   const planilhaArquivos = useMemo(
     () => arquivos.filter(arquivo => arquivo.tipo === 'PLANILHA'),
     [arquivos],
@@ -185,15 +276,38 @@ const PrateleiraDetailPage: React.FC = () => {
     setPreviewImageId(null);
   };
 
-  const handleDownloadPreviewImage = (anexoId: number | string) => {
+  const downloadFileWithAuth = async (fileUrl: string, fileName: string) => {
+    const response = await fetch(fileUrl, {
+      headers: {
+        ...getAuthHeader(),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao baixar arquivo');
+    }
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(objectUrl);
+  };
+
+  const handleDownloadPreviewImage = async (anexoId: number | string) => {
     const imagem = imagens.find(item => item.id === String(anexoId));
-    if (imagem?.url) {
-      const link = document.createElement('a');
-      link.href = imagem.url;
-      link.download = imagem.nomeOriginal || 'imagem';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (!imagem?.url) {
+      return;
+    }
+
+    try {
+      await downloadFileWithAuth(imagem.url, imagem.nomeOriginal || 'imagem');
+    } catch (error) {
+      toast.error('Não foi possível baixar a imagem.');
     }
   };
 
@@ -349,9 +463,9 @@ const PrateleiraDetailPage: React.FC = () => {
                     }}
                     className="group relative flex h-44 cursor-pointer items-end overflow-hidden rounded-xl border border-border/70 bg-black/10 transition focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
                   >
-                    {imagem.previewUrl ? (
+                    {resolvedImageUrls[imagem.id] ? (
                       <img
-                        src={imagem.previewUrl}
+                        src={resolvedImageUrls[imagem.id]}
                         alt={imagem.nomeOriginal}
                         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
@@ -496,9 +610,18 @@ const PrateleiraDetailPage: React.FC = () => {
                         size="icon"
                         variant="secondary"
                         className="h-8 w-8"
-                        onClick={() => {
-                          if (planilha.url) {
-                            window.open(planilha.url, '_blank', 'noopener');
+                        onClick={async () => {
+                          if (!planilha.url) {
+                            return;
+                          }
+
+                          try {
+                            await downloadFileWithAuth(
+                              planilha.url,
+                              planilha.nomeOriginal || 'planilha',
+                            );
+                          } catch (error) {
+                            toast.error('Não foi possível baixar a planilha.');
                           }
                         }}
                       >
@@ -597,12 +720,21 @@ const PrateleiraDetailPage: React.FC = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
+                      onClick={async () => {
                         const arquivo = planilhaArquivos.find(
                           item => item.id === planilha.planilhaId,
                         );
-                        if (arquivo?.url) {
-                          window.open(arquivo.url, '_blank', 'noopener');
+                        if (!arquivo?.url) {
+                          return;
+                        }
+
+                        try {
+                          await downloadFileWithAuth(
+                            arquivo.url,
+                            arquivo.nomeOriginal || 'planilha',
+                          );
+                        } catch (error) {
+                          toast.error('Não foi possível baixar a planilha.');
                         }
                       }}
                     >
@@ -631,14 +763,14 @@ const PrateleiraDetailPage: React.FC = () => {
 
       <ImagePreviewModal
         anexo={imagemEmPreview}
-        previewUrl={imagemEmPreview?.previewUrl ?? imagemEmPreview?.url ?? null}
+        previewUrl={imagemEmPreview?.previewUrl ?? null}
         onClose={handleClosePreview}
         onDownload={handleDownloadPreviewImage}
         canEdit={false}
         allImages={imagens.map(img => ({
           id: img.id,
           nomeOriginal: img.nomeOriginal,
-          previewUrl: img.previewUrl,
+          previewUrl: resolvedImageUrls[img.id] ?? img.previewUrl,
           url: img.url,
           tamanhoBytes: img.tamanhoBytes,
           createdAt: img.dataUpload,

@@ -16,6 +16,8 @@ import {
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import { Response } from "express";
 import * as multer from "multer";
+import { extname, join } from "path";
+import { mkdirSync } from "fs";
 import { PastasService } from "./pastas.service";
 import { CreatePastaDto } from "./dto/create-pasta.dto";
 import { UpdatePastaDto } from "./dto/update-pasta.dto";
@@ -23,6 +25,66 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RoleType } from "../users/enums/role-type.enum";
+
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+
+const ALLOWED_SPREADSHEET_MIME_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/csv",
+  "text/plain",
+]);
+
+const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const PASTAS_TMP_UPLOAD_DIR = join(process.cwd(), "uploads", ".tmp", "pastas");
+
+const pastasFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  if (file.fieldname === "imagens") {
+    if (!ALLOWED_IMAGE_MIME_TYPES.has(file.mimetype)) {
+      cb(new Error("Imagem inválida para upload."));
+      return;
+    }
+    cb(null, true);
+    return;
+  }
+
+  if (file.fieldname === "planilha" || file.fieldname === "planilhas") {
+    const extension = extname(file.originalname || "").toLowerCase();
+    if (
+      !ALLOWED_SPREADSHEET_EXTENSIONS.has(extension) ||
+      !ALLOWED_SPREADSHEET_MIME_TYPES.has(file.mimetype)
+    ) {
+      cb(new Error("Planilha inválida. Envie .xlsx, .xls ou .csv."));
+      return;
+    }
+    cb(null, true);
+    return;
+  }
+
+  cb(new Error("Campo de upload inválido."));
+};
+
+const pastasUploadOptions: multer.Options = {
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      mkdirSync(PASTAS_TMP_UPLOAD_DIR, { recursive: true });
+      cb(null, PASTAS_TMP_UPLOAD_DIR);
+    },
+    filename: (_req, file, cb) => {
+      const suffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const extension = extname(file.originalname || "").toLowerCase();
+      cb(null, `${suffix}${extension}`);
+    },
+  }),
+  fileFilter: pastasFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+};
 
 @Controller("pastas")
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,7 +99,7 @@ export class PastasController {
         { name: "imagens", maxCount: 20 },
         { name: "planilha", maxCount: 5 },
       ],
-      { storage: multer.memoryStorage() },
+      pastasUploadOptions,
     ),
   )
   create(
@@ -111,7 +173,7 @@ export class PastasController {
         { name: "imagens", maxCount: 20 },
         { name: "planilha", maxCount: 5 },
       ],
-      { storage: multer.memoryStorage() },
+      pastasUploadOptions,
     ),
   )
   adicionarArquivos(

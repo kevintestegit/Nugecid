@@ -1,27 +1,34 @@
-import React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useCreateDesarquivamento } from '@/hooks/useDesarquivamentos'
-import DesarquivamentoForm from '@/components/forms/DesarquivamentoForm'
-import { CreateDesarquivamentoDto } from '@/types'
-import { toast } from 'sonner'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useCreateDesarquivamento } from "@/hooks/useDesarquivamentos";
+import DesarquivamentoForm from "@/components/forms/DesarquivamentoForm";
+import { CreateDesarquivamentoDto } from "@/types";
+import { toast } from "sonner";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 const NovoDesarquivamentoPage: React.FC = () => {
-  const navigate = useNavigate()
-  const createDesarquivamento = useCreateDesarquivamento()
+  const navigate = useNavigate();
+  const createDesarquivamento = useCreateDesarquivamento();
 
   const handleSubmit = async (data: CreateDesarquivamentoDto) => {
     try {
-      const result = await createDesarquivamento.mutateAsync(data)
-      toast.success('Solicitação criada com sucesso!')
-      navigate(`/desarquivamentos/${result?.data?.id}`)
-    } catch (error: any) {
-      const message = error.response?.data?.message || error.message || 'Erro ao criar solicitação'
-      toast.error(message)
-      throw error // Re-throw para que o form mantenha o estado de loading
+      const result = await createDesarquivamento.mutateAsync(data);
+      toast.success("Solicitação criada com sucesso!");
+      navigate(`/desarquivamentos/${result?.data?.id}`);
+    } catch (error: unknown) {
+      const axiosErr = error as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      const message =
+        axiosErr.response?.data?.message ||
+        axiosErr.message ||
+        "Erro ao criar solicitação";
+      toast.error(message);
+      throw error; // Re-throw para que o form mantenha o estado de loading
     }
-  }
+  };
 
   return (
     <div className="relative space-y-6">
@@ -36,7 +43,7 @@ const NovoDesarquivamentoPage: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/desarquivamentos')}
+              onClick={() => navigate("/desarquivamentos")}
               className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/60 text-muted-foreground backdrop-blur hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -62,7 +69,7 @@ const NovoDesarquivamentoPage: React.FC = () => {
         isLoading={createDesarquivamento.isPending}
       />
     </div>
-  )
-}
+  );
+};
 
-export default NovoDesarquivamentoPage
+export default NovoDesarquivamentoPage;

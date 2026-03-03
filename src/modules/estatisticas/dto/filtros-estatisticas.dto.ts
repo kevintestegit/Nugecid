@@ -1,4 +1,4 @@
-import { IsOptional, IsDateString, IsNumber, Min } from "class-validator";
+import { IsOptional, IsDateString, IsNumber, Min, Max } from "class-validator";
 import { Type } from "class-transformer";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 
@@ -30,7 +30,7 @@ export class PaginacaoDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  pagina?: number = 1;
+  pagina?: number;
 
   @ApiPropertyOptional({
     description: "Itens por página",
@@ -41,7 +41,8 @@ export class PaginacaoDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  limite?: number = 50;
+  @Max(500)
+  limite?: number;
 }
 
 export class FiltrosRelatorioMensalDto extends PaginacaoDto {
@@ -52,6 +53,8 @@ export class FiltrosRelatorioMensalDto extends PaginacaoDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(2000)
+  @Max(2100)
   ano?: number;
 
   @ApiPropertyOptional({
@@ -62,5 +65,6 @@ export class FiltrosRelatorioMensalDto extends PaginacaoDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
+  @Max(12)
   mes?: number;
 }

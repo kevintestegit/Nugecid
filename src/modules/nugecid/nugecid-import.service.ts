@@ -1,6 +1,5 @@
 import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
-import * as XLSX from "xlsx";
 import { validate, ValidationError } from "class-validator";
 import { plainToClass } from "class-transformer";
 
@@ -59,6 +58,7 @@ export class NugecidImportService {
     );
 
     try {
+      const XLSX = this.getXlsx();
       // Ler arquivo Excel
       const workbook = XLSX.read(file.buffer, {
         type: "buffer",
@@ -142,6 +142,11 @@ export class NugecidImportService {
         `Erro ao processar arquivo: ${error.message}`,
       );
     }
+  }
+
+  private getXlsx(): typeof import("xlsx") {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("xlsx") as typeof import("xlsx");
   }
 
   /**
@@ -340,7 +345,11 @@ export class NugecidImportService {
         const dto = registros[i];
 
         try {
-          await this.nugecidService.create(dto, currentUser);
+          await this.nugecidService.create(dto, currentUser, {
+            manager: queryRunner.manager,
+            skipAudit: true,
+            skipNotifications: true,
+          });
           result.successCount++;
 
           // Log a cada 10 registros

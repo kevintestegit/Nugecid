@@ -79,7 +79,9 @@ export const useNotificacoesProrrogacao =
               d.status !== StatusDesarquivamento.NAO_LOCALIZADO,
           )
           .map((d) => {
-            const solicitacaoDate = new Date(d.dataSolicitacao);
+            const solicitacaoDate = new Date(
+              d.createdAt || d.dataSolicitacao,
+            );
             const diffTime = hoje.getTime() - solicitacaoDate.getTime();
             const diasSolicitacao = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 

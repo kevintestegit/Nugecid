@@ -1,28 +1,32 @@
-import React, { useState, useEffect } from 'react'
-import { useAuth } from '@/contexts/AuthContext'
-import { useDashboardStats } from '@/hooks/useDashboardStats'
-import { useOnlineUsers } from '@/hooks/useOnlineUsers'
-import { useUserTasks } from '@/hooks/useUserTasks'
-import { useDashboardLayout } from '@/hooks/useDashboardLayout'
-import { PageLoading } from '@/components/ui/Loading'
-import { SkeletonStatsCard, Skeleton } from '@/components/ui/Skeleton'
-import DashboardStats from '@/components/dashboard/DashboardStats'
-import RecentActivity from '@/components/dashboard/RecentActivity'
-import QuickActions from '@/components/dashboard/QuickActions'
-import SystemInfo from '@/components/dashboard/SystemInfo'
-import UserTasks from '@/components/dashboard/UserTasks'
-import PrazosCalendar from '@/components/dashboard/PrazosCalendar'
-import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer'
-import { AnnouncementModal } from '@/components/announcements/AnnouncementModal'
-import { Sun, Moon, AlertTriangle, Users, User, Settings2 } from 'lucide-react'
+import React, { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDashboardStats } from "@/hooks/useDashboardStats";
+import { useOnlineUsers } from "@/hooks/useOnlineUsers";
+import { useUserTasks } from "@/hooks/useUserTasks";
+import { useDashboardLayout } from "@/hooks/useDashboardLayout";
+import { PageLoading } from "@/components/ui/Loading";
+import { SkeletonStatsCard, Skeleton } from "@/components/ui/Skeleton";
+import DashboardStats from "@/components/dashboard/DashboardStats";
+import RecentActivity from "@/components/dashboard/RecentActivity";
+import QuickActions from "@/components/dashboard/QuickActions";
+import SystemInfo from "@/components/dashboard/SystemInfo";
+import UserTasks from "@/components/dashboard/UserTasks";
+import PrazosCalendar from "@/components/dashboard/PrazosCalendar";
+import { DashboardCustomizer } from "@/components/dashboard/DashboardCustomizer";
+import { AnnouncementModal } from "@/components/announcements/AnnouncementModal";
+import { Sun, Moon, AlertTriangle, Users, User, Settings2 } from "lucide-react";
 
 const DashboardPage: React.FC = () => {
-  const { user } = useAuth()
-  const { data: stats, isLoading, error } = useDashboardStats()
-  const { data: onlineUsers, isLoading: loadingOnline, error: errorOnline } = useOnlineUsers()
-  const { data: userTasks, isLoading: loadingTasks } = useUserTasks()
-  const [showAnnouncements, setShowAnnouncements] = useState(true)
-  
+  const { user } = useAuth();
+  const { data: stats, isLoading, error } = useDashboardStats();
+  const {
+    data: onlineUsers,
+    isLoading: loadingOnline,
+    error: errorOnline,
+  } = useOnlineUsers();
+  const { data: userTasks, isLoading: loadingTasks } = useUserTasks();
+  const [showAnnouncements, setShowAnnouncements] = useState(true);
+
   const {
     visibleCards,
     cards,
@@ -31,40 +35,42 @@ const DashboardPage: React.FC = () => {
     toggleCardVisibility,
     moveCardUp,
     moveCardDown,
-    resetLayout
-  } = useDashboardLayout()
+    resetLayout,
+  } = useDashboardLayout();
 
   // Preparar dados de prazos para o calendário (ANTES dos returns condicionais)
   const prazosData = React.useMemo(() => {
-    if (!stats?.data?.recentes) return []
-    
+    if (!stats?.data?.recentes) return [];
+
     return stats.data.recentes
-      .filter(item => item.dataDevolucaoSetor || item.dataSolicitacao)
-      .map(item => ({
+      .filter((item) => item.dataDevolucaoSetor || item.createdAt)
+      .map((item) => ({
         id: item.id,
         titulo: `#${item.id} - ${item.nomeCompleto?.substring(0, 30)}...`,
-        data: item.dataDevolucaoSetor || item.dataSolicitacao,
-        tipo: item.dataDevolucaoSetor ? 'devolucao' as const : 'solicitacao' as const,
-        urgente: item.urgente || false
-      }))
-  }, [stats?.data?.recentes])
+        data: item.dataDevolucaoSetor || item.createdAt,
+        tipo: item.dataDevolucaoSetor
+          ? ("devolucao" as const)
+          : ("solicitacao" as const),
+        urgente: item.urgente || false,
+      }));
+  }, [stats?.data?.recentes]);
 
   const getTimeAgo = (lastActivity: string) => {
     const now = new Date();
     const activityDate = new Date(lastActivity);
     const diffMs = now.getTime() - activityDate.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'agora mesmo';
-    if (diffMins === 1) return 'há 1 minuto';
+
+    if (diffMins < 1) return "agora mesmo";
+    if (diffMins === 1) return "há 1 minuto";
     if (diffMins < 60) return `há ${diffMins} minutos`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
-    if (diffHours === 1) return 'há 1 hora';
+    if (diffHours === 1) return "há 1 hora";
     if (diffHours < 24) return `há ${diffHours} horas`;
-    
-    return 'há mais de 1 dia';
-  }
+
+    return "há mais de 1 dia";
+  };
 
   // Returns condicionais DEPOIS de todos os hooks
   if (isLoading) {
@@ -91,7 +97,7 @@ const DashboardPage: React.FC = () => {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -111,33 +117,32 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return { text: 'Bom dia', icon: Sun }
-    if (hour < 18) return { text: 'Boa tarde', icon: Sun }
-    return { text: 'Boa noite', icon: Moon }
-  }
+    const hour = new Date().getHours();
+    if (hour < 12) return { text: "Bom dia", icon: Sun };
+    if (hour < 18) return { text: "Boa tarde", icon: Sun };
+    return { text: "Boa noite", icon: Moon };
+  };
 
-  const greeting = getGreeting()
-  const GreetingIcon = greeting.icon
+  const greeting = getGreeting();
+  const GreetingIcon = greeting.icon;
 
   const renderCard = (cardType: string) => {
     switch (cardType) {
-      case 'stats':
+      case "stats":
         return (
           <DashboardStats
             key="stats"
             data={{
               total: stats?.data?.totalDesarquivamentos || 0,
-              pendentes: (
+              pendentes:
                 stats?.data.pendentesAtrasados ??
                 stats?.data.requisicoesPendentes ??
                 stats?.data.atendimentosPendentes ??
-                0
-              ),
+                0,
               urgentes: stats?.data?.urgentes || 0,
               porTipo: stats?.data?.porTipo || {},
               porStatus: stats?.data?.porStatus || {},
@@ -149,39 +154,39 @@ const DashboardPage: React.FC = () => {
             }}
             isLoading={isLoading}
           />
-        )
-      
-      case 'quick-actions':
-        return <QuickActions key="quick-actions" />
-      
-      case 'tasks':
+        );
+
+      case "quick-actions":
+        return <QuickActions key="quick-actions" />;
+
+      case "tasks":
         return (
           <UserTasks
             key="tasks"
             tasks={userTasks || []}
             isLoading={loadingTasks}
           />
-        )
-      
-      case 'activity':
+        );
+
+      case "activity":
         return (
           <RecentActivity
             key="activity"
             activities={stats?.data.recentes || []}
             isLoading={isLoading}
           />
-        )
-      
-      case 'calendar':
+        );
+
+      case "calendar":
         return (
-          <PrazosCalendar 
+          <PrazosCalendar
             key="calendar"
             prazos={prazosData}
             isLoading={isLoading}
           />
-        )
-      
-      case 'online-users':
+        );
+
+      case "online-users":
         return (
           <div
             key="online-users"
@@ -195,14 +200,20 @@ const DashboardPage: React.FC = () => {
                   <span className="absolute -top-1 -right-1 flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500 items-center justify-center">
-                      <span className="text-[10px] font-bold text-white">{onlineUsers.length}</span>
+                      <span className="text-[10px] font-bold text-white">
+                        {onlineUsers.length}
+                      </span>
                     </span>
                   </span>
                 )}
               </div>
               <div>
-                <h3 className="text-lg font-bold text-foreground">Usuários Online</h3>
-                <p className="text-xs text-foreground/60">Presença da equipe em tempo real</p>
+                <h3 className="text-lg font-bold text-foreground">
+                  Usuários Online
+                </h3>
+                <p className="text-xs text-foreground/60">
+                  Presença da equipe em tempo real
+                </p>
               </div>
             </div>
 
@@ -212,7 +223,9 @@ const DashboardPage: React.FC = () => {
                 <span className="text-sm font-medium">Carregando...</span>
               </div>
             ) : errorOnline ? (
-              <p className="text-sm text-destructive font-medium">Erro ao carregar usuários online</p>
+              <p className="text-sm text-destructive font-medium">
+                Erro ao carregar usuários online
+              </p>
             ) : onlineUsers && onlineUsers.length > 0 ? (
               <div className="space-y-3">
                 {onlineUsers.slice(0, 5).map((onlineUser) => (
@@ -224,7 +237,11 @@ const DashboardPage: React.FC = () => {
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center overflow-hidden">
                         {onlineUser.avatarUrl || onlineUser.avatar ? (
                           <img
-                            src={onlineUser.avatarUrl ?? onlineUser.avatar ?? undefined}
+                            src={
+                              onlineUser.avatarUrl ??
+                              onlineUser.avatar ??
+                              undefined
+                            }
                             alt={onlineUser.nome}
                             className="h-full w-full object-cover"
                           />
@@ -261,20 +278,20 @@ const DashboardPage: React.FC = () => {
                 )}
               </div>
             ) : (
-              <p className="text-sm text-foreground/70 font-medium text-center py-4">Nenhum usuário online</p>
+              <p className="text-sm text-foreground/70 font-medium text-center py-4">
+                Nenhum usuário online
+              </p>
             )}
           </div>
-        )
-      
-      case 'system-info':
-        return (
-          <SystemInfo key="system-info" isLoading={isLoading} />
-        )
-      
+        );
+
+      case "system-info":
+        return <SystemInfo key="system-info" isLoading={isLoading} />;
+
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   return (
     <div className="relative space-y-8">
@@ -301,7 +318,8 @@ const DashboardPage: React.FC = () => {
                   {greeting.text}, {user?.nome}!
                 </h1>
                 <p className="text-foreground/70 text-sm md:text-base">
-                  Bem-vindo ao Sistema de Gerenciamento de Desarquivamentos
+                  Bem-vindo ao Sistema de Gerenciamento Eletrônico de Documentos
+                  - GED
                 </p>
               </div>
             </div>
@@ -333,18 +351,31 @@ const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <div className="space-y-6 md:col-span-3">
           {visibleCards
-            .filter((card) => !['quick-actions', 'calendar', 'online-users'].includes(card.type))
+            .filter(
+              (card) =>
+                !["quick-actions", "calendar", "online-users"].includes(
+                  card.type,
+                ),
+            )
             .map((card) => (
-              <div key={card.id} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+              <div
+                key={card.id}
+                className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500"
+              >
                 {renderCard(card.type)}
               </div>
             ))}
         </div>
         <div className="space-y-6 md:col-span-2">
           {visibleCards
-            .filter((card) => ['quick-actions', 'calendar', 'online-users'].includes(card.type))
+            .filter((card) =>
+              ["quick-actions", "calendar", "online-users"].includes(card.type),
+            )
             .map((card) => (
-              <div key={card.id} className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+              <div
+                key={card.id}
+                className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500"
+              >
                 {renderCard(card.type)}
               </div>
             ))}
@@ -356,7 +387,7 @@ const DashboardPage: React.FC = () => {
         <AnnouncementModal onClose={() => setShowAnnouncements(false)} />
       )}
     </div>
-  )
-}
+  );
+};
 
-export default DashboardPage
+export default DashboardPage;

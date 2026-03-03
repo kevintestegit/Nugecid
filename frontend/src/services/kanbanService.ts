@@ -5,6 +5,7 @@ import {
   Tarefa,
   Checklist,
   ItemChecklist,
+  HistoricoTarefa,
 } from "../types/kanban.types";
 
 type ApiEnvelope<T> = { data: T; success?: boolean };
@@ -129,6 +130,35 @@ interface UpdateMembroDto {
   papel: PapelMembro;
 }
 
+interface ProjetoStats {
+  totalTarefas: number;
+  porColuna: Record<string, number>;
+  porPrioridade: Record<string, number>;
+  atrasadas: number;
+  concluidas: number;
+  [key: string]: unknown;
+}
+
+interface ColunaStats {
+  totalTarefas: number;
+  porPrioridade: Record<string, number>;
+  atrasadas: number;
+  [key: string]: unknown;
+}
+
+interface ComentarioEstatisticas {
+  total: number;
+  porPeriodo?: Record<string, number>;
+  porUsuario?: Record<string, number>;
+  [key: string]: unknown;
+}
+
+interface ComentariosPorPeriodo {
+  comentarios: Comentario[];
+  total: number;
+  [key: string]: unknown;
+}
+
 class KanbanService {
   // Projetos
   async getProjetos(): Promise<Projeto[]> {
@@ -155,9 +185,9 @@ class KanbanService {
     await api.delete(`/projetos/${id}`);
   }
 
-  async getProjetoStats(id: number): Promise<any> {
+  async getProjetoStats(id: number): Promise<ProjetoStats> {
     const response = await api.get(`/projetos/${id}/stats`);
-    return unwrapData<any>(response.data);
+    return unwrapData<ProjetoStats>(response.data);
   }
 
   // Membros do projeto
@@ -240,9 +270,9 @@ class KanbanService {
     await api.patch(`/colunas/${id}/move`, { newOrder: ordem });
   }
 
-  async getColunaStats(id: number): Promise<any> {
+  async getColunaStats(id: number): Promise<ColunaStats> {
     const response = await api.get(`/colunas/${id}/stats`);
-    return unwrapData<any>(response.data);
+    return unwrapData<ColunaStats>(response.data);
   }
 
   // Tarefas
@@ -251,7 +281,7 @@ class KanbanService {
     const params = new URLSearchParams();
 
     if (projetoId) params.append("projeto_id", projetoId.toString());
-    if (colunaId) params.append("coluna_id", colunaId.toString());
+    if (colunaId) params.append("colunaId", colunaId.toString());
 
     if (params.toString()) {
       url += `?${params.toString()}`;
@@ -285,23 +315,25 @@ class KanbanService {
   }
 
   async reorderTarefas(colunaId: number, tarefaIds: number[]): Promise<void> {
-    await api.patch(`/colunas/${colunaId}/reorder-tasks`, {
-      tarefa_ids: tarefaIds,
-    });
+    // NOTA: Backend não possui endpoint /colunas/:id/reorder-tasks.
+    // Reordenação é feita movendo tarefas individualmente via /tarefas/:id/mover.
+    for (let i = 0; i < tarefaIds.length; i++) {
+      await api.patch(`/tarefas/${tarefaIds[i]}/mover`, {
+        colunaId,
+        ordem: i,
+      });
+    }
   }
 
-  async getTarefasAtrasadas(projetoId?: number): Promise<Tarefa[]> {
-    let url = "/tarefas/atrasadas";
-    if (projetoId) {
-      url += `?projeto_id=${projetoId}`;
-    }
+  async getTarefasAtrasadas(projetoId: number): Promise<Tarefa[]> {
+    const url = `/tarefas/atrasadas/${projetoId}`;
     const response = await api.get(url);
     return unwrapArrayData<Tarefa>(response.data);
   }
 
-  async getTarefaHistorico(id: number): Promise<any[]> {
+  async getTarefaHistorico(id: number): Promise<HistoricoTarefa[]> {
     const response = await api.get(`/tarefas/${id}/historico`);
-    return unwrapArrayData<any>(response.data);
+    return unwrapArrayData<HistoricoTarefa>(response.data);
   }
 
   // Checklists
@@ -372,39 +404,29 @@ class KanbanService {
   }
 
   async getComentariosEstatisticas(
-    tarefaId?: number,
-    periodo?: string,
-  ): Promise<any> {
-    let url = "/comentarios/estatisticas";
-    const params = new URLSearchParams();
-
-    if (tarefaId) params.append("tarefa_id", tarefaId.toString());
-    if (periodo) params.append("periodo", periodo);
-
-    if (params.toString()) {
-      url += `?${params.toString()}`;
-    }
-
+    tarefaId: number,
+  ): Promise<ComentarioEstatisticas> {
+    const url = `/comentarios/tarefa/${tarefaId}/estatisticas`;
     const response = await api.get(url);
-    return unwrapData<any>(response.data);
+    return unwrapData<ComentarioEstatisticas>(response.data);
   }
 
   async getComentariosPorPeriodo(
     inicio: string,
     fim: string,
     tarefaId?: number,
-  ): Promise<any> {
-    let url = "/comentarios/por-periodo";
+  ): Promise<ComentariosPorPeriodo> {
+    let url = "/comentarios/periodo";
     const params = new URLSearchParams();
 
-    params.append("inicio", inicio);
-    params.append("fim", fim);
-    if (tarefaId) params.append("tarefa_id", tarefaId.toString());
+    params.append("dataInicio", inicio);
+    params.append("dataFim", fim);
+    if (tarefaId) params.append("tarefaId", tarefaId.toString());
 
     url += `?${params.toString()}`;
 
     const response = await api.get(url);
-    return unwrapData<any>(response.data);
+    return unwrapData<ComentariosPorPeriodo>(response.data);
   }
 }
 
@@ -423,4 +445,8 @@ export type {
   CreateComentarioDto,
   UpdateComentarioDto,
   PapelMembro,
+  ProjetoStats,
+  ColunaStats,
+  ComentarioEstatisticas,
+  ComentariosPorPeriodo,
 };

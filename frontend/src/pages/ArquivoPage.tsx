@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import {
@@ -91,6 +91,7 @@ const formatDate = (value?: string): string => {
 
 const ArquivoPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { checkPermission } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
@@ -101,6 +102,12 @@ const ArquivoPage: React.FC = () => {
   );
   const [deletePastaId, setDeletePastaId] = useState<string | null>(null);
   const [deletePlanilhaItem, setDeletePlanilhaItem] = useState<{ id: string; nome: string } | null>(null);
+  const [pendingPlanilhaId, setPendingPlanilhaId] = useState<string | null>(
+    null,
+  );
+  const [highlightedPlanilhaId, setHighlightedPlanilhaId] = useState<
+    string | null
+  >(null);
   const canManageArquivos =
     checkPermission('create', 'arquivos') ||
     checkPermission('update', 'arquivos') ||
@@ -152,6 +159,59 @@ const ArquivoPage: React.FC = () => {
     () => new Set(planilhasControle.map(planilha => planilha.id)),
     [planilhasControle],
   );
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    const queryFromUrl = searchParams.get('q');
+    const planilhaIdFromUrl = searchParams.get('planilhaId');
+
+    if (
+      tabFromUrl === 'pastas' ||
+      tabFromUrl === 'planilhas' ||
+      tabFromUrl === 'caixas'
+    ) {
+      setActiveTab(tabFromUrl);
+    }
+
+    if (queryFromUrl) {
+      setSearchTerm(queryFromUrl);
+    }
+
+    if (planilhaIdFromUrl) {
+      setPendingPlanilhaId(planilhaIdFromUrl);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (
+      !pendingPlanilhaId ||
+      activeTab !== 'planilhas' ||
+      !planilhasControle.some(planilha => planilha.id === pendingPlanilhaId)
+    ) {
+      return;
+    }
+
+    setHighlightedPlanilhaId(pendingPlanilhaId);
+    setPendingPlanilhaId(null);
+
+    const params = new URLSearchParams(searchParams);
+    params.delete('planilhaId');
+    setSearchParams(params, { replace: true });
+
+    const timeout = window.setTimeout(() => {
+      const target = document.getElementById(`planilha-card-${pendingPlanilhaId}`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setHighlightedPlanilhaId(null);
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    activeTab,
+    pendingPlanilhaId,
+    planilhasControle,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const planilhaGeralSections = useMemo(() => {
     if (!planilhaGeral?.linhas?.length) {
@@ -893,7 +953,12 @@ const ArquivoPage: React.FC = () => {
               {planilhasControle.map(planilha => (
                 <Card
                   key={planilha.id}
-                  className="border border-border/60 bg-muted/10 transition-colors hover:border-primary/60"
+                  id={`planilha-card-${planilha.id}`}
+                  className={cn(
+                    'border border-border/60 bg-muted/10 transition-colors hover:border-primary/60',
+                    highlightedPlanilhaId === planilha.id &&
+                      'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
+                  )}
                 >
                   <CardContent className="p-5 space-y-4">
                     <div className="flex items-start justify-between gap-3">

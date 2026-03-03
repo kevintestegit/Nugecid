@@ -1,26 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/ui/Button';
-import { Alert } from '../components/ui/Alert';
-import { Input } from '../components/ui/Input';
-import { Label } from '../components/ui/Label';
-import { Textarea } from '../components/ui/Textarea';
-import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/AlertDialog';
-import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
-import { ProjectCard } from '../components/kanban/ProjectCard';
-import { SkeletonCard } from '../components/ui/Skeleton';
-import { PageHeader } from '@/components/layout/PageHeader'
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { Button } from "../components/ui/Button";
+import { Alert } from "../components/ui/Alert";
+import { Input } from "../components/ui/Input";
+import { Label } from "../components/ui/Label";
+import { Textarea } from "../components/ui/Textarea";
 import {
-  Plus,
-  Star,
-  Archive,
-  Filter,
-  Loader2
-} from 'lucide-react';
-import { SearchInput } from '@/components/ui/SearchInput';
-import { kanbanService } from '../services/kanbanService';
-import { toast } from 'sonner';
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/AlertDialog";
+import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
+import { ProjectCard } from "../components/kanban/ProjectCard";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Plus, Star, Archive, Filter, Loader2 } from "lucide-react";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { kanbanService } from "../services/kanbanService";
+import { toast } from "sonner";
 
 interface Projeto {
   id: number;
@@ -41,7 +41,7 @@ interface ProjetosPageState {
   loading: boolean;
   error: string | null;
   searchTerm: string;
-  filterStatus: 'todos' | 'ativos' | 'arquivados' | 'favoritos';
+  filterStatus: "todos" | "ativos" | "arquivados" | "favoritos";
 }
 
 interface ProjectFormValues {
@@ -50,8 +50,9 @@ interface ProjectFormValues {
 }
 
 const getApiErrorMessage = (error: unknown, fallback: string) => {
-  if (error && typeof error === 'object') {
-    const response = (error as { response?: { data?: { message?: string } } }).response;
+  if (error && typeof error === "object") {
+    const response = (error as { response?: { data?: { message?: string } } })
+      .response;
     if (response?.data?.message) {
       return response.data.message;
     }
@@ -65,15 +66,15 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
 const ProjetosPage: React.FC = () => {
   const navigate = useNavigate();
   const { checkPermission, isAuthenticated } = useAuth();
-  
+
   const [state, setState] = useState<ProjetosPageState>({
     projetos: [],
     loading: true,
     error: null,
-    searchTerm: '',
-    filterStatus: 'todos'
+    searchTerm: "",
+    filterStatus: "todos",
   });
-  
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Projeto | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -96,33 +97,42 @@ const ProjetosPage: React.FC = () => {
 
   const loadProjetos = useCallback(async () => {
     if (!isAuthenticated) {
-      setState(prev => ({ ...prev, projetos: [], loading: false, error: null }));
+      setState((prev) => ({
+        ...prev,
+        projetos: [],
+        loading: false,
+        error: null,
+      }));
       return;
     }
 
     try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+
       const response = await kanbanService.getProjetos();
-      const projetos = Array.isArray(response) ? (response as unknown as ProjetoApi[]) : [];
+      const projetos = Array.isArray(response)
+        ? (response as unknown as ProjetoApi[])
+        : [];
       const normalized = projetos.map((p) => ({
         ...p,
-        data_criacao: p.data_criacao || p.created_at || p.createdAt || undefined,
-        data_atualizacao: p.data_atualizacao || p.updated_at || p.updatedAt || undefined,
+        data_criacao:
+          p.data_criacao || p.created_at || p.createdAt || undefined,
+        data_atualizacao:
+          p.data_atualizacao || p.updated_at || p.updatedAt || undefined,
         ativo: p.ativo !== undefined ? p.ativo : true,
       }));
 
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         projetos: normalized,
-        loading: false
+        loading: false,
       }));
     } catch (error) {
-      console.error('Erro ao carregar projetos:', error);
-      setState(prev => ({
+      console.error("Erro ao carregar projetos:", error);
+      setState((prev) => ({
         ...prev,
-        error: getApiErrorMessage(error, 'Erro ao carregar projetos'),
-        loading: false
+        error: getApiErrorMessage(error, "Erro ao carregar projetos"),
+        loading: false,
       }));
     }
   }, [isAuthenticated]);
@@ -132,38 +142,42 @@ const ProjetosPage: React.FC = () => {
   }, [loadProjetos]);
 
   // Filtrar projetos
-  const filteredProjetos = state.projetos.filter(projeto => {
-    const matchesSearch = projeto.nome.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
-                         (projeto.descricao?.toLowerCase().includes(state.searchTerm.toLowerCase()) || false);
-    
+  const filteredProjetos = state.projetos.filter((projeto) => {
+    const matchesSearch =
+      projeto.nome.toLowerCase().includes(state.searchTerm.toLowerCase()) ||
+      projeto.descricao
+        ?.toLowerCase()
+        .includes(state.searchTerm.toLowerCase()) ||
+      false;
+
     const matchesFilter = (() => {
       switch (state.filterStatus) {
-        case 'ativos':
+        case "ativos":
           return projeto.ativo;
-        case 'arquivados':
+        case "arquivados":
           return !projeto.ativo;
-        case 'favoritos':
+        case "favoritos":
           return projeto.favorito;
         default:
           return true;
       }
     })();
-    
+
     return matchesSearch && matchesFilter;
   });
 
   // Handlers
   const handleCreateProject = () => {
-    if (!checkPermission('create', 'projetos')) {
-      toast.error('Você não tem permissão para criar projetos');
+    if (!checkPermission("create", "projetos")) {
+      toast.error("Você não tem permissão para criar projetos");
       return;
     }
     setShowCreateModal(true);
   };
 
   const handleEditProject = (projeto: Projeto) => {
-    if (!checkPermission('update', 'projetos')) {
-      toast.error('Você não tem permissão para editar projetos');
+    if (!checkPermission("update", "projetos")) {
+      toast.error("Você não tem permissão para editar projetos");
       return;
     }
     setSelectedProject(projeto);
@@ -178,12 +192,12 @@ const ProjetosPage: React.FC = () => {
         descricao: values.descricao?.trim() || undefined,
       };
       await kanbanService.createProjeto(payload);
-      toast.success('Projeto criado com sucesso');
+      toast.success("Projeto criado com sucesso");
       setShowCreateModal(false);
       await loadProjetos();
     } catch (error) {
-      console.error('Erro ao criar projeto:', error);
-      toast.error(getApiErrorMessage(error, 'Erro ao criar projeto'));
+      console.error("Erro ao criar projeto:", error);
+      toast.error(getApiErrorMessage(error, "Erro ao criar projeto"));
     } finally {
       setIsCreatingProject(false);
     }
@@ -200,13 +214,13 @@ const ProjetosPage: React.FC = () => {
         descricao: values.descricao?.trim() || undefined,
       };
       await kanbanService.updateProjeto(selectedProject.id, payload);
-      toast.success('Projeto atualizado com sucesso');
+      toast.success("Projeto atualizado com sucesso");
       setShowEditModal(false);
       setSelectedProject(null);
       await loadProjetos();
     } catch (error) {
-      console.error('Erro ao atualizar projeto:', error);
-      toast.error(getApiErrorMessage(error, 'Erro ao atualizar projeto'));
+      console.error("Erro ao atualizar projeto:", error);
+      toast.error(getApiErrorMessage(error, "Erro ao atualizar projeto"));
     } finally {
       setIsUpdatingProject(false);
     }
@@ -217,8 +231,8 @@ const ProjetosPage: React.FC = () => {
     setSelectedProject(null);
   };
   const handleDeleteProject = (projeto: Projeto) => {
-    if (!checkPermission('delete', 'projetos')) {
-      toast.error('Você não tem permissão para excluir projetos');
+    if (!checkPermission("delete", "projetos")) {
+      toast.error("Você não tem permissão para excluir projetos");
       return;
     }
     setDeleteProject(projeto);
@@ -229,22 +243,22 @@ const ProjetosPage: React.FC = () => {
 
     try {
       await kanbanService.deleteProjeto(deleteProject.id);
-      toast.success('Projeto excluído com sucesso');
+      toast.success("Projeto excluído com sucesso");
       setDeleteProject(null);
       loadProjetos();
     } catch (error) {
-      console.error('Erro ao excluir projeto:', error);
-      toast.error(getApiErrorMessage(error, 'Erro ao excluir projeto'));
+      console.error("Erro ao excluir projeto:", error);
+      toast.error(getApiErrorMessage(error, "Erro ao excluir projeto"));
     }
   };
 
   const handleToggleFavorite = async (projeto: Projeto) => {
     try {
       // Implementar toggle favorito quando a API estiver disponível
-      toast.info('Funcionalidade em desenvolvimento');
+      toast.info("Funcionalidade em desenvolvimento");
     } catch (error) {
-      console.error('Erro ao alterar favorito:', error);
-      toast.error(getApiErrorMessage(error, 'Erro ao alterar favorito'));
+      console.error("Erro ao alterar favorito:", error);
+      toast.error(getApiErrorMessage(error, "Erro ao alterar favorito"));
     }
   };
 
@@ -257,11 +271,11 @@ const ProjetosPage: React.FC = () => {
 
     try {
       // Implementar arquivamento quando a API estiver disponível
-      toast.info('Funcionalidade em desenvolvimento');
+      toast.info("Funcionalidade em desenvolvimento");
       setArchiveProject(null);
     } catch (error) {
-      console.error('Erro ao arquivar projeto:', error);
-      toast.error(getApiErrorMessage(error, 'Erro ao arquivar projeto'));
+      console.error("Erro ao arquivar projeto:", error);
+      toast.error(getApiErrorMessage(error, "Erro ao arquivar projeto"));
     }
   };
 
@@ -275,14 +289,40 @@ const ProjetosPage: React.FC = () => {
 
   if (state.loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="h-9 w-48 bg-gray-200 rounded animate-pulse mb-2" />
-          <div className="h-5 w-64 bg-gray-200 rounded animate-pulse" />
+      <div className="relative space-y-6">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+          <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_8%_10%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0))] dark:bg-[radial-gradient(120%_80%_at_8%_10%,rgba(14,116,144,0.24),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+        </div>
+        <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+          <Skeleton variant="text" width={200} height={28} className="mb-2" />
+          <Skeleton variant="text" width={320} height={18} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonCard key={i} showImage={false} lines={4} />
+            <div
+              key={i}
+              className="rounded-2xl border border-border/50 bg-card p-6 shadow-sm"
+            >
+              <Skeleton
+                variant="text"
+                width="60%"
+                height={20}
+                className="mb-3"
+              />
+              <Skeleton
+                variant="text"
+                width="80%"
+                height={14}
+                className="mb-2"
+              />
+              <Skeleton
+                variant="text"
+                width="40%"
+                height={14}
+                className="mb-2"
+              />
+              <Skeleton variant="text" width="70%" height={14} />
+            </div>
           ))}
         </div>
       </div>
@@ -291,14 +331,15 @@ const ProjetosPage: React.FC = () => {
 
   if (state.error) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="relative space-y-6">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+          <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_8%_10%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0))] dark:bg-[radial-gradient(120%_80%_at_8%_10%,rgba(14,116,144,0.24),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+        </div>
         <Alert variant="destructive">
           <h3 className="font-semibold">Erro ao carregar projetos</h3>
           <p>{state.error}</p>
           <div className="mt-4">
-            <Button onClick={loadProjetos}>
-              Tentar Novamente
-            </Button>
+            <Button onClick={loadProjetos}>Tentar Novamente</Button>
           </div>
         </Alert>
       </div>
@@ -306,60 +347,82 @@ const ProjetosPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <PageHeader
-        title="Projetos"
-        description="Gerencie seus projetos Kanban e acompanhe o progresso"
-        breadcrumb={[{ label: 'Workspace' }, { label: 'Projetos' }]}
-        actions={(
+    <div className="relative space-y-6">
+      {/* Radial gradient background */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_8%_10%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0))] dark:bg-[radial-gradient(120%_80%_at_8%_10%,rgba(14,116,144,0.24),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+      </div>
+
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Projetos</h1>
+            <p className="mt-1 text-muted-foreground">
+              Gerencie seus projetos Kanban e acompanhe o progresso
+            </p>
+          </div>
           <Button onClick={handleCreateProject} className="gap-2">
             <Plus className="w-4 h-4" />
             Novo Projeto
           </Button>
-        )}
-        className="mb-8"
-      />
+        </div>
+      </div>
 
       {/* Filtros e Busca */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8 items-start sm:items-center">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
         <div className="flex-1 max-w-lg">
           <SearchInput
             placeholder="Buscar projetos..."
             value={state.searchTerm}
-            onChange={(e) => setState(prev => ({ ...prev, searchTerm: e.target.value }))}
+            onChange={(e) =>
+              setState((prev) => ({ ...prev, searchTerm: e.target.value }))
+            }
           />
         </div>
-        
+
         <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
           <Button
-            variant={state.filterStatus === 'todos' ? 'default' : 'outline'}
+            variant={state.filterStatus === "todos" ? "default" : "outline"}
             size="sm"
-            onClick={() => setState(prev => ({ ...prev, filterStatus: 'todos' }))}
+            onClick={() =>
+              setState((prev) => ({ ...prev, filterStatus: "todos" }))
+            }
             className="rounded-full"
           >
             Todos
           </Button>
           <Button
-            variant={state.filterStatus === 'ativos' ? 'default' : 'outline'}
+            variant={state.filterStatus === "ativos" ? "default" : "outline"}
             size="sm"
-            onClick={() => setState(prev => ({ ...prev, filterStatus: 'ativos' }))}
+            onClick={() =>
+              setState((prev) => ({ ...prev, filterStatus: "ativos" }))
+            }
             className="rounded-full"
           >
             Ativos
           </Button>
           <Button
-            variant={state.filterStatus === 'favoritos' ? 'default' : 'outline'}
+            variant={state.filterStatus === "favoritos" ? "default" : "outline"}
             size="sm"
-            onClick={() => setState(prev => ({ ...prev, filterStatus: 'favoritos' }))}
+            onClick={() =>
+              setState((prev) => ({ ...prev, filterStatus: "favoritos" }))
+            }
             className="rounded-full"
           >
             <Star className="w-4 h-4 mr-1" />
             Favoritos
           </Button>
           <Button
-            variant={state.filterStatus === 'arquivados' ? 'default' : 'outline'}
+            variant={
+              state.filterStatus === "arquivados" ? "default" : "outline"
+            }
             size="sm"
-            onClick={() => setState(prev => ({ ...prev, filterStatus: 'arquivados' }))}
+            onClick={() =>
+              setState((prev) => ({ ...prev, filterStatus: "arquivados" }))
+            }
             className="rounded-full"
           >
             <Archive className="w-4 h-4 mr-1" />
@@ -370,23 +433,21 @@ const ProjetosPage: React.FC = () => {
 
       {/* Lista de Projetos */}
       {filteredProjetos.length === 0 ? (
-        <div className="text-center py-16 bg-gray-50/70 dark:bg-gray-900/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
-          <div className="text-gray-400 mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <div className="text-center py-16 rounded-2xl border border-dashed border-border/60 bg-card/85 backdrop-blur">
+          <div className="text-muted-foreground mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-background border border-border/60">
             <Filter className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            {state.searchTerm || state.filterStatus !== 'todos' 
-              ? 'Nenhum projeto encontrado' 
-              : 'Comece sua jornada'
-            }
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            {state.searchTerm || state.filterStatus !== "todos"
+              ? "Nenhum projeto encontrado"
+              : "Comece sua jornada"}
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-            {state.searchTerm || state.filterStatus !== 'todos'
-              ? 'Não encontramos projetos com os filtros atuais. Tente buscar por outro termo.'
-              : 'Crie seu primeiro projeto para organizar tarefas e colaborar com sua equipe.'
-            }
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+            {state.searchTerm || state.filterStatus !== "todos"
+              ? "Não encontramos projetos com os filtros atuais. Tente buscar por outro termo."
+              : "Crie seu primeiro projeto para organizar tarefas e colaborar com sua equipe."}
           </p>
-          {(!state.searchTerm && state.filterStatus === 'todos') && (
+          {!state.searchTerm && state.filterStatus === "todos" && (
             <Button onClick={handleCreateProject} className="gap-2">
               <Plus className="w-4 h-4" />
               Criar Primeiro Projeto
@@ -404,20 +465,24 @@ const ProjetosPage: React.FC = () => {
               onDelete={() => handleDeleteProject(projeto)}
               onArchive={() => handleArchiveProject(projeto)}
               onToggleFavorite={() => handleToggleFavorite(projeto)}
-              onMembers={() => toast.info('Acesse o quadro do projeto para gerenciar membros')}
+              onMembers={() =>
+                toast.info("Acesse o quadro do projeto para gerenciar membros")
+              }
               onOpenBoard={() => handleOpenBoard(projeto)}
             />
           ))}
-          
-          {/* Card para criar novo projeto (opcional, visualmente agradável) */}
-          <button 
-             onClick={handleCreateProject}
-             className="flex flex-col items-center justify-center p-6 border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl hover:border-gray-400 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors text-gray-500 dark:text-gray-400 group min-h-[250px]"
+
+          {/* Card para criar novo projeto */}
+          <button
+            onClick={handleCreateProject}
+            className="flex flex-col items-center justify-center p-6 border border-dashed border-border/60 rounded-2xl hover:border-border hover:bg-muted/30 transition-colors text-muted-foreground group min-h-[250px]"
           >
-             <div className="w-11 h-11 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 group-hover:border-gray-300 dark:group-hover:border-gray-600 flex items-center justify-center mb-4 transition-colors">
-               <Plus className="w-5 h-5 group-hover:text-gray-700 dark:group-hover:text-gray-200 transition-colors" />
-             </div>
-             <span className="font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Criar Novo Projeto</span>
+            <div className="w-11 h-11 rounded-full bg-background border border-border/60 group-hover:border-border flex items-center justify-center mb-4 transition-colors">
+              <Plus className="w-5 h-5 group-hover:text-foreground transition-colors" />
+            </div>
+            <span className="font-medium group-hover:text-foreground transition-colors">
+              Criar Novo Projeto
+            </span>
           </button>
         </div>
       )}
@@ -437,7 +502,14 @@ const ProjetosPage: React.FC = () => {
         description="Atualize as informações do projeto selecionado."
         submitLabel="Salvar alterações"
         loading={isUpdatingProject}
-        initialData={selectedProject ? { nome: selectedProject.nome, descricao: selectedProject.descricao ?? '' } : undefined}
+        initialData={
+          selectedProject
+            ? {
+                nome: selectedProject.nome,
+                descricao: selectedProject.descricao ?? "",
+              }
+            : undefined
+        }
         onClose={handleCloseEditModal}
         onSubmit={handleUpdateProjectSubmit}
       />
@@ -453,9 +525,9 @@ const ProjetosPage: React.FC = () => {
         confirmationType="checkbox"
         checkboxLabel="Sim, desejo excluir este projeto permanentemente"
         warningList={[
-          'Esta ação não pode ser desfeita',
-          'Todas as tarefas do projeto serão perdidas',
-          'Os membros perderão acesso ao projeto'
+          "Esta ação não pode ser desfeita",
+          "Todas as tarefas do projeto serão perdidas",
+          "Os membros perderão acesso ao projeto",
         ]}
       />
 
@@ -463,8 +535,10 @@ const ProjetosPage: React.FC = () => {
         isOpen={archiveProject !== null}
         onClose={() => setArchiveProject(null)}
         onConfirm={handleConfirmArchive}
-        title={archiveProject?.ativo ? 'Arquivar projeto' : 'Desarquivar projeto'}
-        description={`Tem certeza que deseja ${archiveProject?.ativo ? 'arquivar' : 'desarquivar'} o projeto "${archiveProject?.nome}"?`}
+        title={
+          archiveProject?.ativo ? "Arquivar projeto" : "Desarquivar projeto"
+        }
+        description={`Tem certeza que deseja ${archiveProject?.ativo ? "arquivar" : "desarquivar"} o projeto "${archiveProject?.nome}"?`}
         variant="warning"
         confirmationType="none"
       />
@@ -491,14 +565,15 @@ function ProjectModal({
   onClose: () => void;
   onSubmit: (values: ProjectFormValues) => void;
 }) {
-  const defaultValues: ProjectFormValues = { nome: '', descricao: '' };
-  const [formValues, setFormValues] = React.useState<ProjectFormValues>(defaultValues);
+  const defaultValues: ProjectFormValues = { nome: "", descricao: "" };
+  const [formValues, setFormValues] =
+    React.useState<ProjectFormValues>(defaultValues);
 
   React.useEffect(() => {
     if (open) {
       setFormValues({
-        nome: initialData?.nome ?? '',
-        descricao: initialData?.descricao ?? '',
+        nome: initialData?.nome ?? "",
+        descricao: initialData?.descricao ?? "",
       });
     }
   }, [open, initialData]);
@@ -510,12 +585,17 @@ function ProjectModal({
     }
     onSubmit({
       nome: formValues.nome.trim(),
-      descricao: formValues.descricao?.trim() || '',
+      descricao: formValues.descricao?.trim() || "",
     });
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) onClose();
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
@@ -527,7 +607,9 @@ function ProjectModal({
             <Input
               id="project-name"
               value={formValues.nome}
-              onChange={(event) => setFormValues(prev => ({ ...prev, nome: event.target.value }))}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, nome: event.target.value }))
+              }
               placeholder="Ex.: Projeto Kanban"
               disabled={loading}
               required
@@ -538,14 +620,24 @@ function ProjectModal({
             <Textarea
               id="project-description"
               value={formValues.descricao}
-              onChange={(event) => setFormValues(prev => ({ ...prev, descricao: event.target.value }))}
+              onChange={(event) =>
+                setFormValues((prev) => ({
+                  ...prev,
+                  descricao: event.target.value,
+                }))
+              }
               placeholder="Detalhes ou objetivos do projeto"
               disabled={loading}
               rows={4}
             />
           </div>
           <AlertDialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+            >
               Cancelar
             </Button>
             <Button type="submit" disabled={loading || !formValues.nome.trim()}>

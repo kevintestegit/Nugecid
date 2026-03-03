@@ -3,7 +3,7 @@ import { config as dotenvConfig } from "dotenv";
 import { join } from "path";
 import { ConfigService } from "@nestjs/config";
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from "@nestjs/typeorm";
-import { DataSource, DataSourceOptions } from "typeorm";
+import { DataSourceOptions } from "typeorm";
 import { neonConfig, Pool as NeonPool } from "@neondatabase/serverless";
 import * as ws from "ws";
 
@@ -98,34 +98,31 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
   }
 }
 
-// DataSource para migrations/CLI (não usado pelo Nest em runtime)
-let cliDataSourceOptions: DataSourceOptions;
-try {
-  cliDataSourceOptions = new DataSource(
-    new DatabaseConfig(
+// Mantém opções para tooling de migration sem inicializar DataSource em runtime.
+export const buildCliDataSourceOptions = (): DataSourceOptions => {
+  try {
+    return new DatabaseConfig(
       new ConfigService(),
-    ).createTypeOrmOptions() as DataSourceOptions,
-  ).options as DataSourceOptions;
-} catch (e) {
-  cliDataSourceOptions = {
-    type: "postgres",
-    host: process.env.DATABASE_HOST || "localhost",
-    port: parseInt(process.env.DATABASE_PORT || "5432", 10),
-    username: process.env.DATABASE_USERNAME || "postgres",
-    password: process.env.DATABASE_PASSWORD || process.env.DOCKER_DB_PASSWORD,
-    database: process.env.DATABASE_NAME || "sgc_itep",
-    entities: [__dirname + "/../**/*.entity{.ts,.js}"],
-    migrations: [__dirname + "/../migrations/*{.ts,.js}"],
-    synchronize: false,
-    logging: ["error", "warn"],
-    ssl:
-      process.env.DATABASE_SSL === "true"
-        ? { rejectUnauthorized: false }
-        : false,
-  } as DataSourceOptions;
-}
-
-export const AppDataSource = new DataSource(cliDataSourceOptions);
+    ).createTypeOrmOptions() as DataSourceOptions;
+  } catch {
+    return {
+      type: "postgres",
+      host: process.env.DATABASE_HOST || "localhost",
+      port: parseInt(process.env.DATABASE_PORT || "5432", 10),
+      username: process.env.DATABASE_USERNAME || "postgres",
+      password: process.env.DATABASE_PASSWORD || process.env.DOCKER_DB_PASSWORD,
+      database: process.env.DATABASE_NAME || "sgc_itep",
+      entities: [__dirname + "/../**/*.entity{.ts,.js}"],
+      migrations: [__dirname + "/../migrations/*{.ts,.js}"],
+      synchronize: false,
+      logging: ["error", "warn"],
+      ssl:
+        process.env.DATABASE_SSL === "true"
+          ? { rejectUnauthorized: false }
+          : false,
+    } as DataSourceOptions;
+  }
+};
 
 export default DatabaseConfig;
 

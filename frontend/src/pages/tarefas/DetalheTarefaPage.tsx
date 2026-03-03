@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { Button } from '@/components/ui'
-import { Badge } from '@/components/ui'
-import { 
-  ArrowLeft, 
-  Edit, 
-  Trash2, 
-  Save, 
-  X, 
-  Clock, 
-  User, 
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { Badge } from "@/components/ui";
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
+  Save,
+  X,
+  Clock,
+  User,
   Calendar,
   Flag,
   FileText,
@@ -18,241 +18,262 @@ import {
   CheckCircle,
   XCircle,
   PlayCircle,
-  PauseCircle
-} from 'lucide-react'
-import { toast } from 'sonner'
-import TarefaForm from '@/components/tarefas/TarefaForm'
-import { useTarefas } from '@/hooks/useTarefas'
-import { useUsers } from '@/hooks/useUsers'
-import { Tarefa, StatusTarefa, PrioridadeTarefa, UpdateTarefaDto } from '@/types'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
-import { AvatarGroup } from '@/components/kanban/Avatar'
+  PauseCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+import TarefaForm from "@/components/tarefas/TarefaForm";
+import { useTarefas } from "@/hooks/useTarefas";
+import { useUsers } from "@/hooks/useUsers";
+import {
+  Tarefa,
+  StatusTarefa,
+  PrioridadeTarefa,
+  UpdateTarefaDto,
+  HistoricoTarefa,
+} from "@/types";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
+import { AvatarGroup } from "@/components/kanban/Avatar";
 
 const DetalheTarefaPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const {
-    getTarefa,
-    updateTarefa,
-    deleteTarefa,
-    getHistoricoTarefa,
-    loading
-  } = useTarefas()
-  const { data: usersResponse, isLoading: loadingUsers } = useUsers({ page: 1, limit: 1000 })
-  const usuarios = usersResponse?.data ?? []
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { getTarefa, updateTarefa, deleteTarefa, getHistoricoTarefa, loading } =
+    useTarefas();
+  const { data: usersResponse, isLoading: loadingUsers } = useUsers({
+    page: 1,
+    limit: 1000,
+  });
+  const usuarios = usersResponse?.data ?? [];
 
-  const [tarefa, setTarefa] = useState<Tarefa | null>(null)
-  const [historico, setHistorico] = useState<any[]>([])
-  const [isEditing, setIsEditing] = useState(false)
-  const [loadingTarefa, setLoadingTarefa] = useState(true)
-  const [loadingHistorico, setLoadingHistorico] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [tarefa, setTarefa] = useState<Tarefa | null>(null);
+  const [historico, setHistorico] = useState<HistoricoTarefa[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [loadingTarefa, setLoadingTarefa] = useState(true);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const loadTarefa = useCallback(async () => {
-    if (!id) return
-    
+    if (!id) return;
+
     try {
-      setLoadingTarefa(true)
-      const tarefaData = await getTarefa(parseInt(id))
-      setTarefa(tarefaData)
+      setLoadingTarefa(true);
+      const tarefaData = await getTarefa(parseInt(id));
+      setTarefa(tarefaData);
     } catch (error) {
-      console.error('Erro ao carregar tarefa:', error)
-      toast.error('Erro ao carregar tarefa')
-      navigate('/tarefas')
+      console.error("Erro ao carregar tarefa:", error);
+      toast.error("Erro ao carregar tarefa");
+      navigate("/tarefas");
     } finally {
-      setLoadingTarefa(false)
+      setLoadingTarefa(false);
     }
-  }, [getTarefa, id, navigate])
+  }, [getTarefa, id, navigate]);
 
   useEffect(() => {
     if (id) {
-      loadTarefa()
+      loadTarefa();
     }
-  }, [id, loadTarefa])
+  }, [id, loadTarefa]);
 
   const loadHistorico = async () => {
-    if (!id) return
-    
+    if (!id) return;
+
     try {
-      setLoadingHistorico(true)
-      const historicoData = await getHistoricoTarefa(parseInt(id))
-      setHistorico(historicoData)
+      setLoadingHistorico(true);
+      const historicoData = await getHistoricoTarefa(parseInt(id));
+      setHistorico(historicoData);
     } catch (error) {
-      console.error('Erro ao carregar histórico:', error)
-      toast.error('Erro ao carregar histórico')
+      console.error("Erro ao carregar histórico:", error);
+      toast.error("Erro ao carregar histórico");
     } finally {
-      setLoadingHistorico(false)
+      setLoadingHistorico(false);
     }
-  }
+  };
 
   const handleUpdate = async (data: UpdateTarefaDto) => {
-    if (!tarefa) return
-    
+    if (!tarefa) return;
+
     try {
-      const tarefaAtualizada = await updateTarefa(tarefa.id, data)
-      setTarefa(tarefaAtualizada)
-      setIsEditing(false)
-      toast.success('Tarefa atualizada com sucesso!')
+      const tarefaAtualizada = await updateTarefa(tarefa.id, data);
+      setTarefa(tarefaAtualizada);
+      setIsEditing(false);
+      toast.success("Tarefa atualizada com sucesso!");
     } catch (error) {
-      console.error('Erro ao atualizar tarefa:', error)
-      toast.error('Erro ao atualizar tarefa')
+      console.error("Erro ao atualizar tarefa:", error);
+      toast.error("Erro ao atualizar tarefa");
     }
-  }
+  };
 
   const handleDelete = () => {
-    setShowDeleteDialog(true)
-  }
+    setShowDeleteDialog(true);
+  };
 
   const handleConfirmDelete = async () => {
-    if (!tarefa) return
+    if (!tarefa) return;
 
     try {
-      await deleteTarefa(tarefa.id)
-      toast.success('Tarefa excluída com sucesso!')
-      navigate('/tarefas')
+      await deleteTarefa(tarefa.id);
+      toast.success("Tarefa excluída com sucesso!");
+      navigate("/tarefas");
     } catch (error) {
-      console.error('Erro ao excluir tarefa:', error)
-      toast.error('Erro ao excluir tarefa')
+      console.error("Erro ao excluir tarefa:", error);
+      toast.error("Erro ao excluir tarefa");
     } finally {
-      setShowDeleteDialog(false)
+      setShowDeleteDialog(false);
     }
-  }
+  };
 
   const handleStatusChange = async (novoStatus: StatusTarefa) => {
-    if (!tarefa) return
-    
+    if (!tarefa) return;
+
     try {
-      const tarefaAtualizada = await updateTarefa(tarefa.id, { estado: novoStatus } as UpdateTarefaDto)
-      setTarefa(tarefaAtualizada)
-      toast.success('Status atualizado com sucesso!')
+      const tarefaAtualizada = await updateTarefa(tarefa.id, {
+        estado: novoStatus,
+      } as UpdateTarefaDto);
+      setTarefa(tarefaAtualizada);
+      toast.success("Status atualizado com sucesso!");
     } catch (error) {
-      console.error('Erro ao atualizar status:', error)
-      toast.error('Erro ao atualizar status')
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Erro ao atualizar status");
     }
-  }
+  };
 
   const getStatusIcon = (status: StatusTarefa) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-4 w-4" />;
       case StatusTarefa.EM_ANDAMENTO:
-        return <PlayCircle className="h-4 w-4" />
+        return <PlayCircle className="h-4 w-4" />;
       case StatusTarefa.CONCLUIDA:
-        return <CheckCircle className="h-4 w-4" />
+        return <CheckCircle className="h-4 w-4" />;
       case StatusTarefa.CANCELADA:
-        return <XCircle className="h-4 w-4" />
+        return <XCircle className="h-4 w-4" />;
       default:
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-4 w-4" />;
     }
-  }
+  };
 
   const getStatusColor = (status: StatusTarefa) => {
     switch (status) {
       case StatusTarefa.PENDENTE:
-        return 'bg-yellow-100 text-yellow-800'
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
       case StatusTarefa.EM_ANDAMENTO:
-        return 'bg-blue-100 text-blue-800'
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
       case StatusTarefa.CONCLUIDA:
-        return 'bg-green-100 text-green-800'
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case StatusTarefa.CANCELADA:
-        return 'bg-red-100 text-red-800'
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       default:
-        return 'bg-gray-100 text-gray-800'
+        return "bg-muted text-muted-foreground";
     }
-  }
+  };
 
   const getPrioridadeColor = (prioridade: PrioridadeTarefa) => {
     switch (prioridade) {
       case PrioridadeTarefa.BAIXA:
-        return 'bg-green-100 text-green-800'
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case PrioridadeTarefa.MEDIA:
-        return 'bg-yellow-100 text-yellow-800'
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
       case PrioridadeTarefa.ALTA:
-        return 'bg-orange-100 text-orange-800'
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400";
       case PrioridadeTarefa.CRITICA:
-        return 'bg-red-100 text-red-800'
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       default:
-        return 'bg-gray-100 text-gray-800'
+        return "bg-muted text-muted-foreground";
     }
-  }
+  };
 
   const formatDate = (date: string | Date) => {
-    return format(new Date(date), 'dd/MM/yyyy HH:mm', { locale: ptBR })
-  }
+    return format(new Date(date), "dd/MM/yyyy HH:mm", { locale: ptBR });
+  };
 
   if (loadingTarefa) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </div>
-    )
+    );
   }
 
   if (!tarefa) {
     return (
       <div className="container mx-auto px-4 py-6">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Tarefa não encontrada</h2>
-          <p className="text-gray-600 mb-4">A tarefa que você está procurando não existe ou foi removida.</p>
-          <Button onClick={() => navigate('/tarefas')}>Voltar para Tarefas</Button>
+          <h2 className="text-xl font-semibold text-foreground mb-2">
+            Tarefa não encontrada
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            A tarefa que você está procurando não existe ou foi removida.
+          </p>
+          <Button onClick={() => navigate("/tarefas")}>
+            Voltar para Tarefas
+          </Button>
         </div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate('/tarefas')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{tarefa.titulo}</h1>
-            <p className="text-gray-600">Detalhes da tarefa #{tarefa.id}</p>
-          </div>
-        </div>
-        
-        {!isEditing && (
-          <div className="flex items-center gap-2">
+      {/* Header glassmorphism */}
+      <div className="relative mb-6 overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsEditing(true)}
+              onClick={() => navigate("/tarefas")}
               className="flex items-center gap-2"
             >
-              <Edit className="h-4 w-4" />
-              Editar
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDelete}
-              className="flex items-center gap-2 text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="h-4 w-4" />
-              Excluir
-            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                {tarefa.titulo}
+              </h1>
+              <p className="text-muted-foreground">
+                Detalhes da tarefa #{tarefa.id}
+              </p>
+            </div>
           </div>
-        )}
+
+          {!isEditing && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Editar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDelete}
+                className="flex items-center gap-2 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Excluir
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Conteúdo Principal */}
         <div className="lg:col-span-2 space-y-6">
           {isEditing ? (
-            <Card>
+            <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Edit className="h-5 w-5" />
@@ -274,7 +295,7 @@ const DetalheTarefaPage: React.FC = () => {
           ) : (
             <>
               {/* Informações da Tarefa */}
-              <Card>
+              <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
@@ -283,23 +304,29 @@ const DetalheTarefaPage: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Descrição</h3>
-                    <p className="text-gray-700 whitespace-pre-wrap">
-                      {tarefa.descricao || 'Nenhuma descrição fornecida.'}
+                    <h3 className="font-medium text-foreground mb-2">
+                      Descrição
+                    </h3>
+                    <p className="text-muted-foreground whitespace-pre-wrap">
+                      {tarefa.descricao || "Nenhuma descrição fornecida."}
                     </p>
                   </div>
-                  
+
                   {tarefa.observacoes && (
                     <div>
-                      <h3 className="font-medium text-gray-900 mb-2">Observações</h3>
-                      <p className="text-gray-700 whitespace-pre-wrap">{tarefa.observacoes}</p>
+                      <h3 className="font-medium text-foreground mb-2">
+                        Observações
+                      </h3>
+                      <p className="text-muted-foreground whitespace-pre-wrap">
+                        {tarefa.observacoes}
+                      </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
 
               {/* Ações Rápidas */}
-              <Card>
+              <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
                 <CardHeader>
                   <CardTitle>Ações Rápidas</CardTitle>
                 </CardHeader>
@@ -309,7 +336,9 @@ const DetalheTarefaPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange(StatusTarefa.EM_ANDAMENTO)}
+                        onClick={() =>
+                          handleStatusChange(StatusTarefa.EM_ANDAMENTO)
+                        }
                         className="flex items-center gap-2"
                       >
                         <PlayCircle className="h-4 w-4" />
@@ -320,7 +349,9 @@ const DetalheTarefaPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange(StatusTarefa.CONCLUIDA)}
+                        onClick={() =>
+                          handleStatusChange(StatusTarefa.CONCLUIDA)
+                        }
                         className="flex items-center gap-2"
                       >
                         <CheckCircle className="h-4 w-4" />
@@ -331,8 +362,10 @@ const DetalheTarefaPage: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleStatusChange(StatusTarefa.CANCELADA)}
-                        className="flex items-center gap-2 text-red-600 hover:text-red-700"
+                        onClick={() =>
+                          handleStatusChange(StatusTarefa.CANCELADA)
+                        }
+                        className="flex items-center gap-2 text-destructive hover:text-destructive"
                       >
                         <XCircle className="h-4 w-4" />
                         Cancelar
@@ -348,29 +381,43 @@ const DetalheTarefaPage: React.FC = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Status e Prioridade */}
-          <Card>
+          <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
             <CardHeader>
               <CardTitle className="text-lg">Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-2">
-                <Badge className={`flex items-center gap-1 ${tarefa.status ? getStatusColor(tarefa.status) : ''}`}>
-                  {tarefa.status ? getStatusIcon(tarefa.status) : null}
-                  {tarefa.status ? tarefa.status.replace('_', ' ').toUpperCase() : 'STATUS INDEFINIDO'}
+                <Badge
+                  className={`flex items-center gap-1 ${tarefa.status ? getStatusColor(tarefa.status as StatusTarefa) : ""}`}
+                >
+                  {tarefa.status
+                    ? getStatusIcon(tarefa.status as StatusTarefa)
+                    : null}
+                  {tarefa.status
+                    ? tarefa.status.replace("_", " ").toUpperCase()
+                    : "STATUS INDEFINIDO"}
                 </Badge>
               </div>
-              
+
               <div className="flex items-center gap-2">
-                <Flag className="h-4 w-4 text-gray-500" />
-                <Badge className={tarefa.prioridade ? getPrioridadeColor(tarefa.prioridade) : ''}>
-                  {tarefa.prioridade ? tarefa.prioridade.toUpperCase() : 'PRIORIDADE INDEFINIDA'}
+                <Flag className="h-4 w-4 text-muted-foreground" />
+                <Badge
+                  className={
+                    tarefa.prioridade
+                      ? getPrioridadeColor(tarefa.prioridade)
+                      : ""
+                  }
+                >
+                  {tarefa.prioridade
+                    ? tarefa.prioridade.toUpperCase()
+                    : "PRIORIDADE INDEFINIDA"}
                 </Badge>
               </div>
             </CardContent>
           </Card>
 
           {/* Pessoas */}
-          <Card>
+          <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
             <CardHeader>
               <CardTitle className="text-lg">Pessoas</CardTitle>
             </CardHeader>
@@ -381,100 +428,123 @@ const DetalheTarefaPage: React.FC = () => {
                     ? tarefa.responsaveis
                     : tarefa.responsavel
                       ? [tarefa.responsavel]
-                      : []
+                      : [];
                   if (responsaveis.length > 1) {
                     return (
                       <>
-                        <AvatarGroup usuarios={responsaveis} size="xs" max={4} />
+                        <AvatarGroup
+                          usuarios={responsaveis}
+                          size="xs"
+                          max={4}
+                        />
                         <div>
                           <p className="text-sm font-medium">Responsáveis</p>
-                          <p className="text-sm text-gray-600">
-                            {responsaveis.map((usuario) => usuario.nome).join(', ')}
+                          <p className="text-sm text-muted-foreground">
+                            {responsaveis
+                              .map((usuario) => usuario.nome)
+                              .join(", ")}
                           </p>
                         </div>
                       </>
-                    )
+                    );
                   }
                   return (
                     <>
-                      <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                        {responsaveis[0]?.avatarUrl || responsaveis[0]?.avatar ? (
+                      <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                        {responsaveis[0]?.avatarUrl ||
+                        responsaveis[0]?.avatar ? (
                           <img
-                            src={responsaveis[0]?.avatarUrl ?? responsaveis[0]?.avatar ?? undefined}
-                            alt={responsaveis[0]?.nome ?? 'Responsável'}
+                            src={
+                              responsaveis[0]?.avatarUrl ??
+                              responsaveis[0]?.avatar ??
+                              undefined
+                            }
+                            alt={responsaveis[0]?.nome ?? "Responsável"}
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <User className="h-4 w-4 text-gray-500" />
+                          <User className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
                       <div>
                         <p className="text-sm font-medium">Responsável</p>
-                        <p className="text-sm text-gray-600">
-                          {responsaveis[0]?.nome || 'Não atribuído'}
+                        <p className="text-sm text-muted-foreground">
+                          {responsaveis[0]?.nome || "Não atribuído"}
                         </p>
                       </div>
                     </>
-                  )
+                  );
                 })()}
               </div>
-              
+
               <div className="flex items-center gap-2">
-                <div className="h-7 w-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center overflow-hidden">
                   {tarefa.criador?.avatarUrl || tarefa.criador?.avatar ? (
                     <img
-                      src={tarefa.criador?.avatarUrl ?? tarefa.criador?.avatar ?? undefined}
-                      alt={tarefa.criador?.nome ?? 'Criador'}
+                      src={
+                        tarefa.criador?.avatarUrl ??
+                        tarefa.criador?.avatar ??
+                        undefined
+                      }
+                      alt={tarefa.criador?.nome ?? "Criador"}
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <User className="h-4 w-4 text-gray-500" />
+                    <User className="h-4 w-4 text-muted-foreground" />
                   )}
                 </div>
                 <div>
                   <p className="text-sm font-medium">Criado por</p>
-                  <p className="text-sm text-gray-600">{tarefa.criador?.nome}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {tarefa.criador?.nome}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Datas */}
-          <Card>
+          <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
             <CardHeader>
               <CardTitle className="text-lg">Datas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Criado em</p>
-                  <p className="text-sm text-gray-600">{formatDate(tarefa.createdAt || new Date())}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(tarefa.createdAt || new Date())}
+                  </p>
                 </div>
               </div>
-              
+
               {tarefa.prazo && (
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-gray-500" />
+                  <Clock className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Prazo</p>
-                    <p className="text-sm text-gray-600">{formatDate(tarefa.prazo)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(tarefa.prazo)}
+                    </p>
                   </div>
                 </div>
               )}
-              
+
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Atualizado em</p>
-                  <p className="text-sm text-gray-600">{formatDate(tarefa.updatedAt || new Date())}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(tarefa.updatedAt || new Date())}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Histórico */}
-          <Card>
+          <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -487,7 +557,7 @@ const DetalheTarefaPage: React.FC = () => {
                   onClick={loadHistorico}
                   disabled={loadingHistorico}
                 >
-                  {loadingHistorico ? 'Carregando...' : 'Carregar'}
+                  {loadingHistorico ? "Carregando..." : "Carregar"}
                 </Button>
               </div>
             </CardHeader>
@@ -495,16 +565,22 @@ const DetalheTarefaPage: React.FC = () => {
               {historico.length > 0 ? (
                 <div className="space-y-3">
                   {historico.map((item, index) => (
-                    <div key={index} className="border-l-2 border-gray-200 pl-3 pb-3">
+                    <div
+                      key={index}
+                      className="border-l-2 border-border pl-3 pb-3"
+                    >
                       <p className="text-sm font-medium">{item.acao}</p>
-                      <p className="text-xs text-gray-500">
-                        {formatDate(item.createdAt || new Date())} - {item.usuario?.nome}
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(item.data_acao || new Date())} -{" "}
+                        {item.usuario?.nome}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-gray-500">Nenhum histórico disponível</p>
+                <p className="text-sm text-muted-foreground">
+                  Nenhum histórico disponível
+                </p>
               )}
             </CardContent>
           </Card>
@@ -522,13 +598,13 @@ const DetalheTarefaPage: React.FC = () => {
         confirmationType="checkbox"
         checkboxLabel="Sim, desejo excluir esta tarefa permanentemente"
         warningList={[
-          'Esta ação não pode ser desfeita',
-          'Todos os dados da tarefa serão perdidos',
-          'O histórico será apagado'
+          "Esta ação não pode ser desfeita",
+          "Todos os dados da tarefa serão perdidos",
+          "O histórico será apagado",
         ]}
       />
     </div>
-  )
-}
+  );
+};
 
-export default DetalheTarefaPage
+export default DetalheTarefaPage;

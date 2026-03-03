@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/services/api';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/services/api";
 
 export interface PlanilhaControle {
   id: string;
@@ -35,34 +35,36 @@ export interface PlanilhaGeralResumo {
   grupos: PlanilhaGeralGrupo[];
 }
 
-const normalizePlanilhaControle = (payload: any): PlanilhaControle => {
+const normalizePlanilhaControle = (
+  payload: Record<string, unknown>,
+): PlanilhaControle => {
   if (!payload) {
     return {
-      id: '',
-      nomeOriginal: '',
+      id: "",
+      nomeOriginal: "",
       tamanhoBytes: 0,
-      dataUpload: '',
-      url: '',
+      dataUpload: "",
+      url: "",
     };
   }
 
   return {
-    id: String(payload.id ?? payload.planilhaId ?? ''),
+    id: String(payload.id ?? payload.planilhaId ?? ""),
     nomeOriginal: String(
-      payload.nomeOriginal ?? payload.nome_original ?? payload.nome ?? '',
+      payload.nomeOriginal ?? payload.nome_original ?? payload.nome ?? "",
     ),
     tamanhoBytes: Number(
       payload.tamanhoBytes ?? payload.tamanho_bytes ?? payload.tamanho ?? 0,
     ),
     dataUpload: String(
-      payload.dataUpload ?? payload.data_upload ?? payload.createdAt ?? '',
+      payload.dataUpload ?? payload.data_upload ?? payload.createdAt ?? "",
     ),
-    url: String(payload.url ?? payload.downloadUrl ?? ''),
+    url: String(payload.url ?? payload.downloadUrl ?? ""),
   };
 };
 
 const fetchPlanilhasControle = async (): Promise<PlanilhaControle[]> => {
-  const { data } = await api.get('/planilhas');
+  const { data } = await api.get("/planilhas");
 
   if (Array.isArray(data)) {
     return data.map(normalizePlanilhaControle);
@@ -79,11 +81,11 @@ const uploadPlanilhaControle = async (
   file: File,
 ): Promise<PlanilhaControle> => {
   const formData = new FormData();
-  formData.append('planilha', file);
+  formData.append("planilha", file);
 
-  const { data } = await api.post('/planilhas', formData, {
+  const { data } = await api.post("/planilhas", formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
+      "Content-Type": "multipart/form-data",
     },
   });
 
@@ -94,7 +96,9 @@ const deletePlanilhaControle = async (id: string): Promise<void> => {
   await api.delete(`/planilhas/${id}`);
 };
 
-const normalizePlanilhaGeral = (payload: any): PlanilhaGeralResumo => {
+const normalizePlanilhaGeral = (
+  payload: Record<string, unknown> | null,
+): PlanilhaGeralResumo => {
   const defaultValue: PlanilhaGeralResumo = {
     totalPastas: 0,
     totalPlanilhas: 0,
@@ -104,47 +108,65 @@ const normalizePlanilhaGeral = (payload: any): PlanilhaGeralResumo => {
     grupos: [],
   };
 
-  if (!payload || typeof payload !== 'object') {
+  if (!payload || typeof payload !== "object") {
     return defaultValue;
   }
 
   const colunas = Array.isArray(payload.colunas)
-    ? payload.colunas.map((coluna: any) => String(coluna ?? ''))
+    ? payload.colunas.map((coluna: unknown) => String(coluna ?? ""))
     : [];
 
   const linhas = Array.isArray(payload.linhas)
-    ? payload.linhas.map((linha: any) => {
+    ? payload.linhas.map((linha: unknown) => {
         const normalizado: PlanilhaGeralLinha = {};
-        if (linha && typeof linha === 'object') {
-          Object.entries(linha).forEach(([chave, valor]) => {
-            normalizado[String(chave)] =
-              valor !== null && valor !== undefined ? String(valor) : '';
-          });
+        if (linha && typeof linha === "object") {
+          Object.entries(linha as Record<string, unknown>).forEach(
+            ([chave, valor]) => {
+              normalizado[String(chave)] =
+                valor !== null && valor !== undefined ? String(valor) : "";
+            },
+          );
         }
         return normalizado;
       })
     : [];
 
   const grupos = Array.isArray(payload.grupos)
-    ? payload.grupos.map((grupo: any) => ({
-        pastaId: String(grupo?.pastaId ?? grupo?.pasta_id ?? ''),
-        pastaNome: String(grupo?.pastaNome ?? grupo?.pasta_nome ?? ''),
-        totalPlanilhas: Number(grupo?.totalPlanilhas ?? grupo?.total_planilhas ?? 0),
+    ? payload.grupos.map((grupo: Record<string, unknown>) => ({
+        pastaId: String(grupo?.pastaId ?? grupo?.pasta_id ?? ""),
+        pastaNome: String(grupo?.pastaNome ?? grupo?.pasta_nome ?? ""),
+        totalPlanilhas: Number(
+          grupo?.totalPlanilhas ?? grupo?.total_planilhas ?? 0,
+        ),
         totalItens: Number(grupo?.totalItens ?? grupo?.total_itens ?? 0),
         planilhas: Array.isArray(grupo?.planilhas)
-          ? grupo.planilhas.map((planilha: any) => ({
-              planilhaId: String(planilha?.planilhaId ?? planilha?.planilha_id ?? ''),
-              planilhaNome: String(planilha?.planilhaNome ?? planilha?.planilha_nome ?? ''),
-              sheetName: String(planilha?.sheetName ?? planilha?.sheet_name ?? ''),
-              totalItens: Number(planilha?.totalItens ?? planilha?.total_itens ?? 0),
-            }))
+          ? (grupo.planilhas as Record<string, unknown>[]).map(
+              (planilha: Record<string, unknown>) => ({
+                planilhaId: String(
+                  planilha?.planilhaId ?? planilha?.planilha_id ?? "",
+                ),
+                planilhaNome: String(
+                  planilha?.planilhaNome ?? planilha?.planilha_nome ?? "",
+                ),
+                sheetName: String(
+                  planilha?.sheetName ?? planilha?.sheet_name ?? "",
+                ),
+                totalItens: Number(
+                  planilha?.totalItens ?? planilha?.total_itens ?? 0,
+                ),
+              }),
+            )
           : [],
       }))
     : [];
 
   return {
-    totalPastas: Number(payload.totalPastas ?? payload.total_pastas ?? grupos.length ?? 0),
-    totalPlanilhas: Number(payload.totalPlanilhas ?? payload.total_planilhas ?? 0),
+    totalPastas: Number(
+      payload.totalPastas ?? payload.total_pastas ?? grupos.length ?? 0,
+    ),
+    totalPlanilhas: Number(
+      payload.totalPlanilhas ?? payload.total_planilhas ?? 0,
+    ),
     totalItens: Number(payload.totalItens ?? payload.total_itens ?? 0),
     colunas,
     linhas,
@@ -153,7 +175,7 @@ const normalizePlanilhaGeral = (payload: any): PlanilhaGeralResumo => {
 };
 
 const fetchPlanilhaGeral = async (): Promise<PlanilhaGeralResumo> => {
-  const { data } = await api.get('/planilhas/geral');
+  const { data } = await api.get("/planilhas/geral");
   return normalizePlanilhaGeral(data);
 };
 
@@ -165,7 +187,7 @@ export function usePlanilhasControle() {
     isLoading,
     error,
   } = useQuery<PlanilhaControle[]>({
-    queryKey: ['planilhas-controle'],
+    queryKey: ["planilhas-controle"],
     queryFn: fetchPlanilhasControle,
   });
 
@@ -175,7 +197,7 @@ export function usePlanilhasControle() {
     error: planilhaGeralError,
     refetch: refetchPlanilhaGeral,
   } = useQuery<PlanilhaGeralResumo>({
-    queryKey: ['planilhas-controle', 'geral'],
+    queryKey: ["planilhas-controle", "geral"],
     queryFn: fetchPlanilhaGeral,
     staleTime: 30 * 1000,
   });
@@ -183,9 +205,9 @@ export function usePlanilhasControle() {
   const uploadMutation = useMutation<PlanilhaControle, Error, File>({
     mutationFn: uploadPlanilhaControle,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['planilhas-controle'] });
+      queryClient.invalidateQueries({ queryKey: ["planilhas-controle"] });
       queryClient.invalidateQueries({
-        queryKey: ['planilhas-controle', 'geral'],
+        queryKey: ["planilhas-controle", "geral"],
       });
     },
   });
@@ -193,9 +215,9 @@ export function usePlanilhasControle() {
   const deleteMutation = useMutation<void, Error, string>({
     mutationFn: deletePlanilhaControle,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['planilhas-controle'] });
+      queryClient.invalidateQueries({ queryKey: ["planilhas-controle"] });
       queryClient.invalidateQueries({
-        queryKey: ['planilhas-controle', 'geral'],
+        queryKey: ["planilhas-controle", "geral"],
       });
     },
   });

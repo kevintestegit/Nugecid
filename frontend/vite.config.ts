@@ -5,7 +5,6 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(() => {
   const sourcemap = process.env.GENERATE_SOURCEMAP === "true";
-  const isCi = process.env.CI === "true";
 
   const chunkByPackage = (id: string): string | undefined => {
     if (!id.includes("node_modules")) return undefined;
@@ -63,7 +62,7 @@ export default defineConfig(() => {
       return "vendor-widgets";
     }
 
-    return isCi ? undefined : "vendor-misc";
+    return undefined;
   };
 
   return {

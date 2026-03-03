@@ -143,8 +143,8 @@ export const ImportModal = ({
                             onClick={() => {
                               const errosTexto = importErrors
                                 .map(
-                                  (err: any) =>
-                                    `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`,
+                                  (err) =>
+                                    `Linha ${err.line || err.row}: ${err.error || (err.details && typeof err.details === "object" && "message" in err.details ? String((err.details as Record<string, unknown>).message) : JSON.stringify(err.details))}`,
                                 )
                                 .join("\n");
                               navigator.clipboard.writeText(errosTexto);
@@ -161,8 +161,8 @@ export const ImportModal = ({
                             onClick={() => {
                               const errosTexto = importErrors
                                 .map(
-                                  (err: any) =>
-                                    `Linha ${err.line || err.row}: ${err.error || err.details?.message || JSON.stringify(err.details)}`,
+                                  (err) =>
+                                    `Linha ${err.line || err.row}: ${err.error || (err.details && typeof err.details === "object" && "message" in err.details ? String((err.details as Record<string, unknown>).message) : JSON.stringify(err.details))}`,
                                 )
                                 .join("\n");
                               const blob = new Blob([errosTexto], {
@@ -182,7 +182,7 @@ export const ImportModal = ({
                       </div>
                       <div className="max-h-60 overflow-y-auto mt-2 p-3 bg-red-50 border border-red-200 rounded">
                         <ul className="space-y-2">
-                          {importErrors.map((err: any, index: number) => (
+                          {importErrors.map((err, index) => (
                             <li
                               key={index}
                               className="text-sm border-b border-red-100 pb-2 last:border-0"
@@ -192,8 +192,14 @@ export const ImportModal = ({
                               </div>
                               <div className="text-red-600 mt-1">
                                 {err.error ||
-                                  err.details?.message ||
-                                  JSON.stringify(err.details)}
+                                  (err.details &&
+                                  typeof err.details === "object" &&
+                                  "message" in err.details
+                                    ? String(
+                                        (err.details as Record<string, unknown>)
+                                          .message,
+                                      )
+                                    : JSON.stringify(err.details))}
                               </div>
                             </li>
                           ))}

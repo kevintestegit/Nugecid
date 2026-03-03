@@ -36,8 +36,9 @@ const TarefaCard: React.FC<TarefaCardProps> = ({
   showActions = true,
   compact = false,
 }) => {
-  const statusAtual =
-    tarefa.status ?? tarefa.statusTarefa ?? StatusTarefa.PENDENTE;
+  const statusAtual = (tarefa.status ??
+    tarefa.statusTarefa ??
+    StatusTarefa.PENDENTE) as StatusTarefa;
   const responsaveis = tarefa.responsaveis?.length
     ? tarefa.responsaveis
     : tarefa.responsavel

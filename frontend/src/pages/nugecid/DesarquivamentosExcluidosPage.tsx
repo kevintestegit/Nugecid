@@ -1,21 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
-import { Table } from '../../components/ui/Table';
-import { Badge } from '../../components/ui/Badge';
-import { Checkbox } from '../../components/ui/Checkbox';
-import { AlertDialog } from '../../components/ui/AlertDialog';
-import { Pagination } from '../../components/ui/Pagination';
-import Loading from '../../components/ui/Loading';
-import { Alert } from '../../components/ui/Alert';
-import { RefreshCw, Trash2, RotateCcw, Filter, X } from 'lucide-react';
-import { SearchInput } from '@/components/ui/SearchInput';
-import { useDesarquivamentosExcluidos } from '../../hooks/useDesarquivamentosExcluidos';
-import { formatDate } from '../../utils/date';
-import { toast } from 'sonner';
-import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../components/ui/Card";
+import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { Table } from "../../components/ui/Table";
+import { Badge } from "../../components/ui/Badge";
+import { Checkbox } from "../../components/ui/Checkbox";
+import { AlertDialog } from "../../components/ui/AlertDialog";
+import { Pagination } from "../../components/ui/Pagination";
+import Loading from "../../components/ui/Loading";
+import { Alert } from "../../components/ui/Alert";
+import { RefreshCw, Trash2, RotateCcw, Filter, X } from "lucide-react";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { useDesarquivamentosExcluidos } from "../../hooks/useDesarquivamentosExcluidos";
+import { formatDate } from "../../utils/date";
+import { toast } from "sonner";
+import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
 
 interface FilterState {
   search: string;
@@ -27,13 +32,13 @@ interface FilterState {
 
 const DesarquivamentosExcluidosPage: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>({
-    search: '',
-    tipoDesarquivamento: '',
-    dataExclusaoInicio: '',
-    dataExclusaoFim: '',
-    status: ''
+    search: "",
+    tipoDesarquivamento: "",
+    dataExclusaoInicio: "",
+    dataExclusaoFim: "",
+    status: "",
   });
-  
+
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -46,32 +51,32 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
     error,
     refetch,
     restoreDesarquivamento,
-    restoreMultiple
+    restoreMultiple,
   } = useDesarquivamentosExcluidos({
     page: currentPage,
     limit: itemsPerPage,
-    ...filters
+    ...filters,
   });
 
   const handleFilterChange = (key: keyof FilterState, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters((prev) => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   };
 
   const clearFilters = () => {
     setFilters({
-      search: '',
-      tipoDesarquivamento: '',
-      dataExclusaoInicio: '',
-      dataExclusaoFim: '',
-      status: ''
+      search: "",
+      tipoDesarquivamento: "",
+      dataExclusaoInicio: "",
+      dataExclusaoFim: "",
+      status: "",
     });
     setCurrentPage(1);
   };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked && data?.items) {
-      setSelectedIds(data.items.map(item => item.id));
+      setSelectedIds(data.items.map((item) => item.id));
     } else {
       setSelectedIds([]);
     }
@@ -79,9 +84,9 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
 
   const handleSelectItem = (id: number, checked: boolean) => {
     if (checked) {
-      setSelectedIds(prev => [...prev, id]);
+      setSelectedIds((prev) => [...prev, id]);
     } else {
-      setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
+      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
     }
   };
 
@@ -89,38 +94,54 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
     try {
       if (selectedIds.length === 1) {
         await restoreDesarquivamento(selectedIds[0]);
-        toast.success('Desarquivamento restaurado com sucesso!');
+        toast.success("Desarquivamento restaurado com sucesso!");
       } else {
         await restoreMultiple(selectedIds);
-        toast.success(`${selectedIds.length} desarquivamentos restaurados com sucesso!`);
+        toast.success(
+          `${selectedIds.length} desarquivamentos restaurados com sucesso!`,
+        );
       }
-      
+
       setSelectedIds([]);
       setShowConfirmDialog(false);
       refetch();
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao restaurar desarquivamento(s)');
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao restaurar desarquivamento(s)",
+      );
     }
   };
 
   const getTipoDesarquivamentoBadge = (tipo: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      'EXTRAVIO': 'destructive',
-      'FURTO': 'secondary',
-      'ROUBO': 'default',
-      'OUTROS': 'outline'
+    const variants: Record<
+      string,
+      "default" | "secondary" | "destructive" | "outline"
+    > = {
+      EXTRAVIO: "destructive",
+      FURTO: "secondary",
+      ROUBO: "default",
+      OUTROS: "outline",
     };
-    return <Badge variant={variants[tipo] || 'outline'}>{tipo}</Badge>;
+    return <Badge variant={variants[tipo] || "outline"}>{tipo}</Badge>;
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-      'PENDENTE': 'outline',
-      'EM_ANDAMENTO': 'secondary',
-      'CONCLUIDO': 'default',
-      'CANCELADO': 'destructive'
+    const variants: Record<
+      string,
+      "default" | "secondary" | "destructive" | "outline"
+    > = {
+      PENDENTE: "outline",
+      EM_ANDAMENTO: "secondary",
+      CONCLUIDO: "default",
+      CANCELADO: "destructive",
     };
-    return <Badge variant={variants[status] || 'outline'}>{status.replace('_', ' ')}</Badge>;
+    return (
+      <Badge variant={variants[status] || "outline"}>
+        {status.replace("_", " ")}
+      </Badge>
+    );
   };
 
   if (loading && !data) {
@@ -133,40 +154,49 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Desarquivamentos Excluídos</h1>
-          <p className="text-gray-600 mt-1">
-            Visualize e restaure registros de desarquivamento excluídos
-          </p>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Filtros
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={refetch}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Atualizar
-          </Button>
+      {/* Header glassmorphism */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-40 w-40 rounded-full bg-orange-400/10 blur-3xl" />
+
+        <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Desarquivamentos Excluídos
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Visualize e restaure registros de desarquivamento excluídos
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2"
+            >
+              <Filter className="h-4 w-4" />
+              Filtros
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={refetch}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Filters */}
       {showFilters && (
-        <Card>
+        <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
           <CardHeader>
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg">Filtros de Busca</CardTitle>
@@ -188,15 +218,19 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                 <SearchInput
                   placeholder="Nome, código, solicitante..."
                   value={filters.search}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  onChange={(e) => handleFilterChange("search", e.target.value)}
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-2">Tipo de Desarquivamento</label>
+                <label className="block text-sm font-medium mb-2">
+                  Tipo de Desarquivamento
+                </label>
                 <Select
                   value={filters.tipoDesarquivamento}
-                  onValueChange={(value) => handleFilterChange('tipoDesarquivamento', value)}
+                  onValueChange={(value) =>
+                    handleFilterChange("tipoDesarquivamento", value)
+                  }
                 >
                   <option value="">Todos os tipos</option>
                   <option value="EXTRAVIO">Extravio</option>
@@ -205,12 +239,12 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                   <option value="OUTROS">Outros</option>
                 </Select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium mb-2">Status</label>
                 <Select
                   value={filters.status}
-                  onValueChange={(value) => handleFilterChange('status', value)}
+                  onValueChange={(value) => handleFilterChange("status", value)}
                 >
                   <option value="">Todos os status</option>
                   <option value="PENDENTE">Pendente</option>
@@ -219,22 +253,30 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                   <option value="CANCELADO">Cancelado</option>
                 </Select>
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-2">Data Exclusão (Início)</label>
+                <label className="block text-sm font-medium mb-2">
+                  Data Exclusão (Início)
+                </label>
                 <Input
                   type="date"
                   value={filters.dataExclusaoInicio}
-                  onChange={(e) => handleFilterChange('dataExclusaoInicio', e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange("dataExclusaoInicio", e.target.value)
+                  }
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium mb-2">Data Exclusão (Fim)</label>
+                <label className="block text-sm font-medium mb-2">
+                  Data Exclusão (Fim)
+                </label>
                 <Input
                   type="date"
                   value={filters.dataExclusaoFim}
-                  onChange={(e) => handleFilterChange('dataExclusaoFim', e.target.value)}
+                  onChange={(e) =>
+                    handleFilterChange("dataExclusaoFim", e.target.value)
+                  }
                 />
               </div>
             </div>
@@ -254,7 +296,7 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
       )}
 
       {/* Results */}
-      <Card>
+      <Card className="border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -263,12 +305,12 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                 Registros Excluídos
               </CardTitle>
               {data && (
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {data.total} registro(s) encontrado(s)
                 </p>
               )}
             </div>
-            
+
             {selectedIds.length > 0 && (
               <Button
                 onClick={() => setShowConfirmDialog(true)}
@@ -280,7 +322,7 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
             )}
           </div>
         </CardHeader>
-        
+
         <CardContent>
           {data?.items && data.items.length > 0 ? (
             <div className="space-y-4">
@@ -290,7 +332,10 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                     <tr>
                       <th className="w-12">
                         <Checkbox
-                          checked={data.items.length > 0 && selectedIds.length === data.items.length}
+                          checked={
+                            data.items.length > 0 &&
+                            selectedIds.length === data.items.length
+                          }
                           onCheckedChange={handleSelectAll}
                         />
                       </th>
@@ -309,13 +354,19 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                         <td>
                           <Checkbox
                             checked={selectedIds.includes(item.id)}
-                            onCheckedChange={(checked) => handleSelectItem(item.id, checked === true)}
+                            onCheckedChange={(checked) =>
+                              handleSelectItem(item.id, checked === true)
+                            }
                           />
                         </td>
                         <td className="font-mono text-sm">{item.codigo}</td>
                         <td>{item.nomeSolicitante}</td>
                         <td>{item.nomeVitima}</td>
-                        <td>{getTipoDesarquivamentoBadge(item.tipoDesarquivamento)}</td>
+                        <td>
+                          {getTipoDesarquivamentoBadge(
+                            item.tipoDesarquivamento,
+                          )}
+                        </td>
                         <td>{getStatusBadge(item.status)}</td>
                         <td>{formatDate(item.deletedAt)}</td>
                         <td>
@@ -337,7 +388,7 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
                   </tbody>
                 </Table>
               </div>
-              
+
               {data.totalPages > 1 && (
                 <Pagination
                   currentPage={currentPage}
@@ -350,15 +401,14 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Trash2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <Trash2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">
                 Nenhum registro excluído encontrado
               </h3>
-              <p className="text-gray-600">
-                {Object.values(filters).some(f => f) 
-                  ? 'Tente ajustar os filtros de busca'
-                  : 'Não há registros excluídos no momento'
-                }
+              <p className="text-muted-foreground">
+                {Object.values(filters).some((f) => f)
+                  ? "Tente ajustar os filtros de busca"
+                  : "Não há registros excluídos no momento"}
               </p>
             </div>
           )}
@@ -373,7 +423,7 @@ const DesarquivamentosExcluidosPage: React.FC = () => {
         title="Confirmar restauração"
         description={
           selectedIds.length === 1
-            ? 'Tem certeza que deseja restaurar este desarquivamento?'
+            ? "Tem certeza que deseja restaurar este desarquivamento?"
             : `Tem certeza que deseja restaurar ${selectedIds.length} desarquivamentos?`
         }
         variant="warning"

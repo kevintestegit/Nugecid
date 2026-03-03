@@ -1,0 +1,231 @@
+{
+  "generatedAt": "2026-02-27T13:26:01.643Z",
+  "baseUrl": "http://127.0.0.1:8080",
+  "concurrency": 20,
+  "durationSeconds": 15,
+  "cold": [
+    {
+      "name": "health",
+      "pathname": "/api/health",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 64832,
+      "errors": 63836,
+      "errorRatePct": 98.4637216189536,
+      "rps": 4320.98107171421,
+      "latencyMs": {
+        "min": 2.001532,
+        "p50": 3.722819,
+        "p90": 5.486909,
+        "p95": 7.473736,
+        "p99": 23.358777,
+        "max": 108.842466,
+        "avg": 4.601273697109446
+      },
+      "status": {
+        "200": 996,
+        "429": 63836
+      }
+    },
+    {
+      "name": "nugecid-list",
+      "pathname": "/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 67156,
+      "errors": 67156,
+      "errorRatePct": 100,
+      "rps": 4476.171432380191,
+      "latencyMs": {
+        "min": 1.274163,
+        "p50": 3.972513,
+        "p90": 5.33903,
+        "p95": 7.356736,
+        "p99": 9.732346,
+        "max": 73.481937,
+        "avg": 4.446078712609421
+      },
+      "status": {
+        "429": 67156
+      }
+    },
+    {
+      "name": "pastas-list",
+      "pathname": "/api/pastas",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 71901,
+      "errors": 71901,
+      "errorRatePct": 100,
+      "rps": 4792.441511697661,
+      "latencyMs": {
+        "min": 0.311755,
+        "p50": 3.697409,
+        "p90": 5.048716,
+        "p95": 6.806711,
+        "p99": 9.214814,
+        "max": 68.1567,
+        "avg": 4.151633321191655
+      },
+      "status": {
+        "429": 71901
+      }
+    },
+    {
+      "name": "notificacoes-list",
+      "pathname": "/api/notificacoes?page=1&limit=20",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 68205,
+      "errors": 68205,
+      "errorRatePct": 100,
+      "rps": 4545.787789922688,
+      "latencyMs": {
+        "min": 0.905615,
+        "p50": 3.956008,
+        "p90": 5.424404,
+        "p95": 7.101889,
+        "p99": 9.810864,
+        "max": 70.923626,
+        "avg": 4.3772113070889365
+      },
+      "status": {
+        "429": 68205
+      }
+    },
+    {
+      "name": "global-search",
+      "pathname": "/api/search?query=pro&limit=20&offset=0",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 68540,
+      "errors": 68540,
+      "errorRatePct": 100,
+      "rps": 4567.810729756748,
+      "latencyMs": {
+        "min": 0.877377,
+        "p50": 3.933014,
+        "p90": 5.206015,
+        "p95": 7.15442,
+        "p99": 9.444463,
+        "max": 68.287816,
+        "avg": 4.356628234344929
+      },
+      "status": {
+        "429": 68540
+      }
+    }
+  ],
+  "warm": [
+    {
+      "name": "health",
+      "pathname": "/api/health",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 72064,
+      "errors": 72064,
+      "errorRatePct": 100,
+      "rps": 4803.306005465573,
+      "latencyMs": {
+        "min": 0.852668,
+        "p50": 3.689975,
+        "p90": 5.048335,
+        "p95": 6.890576,
+        "p99": 9.370433,
+        "max": 64.590783,
+        "avg": 4.14180204362787
+      },
+      "status": {
+        "429": 72064
+      }
+    },
+    {
+      "name": "nugecid-list",
+      "pathname": "/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 67063,
+      "errors": 67063,
+      "errorRatePct": 100,
+      "rps": 4469.97267213224,
+      "latencyMs": {
+        "min": 0.912171,
+        "p50": 3.990306,
+        "p90": 5.317579,
+        "p95": 7.431117,
+        "p99": 9.684063,
+        "max": 63.355925,
+        "avg": 4.452637160177714
+      },
+      "status": {
+        "429": 67063
+      }
+    },
+    {
+      "name": "pastas-list",
+      "pathname": "/api/pastas",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 73884,
+      "errors": 73884,
+      "errorRatePct": 100,
+      "rps": 4924.615076984603,
+      "latencyMs": {
+        "min": 1.285278,
+        "p50": 3.560034,
+        "p90": 4.867861,
+        "p95": 6.809619,
+        "p99": 8.986571,
+        "max": 64.793266,
+        "avg": 4.040263198595069
+      },
+      "status": {
+        "429": 73884
+      }
+    },
+    {
+      "name": "notificacoes-list",
+      "pathname": "/api/notificacoes?page=1&limit=20",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 66324,
+      "errors": 66324,
+      "errorRatePct": 100,
+      "rps": 4420.715856828634,
+      "latencyMs": {
+        "min": 1.388492,
+        "p50": 3.98565,
+        "p90": 5.439104,
+        "p95": 7.267532,
+        "p99": 9.717182,
+        "max": 82.184136,
+        "avg": 4.501761433387599
+      },
+      "status": {
+        "429": 66324
+      }
+    },
+    {
+      "name": "global-search",
+      "pathname": "/api/search?query=pro&limit=20&offset=0",
+      "concurrency": 20,
+      "durationSeconds": 15,
+      "requests": 66623,
+      "errors": 66623,
+      "errorRatePct": 100,
+      "rps": 4440.645204292475,
+      "latencyMs": {
+        "min": 0.909972,
+        "p50": 3.999053,
+        "p90": 5.322868,
+        "p95": 7.421224,
+        "p99": 9.593486,
+        "max": 82.03751,
+        "avg": 4.481928676418083
+      },
+      "status": {
+        "429": 66623
+      }
+    }
+  ]
+}

@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { apiService } from '@/services/api';
-import { ImportResultDto } from '@/types';
+import { useState } from "react";
+import axios from "axios";
+import { apiService } from "@/services/api";
+import { ImportResultDto } from "@/types";
 
 export const useDesarquivamentosImport = (onImportSuccess?: () => void) => {
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [importResult, setImportResult] = useState<ImportResultDto | null>(null);
+  const [importResult, setImportResult] = useState<ImportResultDto | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   const handleFileImport = async (file: File) => {
@@ -15,14 +18,20 @@ export const useDesarquivamentosImport = (onImportSuccess?: () => void) => {
 
     try {
       const result = await apiService.importDesarquivamentos(file);
-      setImportResult(result.data || result);
+      if (result.data) {
+        setImportResult(result.data);
+      }
 
       if (onImportSuccess) {
         onImportSuccess();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Se a API retornou HTTP 400 com detalhes dos erros de validação
-      if (err.response?.status === 400 && err.response?.data?.error) {
+      if (
+        axios.isAxiosError(err) &&
+        err.response?.status === 400 &&
+        err.response?.data?.error
+      ) {
         const apiError = err.response.data;
 
         // Extrair os erros da resposta
@@ -38,10 +47,19 @@ export const useDesarquivamentosImport = (onImportSuccess?: () => void) => {
         });
 
         // Definir mensagem de erro principal
-        setError(apiError.message || apiError.error?.summary || 'Erro na validação dos dados.');
+        setError(
+          apiError.message ||
+            apiError.error?.summary ||
+            "Erro na validação dos dados.",
+        );
       } else {
         // Erro genérico (rede, servidor, etc)
-        setError(err.response?.data?.message || err.message || 'Ocorreu um erro ao importar a planilha.');
+        const message = axios.isAxiosError(err)
+          ? err.response?.data?.message || err.message
+          : err instanceof Error
+            ? err.message
+            : "Ocorreu um erro ao importar a planilha.";
+        setError(message);
       }
     } finally {
       setIsLoading(false);

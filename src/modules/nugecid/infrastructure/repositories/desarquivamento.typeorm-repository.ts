@@ -14,17 +14,46 @@ import { DesarquivamentoMapper } from "../mappers/desarquivamento.mapper";
 import { DesarquivamentoId } from "../../domain/value-objects";
 import { StatusDesarquivamentoEnum } from "../../domain/enums/status-desarquivamento.enum";
 import { TipoDesarquivamentoEnum } from "../../domain/enums/tipo-desarquivamento.enum";
+import { SyncRealtimeService } from "../../../sync/sync-realtime.service";
 
 @Injectable()
 export class DesarquivamentoTypeOrmRepository
   implements IDesarquivamentoRepository
 {
   private readonly logger = new Logger(DesarquivamentoTypeOrmRepository.name);
+  private static readonly SORTABLE_COLUMNS: Record<string, string> = {
+    id: "d.id",
+    // Alias legado: codigoBarras corresponde ao numeroNicLaudoAuto
+    codigoBarras: "d.numeroNicLaudoAuto",
+    tipoDesarquivamento: "d.tipoDesarquivamento",
+    status: "d.status",
+    nomeCompleto: "d.nomeCompleto",
+    numeroNicLaudoAuto: "d.numeroNicLaudoAuto",
+    numeroProcesso: "d.numeroProcesso",
+    tipoDocumento: "d.tipoDocumento",
+    dataSolicitacao: "d.dataSolicitacao",
+    dataDesarquivamentoSAG: "d.dataDesarquivamentoSAG",
+    dataDevolucaoSetor: "d.dataDevolucaoSetor",
+    setorDemandante: "d.setorDemandante",
+    servidorResponsavel: "d.servidorResponsavel",
+    finalidadeDesarquivamento: "d.finalidadeDesarquivamento",
+    solicitacaoProrrogacao: "d.solicitacaoProrrogacao",
+    urgente: "d.urgente",
+    criadoPorId: "d.criadoPorId",
+    responsavelId: "d.responsavelId",
+    createdAt: "d.createdAt",
+    updatedAt: "d.updatedAt",
+  };
+  private static readonly ACCENTED_CHARACTERS =
+    "ÁÀÂÃÄáàâãäÉÈÊËéèêëÍÌÎÏíìîïÓÒÔÕÖóòôõöÚÙÛÜúùûüÇç";
+  private static readonly UNACCENTED_CHARACTERS =
+    "AAAAAaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuCc";
 
   constructor(
     @InjectRepository(DesarquivamentoTypeOrmEntity)
     private readonly repository: Repository<DesarquivamentoTypeOrmEntity>,
     private readonly mapper: DesarquivamentoMapper,
+    private readonly syncRealtimeService: SyncRealtimeService,
   ) {}
 
   async create(
@@ -46,6 +75,23 @@ export class DesarquivamentoTypeOrmRepository
       `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | dadosAdicionais=${entity.dadosAdicionais || "VAZIO"}`,
     );
     const savedEntity = await this.repository.save(entity);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "desarquivamentos",
+      action: "created",
+      entityId: savedEntity.id,
+      entityType: "desarquivamento",
+      metadata: {
+        status: savedEntity.status,
+      },
+    });
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      metadata: { section: "desarquivamentos" },
+    });
+
     return this.mapper.toDomain(savedEntity);
   }
 
@@ -54,13 +100,29 @@ export class DesarquivamentoTypeOrmRepository
   ): Promise<DesarquivamentoDomain> {
     const entity = this.mapper.toTypeOrm(desarquivamento);
     const savedEntity = await this.repository.save(entity);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "desarquivamentos",
+      action: "updated",
+      entityId: savedEntity.id,
+      entityType: "desarquivamento",
+      metadata: {
+        status: savedEntity.status,
+      },
+    });
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      metadata: { section: "desarquivamentos" },
+    });
+
     return this.mapper.toDomain(savedEntity);
   }
 
   async findById(id: DesarquivamentoId): Promise<DesarquivamentoDomain | null> {
     const entity = await this.repository.findOne({
       where: { id: id.value },
-      relations: ["criadoPor", "responsavel"],
     });
     return entity ? this.mapper.toDomain(entity) : null;
   }
@@ -70,7 +132,6 @@ export class DesarquivamentoTypeOrmRepository
   ): Promise<DesarquivamentoDomain | null> {
     const entity = await this.repository.findOne({
       where: { id: id.value },
-      relations: ["criadoPor", "responsavel"],
       withDeleted: true, // Include soft-deleted records
     });
     return entity ? this.mapper.toDomain(entity) : null;
@@ -88,13 +149,14 @@ export class DesarquivamentoTypeOrmRepository
 
     this.applyFilters(queryBuilder, filtersWithDefaults);
 
-    if (sortBy) {
-      queryBuilder.orderBy(`d.${sortBy}`, sortOrder || "ASC");
-    } else {
-      queryBuilder.orderBy("d.createdAt", "DESC");
-    }
+    const sortColumn = this.resolveSortColumn(sortBy);
+    const normalizedSortOrder = this.normalizeSortOrder(
+      sortOrder,
+      sortBy ? "ASC" : "DESC",
+    );
+    queryBuilder.orderBy(sortColumn, normalizedSortOrder);
 
-    const [entities] = await queryBuilder
+    const [entities, total] = await queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -126,15 +188,28 @@ export class DesarquivamentoTypeOrmRepository
 
     return {
       data: domainEntities,
-      total: domainEntities.length, // Ajustar total para refletir apenas entidades válidas
+      total,
       page,
       limit,
-      totalPages: Math.ceil(domainEntities.length / limit),
+      totalPages: Math.ceil(total / limit),
     };
   }
 
   async delete(id: DesarquivamentoId): Promise<void> {
     await this.repository.delete(id.value);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "desarquivamentos",
+      action: "deleted",
+      entityId: id.value,
+      entityType: "desarquivamento",
+    });
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      metadata: { section: "desarquivamentos" },
+    });
   }
 
   async softDelete(id: DesarquivamentoId): Promise<void> {
@@ -192,6 +267,19 @@ export class DesarquivamentoTypeOrmRepository
       this.logger.log(
         `[REPOSITORY] ✅ SUCESSO: Soft delete concluído para ID ${id.value}`,
       );
+
+      this.syncRealtimeService.emitDomainChange({
+        scope: "desarquivamentos",
+        action: "deleted",
+        entityId: id.value,
+        entityType: "desarquivamento",
+      });
+      this.syncRealtimeService.emitDomainChange({
+        scope: "dashboard",
+        action: "updated",
+        entityType: "dashboard",
+        metadata: { section: "desarquivamentos" },
+      });
     } catch (error) {
       this.logger.error(
         `[REPOSITORY] ❌ ERRO durante soft delete para ID ${id.value}: ${error.message}`,
@@ -202,6 +290,19 @@ export class DesarquivamentoTypeOrmRepository
 
   async restore(id: DesarquivamentoId): Promise<void> {
     await this.repository.restore(id.value);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "desarquivamentos",
+      action: "restored",
+      entityId: id.value,
+      entityType: "desarquivamento",
+    });
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      metadata: { section: "desarquivamentos" },
+    });
   }
 
   async findByNumeroNicLaudoAuto(
@@ -489,6 +590,22 @@ export class DesarquivamentoTypeOrmRepository
   ): Promise<DesarquivamentoDomain[]> {
     const entities = desarquivamentos.map((d) => this.mapper.toTypeOrm(d));
     const saved = await this.repository.save(entities);
+
+    if (saved.length) {
+      this.syncRealtimeService.emitDomainChange({
+        scope: "desarquivamentos",
+        action: "bulk",
+        entityType: "desarquivamento",
+        metadata: { count: saved.length, operation: "createMany" },
+      });
+      this.syncRealtimeService.emitDomainChange({
+        scope: "dashboard",
+        action: "updated",
+        entityType: "dashboard",
+        metadata: { section: "desarquivamentos" },
+      });
+    }
+
     return saved.map((e) => this.mapper.toDomain(e));
   }
 
@@ -497,6 +614,22 @@ export class DesarquivamentoTypeOrmRepository
   ): Promise<DesarquivamentoDomain[]> {
     const entities = desarquivamentos.map((d) => this.mapper.toTypeOrm(d));
     const saved = await this.repository.save(entities);
+
+    if (saved.length) {
+      this.syncRealtimeService.emitDomainChange({
+        scope: "desarquivamentos",
+        action: "bulk",
+        entityType: "desarquivamento",
+        metadata: { count: saved.length, operation: "updateMany" },
+      });
+      this.syncRealtimeService.emitDomainChange({
+        scope: "dashboard",
+        action: "updated",
+        entityType: "dashboard",
+        metadata: { section: "desarquivamentos" },
+      });
+    }
+
     return saved.map((e) => this.mapper.toDomain(e));
   }
 
@@ -511,6 +644,7 @@ export class DesarquivamentoTypeOrmRepository
       statusList,
       tipoDesarquivamento,
       tipoDesarquivamentoList,
+      codigoBarras,
       search,
       criadoPorId,
       responsavelId,
@@ -579,66 +713,110 @@ export class DesarquivamentoTypeOrmRepository
       );
 
       // O frontend já adiciona 1 dia ao endDate, então usamos < endDate diretamente
+      // para filtrar por data de criação (createdAt), que é o campo exibido na listagem.
       if (startDateStr && endDateStr) {
         qb.andWhere(
-          "d.dataSolicitacao >= CAST(:dataInicio AS TIMESTAMP) AND d.dataSolicitacao < CAST(:dataFim AS TIMESTAMP)",
+          "d.createdAt >= CAST(:dataInicio AS TIMESTAMP) AND d.createdAt < CAST(:dataFim AS TIMESTAMP)",
           {
             dataInicio: `${startDateStr} 00:00:00`,
             dataFim: `${endDateStr} 00:00:00`,
           },
         );
         this.logger.log(
-          `[applyFilters] Query: dataSolicitacao >= '${startDateStr} 00:00:00' AND < '${endDateStr} 00:00:00'`,
+          `[applyFilters] Query: createdAt >= '${startDateStr} 00:00:00' AND < '${endDateStr} 00:00:00'`,
         );
       } else if (startDateStr) {
-        qb.andWhere("d.dataSolicitacao >= CAST(:dataInicio AS TIMESTAMP)", {
+        qb.andWhere("d.createdAt >= CAST(:dataInicio AS TIMESTAMP)", {
           dataInicio: `${startDateStr} 00:00:00`,
         });
       } else if (endDateStr) {
-        qb.andWhere("d.dataSolicitacao < CAST(:dataFim AS TIMESTAMP)", {
+        qb.andWhere("d.createdAt < CAST(:dataFim AS TIMESTAMP)", {
           dataFim: `${endDateStr} 00:00:00`,
         });
       }
     }
 
     if (search) {
-      qb.andWhere(
-        new Brackets((qb) => {
-          qb.where("d.nomeCompleto ILIKE :search", { search: `%${search}%` })
-            .orWhere("d.numeroProcesso ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.numeroNicLaudoAuto ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.tipoDocumento ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.setorDemandante ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.servidorResponsavel ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.finalidadeDesarquivamento ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.instituto ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.requerente ILIKE :search", {
-              search: `%${search}%`,
-            })
-            .orWhere("d.numeroOficio ILIKE :search", {
-              search: `%${search}%`,
+      const normalizedSearch = this.normalizeSearchText(search);
+      if (normalizedSearch) {
+        const normalizedSearchLike = `%${normalizedSearch}%`;
+        const searchableColumns = [
+          "d.nomeCompleto",
+          "d.numeroProcesso",
+          "d.numeroNicLaudoAuto",
+          "d.tipoDocumento",
+          "d.setorDemandante",
+          "d.servidorResponsavel",
+          "d.finalidadeDesarquivamento",
+          "d.instituto",
+          "d.requerente",
+          "d.numeroOficio",
+        ];
+
+        qb.andWhere(
+          new Brackets((searchQb) => {
+            searchableColumns.forEach((column, index) => {
+              const accentInsensitiveCondition = `${this.buildAccentInsensitiveColumnExpression(
+                column,
+              )} LIKE :normalizedSearch`;
+
+              if (index === 0) {
+                searchQb.where(accentInsensitiveCondition, {
+                  normalizedSearch: normalizedSearchLike,
+                });
+                return;
+              }
+
+              searchQb.orWhere(accentInsensitiveCondition, {
+                normalizedSearch: normalizedSearchLike,
+              });
             });
-        }),
-      );
+          }),
+        );
+      }
+    }
+
+    if (codigoBarras) {
+      qb.andWhere("d.numeroNicLaudoAuto ILIKE :codigoBarras", {
+        codigoBarras: `%${codigoBarras}%`,
+      });
     }
 
     // Controla a inclusão de registros soft-deleted
     if (incluirExcluidos) {
       qb.withDeleted().andWhere("d.deletedAt IS NOT NULL");
     }
+  }
+
+  private normalizeSortOrder(
+    sortOrder?: "ASC" | "DESC",
+    fallback: "ASC" | "DESC" = "ASC",
+  ): "ASC" | "DESC" {
+    if (!sortOrder) {
+      return fallback;
+    }
+    return String(sortOrder).toUpperCase() === "DESC" ? "DESC" : "ASC";
+  }
+
+  private resolveSortColumn(sortBy?: string): string {
+    if (!sortBy) {
+      return DesarquivamentoTypeOrmRepository.SORTABLE_COLUMNS["createdAt"];
+    }
+    return (
+      DesarquivamentoTypeOrmRepository.SORTABLE_COLUMNS[sortBy] ??
+      DesarquivamentoTypeOrmRepository.SORTABLE_COLUMNS["createdAt"]
+    );
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  }
+
+  private buildAccentInsensitiveColumnExpression(column: string): string {
+    return `translate(lower(coalesce(${column}, '')), '${DesarquivamentoTypeOrmRepository.ACCENTED_CHARACTERS}', '${DesarquivamentoTypeOrmRepository.UNACCENTED_CHARACTERS}')`;
   }
 }

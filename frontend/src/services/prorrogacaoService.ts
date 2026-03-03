@@ -190,7 +190,9 @@ class ProrrogacaoService {
     motivo: string;
   } {
     const hoje = new Date();
-    const solicitacaoDate = new Date(desarquivamento.dataSolicitacao);
+    const solicitacaoDate = new Date(
+      desarquivamento.createdAt || desarquivamento.dataSolicitacao,
+    );
     const diffTime = hoje.getTime() - solicitacaoDate.getTime();
     const diasSolicitacao = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 

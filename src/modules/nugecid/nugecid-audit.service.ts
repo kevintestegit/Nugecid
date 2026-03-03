@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 
-import { Auditoria } from "../audit/entities/auditoria.entity";
+import { AuditAction, Auditoria } from "../audit/entities/auditoria.entity";
 import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 
 @Injectable()
@@ -86,6 +86,18 @@ export class NugecidAuditService {
       previousValues: changes ? this.extractPreviousValues(changes) : null,
     };
 
+    if (action === "VIEW" && desarquivamento.id) {
+      await this.saveOrMergeViewAudit(
+        userId,
+        desarquivamento.id,
+        details,
+        auditData,
+        ipAddress,
+        userAgent,
+      );
+      return;
+    }
+
     await this.saveAudit(
       userId,
       action,
@@ -96,6 +108,99 @@ export class NugecidAuditService {
       ipAddress,
       userAgent,
     );
+  }
+
+  /**
+   * Mantém apenas um registro de visualização por usuário + desarquivamento.
+   * A primeira visualização cria o log; as demais apenas atualizam metadados.
+   */
+  private async saveOrMergeViewAudit(
+    userId: number,
+    desarquivamentoId: number,
+    details: string,
+    auditData: Record<string, unknown>,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<void> {
+    const nowIso = new Date().toISOString();
+
+    try {
+      const toRecord = (value: unknown): Record<string, unknown> =>
+        value && typeof value === "object"
+          ? (value as Record<string, unknown>)
+          : {};
+
+      const existingViewAudit = await this.auditoriaRepository.findOne({
+        where: {
+          userId,
+          action: AuditAction.VIEW,
+          entityName: "DESARQUIVAMENTO",
+          entityId: desarquivamentoId,
+        },
+        order: { timestamp: "ASC" },
+      });
+
+      if (!existingViewAudit) {
+        await this.saveAudit(
+          userId,
+          "VIEW",
+          "DESARQUIVAMENTO",
+          details,
+          {
+            ...auditData,
+            metadata: {
+              viewCount: 1,
+              firstViewedAt: nowIso,
+              lastViewedAt: nowIso,
+            },
+          },
+          desarquivamentoId,
+          ipAddress,
+          userAgent,
+        );
+        return;
+      }
+
+      const existingDetails = toRecord(existingViewAudit.details);
+      const existingMetadata = toRecord(existingDetails.metadata);
+
+      const viewCount =
+        Number.isFinite(Number(existingMetadata.viewCount)) &&
+        Number(existingMetadata.viewCount) > 0
+          ? Number(existingMetadata.viewCount) + 1
+          : 2;
+
+      existingViewAudit.details = {
+        ...existingDetails,
+        details,
+        originalData: auditData,
+        timestamp: nowIso,
+        action: "VIEW",
+        resource: "DESARQUIVAMENTO",
+        userId,
+        resourceId: desarquivamentoId,
+        metadata: {
+          ...existingMetadata,
+          viewCount,
+          firstViewedAt:
+            (existingMetadata.firstViewedAt as string | undefined) ||
+            existingViewAudit.timestamp?.toISOString() ||
+            nowIso,
+          lastViewedAt: nowIso,
+        },
+      };
+
+      existingViewAudit.success = true;
+      existingViewAudit.ipAddress = ipAddress || existingViewAudit.ipAddress;
+      existingViewAudit.userAgent = userAgent || existingViewAudit.userAgent;
+
+      await this.auditoriaRepository.save(existingViewAudit);
+    } catch (error) {
+      this.logger.error(
+        `Erro ao consolidar visualização: ${error.message}`,
+        error.stack,
+      );
+    }
   }
 
   private buildAuditDetails(

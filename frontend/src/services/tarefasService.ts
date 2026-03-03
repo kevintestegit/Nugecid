@@ -114,7 +114,7 @@ class TarefasService {
   }
   async getTarefasAtrasadas(projetoId: number): Promise<Tarefa[]> {
     const response = await api.get<ApiResponse<Tarefa[]>>(
-      `${this.baseUrl}/atrasadas?projetoId=${projetoId}`,
+      `${this.baseUrl}/atrasadas/${projetoId}`,
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(
@@ -139,7 +139,7 @@ class TarefasService {
   // Comentários
   async getComentarios(tarefaId: number): Promise<TarefaComentario[]> {
     const response = await api.get<ApiResponse<TarefaComentario[]>>(
-      `${this.baseUrl}/${tarefaId}/comentarios`,
+      `/comentarios?tarefaId=${tarefaId}`,
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || "Erro ao buscar comentários");
@@ -152,8 +152,8 @@ class TarefasService {
     conteudo: string,
   ): Promise<TarefaComentario> {
     const response = await api.post<ApiResponse<TarefaComentario>>(
-      `${this.baseUrl}/${tarefaId}/comentarios`,
-      { conteudo },
+      `/comentarios`,
+      { tarefaId, conteudo },
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || "Erro ao criar comentário");
@@ -167,7 +167,7 @@ class TarefasService {
     conteudo: string,
   ): Promise<TarefaComentario> {
     const response = await api.patch<ApiResponse<TarefaComentario>>(
-      `${this.baseUrl}/${tarefaId}/comentarios/${comentarioId}`,
+      `/comentarios/${comentarioId}`,
       { conteudo },
     );
     if (!response.data.success || !response.data.data) {
@@ -181,7 +181,7 @@ class TarefasService {
     comentarioId: number,
   ): Promise<void> {
     const response = await api.delete<ApiResponse>(
-      `${this.baseUrl}/${tarefaId}/comentarios/${comentarioId}`,
+      `/comentarios/${comentarioId}`,
     );
     if (!response.data.success) {
       throw new Error(response.data.message || "Erro ao excluir comentário");
@@ -288,7 +288,7 @@ class TarefasService {
   // Utilitários
   async duplicarTarefa(id: number): Promise<Tarefa> {
     const response = await api.post<ApiResponse<Tarefa>>(
-      `${this.baseUrl}/${id}/duplicate`,
+      `${this.baseUrl}/${id}/duplicar`,
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || "Erro ao duplicar tarefa");
@@ -298,7 +298,7 @@ class TarefasService {
 
   async arquivarTarefa(id: number): Promise<Tarefa> {
     const response = await api.patch<ApiResponse<Tarefa>>(
-      `${this.baseUrl}/${id}/archive`,
+      `${this.baseUrl}/${id}/arquivar`,
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || "Erro ao arquivar tarefa");
@@ -306,15 +306,8 @@ class TarefasService {
     return response.data.data;
   }
 
-  async desarquivarTarefa(id: number): Promise<Tarefa> {
-    const response = await api.patch<ApiResponse<Tarefa>>(
-      `${this.baseUrl}/${id}/unarchive`,
-    );
-    if (!response.data.success || !response.data.data) {
-      throw new Error(response.data.message || "Erro ao desarquivar tarefa");
-    }
-    return response.data.data;
-  }
+  // desarquivarTarefa removido — backend não possui endpoint de desarquivamento.
+  // Para desarquivar, use moverTarefa() movendo a tarefa para outra coluna.
 }
 
 export const tarefasService = new TarefasService();

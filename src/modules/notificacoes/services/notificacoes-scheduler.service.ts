@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { Cron } from "@nestjs/schedule";
 import { NotificacoesService } from "./notificacoes.service";
 
 @Injectable()
@@ -9,10 +9,10 @@ export class NotificacoesSchedulerService {
   constructor(private readonly notificacoesService: NotificacoesService) {}
 
   /**
-   * Executa a cada hora para verificar solicitações pendentes
-   * e criar notificações automáticas
+   * Executa diariamente às 8h para verificar solicitações pendentes
+   * e criar notificações automáticas (uma por dia por solicitação)
    */
-  @Cron(CronExpression.EVERY_HOUR)
+  @Cron("0 8 * * *")
   async verificarSolicitacoesPendentes(): Promise<void> {
     try {
       this.logger.log("Iniciando verificação de solicitações pendentes...");
@@ -39,19 +39,19 @@ export class NotificacoesSchedulerService {
 
   /**
    * Executa diariamente às 9h para limpeza de notificações antigas
-   * Remove notificações lidas com mais de 30 dias
+   * Remove notificações lidas com mais de 30 dias (soft-delete)
    */
   @Cron("0 9 * * *")
   async limpezaNotificacoesAntigas(): Promise<void> {
     try {
       this.logger.log("Iniciando limpeza de notificações antigas...");
 
-      const trintaDiasAtras = new Date();
-      trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+      const removidas =
+        await this.notificacoesService.limparNotificacoesAntigas(30);
 
-      // Aqui você pode implementar a lógica de limpeza se necessário
-      // Por enquanto, apenas log
-      this.logger.log("Limpeza de notificações antigas concluída.");
+      this.logger.log(
+        `Limpeza de notificações antigas concluída. ${removidas} notificações removidas.`,
+      );
     } catch (error) {
       this.logger.error(
         "Erro na limpeza de notificações antigas:",
@@ -78,9 +78,9 @@ export class NotificacoesSchedulerService {
 
   /**
    * Verifica tarefas com prazo próximo (próximos 2 dias)
-   * Executa diariamente às 8h
+   * Executa diariamente às 8h15 (escalonado para evitar concorrência com verificarSolicitacoesPendentes)
    */
-  @Cron("0 8 * * *")
+  @Cron("15 8 * * *")
   async verificarTarefasComPrazoProximo(): Promise<void> {
     try {
       this.logger.log("Iniciando verificação de tarefas com prazo próximo...");
@@ -101,9 +101,9 @@ export class NotificacoesSchedulerService {
 
   /**
    * Verifica tarefas atrasadas
-   * Executa diariamente às 9h
+   * Executa diariamente às 9h15 (defasado da limpeza às 9h para evitar race condition)
    */
-  @Cron("0 9 * * *")
+  @Cron("15 9 * * *")
   async verificarTarefasAtrasadas(): Promise<void> {
     try {
       this.logger.log("Iniciando verificação de tarefas atrasadas...");

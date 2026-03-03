@@ -4,14 +4,14 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from "@nestjs/common";
+import * as Sentry from "@sentry/nestjs";
 import * as fs from "fs";
 import * as path from "path";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
-import PdfPrinter from "pdfmake";
+import PdfPrinter = require("pdfmake");
 import { TDocumentDefinitions } from "pdfmake/interfaces";
-import htmlToPdfmake from "html-to-pdfmake";
-import { JSDOM } from "jsdom";
+import type { Browser } from "playwright";
 
 import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 import {
@@ -64,8 +64,8 @@ export class NugecidPdfService {
     });
 
     if (invalidOrMissingFonts.length) {
-      this.logger.warn(
-        `Fontes Roboto ausentes/inválidas (${invalidOrMissingFonts.join(", ")}). Usando fallback Helvetica.`,
+      this.logger.debug(
+        `Fontes Roboto ausentes/inválidas (${invalidOrMissingFonts.join(", ")}). Aplicando fallback Helvetica para geração de PDF.`,
       );
       this.pdfPrinter = new PdfPrinter({
         Roboto: {
@@ -123,6 +123,13 @@ export class NugecidPdfService {
         "Erro ao renderizar termo de desarquivamento em PDF.",
         error,
       );
+      Sentry.captureException(error, {
+        tags: { pdf_type: "termo_desarquivamento" },
+        extra: {
+          desarquivamentoId: desarquivamento.id,
+          itensCount: somenteDesarquivados.length,
+        },
+      });
       throw new InternalServerErrorException(
         "Não foi possível gerar o termo de desarquivamento em PDF. Tente novamente mais tarde.",
       );
@@ -152,14 +159,46 @@ export class NugecidPdfService {
       { text: item.numeroNicLaudoAuto || "", alignment: "center" as const },
     ]);
 
+    // Altura reservada pelo rodapé fixo (linha + 4 linhas de texto)
+    const FOOTER_HEIGHT = 55;
+
     const docDefinition: TDocumentDefinitions = {
       pageSize: "A4",
-      pageMargins: [28, 28, 28, 28],
+      // top margin aumentada para dar espaço ao cabeçalho dinâmico (exceto pág 1 que já tem o bloco de cabeçalho no content)
+      pageMargins: [28, 28, 28, FOOTER_HEIGHT + 10],
       defaultStyle: {
         font: "Roboto",
         fontSize: 9,
         lineHeight: 1.2,
       },
+      // Rodapé dinâmico com numeração de páginas em todas as páginas
+      footer: (currentPage: number, pageCount: number) => ({
+        stack: [
+          {
+            canvas: [
+              { type: "line", x1: 28, y1: 0, x2: 567, y2: 0, lineWidth: 0.5 },
+            ],
+          },
+          {
+            columns: [
+              {
+                text: "Polícia Científica do Rio Grande do Norte - PCIRN\nNúcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID\nRua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928\nEmail: arquivogeral@pci.rn.gov.br",
+                alignment: "center" as const,
+                fontSize: 7,
+                margin: [0, 4, 0, 0],
+              },
+              {
+                text: `Página ${currentPage} de ${pageCount}`,
+                alignment: "right" as const,
+                fontSize: 7,
+                margin: [0, 4, 0, 0],
+                width: 70,
+              },
+            ],
+            margin: [28, 0, 28, 0],
+          },
+        ],
+      }),
       content: [
         // Cabeçalho
         {
@@ -270,6 +309,8 @@ export class NugecidPdfService {
         {
           table: {
             headerRows: 1,
+            dontBreakRows: true,
+            keepWithHeaderRows: 1,
             widths: [25, 90, 170, "*"],
             body: [
               [
@@ -400,39 +441,6 @@ export class NugecidPdfService {
           margin: [0, 10, 0, 0],
         },
       ],
-
-      // Rodapé
-      footer: {
-        stack: [
-          {
-            canvas: [
-              { type: "line", x1: 28, y1: 0, x2: 567, y2: 0, lineWidth: 0.5 },
-            ],
-          },
-          {
-            text: "Polícia Científica do Rio Grande do Norte - PCIRN",
-            alignment: "center" as const,
-            fontSize: 7,
-            margin: [0, 5, 0, 0],
-          },
-          {
-            text: "Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID",
-            alignment: "center" as const,
-            fontSize: 7,
-          },
-          {
-            text: "Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928",
-            alignment: "center" as const,
-            fontSize: 7,
-          },
-          {
-            text: "Email: arquivogeral@pci.rn.gov.br",
-            alignment: "center" as const,
-            fontSize: 7,
-          },
-        ],
-        margin: [28, 0, 28, 10],
-      },
     };
 
     return await new Promise<Buffer>((resolve, reject) => {
@@ -454,10 +462,11 @@ export class NugecidPdfService {
   }
 
   private async tryRenderWithPlaywright(html: string): Promise<Buffer | null> {
+    let browser: Browser | null = null;
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { chromium } = require("playwright");
-      const browser = await chromium.launch({
+      browser = await chromium.launch({
         args: ["--no-sandbox", "--font-render-hinting=none"],
         headless: true,
       });
@@ -481,14 +490,23 @@ export class NugecidPdfService {
         },
       });
 
-      await browser.close();
       return Buffer.from(pdfBuffer);
     } catch (error) {
       this.logger.warn(
         "Playwright indisponível para gerar termo PDF. Aplicando fallback via pdfmake.",
         error,
       );
+      Sentry.addBreadcrumb({
+        category: "pdf",
+        message:
+          "Playwright unavailable for termo PDF, falling back to pdfmake",
+        level: "warning",
+      });
       return null;
+    } finally {
+      if (browser) {
+        await browser.close().catch(() => undefined);
+      }
     }
   }
 
@@ -514,11 +532,16 @@ export class NugecidPdfService {
   }
 
   private async renderPdfWithPdfmake(html: string): Promise<Buffer> {
+    // Carrega bibliotecas pesadas apenas quando este fallback é utilizado.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const htmlToPdfmakeModule = require("html-to-pdfmake");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { JSDOM } = require("jsdom");
     const dom = new JSDOM("<!DOCTYPE html><body></body>");
     const htmlToPdfMakeFn =
-      typeof htmlToPdfmake === "function"
-        ? htmlToPdfmake
-        : (htmlToPdfmake as any)?.default;
+      typeof htmlToPdfmakeModule === "function"
+        ? htmlToPdfmakeModule
+        : htmlToPdfmakeModule?.default;
 
     if (typeof htmlToPdfMakeFn !== "function") {
       throw new InternalServerErrorException(

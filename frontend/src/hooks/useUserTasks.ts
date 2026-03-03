@@ -1,12 +1,12 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/services/api';
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
 
 export interface UserTask {
   id: number;
   titulo: string;
   descricao: string;
-  status: 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDA' | 'CANCELADA';
-  prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE';
+  status: "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA";
+  prioridade: "BAIXA" | "MEDIA" | "ALTA" | "URGENTE";
   prazo: string;
   createdAt: string;
   responsavel?: {
@@ -28,7 +28,7 @@ export interface UserTask {
 }
 
 export const QUERY_KEYS = {
-  userTasks: ['userTasks'] as const,
+  userTasks: ["userTasks"] as const,
 };
 
 export function useUserTasks() {
@@ -36,13 +36,13 @@ export function useUserTasks() {
     queryKey: QUERY_KEYS.userTasks,
     queryFn: async (): Promise<UserTask[]> => {
       try {
-        const response = await api.get('/tarefas/usuario');
+        const response = await api.get("/tarefas/usuario");
         const envelope = response?.data;
         const payload = envelope?.data ?? envelope;
         const list = Array.isArray(payload) ? payload : [];
         return list;
-      } catch (error: any) {
-        console.error('❌ [FRONTEND] Erro ao buscar tarefas do usuário:', error);
+      } catch (error: unknown) {
+        console.error("[FRONTEND] Erro ao buscar tarefas do usuario:", error);
         throw error;
       }
     },

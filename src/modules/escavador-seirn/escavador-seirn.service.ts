@@ -113,10 +113,16 @@ export class EscavadorSeirnService implements OnModuleDestroy {
       );
     }
 
-    await this.emitNotification(data.numero, data.titulo, data.link, usuarioId);
+    const sanitizedLink = this.sanitizeExternalHttpUrl(data.link);
+    await this.emitNotification(
+      data.numero,
+      data.titulo,
+      sanitizedLink,
+      usuarioId,
+    );
     this.status.lastProcess = data.numero;
     this.status.lastTitle = data.titulo;
-    this.status.lastLink = data.link;
+    this.status.lastLink = sanitizedLink;
     this.status.lastChangeAt = new Date();
 
     return { ok: true };
@@ -134,7 +140,9 @@ export class EscavadorSeirnService implements OnModuleDestroy {
       this.status.lastProcess =
         detalhes.numero || latest.descricao || latest.titulo;
       this.status.lastTitle = detalhes.titulo || latest.titulo;
-      this.status.lastLink = detalhes.link || latest.link;
+      this.status.lastLink = this.sanitizeExternalHttpUrl(
+        detalhes.link || latest.link,
+      );
       this.status.lastChangeAt = latest.createdAt;
     }
   }
@@ -169,12 +177,13 @@ export class EscavadorSeirnService implements OnModuleDestroy {
       const parsed = this.parseProcessLine(line);
       if (parsed) {
         const { numero, titulo, link, isNew } = parsed;
+        const sanitizedLink = this.sanitizeExternalHttpUrl(link);
         this.status.lastProcess = numero;
         this.status.lastTitle = titulo;
-        this.status.lastLink = link;
+        this.status.lastLink = sanitizedLink;
         if (isNew) {
           this.status.lastChangeAt = new Date();
-          await this.emitNotification(numero, titulo, link, usuarioId);
+          await this.emitNotification(numero, titulo, sanitizedLink, usuarioId);
         }
       }
     });
@@ -209,14 +218,15 @@ export class EscavadorSeirnService implements OnModuleDestroy {
     usuarioId: number,
   ) {
     try {
+      const sanitizedLink = this.sanitizeExternalHttpUrl(link);
       const dto: CreateNotificacaoDto = {
         usuarioId,
         tipo: TipoNotificacao.NOVO_PROCESSO,
         titulo: `Novo processo recebido: ${numero}`,
         descricao: titulo || "Novo processo detectado pelo escavador SEIRN",
-        detalhes: { numero, titulo, link },
+        detalhes: { numero, titulo, link: sanitizedLink },
         prioridade: PrioridadeNotificacao.ALTA,
-        link,
+        link: sanitizedLink,
       };
       await this.notificacoesService.create(dto);
       this.logger.log(
@@ -226,6 +236,27 @@ export class EscavadorSeirnService implements OnModuleDestroy {
       this.logger.error(
         `Falha ao criar notificação para ${usuarioId}: ${error?.message || error}`,
       );
+    }
+  }
+
+  private sanitizeExternalHttpUrl(url?: string): string | undefined {
+    if (!url) {
+      return undefined;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        return undefined;
+      }
+      return parsed.toString();
+    } catch {
+      return undefined;
     }
   }
 }

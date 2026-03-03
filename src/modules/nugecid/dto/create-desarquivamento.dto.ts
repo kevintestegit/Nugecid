@@ -61,15 +61,15 @@ export class CreateDesarquivamentoDto {
   @Transform(({ value }) => value?.trim())
   nomeCompleto: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: "Número do NIC, Laudo, Auto ou Informação Técnica",
     example: "BIC Nº 146.040 - João Silva Santos",
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: "Número NIC/Laudo/Auto é obrigatório" })
   @MaxLength(500)
-  @Transform(({ value }) => value?.trim())
-  numeroNicLaudoAuto: string;
+  @Transform(({ value }) => value?.trim() || null)
+  numeroNicLaudoAuto?: string | null;
 
   @ApiPropertyOptional({
     description: "Número do processo",

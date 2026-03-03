@@ -11,6 +11,15 @@ import { BlockedIp } from "./entities/blocked-ip.entity";
 import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
 import { User } from "../users/entities/user.entity";
 
+export interface IpUserInfo {
+  id: number;
+  usuario: string;
+  nome: string;
+  successfulLogins: number;
+  failedLogins: number;
+  lastAttempt: Date;
+}
+
 export interface IpAccessStats {
   ipAddress: string;
   totalAttempts: number;
@@ -19,6 +28,7 @@ export interface IpAccessStats {
   lastAttempt: Date;
   firstAttempt: Date;
   userAgents: string[];
+  users: IpUserInfo[];
   isBlocked: boolean;
   blockedReason?: string;
 }
@@ -160,7 +170,7 @@ export class SecurityService {
   }
 
   /**
-   * Obtém estatísticas de acesso por IP
+   * Obtém estatísticas de acesso por IP (com usuários associados)
    */
   async getIpAccessStats(
     days: number = 7,
@@ -169,12 +179,13 @@ export class SecurityService {
     const since = new Date();
     since.setDate(since.getDate() - days);
 
-    // Busca todos os acessos desde a data especificada
+    // Busca todos os acessos desde a data especificada COM relação de usuário
     const audits = await this.auditoriaRepository.find({
       where: {
         action: AuditAction.LOGIN,
         timestamp: MoreThan(since),
       },
+      relations: ["user"],
       order: { timestamp: "DESC" },
     });
 
@@ -186,6 +197,8 @@ export class SecurityService {
 
     // Agrupa por IP
     const ipMap = new Map<string, IpAccessStats>();
+    // Mapa auxiliar para rastrear usuários por IP
+    const ipUsersMap = new Map<string, Map<number, IpUserInfo>>();
 
     for (const audit of audits) {
       if (!audit.ipAddress) continue;
@@ -199,9 +212,11 @@ export class SecurityService {
           lastAttempt: audit.timestamp,
           firstAttempt: audit.timestamp,
           userAgents: [],
+          users: [],
           isBlocked: blockedIpsMap.has(audit.ipAddress),
           blockedReason: blockedIpsMap.get(audit.ipAddress),
         });
+        ipUsersMap.set(audit.ipAddress, new Map<number, IpUserInfo>());
       }
 
       const stats = ipMap.get(audit.ipAddress)!;
@@ -224,6 +239,39 @@ export class SecurityService {
       if (audit.userAgent && !stats.userAgents.includes(audit.userAgent)) {
         stats.userAgents.push(audit.userAgent);
       }
+
+      // Agrupa info do usuário
+      if (audit.userId && audit.user) {
+        const usersMap = ipUsersMap.get(audit.ipAddress)!;
+        if (!usersMap.has(audit.userId)) {
+          usersMap.set(audit.userId, {
+            id: audit.userId,
+            usuario: audit.user.usuario,
+            nome: audit.user.nome,
+            successfulLogins: 0,
+            failedLogins: 0,
+            lastAttempt: audit.timestamp,
+          });
+        }
+
+        const userInfo = usersMap.get(audit.userId)!;
+        if (audit.success) {
+          userInfo.successfulLogins++;
+        } else {
+          userInfo.failedLogins++;
+        }
+        if (audit.timestamp > userInfo.lastAttempt) {
+          userInfo.lastAttempt = audit.timestamp;
+        }
+      }
+    }
+
+    // Monta o array de usuários em cada IP stat
+    for (const [ip, usersMap] of ipUsersMap.entries()) {
+      const stats = ipMap.get(ip)!;
+      stats.users = Array.from(usersMap.values()).sort(
+        (a, b) => b.lastAttempt.getTime() - a.lastAttempt.getTime(),
+      );
     }
 
     // Converte para array e ordena por total de tentativas

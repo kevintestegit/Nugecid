@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/services/api';
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/services/api";
 
 export interface OnlineUser {
   id: number;
@@ -12,7 +12,7 @@ export interface OnlineUser {
 }
 
 export const QUERY_KEYS = {
-  onlineUsers: ['onlineUsers'] as const,
+  onlineUsers: ["onlineUsers"] as const,
 };
 
 export function useOnlineUsers() {
@@ -20,13 +20,17 @@ export function useOnlineUsers() {
     queryKey: QUERY_KEYS.onlineUsers,
     queryFn: async (): Promise<OnlineUser[]> => {
       try {
-        const response = await api.get('/auth/online-users');
+        const response = await api.get("/auth/online-users");
         // A API usa TransformInterceptor e envolve as respostas em { success, data, ... }
         const envelope = response?.data;
         const payload = envelope?.data ?? envelope; // fallback caso interceptor esteja desativado
-        const list = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+        const list = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : [];
         return list;
-      } catch (error: any) {
+      } catch (error: unknown) {
         throw error;
       }
     },

@@ -10,7 +10,7 @@ export interface DesarquivamentoDomainProps {
   tipoDesarquivamento: string;
   status: StatusDesarquivamento;
   nomeCompleto: string;
-  numeroNicLaudoAuto: string;
+  numeroNicLaudoAuto?: string | null;
   numeroProcesso: string;
   tipoDocumento: string;
   dataSolicitacao: Date;
@@ -40,7 +40,7 @@ export class DesarquivamentoDomain {
     private _tipoDesarquivamento: string,
     private _status: StatusDesarquivamento,
     private readonly _nomeCompleto: string,
-    private readonly _numeroNicLaudoAuto: string,
+    private readonly _numeroNicLaudoAuto: string | null | undefined,
     private readonly _numeroProcesso: string,
     private readonly _tipoDocumento: string,
     private _dataSolicitacao: Date,
@@ -158,7 +158,7 @@ export class DesarquivamentoDomain {
     return this._nomeCompleto;
   }
 
-  get numeroNicLaudoAuto(): string {
+  get numeroNicLaudoAuto(): string | null | undefined {
     return this._numeroNicLaudoAuto;
   }
 
@@ -250,13 +250,6 @@ export class DesarquivamentoDomain {
 
     if (this._nomeCompleto.length > 255) {
       throw new Error("Nome completo deve ter no mÃ¡ximo 255 caracteres");
-    }
-
-    if (
-      !this._numeroNicLaudoAuto ||
-      this._numeroNicLaudoAuto.trim().length === 0
-    ) {
-      throw new Error("NÃºmero NIC/Laudo/Auto Ã© obrigatÃ³rio");
     }
 
     // numeroProcesso agora é OPCIONAL - removida validação

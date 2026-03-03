@@ -23,6 +23,7 @@ export enum TipoNotificacao {
   TAREFA_COMENTADA = "tarefa_comentada",
   PRAZO_PROXIMO = "prazo_proximo",
   TAREFA_ATRASADA = "tarefa_atrasada",
+  /** Reservado para uso futuro — nenhum código gera este tipo ainda. */
   PROJETO_ATUALIZADO = "projeto_atualizado",
   NOVO_REGISTRO = "novo_registro",
   PASTA_CRIADA = "pasta_criada",

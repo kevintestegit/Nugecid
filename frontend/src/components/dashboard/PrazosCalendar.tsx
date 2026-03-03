@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -16,6 +16,47 @@ interface PrazoItem {
 interface PrazosCalendarProps {
   prazos: PrazoItem[]
   isLoading?: boolean
+}
+
+const ISO_DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
+const ISO_UTC_MIDNIGHT_REGEX = /^(\d{4})-(\d{2})-(\d{2})[T\s]00:00:00(?:\.\d{1,3})?(?:Z|[+-]00:00)$/i
+const BR_DATE_ONLY_REGEX = /^(\d{2})\/(\d{2})\/(\d{4})$/
+
+const toDateKey = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const resolveCalendarDateKey = (value: string): string | null => {
+  const normalizedValue = value?.trim()
+  if (!normalizedValue) return null
+
+  const dateOnlyMatch = normalizedValue.match(ISO_DATE_ONLY_REGEX)
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    return `${year}-${month}-${day}`
+  }
+
+  const utcMidnightMatch = normalizedValue.match(ISO_UTC_MIDNIGHT_REGEX)
+  if (utcMidnightMatch) {
+    const [, year, month, day] = utcMidnightMatch
+    return `${year}-${month}-${day}`
+  }
+
+  const brDateMatch = normalizedValue.match(BR_DATE_ONLY_REGEX)
+  if (brDateMatch) {
+    const [, day, month, year] = brDateMatch
+    return `${year}-${month}-${day}`
+  }
+
+  const parsedDate = new Date(normalizedValue)
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null
+  }
+
+  return toDateKey(parsedDate)
 }
 
 const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) => {
@@ -42,9 +83,26 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))
   }
 
+  const prazosByDate = useMemo(() => {
+    const grouped = new Map<string, PrazoItem[]>()
+
+    prazos.forEach((prazo) => {
+      const dateKey = resolveCalendarDateKey(prazo.data)
+      if (!dateKey) return
+
+      const currentItems = grouped.get(dateKey) ?? []
+      currentItems.push(prazo)
+      grouped.set(dateKey, currentItems)
+    })
+
+    return grouped
+  }, [prazos])
+
   const getPrazosForDay = (day: number) => {
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    return prazos.filter(prazo => prazo.data.startsWith(dateStr))
+    const dateStr = toDateKey(
+      new Date(currentDate.getFullYear(), currentDate.getMonth(), day),
+    )
+    return prazosByDate.get(dateStr) ?? []
   }
 
   const isToday = (day: number) => {
@@ -64,7 +122,7 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
 
   if (isLoading) {
     return (
-      <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+      <Card className="relative overflow-visible border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -74,7 +132,7 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
             Calendário de Prazos
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative overflow-visible">
           <div className="animate-pulse space-y-3">
             <div className="h-8 bg-muted rounded"></div>
             <div className="grid grid-cols-7 gap-1">
@@ -89,7 +147,7 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
   }
 
   return (
-    <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
+    <Card className="relative overflow-visible border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -122,7 +180,7 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative overflow-visible">
         {/* Week days header */}
         <div className="grid grid-cols-7 gap-1 mb-2">
           {weekDays.map(day => (
@@ -148,6 +206,16 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
             const dayPrazos = getPrazosForDay(day)
             const hasPrazos = dayPrazos.length > 0
             const hasUrgente = dayPrazos.some(p => p.urgente)
+            const dayColumn = (firstDay + i) % 7
+            const dayRow = Math.floor((firstDay + i) / 7)
+            const horizontalTooltipClass =
+              dayColumn <= 1
+                ? 'left-0'
+                : dayColumn >= 5
+                  ? 'right-0'
+                  : 'left-1/2 -translate-x-1/2'
+            const verticalTooltipClass =
+              dayRow <= 1 ? 'top-full mt-2' : 'bottom-full mb-2'
 
             return (
               <div
@@ -188,7 +256,13 @@ const PrazosCalendar: React.FC<PrazosCalendarProps> = ({ prazos, isLoading }) =>
 
                 {/* Tooltip on hover */}
                 {hoveredDay === day && hasPrazos && (
-                  <div className="absolute z-50 bottom-full mb-2 left-1/2 -translate-x-1/2 w-64 p-3 bg-popover border border-border rounded-lg shadow-lg">
+                  <div
+                    className={cn(
+                      'pointer-events-none absolute z-[70] w-64 rounded-lg border border-border bg-popover p-3 shadow-lg',
+                      horizontalTooltipClass,
+                      verticalTooltipClass,
+                    )}
+                  >
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-foreground border-b border-border pb-1">
                         {day} de {monthName}

@@ -8,6 +8,7 @@ import { AuthService } from "./auth.service";
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { RedisService } from "../redis/redis.service";
 import { LoginDto } from "./dto/login.dto";
 
 describe("AuthService", () => {
@@ -59,6 +60,13 @@ describe("AuthService", () => {
     }),
   };
 
+  const mockRedisService = {
+    set: jest.fn(),
+    get: jest.fn(),
+    del: jest.fn(),
+    keys: jest.fn().mockResolvedValue([]),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,6 +90,10 @@ describe("AuthService", () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: RedisService,
+          useValue: mockRedisService,
         },
       ],
     }).compile();

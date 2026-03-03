@@ -5,13 +5,17 @@ import {
   DatabaseHealthStatus,
 } from "./database-health.service";
 import { IsPublic } from "../../common/decorators/is-public.decorator";
+import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
 
 @ApiTags("health")
 @Controller("health")
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
-  constructor(private readonly databaseHealthService: DatabaseHealthService) {}
+  constructor(
+    private readonly databaseHealthService: DatabaseHealthService,
+    private readonly runtimeMetricsService: RuntimeMetricsService,
+  ) {}
 
   @Get()
   @IsPublic()
@@ -28,6 +32,7 @@ export class HealthController {
       uptime: process.uptime(),
       database: dbHealth,
       memory: process.memoryUsage(),
+      runtime: this.runtimeMetricsService.getSummary(),
       version: process.version,
     };
 
@@ -132,5 +137,15 @@ export class HealthController {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     };
+  }
+
+  @Get("metrics")
+  @IsPublic()
+  @ApiOperation({
+    summary: "Métricas de runtime (event loop, GC, HTTP e cache)",
+  })
+  @ApiResponse({ status: 200, description: "Snapshot de métricas do backend" })
+  async getRuntimeMetrics() {
+    return this.runtimeMetricsService.getSnapshot();
   }
 }

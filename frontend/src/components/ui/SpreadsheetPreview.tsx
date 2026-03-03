@@ -1,7 +1,7 @@
-import React from 'react';
-import { cn } from '@/utils/cn';
+import React from "react";
+import { cn } from "@/utils/cn";
 
-export type SheetRow = Record<string, any>;
+export type SheetRow = Record<string, unknown>;
 export type SheetData = SheetRow[];
 
 interface SpreadsheetPreviewProps {
@@ -12,17 +12,19 @@ interface SpreadsheetPreviewProps {
   showRowNumbers?: boolean;
 }
 
-export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({ 
-  headers, 
-  data, 
+export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({
+  headers,
+  data,
   className,
-  maxHeight = 'max-h-[400px]',
-  showRowNumbers = false
+  maxHeight = "max-h-[400px]",
+  showRowNumbers = false,
 }) => {
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 border rounded-lg bg-gray-50 dark:bg-gray-800">
-        <p className="text-gray-500 dark:text-gray-400">Nenhum dado para exibir</p>
+        <p className="text-gray-500 dark:text-gray-400">
+          Nenhum dado para exibir
+        </p>
       </div>
     );
   }
@@ -40,8 +42,8 @@ export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({
                   </th>
                 )}
                 {headers.map((header, index) => (
-                  <th 
-                    key={`header-${index}`} 
+                  <th
+                    key={`header-${index}`}
                     className="px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-300 min-w-[120px] whitespace-nowrap"
                   >
                     {header}
@@ -51,11 +53,13 @@ export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({
             </thead>
             <tbody>
               {data.map((row, rowIndex) => (
-                <tr 
-                  key={`row-${rowIndex}`} 
+                <tr
+                  key={`row-${rowIndex}`}
                   className={cn(
                     "border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors",
-                    rowIndex % 2 === 0 ? "bg-white dark:bg-gray-900" : "bg-gray-50/50 dark:bg-gray-800/30"
+                    rowIndex % 2 === 0
+                      ? "bg-white dark:bg-gray-900"
+                      : "bg-gray-50/50 dark:bg-gray-800/30",
                   )}
                 >
                   {showRowNumbers && (
@@ -69,7 +73,9 @@ export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({
                       className="px-4 py-3 text-gray-900 dark:text-gray-100 max-w-[200px] truncate"
                       title={String(row[header])}
                     >
-                      {row[header] !== null && row[header] !== undefined ? String(row[header]) : ''}
+                      {row[header] !== null && row[header] !== undefined
+                        ? String(row[header])
+                        : ""}
                     </td>
                   ))}
                 </tr>
@@ -78,7 +84,7 @@ export const SpreadsheetPreview: React.FC<SpreadsheetPreviewProps> = ({
           </table>
         </div>
       </div>
-      
+
       <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t text-xs text-gray-500 dark:text-gray-400">
         Exibindo {data.length} linha(s) com {headers.length} coluna(s)
       </div>

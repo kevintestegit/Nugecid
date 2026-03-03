@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import axios from "axios";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -115,15 +116,19 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
         setError("Credenciais inválidas");
         return false;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro na validação de credenciais:", error);
 
-      if (error.response?.status === 401) {
-        setError("Usuário ou senha incorretos");
-      } else if (error.response?.status === 403) {
-        setError(
-          "Acesso negado. Apenas administradores podem realizar esta ação",
-        );
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          setError("Usuário ou senha incorretos");
+        } else if (error.response?.status === 403) {
+          setError(
+            "Acesso negado. Apenas administradores podem realizar esta ação",
+          );
+        } else {
+          setError("Erro ao validar credenciais. Tente novamente");
+        }
       } else {
         setError("Erro ao validar credenciais. Tente novamente");
       }

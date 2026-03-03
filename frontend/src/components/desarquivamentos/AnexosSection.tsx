@@ -1,8 +1,15 @@
-import React, { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import React, { useEffect, useRef, useState } from "react";
+import axios from "axios";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 import {
   Upload,
   Download,
@@ -12,28 +19,32 @@ import {
   Loader2,
   Eye,
   Edit2,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { DesarquivamentoAnexo } from '@/hooks/useDesarquivamentosAnexos'
-import { ImageThumbnail } from './ImageThumbnail'
-import { LinearProgress } from '@/components/ui/ProgressBar'
-import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog'
-import { NoFilesFound } from '@/components/ui/EmptyState'
+} from "lucide-react";
+import { toast } from "sonner";
+import { DesarquivamentoAnexo } from "@/hooks/useDesarquivamentosAnexos";
+import { ImageThumbnail } from "./ImageThumbnail";
+import { LinearProgress } from "@/components/ui/ProgressBar";
+import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
+import { NoFilesFound } from "@/components/ui/EmptyState";
 
 interface AnexosSectionProps {
-  title: string
-  description: string
-  anexos: DesarquivamentoAnexo[]
-  isLoading: boolean
-  canEdit: boolean
-  tipoAnexo: 'desarquivamento' | 'rearquivamento'
-  numeroProcesso?: string | null
-  onUpload: (file: File, descricao: string, anexarAoProcesso?: boolean) => Promise<void>
-  onDownload: (anexoId: number) => Promise<void>
-  onDelete: (anexoId: number) => Promise<void>
-  onView?: (anexo: DesarquivamentoAnexo) => void
-  onUpdateDescricao?: (anexoId: number, descricao: string) => Promise<void>
-  isUploading?: boolean
+  title: string;
+  description: string;
+  anexos: DesarquivamentoAnexo[];
+  isLoading: boolean;
+  canEdit: boolean;
+  tipoAnexo: "desarquivamento" | "rearquivamento";
+  numeroProcesso?: string | null;
+  onUpload: (
+    file: File,
+    descricao: string,
+    anexarAoProcesso?: boolean,
+  ) => Promise<void>;
+  onDownload: (anexoId: number) => Promise<void>;
+  onDelete: (anexoId: number) => Promise<void>;
+  onView?: (anexo: DesarquivamentoAnexo) => void;
+  onUpdateDescricao?: (anexoId: number, descricao: string) => Promise<void>;
+  isUploading?: boolean;
 }
 
 export const AnexosSection: React.FC<AnexosSectionProps> = ({
@@ -51,98 +62,127 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
   onUpdateDescricao,
   isUploading = false,
 }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [fileDescricao, setFileDescricao] = useState('')
-  const [anexarAoProcesso, setAnexarAoProcesso] = useState(false)
-  const [editingAnexoId, setEditingAnexoId] = useState<number | null>(null)
-  const [editDescricao, setEditDescricao] = useState('')
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileDescricao, setFileDescricao] = useState("");
+  const [anexarAoProcesso, setAnexarAoProcesso] = useState(false);
+  const [editingAnexoId, setEditingAnexoId] = useState<number | null>(null);
+  const [editDescricao, setEditDescricao] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [deleteAnexoId, setDeleteAnexoId] = useState<number | null>(null);
+  const uploadProgressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+
+  const clearUploadProgressInterval = () => {
+    if (uploadProgressIntervalRef.current) {
+      clearInterval(uploadProgressIntervalRef.current);
+      uploadProgressIntervalRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      clearUploadProgressInterval();
+    },
+    [],
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      setSelectedFile(file)
+      setSelectedFile(file);
     }
-    e.target.value = ''
-  }
+    e.target.value = "";
+  };
 
   const handleUpload = async () => {
-    if (!selectedFile) return
+    if (!selectedFile) return;
 
     try {
-      setUploadProgress(0)
-      // Simular progresso
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) return prev
-          return prev + 10
-        })
-      }, 200)
+      clearUploadProgressInterval();
+      setUploadProgress(0);
+      uploadProgressIntervalRef.current = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 90) return prev;
+          return prev + 10;
+        });
+      }, 200);
 
-      await onUpload(selectedFile, fileDescricao, anexarAoProcesso)
+      await onUpload(selectedFile, fileDescricao, anexarAoProcesso);
 
-      clearInterval(progressInterval)
-      setUploadProgress(100)
+      clearUploadProgressInterval();
+      setUploadProgress(100);
 
       setTimeout(() => {
-        setSelectedFile(null)
-        setFileDescricao('')
-        setAnexarAoProcesso(false)
-        setUploadProgress(0)
-      }, 1000)
+        setSelectedFile(null);
+        setFileDescricao("");
+        setAnexarAoProcesso(false);
+        setUploadProgress(0);
+      }, 1000);
 
-      toast.success('Anexo enviado com sucesso!')
-    } catch (error: any) {
-      setUploadProgress(0)
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Erro ao enviar anexo'
-      toast.error(message)
+      toast.success("Anexo enviado com sucesso!");
+    } catch (error: unknown) {
+      clearUploadProgressInterval();
+      setUploadProgress(0);
+      const message = axios.isAxiosError(error)
+        ? (((error.response?.data as Record<string, unknown>)
+            ?.message as string) ??
+          (error instanceof Error ? error.message : "Erro ao enviar anexo"))
+        : error instanceof Error
+          ? error.message
+          : "Erro ao enviar anexo";
+      toast.error(message);
     }
-  }
+  };
 
   const handleDeleteClick = (anexoId: number) => {
-    setDeleteAnexoId(anexoId)
-  }
+    setDeleteAnexoId(anexoId);
+  };
 
   const handleConfirmDelete = async () => {
-    if (!deleteAnexoId) return
+    if (!deleteAnexoId) return;
 
     try {
-      await onDelete(deleteAnexoId)
-      setDeleteAnexoId(null)
-      toast.success('Anexo excluído com sucesso!')
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Erro ao excluir anexo'
-      toast.error(message)
+      await onDelete(deleteAnexoId);
+      setDeleteAnexoId(null);
+      toast.success("Anexo excluído com sucesso!");
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? (((error.response?.data as Record<string, unknown>)
+            ?.message as string) ??
+          (error instanceof Error ? error.message : "Erro ao excluir anexo"))
+        : error instanceof Error
+          ? error.message
+          : "Erro ao excluir anexo";
+      toast.error(message);
     }
-  }
+  };
 
   const handleStartEdit = (anexo: DesarquivamentoAnexo) => {
-    setEditingAnexoId(anexo.id)
-    setEditDescricao(anexo.descricao || '')
-  }
+    setEditingAnexoId(anexo.id);
+    setEditDescricao(anexo.descricao || "");
+  };
 
   const handleSaveEdit = async (anexoId: number) => {
-    if (!onUpdateDescricao) return
+    if (!onUpdateDescricao) return;
 
     try {
-      await onUpdateDescricao(anexoId, editDescricao)
-      setEditingAnexoId(null)
-      toast.success('Descrição atualizada com sucesso!')
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        'Erro ao atualizar descrição'
-      toast.error(message)
+      await onUpdateDescricao(anexoId, editDescricao);
+      setEditingAnexoId(null);
+      toast.success("Descrição atualizada com sucesso!");
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? (((error.response?.data as Record<string, unknown>)
+            ?.message as string) ??
+          (error instanceof Error
+            ? error.message
+            : "Erro ao atualizar descrição"))
+        : error instanceof Error
+          ? error.message
+          : "Erro ao atualizar descrição";
+      toast.error(message);
     }
-  }
+  };
 
   return (
     <Card className="border-border/60 bg-card/85 shadow-[0_18px_36px_-34px_rgba(15,23,42,0.8)] backdrop-blur">
@@ -184,8 +224,8 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     </span>
                     <button
                       onClick={() => {
-                        setSelectedFile(null)
-                        setFileDescricao('')
+                        setSelectedFile(null);
+                        setFileDescricao("");
                       }}
                       className="text-muted-foreground transition-colors hover:text-foreground"
                     >
@@ -193,7 +233,10 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                     </button>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`fileDescricao-${tipoAnexo}`} className="text-sm">
+                    <Label
+                      htmlFor={`fileDescricao-${tipoAnexo}`}
+                      className="text-sm"
+                    >
                       Título / Descrição (opcional)
                     </Label>
                     <Input
@@ -214,13 +257,17 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                         onChange={(e) => setAnexarAoProcesso(e.target.checked)}
                         className="h-4 w-4 rounded border-border text-primary focus:ring-primary/40"
                       />
-                      <Label 
-                        htmlFor={`anexarAoProcesso-${tipoAnexo}`} 
+                      <Label
+                        htmlFor={`anexarAoProcesso-${tipoAnexo}`}
                         className="flex-1 cursor-pointer text-sm font-medium text-foreground"
                       >
                         Anexar ao processo inteiro
                         <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                          Este anexo ficará disponível em todas as {anexos.filter(a => a.numeroProcesso === numeroProcesso).length || 'outras'} solicitações do processo {numeroProcesso}
+                          Este anexo ficará disponível em todas as{" "}
+                          {anexos.filter(
+                            (a) => a.numeroProcesso === numeroProcesso,
+                          ).length || "outras"}{" "}
+                          solicitações do processo {numeroProcesso}
                         </span>
                       </Label>
                     </div>
@@ -234,7 +281,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                         label={selectedFile.name}
                         showLabel={true}
                         animated={uploadProgress < 100}
-                        variant={uploadProgress === 100 ? 'success' : 'default'}
+                        variant={uploadProgress === 100 ? "success" : "default"}
                         size="sm"
                       />
                     </div>
@@ -246,12 +293,12 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                       disabled={isUploading}
                       className="flex-1 rounded-xl border border-primary/20 bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                     >
-                      {isUploading ? 'Enviando...' : 'Enviar Anexo'}
+                      {isUploading ? "Enviando..." : "Enviar Anexo"}
                     </button>
                     <button
                       onClick={() => {
-                        setSelectedFile(null)
-                        setFileDescricao('')
+                        setSelectedFile(null);
+                        setFileDescricao("");
                       }}
                       disabled={isUploading}
                       className="rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
@@ -286,7 +333,7 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="flex-shrink-0">
                       <ImageThumbnail
-                        desarquivamentoId={anexo.desarquivamentoId}
+                        desarquivamentoId={anexo.desarquivamentoId ?? null}
                         numeroProcesso={anexo.numeroProcesso}
                         anexoId={anexo.id}
                         nomeOriginal={anexo.nomeOriginal}
@@ -299,12 +346,12 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                         <p className="truncate text-sm font-medium text-foreground">
                           {anexo.nomeOriginal}
                         </p>
-                        {anexo.tipoVinculo === 'processo' && (
+                        {anexo.tipoVinculo === "processo" && (
                           <span className="inline-flex flex-shrink-0 items-center rounded border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                             Processo
                           </span>
                         )}
-                        {anexo.tipoVinculo === 'solicitacao' && (
+                        {anexo.tipoVinculo === "solicitacao" && (
                           <span className="inline-flex flex-shrink-0 items-center rounded border border-border/70 bg-muted/35 px-2 py-0.5 text-xs font-medium text-foreground/85">
                             Solicitação
                           </span>
@@ -340,32 +387,36 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
                             </p>
                           ) : null}
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Enviado por {anexo.usuario?.nome || 'Usuário'} em{' '}
-                            {new Date(anexo.createdAt).toLocaleString('pt-BR')}
+                            Enviado por {anexo.usuario?.nome || "Usuário"} em{" "}
+                            {new Date(anexo.createdAt).toLocaleString("pt-BR")}
                           </p>
                         </>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-2">
-                    {onView && (anexo.tipoMime.startsWith('image/') || anexo.tipoMime === 'application/pdf') && (
-                      <button
-                        onClick={() => onView(anexo)}
-                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                        title="Visualizar"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    )}
-                    {canEdit && onUpdateDescricao && editingAnexoId !== anexo.id && (
-                      <button
-                        onClick={() => handleStartEdit(anexo)}
-                        className="rounded p-2 text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-600"
-                        title="Editar descrição"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                    )}
+                    {onView &&
+                      (anexo.tipoMime.startsWith("image/") ||
+                        anexo.tipoMime === "application/pdf") && (
+                        <button
+                          onClick={() => onView(anexo)}
+                          className="rounded p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                          title="Visualizar"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
+                    {canEdit &&
+                      onUpdateDescricao &&
+                      editingAnexoId !== anexo.id && (
+                        <button
+                          onClick={() => handleStartEdit(anexo)}
+                          className="rounded p-2 text-muted-foreground transition-colors hover:bg-blue-500/10 hover:text-blue-600"
+                          title="Editar descrição"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      )}
                     <button
                       onClick={() => onDownload(anexo.id)}
                       className="rounded p-2 text-muted-foreground transition-colors hover:bg-green-500/10 hover:text-green-600"
@@ -400,12 +451,12 @@ export const AnexosSection: React.FC<AnexosSectionProps> = ({
           confirmationType="checkbox"
           checkboxLabel="Sim, quero excluir este anexo permanentemente"
           warningList={[
-            'O anexo será removido permanentemente',
-            'Esta ação não pode ser desfeita',
-            'O arquivo será apagado do servidor'
+            "O anexo será removido permanentemente",
+            "Esta ação não pode ser desfeita",
+            "O arquivo será apagado do servidor",
           ]}
         />
       </CardContent>
     </Card>
-  )
-}
+  );
+};

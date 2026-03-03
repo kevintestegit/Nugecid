@@ -1,15 +1,32 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  BadRequestException,
+  Inject,
+  Optional,
+} from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, In } from "typeorm";
+import { Repository, LessThan, In, Brackets } from "typeorm";
+import { Subject, Observable } from "rxjs";
 import {
   Notificacao,
   TipoNotificacao,
   PrioridadeNotificacao,
+  NotificationPreferences,
 } from "../entities";
 import { User } from "../../users/entities/user.entity";
 import { Tarefa } from "../../tarefas/entities/tarefa.entity";
 import { DesarquivamentoTypeOrmEntity } from "../../nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
 import { StatusDesarquivamentoEnum } from "../../nugecid/domain/enums/status-desarquivamento.enum";
+import {
+  CACHE_VERSION_INITIAL,
+  CACHE_VERSION_KEYS,
+} from "../../../common/constants/cache-version.constants";
+import { RuntimeMetricsService } from "../../observability/runtime-metrics.service";
 
 export interface CreateNotificacaoDto {
   tipo: TipoNotificacao;
@@ -34,10 +51,21 @@ export interface QueryNotificacoesDto {
   prioridade?: PrioridadeNotificacao;
   dataInicio?: Date;
   dataFim?: Date;
+  cursorCreatedAt?: string;
+  cursorId?: number;
 }
 
 @Injectable()
-export class NotificacoesService {
+export class NotificacoesService implements OnModuleDestroy {
+  private readonly logger = new Logger(NotificacoesService.name);
+  private static readonly LIST_CACHE_TTL_SECONDS = 10;
+
+  /**
+   * Per-user RxJS Subjects for real-time SSE push.
+   * Key = userId, Value = Subject that emits Notificacao whenever one is created for that user.
+   */
+  private readonly userSubjects = new Map<number, Subject<Notificacao>>();
+
   constructor(
     @InjectRepository(Notificacao)
     private readonly notificacaoRepository: Repository<Notificacao>,
@@ -47,38 +75,395 @@ export class NotificacoesService {
     private readonly tarefaRepository: Repository<Tarefa>,
     @InjectRepository(DesarquivamentoTypeOrmEntity)
     private readonly desarquivamentoRepository: Repository<DesarquivamentoTypeOrmEntity>,
+    @InjectRepository(NotificationPreferences)
+    private readonly preferencesRepository: Repository<NotificationPreferences>,
+    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+    @Optional()
+    private readonly runtimeMetricsService?: RuntimeMetricsService,
   ) {}
+
+  onModuleDestroy() {
+    // Complete all subjects when the module is destroyed
+    for (const subject of this.userSubjects.values()) {
+      subject.complete();
+    }
+    this.userSubjects.clear();
+  }
+
+  /**
+   * Returns an Observable stream of new notifications for a given user.
+   * The controller subscribes to this for the SSE endpoint.
+   */
+  getUserStream(userId: number): Observable<Notificacao> {
+    return this.getOrCreateSubject(userId).asObservable();
+  }
+
+  /**
+   * Removes the Subject for a user (called when their SSE connection closes).
+   * If no more subscribers, the subject is cleaned up.
+   */
+  removeUserStream(userId: number): void {
+    const subject = this.userSubjects.get(userId);
+    if (subject && !subject.observed) {
+      subject.complete();
+      this.userSubjects.delete(userId);
+    }
+  }
+
+  private getOrCreateSubject(userId: number): Subject<Notificacao> {
+    let subject = this.userSubjects.get(userId);
+    if (!subject) {
+      subject = new Subject<Notificacao>();
+      this.userSubjects.set(userId, subject);
+    }
+    return subject;
+  }
+
+  /**
+   * Emits a notification to the user's SSE stream (if connected).
+   */
+  private emitToUser(userId: number, notificacao: Notificacao): void {
+    const subject = this.userSubjects.get(userId);
+    if (subject && subject.observed) {
+      subject.next(notificacao);
+    }
+  }
+
+  private async saveAndEmit(notificacao: Notificacao): Promise<Notificacao> {
+    const saved = await this.notificacaoRepository.save(notificacao);
+    this.emitToUser(saved.usuarioId, saved);
+    await this.bumpReadCachesVersion();
+    return saved;
+  }
+
+  private async bumpReadCachesVersion(): Promise<void> {
+    await Promise.allSettled([
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.APP_GLOBAL_SEARCH),
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.NOTIFICACOES_LIST),
+    ]);
+  }
+
+  private async bumpCacheVersion(versionKey: string): Promise<void> {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    try {
+      const raw = await this.cacheManager.get<number | string>(versionKey);
+      const current = Number(raw);
+      const next =
+        Number.isFinite(current) && current > 0
+          ? current + 1
+          : CACHE_VERSION_INITIAL + 1;
+      await this.cacheManager.set(versionKey, next);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao invalidar cache (${versionKey}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async getCacheVersion(versionKey: string): Promise<number> {
+    if (!this.cacheManager) {
+      return CACHE_VERSION_INITIAL;
+    }
+
+    try {
+      const raw = await this.cacheManager.get<number | string>(versionKey);
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+      return CACHE_VERSION_INITIAL;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao obter versão de cache (${versionKey}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return CACHE_VERSION_INITIAL;
+    }
+  }
+
+  private async getFromCache<T>(key: string): Promise<T | undefined> {
+    if (!this.cacheManager) {
+      return undefined;
+    }
+
+    const namespace = "notificacoes";
+    try {
+      const cached = await this.cacheManager.get<T>(key);
+      if (cached === undefined || cached === null) {
+        this.runtimeMetricsService?.recordCacheMiss(namespace);
+      } else {
+        this.runtimeMetricsService?.recordCacheHit(namespace);
+      }
+      return cached ?? undefined;
+    } catch (error) {
+      this.runtimeMetricsService?.recordCacheError(namespace);
+      this.logger.warn(
+        `Falha ao ler cache (${key}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return undefined;
+    }
+  }
+
+  private async setInCache(
+    key: string,
+    value: unknown,
+    ttlSeconds: number,
+  ): Promise<void> {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    const namespace = "notificacoes";
+    try {
+      await this.cacheManager.set(key, value, ttlSeconds);
+      this.runtimeMetricsService?.recordCacheSet(namespace);
+    } catch (error) {
+      this.runtimeMetricsService?.recordCacheError(namespace);
+      this.logger.warn(
+        `Falha ao gravar cache (${key}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
 
   async create(
     createNotificacaoDto: CreateNotificacaoDto,
-  ): Promise<Notificacao> {
-    // Verificar se o usuário existe
-    const usuario = await this.userRepository.findOne({
-      where: { id: createNotificacaoDto.usuarioId },
-    });
+  ): Promise<Notificacao | null> {
+    const saved = await this.createMany([createNotificacaoDto]);
+    return saved[0] ?? null;
+  }
 
-    if (!usuario) {
-      throw new NotFoundException("Usuário não encontrado");
+  /**
+   * Cria múltiplas notificações com validação em lote
+   * para evitar N+1 em cenários de alto volume.
+   */
+  async createMany(
+    createNotificacaoDtos: CreateNotificacaoDto[],
+  ): Promise<Notificacao[]> {
+    if (!createNotificacaoDtos.length) {
+      return [];
     }
 
-    // Verificar se a solicitação existe (se especificada)
-    if (createNotificacaoDto.solicitacaoId) {
-      const solicitacao = await this.tarefaRepository.findOne({
-        where: { id: createNotificacaoDto.solicitacaoId },
-      });
+    const userIds = Array.from(
+      new Set(createNotificacaoDtos.map((dto) => dto.usuarioId)),
+    );
 
-      if (!solicitacao) {
-        throw new NotFoundException("Solicitação não encontrada");
+    const [usuarios, preferencias] = await Promise.all([
+      this.loadUsersByIds(userIds),
+      this.loadPreferencesForUsers(userIds),
+    ]);
+
+    const usuariosExistentes = new Set(usuarios.map((usuario) => usuario.id));
+    const usuariosAusentes = userIds.filter(
+      (id) => !usuariosExistentes.has(id),
+    );
+    if (usuariosAusentes.length) {
+      throw new NotFoundException(
+        `Usuário(s) não encontrado(s): ${usuariosAusentes.join(", ")}`,
+      );
+    }
+
+    const preferenciasPorUsuario = new Map(
+      preferencias.map((preferencia) => [preferencia.userId, preferencia]),
+    );
+
+    const solicitacaoIds = Array.from(
+      new Set(
+        createNotificacaoDtos
+          .map((dto) => dto.solicitacaoId)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    );
+
+    if (solicitacaoIds.length) {
+      const solicitacoes = await this.loadSolicitacoesByIds(solicitacaoIds);
+      const solicitacoesExistentes = new Set(
+        solicitacoes.map((solicitacao) => solicitacao.id),
+      );
+      const solicitacoesAusentes = solicitacaoIds.filter(
+        (id) => !solicitacoesExistentes.has(id),
+      );
+      if (solicitacoesAusentes.length) {
+        throw new NotFoundException(
+          `Solicitação(ões) não encontrada(s): ${solicitacoesAusentes.join(", ")}`,
+        );
       }
     }
 
-    const notificacao = this.notificacaoRepository.create({
-      ...createNotificacaoDto,
-      prioridade:
-        createNotificacaoDto.prioridade || PrioridadeNotificacao.MEDIA,
+    const dtosPermitidos = createNotificacaoDtos.filter((dto) => {
+      const preferenciasUsuario = preferenciasPorUsuario.get(dto.usuarioId);
+      if (!preferenciasUsuario) {
+        return true;
+      }
+      const canReceive = preferenciasUsuario.canReceiveNotification(
+        dto.tipo,
+        "in_app",
+      );
+      if (!canReceive) {
+        this.logger.debug(
+          `Notificação ${dto.tipo} bloqueada pelas preferências do usuário ${dto.usuarioId}`,
+        );
+      }
+      return canReceive;
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    if (!dtosPermitidos.length) {
+      return [];
+    }
+
+    const entidades = dtosPermitidos.map((dto) =>
+      this.notificacaoRepository.create({
+        ...dto,
+        prioridade: dto.prioridade || PrioridadeNotificacao.MEDIA,
+      }),
+    );
+
+    const savedRaw = await this.notificacaoRepository.save(entidades, {
+      chunk: 200,
+    });
+    const saved = Array.isArray(savedRaw) ? savedRaw : [savedRaw];
+
+    for (const notificacao of saved) {
+      this.emitToUser(notificacao.usuarioId, notificacao);
+    }
+
+    await this.bumpReadCachesVersion();
+
+    return saved;
+  }
+
+  private async loadUsersByIds(userIds: number[]): Promise<User[]> {
+    const repositoryWithFind = this.userRepository as unknown as {
+      find?: (options: unknown) => Promise<User[]>;
+    };
+
+    if (typeof repositoryWithFind.find === "function") {
+      const users = await repositoryWithFind.find({
+        where: { id: In(userIds) },
+        select: ["id"],
+      });
+      if (Array.isArray(users) && users.length) {
+        return users;
+      }
+    }
+
+    const users = await Promise.all(
+      userIds.map((id) =>
+        this.userRepository.findOne({
+          where: { id },
+          select: ["id"],
+        }),
+      ),
+    );
+    return users.filter((user): user is User => user !== null);
+  }
+
+  private async loadSolicitacoesByIds(ids: number[]): Promise<Tarefa[]> {
+    const repositoryWithFind = this.tarefaRepository as unknown as {
+      find?: (options: unknown) => Promise<Tarefa[]>;
+    };
+
+    if (typeof repositoryWithFind.find === "function") {
+      const tarefas = await repositoryWithFind.find({
+        where: { id: In(ids) },
+        select: ["id"],
+      });
+      return Array.isArray(tarefas) ? tarefas : [];
+    }
+
+    const tarefas = await Promise.all(
+      ids.map((id) =>
+        this.tarefaRepository.findOne({
+          where: { id },
+          select: ["id"],
+        }),
+      ),
+    );
+    return tarefas.filter((tarefa): tarefa is Tarefa => tarefa !== null);
+  }
+
+  private async loadPreferencesForUsers(
+    userIds: number[],
+  ): Promise<NotificationPreferences[]> {
+    const repositoryWithFind = this.preferencesRepository as unknown as {
+      find?: (options: unknown) => Promise<NotificationPreferences[]>;
+    };
+
+    if (typeof repositoryWithFind.find === "function") {
+      try {
+        const preferencias = await repositoryWithFind.find({
+          where: { userId: In(userIds) },
+        });
+        return Array.isArray(preferencias) ? preferencias : [];
+      } catch (error) {
+        this.logger.warn(
+          `Erro ao buscar preferências em lote: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return [];
+      }
+    }
+
+    // Compatibilidade com mocks antigos de teste que expõem apenas `findOne`.
+    const preferencias = await Promise.all(
+      userIds.map((userId) =>
+        this.preferencesRepository
+          .findOne({
+            where: { userId },
+          })
+          .catch((error) => {
+            this.logger.warn(
+              `Erro ao buscar preferências do usuário ${userId}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+            return null;
+          }),
+      ),
+    );
+    return preferencias.filter(
+      (preferencia): preferencia is NotificationPreferences =>
+        preferencia !== null,
+    );
+  }
+
+  /**
+   * Verifica se o usuário pode receber uma notificação de um tipo específico
+   * com base nas suas preferências.
+   */
+  private async checkUserPreferences(
+    userId: number,
+    tipo: TipoNotificacao,
+  ): Promise<boolean> {
+    try {
+      const preferences = await this.preferencesRepository.findOne({
+        where: { userId },
+      });
+
+      // Se não há preferências cadastradas, permitir (default)
+      if (!preferences) {
+        return true;
+      }
+
+      return preferences.canReceiveNotification(tipo, "in_app");
+    } catch (error) {
+      // Em caso de erro ao buscar preferências, permitir a notificação
+      // para não bloquear notificações críticas
+      this.logger.warn(
+        `Erro ao verificar preferências do usuário ${userId}: ${error.message}`,
+      );
+      return true;
+    }
   }
 
   async findByUsuario(
@@ -90,24 +475,66 @@ export class NotificacoesService {
     page: number;
     limit: number;
     totalPages: number;
+    nextCursor?: {
+      createdAt: string;
+      id: number;
+    };
   }> {
-    // Verificar se o usuário existe
+    const page = Math.max(1, Number(queryDto.page || 1));
+    const limit = Math.max(1, Math.min(100, Number(queryDto.limit || 20)));
+    const skip = (page - 1) * limit;
+    const hasCursor = Boolean(queryDto.cursorCreatedAt);
+    const cacheVersion = await this.getCacheVersion(
+      CACHE_VERSION_KEYS.NOTIFICACOES_LIST,
+    );
+    const normalizedFilters = {
+      lida: queryDto.lida ?? null,
+      tipo: queryDto.tipo ?? null,
+      prioridade: queryDto.prioridade ?? null,
+      dataInicio: queryDto.dataInicio
+        ? new Date(queryDto.dataInicio).toISOString()
+        : null,
+      dataFim: queryDto.dataFim
+        ? new Date(queryDto.dataFim).toISOString()
+        : null,
+      cursorCreatedAt: queryDto.cursorCreatedAt ?? null,
+      cursorId: queryDto.cursorId ?? null,
+    };
+    const cacheKey = [
+      "notificacoes:list",
+      `v:${cacheVersion}`,
+      `u:${usuarioId}`,
+      `p:${page}`,
+      `l:${limit}`,
+      `f:${JSON.stringify(normalizedFilters)}`,
+    ].join("|");
+    const cached = await this.getFromCache<{
+      data: Notificacao[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      nextCursor?: {
+        createdAt: string;
+        id: number;
+      };
+    }>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Verificar se o usuário existe apenas em cache miss
     const usuario = await this.userRepository.findOne({
       where: { id: usuarioId },
+      select: ["id"],
     });
 
     if (!usuario) {
       throw new NotFoundException("Usuário não encontrado");
     }
 
-    const page = queryDto.page || 1;
-    const limit = queryDto.limit || 20;
-    const skip = (page - 1) * limit;
-
     const queryBuilder = this.notificacaoRepository
       .createQueryBuilder("notificacao")
-      .leftJoinAndSelect("notificacao.usuario", "usuario")
-      .leftJoinAndSelect("notificacao.solicitacao", "solicitacao")
       .where("notificacao.usuarioId = :usuarioId", { usuarioId })
       .andWhere("notificacao.deletedAt IS NULL");
 
@@ -140,6 +567,8 @@ export class NotificacoesService {
       );
     }
 
+    const totalQueryBuilder = queryBuilder.clone();
+
     // Ordenação por prioridade e data
     queryBuilder
       .addSelect(
@@ -147,22 +576,66 @@ export class NotificacoesService {
         "prioridade_order",
       )
       .orderBy("prioridade_order", "ASC")
-      .addOrderBy("notificacao.createdAt", "DESC");
+      .addOrderBy("notificacao.createdAt", "DESC")
+      .addOrderBy("notificacao.id", "DESC");
 
-    const [data, total] = await queryBuilder
-      .skip(skip)
-      .take(limit)
-      .getManyAndCount();
+    if (hasCursor) {
+      const cursorDate = new Date(queryDto.cursorCreatedAt as string);
+      if (Number.isNaN(cursorDate.getTime())) {
+        throw new BadRequestException(
+          "cursorCreatedAt inválido. Use formato ISO-8601.",
+        );
+      }
+      const cursorId = Number.isFinite(Number(queryDto.cursorId))
+        ? Number(queryDto.cursorId)
+        : Number.MAX_SAFE_INTEGER;
+
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where("notificacao.createdAt < :cursorDate", {
+            cursorDate,
+          }).orWhere(
+            "notificacao.createdAt = :cursorDate AND notificacao.id < :cursorId",
+            { cursorDate, cursorId },
+          );
+        }),
+      );
+    }
+
+    const [data, total] = await Promise.all([
+      hasCursor
+        ? queryBuilder.take(limit).getMany()
+        : queryBuilder.skip(skip).take(limit).getMany(),
+      totalQueryBuilder.getCount(),
+    ]);
 
     const totalPages = Math.ceil(total / limit);
+    const lastItem = data[data.length - 1];
+    const nextCursor = hasCursor
+      ? lastItem
+        ? {
+            createdAt: lastItem.createdAt.toISOString(),
+            id: lastItem.id,
+          }
+        : undefined
+      : undefined;
 
-    return {
+    const result = {
       data,
       total,
       page,
       limit,
       totalPages,
+      nextCursor,
     };
+
+    await this.setInCache(
+      cacheKey,
+      result,
+      NotificacoesService.LIST_CACHE_TTL_SECONDS,
+    );
+
+    return result;
   }
 
   async findOne(id: number, usuarioId: number): Promise<Notificacao> {
@@ -182,14 +655,18 @@ export class NotificacoesService {
     const notificacao = await this.findOne(id, usuarioId);
 
     notificacao.marcarComoLida();
-    return this.notificacaoRepository.save(notificacao);
+    const saved = await this.notificacaoRepository.save(notificacao);
+    await this.bumpReadCachesVersion();
+    return saved;
   }
 
   async marcarComoNaoLida(id: number, usuarioId: number): Promise<Notificacao> {
     const notificacao = await this.findOne(id, usuarioId);
 
     notificacao.marcarComoNaoLida();
-    return this.notificacaoRepository.save(notificacao);
+    const saved = await this.notificacaoRepository.save(notificacao);
+    await this.bumpReadCachesVersion();
+    return saved;
   }
 
   async marcarTodasComoLidas(usuarioId: number): Promise<number> {
@@ -198,6 +675,10 @@ export class NotificacoesService {
       { lida: true },
     );
 
+    if ((result.affected || 0) > 0) {
+      await this.bumpReadCachesVersion();
+    }
+
     return result.affected || 0;
   }
 
@@ -205,6 +686,7 @@ export class NotificacoesService {
     await this.findOne(id, usuarioId);
 
     await this.notificacaoRepository.softDelete(id);
+    await this.bumpReadCachesVersion();
   }
 
   async getEstatisticas(usuarioId: number): Promise<{
@@ -294,7 +776,7 @@ export class NotificacoesService {
     usuarioId: number,
     solicitacaoId: number,
     diasPendentes: number,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
     const titulo = `Solicitação Pendente há ${diasPendentes} dias`;
     const descricao =
       "Uma solicitação está pendente há mais de 5 dias sem movimentação.";
@@ -319,7 +801,7 @@ export class NotificacoesService {
     usuarioId: number,
     processoId: number,
     numeroProcesso: string,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
     const titulo = "Novo Processo de Desarquivamento";
     const descricao = `Um novo processo de desarquivamento foi extraído do SEIRN: ${numeroProcesso}`;
     const detalhes = {
@@ -366,7 +848,12 @@ export class NotificacoesService {
     // Coletar todos os IDs de desarquivamentos e usuários para buscar notificações existentes de uma vez
     const desarquivamentoIds = desarquivamentosPendentes.map((d) => d.id);
 
-    // Buscar todas as notificações existentes de uma vez (evita N+1)
+    // Buscar notificações criadas nas últimas 24h para evitar duplicatas
+    // NÃO filtrar por lida=false — se já notificou hoje, não notifica de novo
+    // mesmo que o usuário tenha marcado como lida
+    const umDiaAtras = new Date();
+    umDiaAtras.setDate(umDiaAtras.getDate() - 1);
+
     const notificacoesExistentes =
       desarquivamentoIds.length > 0
         ? await this.notificacaoRepository
@@ -376,7 +863,7 @@ export class NotificacoesService {
               tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
             })
             .andWhere("n.processoId IN (:...ids)", { ids: desarquivamentoIds })
-            .andWhere("n.lida = false")
+            .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
             .getRawMany()
         : [];
 
@@ -468,21 +955,23 @@ export class NotificacoesService {
       }
     }
 
-    // Criar notificações em lote
-    for (const {
-      usuarioId,
-      desarquivamento,
-      diasPendentes,
-    } of notificacoesParaCriar) {
-      const notificacao = await this.criarNotificacaoArquivoSolicitado(
-        usuarioId,
-        desarquivamento,
-        diasPendentes,
-      );
-      notificacoesCriadas.push(notificacao);
-    }
+    const notificacoesDesarquivamentos = await Promise.all(
+      notificacoesParaCriar.map(
+        ({ usuarioId, desarquivamento, diasPendentes }) =>
+          this.criarNotificacaoArquivoSolicitado(
+            usuarioId,
+            desarquivamento,
+            diasPendentes,
+          ),
+      ),
+    );
+    notificacoesCriadas.push(
+      ...notificacoesDesarquivamentos.filter(
+        (n): n is Notificacao => n !== null,
+      ),
+    );
 
-    // Buscar notificações existentes para tarefas de uma vez
+    // Buscar notificações existentes para tarefas de uma vez (últimas 24h)
     const tarefaIds = solicitacoesPendentes.map((s) => s.id);
     const notificacoesTarefasExistentes =
       tarefaIds.length > 0
@@ -493,7 +982,7 @@ export class NotificacoesService {
               tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
             })
             .andWhere("n.solicitacaoId IN (:...ids)", { ids: tarefaIds })
-            .andWhere("n.lida = false")
+            .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
             .getRawMany()
         : [];
 
@@ -501,27 +990,42 @@ export class NotificacoesService {
       notificacoesTarefasExistentes.map((n) => n.n_solicitacaoId),
     );
 
-    for (const solicitacao of solicitacoesPendentes) {
-      if (tarefasComNotificacao.has(solicitacao.id)) {
-        continue;
-      }
-
-      const diasPendentes = Math.floor(
-        (Date.now() - solicitacao.updatedAt.getTime()) / (1000 * 60 * 60 * 24),
+    const pendenciasParaNotificar = solicitacoesPendentes
+      .filter((solicitacao) => !tarefasComNotificacao.has(solicitacao.id))
+      .map((solicitacao) => {
+        const diasPendentes = Math.floor(
+          (Date.now() - solicitacao.updatedAt.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;
+        return {
+          solicitacaoId: solicitacao.id,
+          diasPendentes,
+          usuarioId,
+        };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          solicitacaoId: number;
+          diasPendentes: number;
+          usuarioId: number;
+        } => !!item.usuarioId && usuariosValidosSet.has(item.usuarioId),
       );
 
-      const usuarioId = solicitacao.responsavelId || solicitacao.criadorId;
-
-      // Verificar se o usuário existe antes de criar notificação
-      if (usuarioId && usuariosValidosSet.has(usuarioId)) {
-        const notificacao = await this.criarNotificacaoSolicitacaoPendente(
-          usuarioId,
-          solicitacao.id,
-          diasPendentes,
-        );
-        notificacoesCriadas.push(notificacao);
-      }
-    }
+    const notificacoesSolicitacoes = await Promise.all(
+      pendenciasParaNotificar.map((item) =>
+        this.criarNotificacaoSolicitacaoPendente(
+          item.usuarioId,
+          item.solicitacaoId,
+          item.diasPendentes,
+        ),
+      ),
+    );
+    notificacoesCriadas.push(
+      ...notificacoesSolicitacoes.filter((n): n is Notificacao => n !== null),
+    );
 
     return notificacoesCriadas;
   }
@@ -530,7 +1034,7 @@ export class NotificacoesService {
     usuarioId: number,
     desarquivamento: DesarquivamentoTypeOrmEntity,
     diasPendentes: number,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
     const dataSolicitacaoFormatada = desarquivamento.dataSolicitacao
       ? new Intl.DateTimeFormat("pt-BR").format(
           new Date(desarquivamento.dataSolicitacao),
@@ -579,7 +1083,14 @@ export class NotificacoesService {
     remetenteId: number,
     tarefaId: number,
     comentario: string,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioMencionadoId,
+      TipoNotificacao.MENCAO,
+    );
+    if (!canReceive) return null;
+
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
       relations: ["projeto"],
@@ -608,14 +1119,21 @@ export class NotificacoesService {
       link: `/tarefas/${tarefaId}`,
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    return this.saveAndEmit(notificacao);
   }
 
   async notificarTarefaAtribuida(
     usuarioAtribuidoId: number,
     remetenteId: number,
     tarefaId: number,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioAtribuidoId,
+      TipoNotificacao.TAREFA_ATRIBUIDA,
+    );
+    if (!canReceive) return null;
+
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
       relations: ["projeto"],
@@ -646,7 +1164,7 @@ export class NotificacoesService {
       link: `/tarefas/${tarefaId}`,
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    return this.saveAndEmit(notificacao);
   }
 
   async notificarTarefaAlterada(
@@ -654,7 +1172,14 @@ export class NotificacoesService {
     remetenteId: number,
     tarefaId: number,
     mudancas: string[],
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioId,
+      TipoNotificacao.TAREFA_ALTERADA,
+    );
+    if (!canReceive) return null;
+
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
     });
@@ -681,7 +1206,7 @@ export class NotificacoesService {
       link: `/tarefas/${tarefaId}`,
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    return this.saveAndEmit(notificacao);
   }
 
   async notificarComentario(
@@ -689,7 +1214,14 @@ export class NotificacoesService {
     remetenteId: number,
     tarefaId: number,
     comentario: string,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioId,
+      TipoNotificacao.TAREFA_COMENTADA,
+    );
+    if (!canReceive) return null;
+
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
     });
@@ -716,25 +1248,76 @@ export class NotificacoesService {
       link: `/tarefas/${tarefaId}`,
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    return this.saveAndEmit(notificacao);
   }
 
   async notificarPrazoProximo(
     usuarioId: number,
     tarefaId: number,
     diasRestantes: number,
-  ): Promise<Notificacao> {
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioId,
+      TipoNotificacao.PRAZO_PROXIMO,
+    );
+    if (!canReceive) return null;
+
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
+      select: ["id", "titulo", "prazo", "prioridade"],
     });
 
     if (!tarefa) {
       throw new NotFoundException("Tarefa não encontrada");
     }
 
+    return this.salvarNotificacaoPrazoProximo(usuarioId, tarefa, diasRestantes);
+  }
+
+  async notificarTarefaAtrasada(
+    usuarioId: number,
+    tarefaId: number,
+    diasAtrasados: number,
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioId,
+      TipoNotificacao.TAREFA_ATRASADA,
+    );
+    if (!canReceive) return null;
+
+    const tarefa = await this.tarefaRepository.findOne({
+      where: { id: tarefaId },
+      select: ["id", "titulo", "prazo", "prioridade"],
+    });
+
+    if (!tarefa) {
+      throw new NotFoundException("Tarefa não encontrada");
+    }
+
+    return this.salvarNotificacaoTarefaAtrasada(
+      usuarioId,
+      tarefa,
+      diasAtrasados,
+    );
+  }
+
+  private async salvarNotificacaoPrazoProximo(
+    usuarioId: number,
+    tarefa: Pick<Tarefa, "id" | "titulo" | "prazo" | "prioridade">,
+    diasRestantes: number,
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioId,
+      TipoNotificacao.PRAZO_PROXIMO,
+    );
+    if (!canReceive) return null;
+
     const notificacao = this.notificacaoRepository.create({
       tipo: TipoNotificacao.PRAZO_PROXIMO,
-      titulo: `Prazo se aproximando`,
+      titulo: "Prazo se aproximando",
       descricao: `A tarefa "${tarefa.titulo}" vence em ${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"}`,
       detalhes: {
         prazo: tarefa.prazo,
@@ -746,25 +1329,24 @@ export class NotificacoesService {
           ? PrioridadeNotificacao.ALTA
           : PrioridadeNotificacao.MEDIA,
       usuarioId,
-      tarefaId,
-      link: `/tarefas/${tarefaId}`,
+      tarefaId: tarefa.id,
+      link: `/tarefas/${tarefa.id}`,
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    return this.saveAndEmit(notificacao);
   }
 
-  async notificarTarefaAtrasada(
+  private async salvarNotificacaoTarefaAtrasada(
     usuarioId: number,
-    tarefaId: number,
+    tarefa: Pick<Tarefa, "id" | "titulo" | "prazo" | "prioridade">,
     diasAtrasados: number,
-  ): Promise<Notificacao> {
-    const tarefa = await this.tarefaRepository.findOne({
-      where: { id: tarefaId },
-    });
-
-    if (!tarefa) {
-      throw new NotFoundException("Tarefa não encontrada");
-    }
+  ): Promise<Notificacao | null> {
+    // Verificar preferências antes de criar
+    const canReceive = await this.checkUserPreferences(
+      usuarioId,
+      TipoNotificacao.TAREFA_ATRASADA,
+    );
+    if (!canReceive) return null;
 
     const notificacao = this.notificacaoRepository.create({
       tipo: TipoNotificacao.TAREFA_ATRASADA,
@@ -777,11 +1359,11 @@ export class NotificacoesService {
       },
       prioridade: PrioridadeNotificacao.CRITICA,
       usuarioId,
-      tarefaId,
-      link: `/tarefas/${tarefaId}`,
+      tarefaId: tarefa.id,
+      link: `/tarefas/${tarefa.id}`,
     });
 
-    return this.notificacaoRepository.save(notificacao);
+    return this.saveAndEmit(notificacao);
   }
 
   async verificarTarefasComPrazoProximo(): Promise<Notificacao[]> {
@@ -793,7 +1375,13 @@ export class NotificacoesService {
 
     const tarefas = await this.tarefaRepository
       .createQueryBuilder("tarefa")
-      .select(["tarefa.id", "tarefa.prazo", "tarefa.responsavelId"])
+      .select([
+        "tarefa.id",
+        "tarefa.titulo",
+        "tarefa.prazo",
+        "tarefa.prioridade",
+        "tarefa.responsavelId",
+      ])
       .where("tarefa.prazo >= :hoje", { hoje })
       .andWhere("tarefa.prazo <= :doisDias", { doisDias: doisDiasDepois })
       .andWhere("tarefa.deletedAt IS NULL")
@@ -804,21 +1392,24 @@ export class NotificacoesService {
       return [];
     }
 
-    // Buscar notificações existentes de uma vez
+    // Buscar notificações existentes nas últimas 24h (independente de lida)
+    const umDiaAtras = new Date();
+    umDiaAtras.setDate(umDiaAtras.getDate() - 1);
+
     const tarefaIds = tarefas.map((t) => t.id);
     const notificacoesExistentes = await this.notificacaoRepository
       .createQueryBuilder("n")
       .select("n.tarefaId")
       .where("n.tipo = :tipo", { tipo: TipoNotificacao.PRAZO_PROXIMO })
       .andWhere("n.tarefaId IN (:...ids)", { ids: tarefaIds })
-      .andWhere("n.lida = false")
+      .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
       .getRawMany();
 
     const tarefasComNotificacao = new Set(
       notificacoesExistentes.map((n) => n.n_tarefaId),
     );
 
-    const notificacoes: Notificacao[] = [];
+    const notificacoesPromises: Promise<Notificacao | null>[] = [];
 
     for (const tarefa of tarefas) {
       if (tarefasComNotificacao.has(tarefa.id)) continue;
@@ -828,16 +1419,17 @@ export class NotificacoesService {
           (1000 * 60 * 60 * 24),
       );
 
-      const notificacao = await this.notificarPrazoProximo(
-        tarefa.responsavelId,
-        tarefa.id,
-        diasRestantes,
+      notificacoesPromises.push(
+        this.salvarNotificacaoPrazoProximo(
+          tarefa.responsavelId,
+          tarefa,
+          diasRestantes,
+        ),
       );
-
-      notificacoes.push(notificacao);
     }
 
-    return notificacoes;
+    const results = await Promise.all(notificacoesPromises);
+    return results.filter((n): n is Notificacao => n !== null);
   }
 
   async verificarTarefasAtrasadas(): Promise<Notificacao[]> {
@@ -846,7 +1438,13 @@ export class NotificacoesService {
 
     const tarefas = await this.tarefaRepository
       .createQueryBuilder("tarefa")
-      .select(["tarefa.id", "tarefa.prazo", "tarefa.responsavelId"])
+      .select([
+        "tarefa.id",
+        "tarefa.titulo",
+        "tarefa.prazo",
+        "tarefa.prioridade",
+        "tarefa.responsavelId",
+      ])
       .where("tarefa.prazo < :hoje", { hoje })
       .andWhere("tarefa.deletedAt IS NULL")
       .andWhere("tarefa.responsavelId IS NOT NULL")
@@ -873,7 +1471,7 @@ export class NotificacoesService {
       notificacoesExistentes.map((n) => n.n_tarefaId),
     );
 
-    const notificacoes: Notificacao[] = [];
+    const notificacoesPromises: Promise<Notificacao | null>[] = [];
 
     for (const tarefa of tarefas) {
       if (tarefasComNotificacao.has(tarefa.id)) continue;
@@ -883,16 +1481,17 @@ export class NotificacoesService {
           (1000 * 60 * 60 * 24),
       );
 
-      const notificacao = await this.notificarTarefaAtrasada(
-        tarefa.responsavelId,
-        tarefa.id,
-        diasAtrasados,
+      notificacoesPromises.push(
+        this.salvarNotificacaoTarefaAtrasada(
+          tarefa.responsavelId,
+          tarefa,
+          diasAtrasados,
+        ),
       );
-
-      notificacoes.push(notificacao);
     }
 
-    return notificacoes;
+    const results = await Promise.all(notificacoesPromises);
+    return results.filter((n): n is Notificacao => n !== null);
   }
 
   private async getAdministradoresIds(
@@ -1055,5 +1654,30 @@ export class NotificacoesService {
       default:
         return PrioridadeNotificacao.MEDIA;
     }
+  }
+
+  /**
+   * Remove notificações lidas com mais de X dias (soft-delete).
+   * Notificações não lidas são preservadas independente da idade.
+   * @param diasRetencao Número de dias para reter notificações lidas (padrão: 30)
+   * @returns Número de notificações removidas
+   */
+  async limparNotificacoesAntigas(diasRetencao = 30): Promise<number> {
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - diasRetencao);
+
+    const result = await this.notificacaoRepository
+      .createQueryBuilder()
+      .softDelete()
+      .where("lida = :lida", { lida: true })
+      .andWhere("deletedAt IS NULL")
+      .andWhere("createdAt < :dataLimite", { dataLimite })
+      .execute();
+
+    if ((result.affected || 0) > 0) {
+      await this.bumpReadCachesVersion();
+    }
+
+    return result.affected || 0;
   }
 }

@@ -70,7 +70,7 @@ export class DesarquivamentoMapper {
     entity.desarquivamentoFisicoDigital = tipoNormalizado; // Mapear para o campo obrigatório do banco
     entity.status = domain.status.value;
     entity.nomeCompleto = domain.nomeCompleto;
-    entity.numeroNicLaudoAuto = domain.numeroNicLaudoAuto;
+    entity.numeroNicLaudoAuto = domain.numeroNicLaudoAuto ?? null;
     entity.numeroProcesso = domain.numeroProcesso;
     entity.tipoDocumento = domain.tipoDocumento;
     entity.dataSolicitacao = domain.dataSolicitacao;
@@ -126,7 +126,12 @@ export class DesarquivamentoMapper {
       entity.numeroProcesso &&
       entity.numeroProcesso.toString().trim().length > 0
         ? entity.numeroProcesso
-        : "N/A";
+        : "";
+    const safeSetorDemandante =
+      entity.setorDemandante &&
+      entity.setorDemandante.toString().trim().length > 0
+        ? entity.setorDemandante
+        : "";
 
     const domainData = {
       id,
@@ -141,7 +146,7 @@ export class DesarquivamentoMapper {
       dataSolicitacao: entity.dataSolicitacao,
       dataDesarquivamentoSAG: entity.dataDesarquivamentoSAG,
       dataDevolucaoSetor: entity.dataDevolucaoSetor,
-      setorDemandante: entity.setorDemandante,
+      setorDemandante: safeSetorDemandante,
       servidorResponsavel: entity.servidorResponsavel,
       finalidadeDesarquivamento: entity.finalidadeDesarquivamento ?? "",
       solicitacaoProrrogacao: entity.solicitacaoProrrogacao,
@@ -257,7 +262,7 @@ export class DesarquivamentoMapper {
       tipoDesarquivamento: dto.tipoDesarquivamento,
       status,
       nomeCompleto: dto.nomeCompleto,
-      numeroNicLaudoAuto: dto.numeroNicLaudoAuto,
+      numeroNicLaudoAuto: dto.numeroNicLaudoAuto ?? null,
       numeroProcesso: dto.numeroProcesso,
       tipoDocumento: dto.tipoDocumento,
       dataSolicitacao: dto.dataSolicitacao

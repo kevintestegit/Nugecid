@@ -43,6 +43,37 @@ export class AuthController {
 
   constructor(private readonly authService: AuthService) {}
 
+  private shouldUseSecureCookie(req: ExpressRequest): boolean {
+    const forwardedProtoHeader = req.headers["x-forwarded-proto"];
+    const forwardedProto = Array.isArray(forwardedProtoHeader)
+      ? forwardedProtoHeader[0]
+      : forwardedProtoHeader;
+    const proto = (forwardedProto ?? "").split(",")[0]?.trim().toLowerCase();
+
+    const forwardedHostHeader = req.headers["x-forwarded-host"];
+    const forwardedHost = Array.isArray(forwardedHostHeader)
+      ? forwardedHostHeader[0]
+      : forwardedHostHeader;
+    const host = (forwardedHost ?? req.headers.host ?? "").toString();
+    const hostname = host.split(":")[0]?.toLowerCase();
+
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1";
+    const isHttps = req.secure || proto === "https";
+
+    if (isHttps) {
+      return true;
+    }
+
+    if (isLocalHost) {
+      return false;
+    }
+
+    return process.env.NODE_ENV === "production";
+  }
+
   @Get("login")
   @IsPublic()
   @ApiOperation({ summary: "Renderiza página de login" })
@@ -101,8 +132,9 @@ export class AuthController {
       // Define o cookie com o token de acesso
       res.cookie("access_token", result.accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: this.shouldUseSecureCookie(req),
         sameSite: "lax",
+        path: "/",
         maxAge: 3600000, // 1 hora
       });
 
@@ -333,6 +365,7 @@ export class AuthController {
   })
   async refreshToken(
     @Body() body: { refreshToken: string },
+    @Request() req: ExpressRequest,
     @Response() res: ExpressResponse,
   ) {
     try {
@@ -342,8 +375,9 @@ export class AuthController {
       // Atualiza o cookie httpOnly com o novo access token
       res.cookie("access_token", result.accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: this.shouldUseSecureCookie(req),
         sameSite: "lax",
+        path: "/",
         maxAge: 50 * 60 * 1000, // 50 minutos
       });
 

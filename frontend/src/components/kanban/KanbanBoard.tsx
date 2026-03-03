@@ -26,20 +26,12 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AvatarGroup } from "./Avatar";
-import { Usuario } from "../../types/kanban.types";
+import type { Projeto, Usuario } from "../../types/kanban.types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 
-export interface Projeto {
-  id: number;
-  nome: string;
-  descricao?: string;
-  cor?: string;
-  data_criacao: string;
-  data_atualizacao: string;
-  membros?: { usuario?: Usuario }[];
-}
+export type { Projeto } from "../../types/kanban.types";
 
 interface KanbanBoardProps {
   projeto: Projeto;

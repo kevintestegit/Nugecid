@@ -197,6 +197,7 @@ export const REQUERENTES = [
   { value: 'Delegacia Especializada na Repressão a Lavagem de Dinheiro (DRLD)', label: 'DRLD' },
   { value: 'Promotoria de Justiça', label: 'Promotoria de Justiça' },
   { value: 'Ministério Público', label: 'Ministério Público' },
+  { value: 'MPRN- Parnamirim', label: 'MPRN - Parnamirim' },
   { value: 'Tribunal de Justiça do Rio Grande do Norte (TJRN)', label: 'TJRN' },
 ] as const
 

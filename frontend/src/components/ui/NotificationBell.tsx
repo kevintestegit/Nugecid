@@ -1,10 +1,21 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bell, X, Check, CheckCheck, Trash2, AlertCircle, Info, Clock } from 'lucide-react';
-import { useNotificacoes, type Notificacao } from '../../hooks/useNotificacoes';
-import { cn } from '../../utils/cn';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Bell,
+  X,
+  Check,
+  CheckCheck,
+  Trash2,
+  AlertCircle,
+  Info,
+  Clock,
+  ExternalLink,
+} from "lucide-react";
+import { useNotificacoesStore } from "@/store/notificacoesStore";
+import { Notificacao } from "@/services/notificacoesService";
+import { cn } from "../../utils/cn";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 
 interface NotificationBellProps {
   className?: string;
@@ -13,53 +24,71 @@ interface NotificationBellProps {
 const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [allNotificacoes, setAllNotificacoes] = useState<Notificacao[]>([]);
+  const [loadingAll, setLoadingAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  
+
   const {
     naoLidas,
-    notificacoes,
+    totalNaoLidas,
+    sseConnected,
     loading,
     error,
-    totalNaoLidas,
-    hasNotificacoes,
     marcarComoLida,
     marcarTodasComoLidas,
     excluirNotificacao,
-    fetchNotificacoes
-  } = useNotificacoes();
+    fetchNotificacoes,
+  } = useNotificacoesStore();
 
-  const normalizePriority = (prioridade?: string) => (prioridade || '').toString().trim().toLowerCase();
-  const normalizeType = (tipo?: string) => (tipo || '').toString().trim().toLowerCase();
+  const hasNotificacoes = totalNaoLidas > 0;
+
+  const normalizePriority = (prioridade?: string) =>
+    (prioridade || "").toString().trim().toLowerCase();
+  const normalizeType = (tipo?: string) =>
+    (tipo || "").toString().trim().toLowerCase();
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Buscar todas as notificações quando abrir o dropdown
+  // Buscar todas as notificações quando abrir o dropdown com "Todas"
   const handleToggleDropdown = async () => {
     if (!isOpen && showAll) {
-      try {
-        await fetchNotificacoes({ limit: 50 });
-      } catch (err) {
-        console.error('Erro ao buscar notificações:', err);
-      }
+      await fetchAllNotificacoes();
     }
     setIsOpen(!isOpen);
   };
 
+  const fetchAllNotificacoes = async () => {
+    try {
+      setLoadingAll(true);
+      const response = await fetchNotificacoes({ limit: 50 });
+      setAllNotificacoes(Array.isArray(response.data) ? response.data : []);
+    } catch {
+      // Silent
+    } finally {
+      setLoadingAll(false);
+    }
+  };
+
   const getNotificationDestination = (notificacao: Notificacao) => {
     if (notificacao.link) return notificacao.link;
-    if (notificacao.processoId) return `/desarquivamentos/${notificacao.processoId}`;
-    if (notificacao.solicitacaoId) return `/desarquivamentos/${notificacao.solicitacaoId}`;
+    if (notificacao.processoId)
+      return `/desarquivamentos/${notificacao.processoId}`;
+    if (notificacao.solicitacaoId)
+      return `/desarquivamentos/${notificacao.solicitacaoId}`;
     if (notificacao.tarefaId) return `/tarefas/${notificacao.tarefaId}`;
     return null;
   };
@@ -75,7 +104,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       }
       setIsOpen(false);
     },
-    [navigate, marcarComoLida]
+    [navigate, marcarComoLida],
   );
 
   // Obter ícone baseado no tipo da notificação
@@ -83,17 +112,17 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     const normalizedPriority = normalizePriority(prioridade);
     const normalizedType = normalizeType(tipo);
     const iconClass = cn(
-      'w-4 h-4 flex-shrink-0',
-      normalizedPriority === 'critica' && 'text-red-500',
-      normalizedPriority === 'alta' && 'text-orange-500',
-      normalizedPriority === 'media' && 'text-yellow-500',
-      normalizedPriority === 'baixa' && 'text-blue-500'
+      "w-4 h-4 flex-shrink-0",
+      normalizedPriority === "critica" && "text-red-500",
+      normalizedPriority === "alta" && "text-orange-500",
+      normalizedPriority === "media" && "text-yellow-500",
+      normalizedPriority === "baixa" && "text-blue-500",
     );
 
     switch (normalizedType) {
-      case 'solicitacao_pendente':
+      case "solicitacao_pendente":
         return <Clock className={iconClass} />;
-      case 'novo_processo':
+      case "novo_processo":
         return <Info className={iconClass} />;
       default:
         return <AlertCircle className={iconClass} />;
@@ -103,16 +132,16 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   // Obter cor da prioridade
   const getPriorityColor = (prioridade: string) => {
     switch (normalizePriority(prioridade)) {
-      case 'critica':
-        return 'border-l-red-500 bg-red-500/10';
-      case 'alta':
-        return 'border-l-orange-500 bg-orange-500/10';
-      case 'media':
-        return 'border-l-yellow-500 bg-yellow-500/10';
-      case 'baixa':
-        return 'border-l-blue-500 bg-blue-500/10';
+      case "critica":
+        return "border-l-red-500 bg-red-500/10";
+      case "alta":
+        return "border-l-orange-500 bg-orange-500/10";
+      case "media":
+        return "border-l-yellow-500 bg-yellow-500/10";
+      case "baixa":
+        return "border-l-blue-500 bg-blue-500/10";
       default:
-        return 'border-l-border bg-muted/30';
+        return "border-l-border bg-muted/30";
     }
   };
 
@@ -120,15 +149,19 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
   const renderNotificationItem = (notificacao: Notificacao) => {
     const timeAgo = formatDistanceToNow(new Date(notificacao.createdAt), {
       addSuffix: true,
-      locale: ptBR
+      locale: ptBR,
     });
 
-    const extraInfo = [
-      notificacao.detalhes?.nome_completo && `Nome: ${notificacao.detalhes?.nome_completo}`,
-      notificacao.detalhes?.numero_processo && `Processo: ${notificacao.detalhes?.numero_processo}`,
-      notificacao.detalhes?.tipo_documento && `Documento: ${notificacao.detalhes?.tipo_documento}`,
-      notificacao.detalhes?.acao_requerida && `Ação: ${notificacao.detalhes?.acao_requerida}`,
-    ].filter(Boolean)
+    const extraInfo: string[] = [
+      notificacao.detalhes?.nome_completo &&
+        `Nome: ${notificacao.detalhes?.nome_completo}`,
+      notificacao.detalhes?.numero_processo &&
+        `Processo: ${notificacao.detalhes?.numero_processo}`,
+      notificacao.detalhes?.tipo_documento &&
+        `Documento: ${notificacao.detalhes?.tipo_documento}`,
+      notificacao.detalhes?.acao_requerida &&
+        `Ação: ${notificacao.detalhes?.acao_requerida}`,
+    ].filter((v): v is string => typeof v === "string");
 
     const destination = getNotificationDestination(notificacao);
     const isClickable = Boolean(destination);
@@ -137,17 +170,17 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
       <div
         key={notificacao.id}
         className={cn(
-          'border-l-4 p-3 transition-all duration-200',
-          isClickable ? 'cursor-pointer hover:bg-muted/45' : '',
+          "border-l-4 p-3 transition-all duration-200",
+          isClickable ? "cursor-pointer hover:bg-muted/45" : "",
           getPriorityColor(notificacao.prioridade),
-          !notificacao.lida && 'border-l-blue-500 bg-blue-500/10'
+          !notificacao.lida && "border-l-blue-500 bg-blue-500/10",
         )}
-        role={isClickable ? 'button' : undefined}
+        role={isClickable ? "button" : undefined}
         tabIndex={isClickable ? 0 : undefined}
         onClick={() => isClickable && handleNotificationClick(notificacao)}
         onKeyDown={(e) => {
           if (!isClickable) return;
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             handleNotificationClick(notificacao);
           }
@@ -157,10 +190,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           <div className="flex items-start gap-2 flex-1 min-w-0">
             {getNotificationIcon(notificacao.tipo, notificacao.prioridade)}
             <div className="flex-1 min-w-0">
-              <h4 className={cn(
-                'truncate text-sm font-medium text-foreground',
-                !notificacao.lida && 'font-semibold'
-              )}>
+              <h4
+                className={cn(
+                  "truncate text-sm font-medium text-foreground",
+                  !notificacao.lida && "font-semibold",
+                )}
+              >
                 {notificacao.titulo}
               </h4>
               <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -168,8 +203,11 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               </p>
               {extraInfo.length > 0 && (
                 <ul className="mt-2 space-y-0.5">
-                  {extraInfo.map(info => (
-                    <li key={info} className="text-[11px] text-muted-foreground/90">
+                  {extraInfo.map((info) => (
+                    <li
+                      key={info}
+                      className="text-[11px] text-muted-foreground/90"
+                    >
                       {info}
                     </li>
                   ))}
@@ -185,7 +223,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-1 flex-shrink-0">
             {!notificacao.lida && (
               <button
@@ -215,27 +253,28 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
     );
   };
 
-  const displayNotifications = showAll ? notificacoes : naoLidas;
+  const isLoading = loading || loadingAll;
+  const displayNotifications = showAll ? allNotificacoes : naoLidas;
 
   return (
-    <div className={cn('relative', className)} ref={dropdownRef}>
+    <div className={cn("relative", className)} ref={dropdownRef}>
       {/* Botão do sino */}
       <button
         onClick={handleToggleDropdown}
         className={cn(
-          'relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-card/70 text-foreground/80 backdrop-blur transition-all',
-          'hover:border-border hover:bg-card hover:text-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2',
-          hasNotificacoes && 'animate-pulse'
+          "relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border/60 bg-card/70 text-foreground/80 backdrop-blur transition-all",
+          "hover:border-border hover:bg-card hover:text-foreground",
+          "focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2",
+          hasNotificacoes && "animate-pulse",
         )}
         title={`${totalNaoLidas} notificações não lidas`}
       >
         <Bell className="w-6 h-6" />
-        
+
         {/* Badge com contador */}
         {totalNaoLidas > 0 && (
           <span className="absolute right-0 top-0 inline-flex h-5 min-w-[1.25rem] -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full border border-red-500/30 bg-red-500 px-2 py-1 text-xs font-bold leading-none text-white shadow-md">
-            {totalNaoLidas > 99 ? '99+' : totalNaoLidas}
+            {totalNaoLidas > 99 ? "99+" : totalNaoLidas}
           </span>
         )}
       </button>
@@ -249,7 +288,8 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           <div className="relative border-b border-border/60 bg-muted/25 px-4 py-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-foreground">
-                Notificações {totalNaoLidas > 0 && `(${totalNaoLidas} não lidas)`}
+                Notificações{" "}
+                {totalNaoLidas > 0 && `(${totalNaoLidas} não lidas)`}
               </h3>
               <div className="flex items-center gap-2">
                 {totalNaoLidas > 0 && (
@@ -270,16 +310,16 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
                 </button>
               </div>
             </div>
-            
+
             {/* Toggle entre não lidas e todas */}
             <div className="flex items-center gap-4 mt-2">
               <button
                 onClick={() => setShowAll(false)}
                 className={cn(
-                  'rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition-colors',
+                  "rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition-colors",
                   !showAll
-                    ? 'border border-primary/20 bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? "border border-primary/20 bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 Não lidas ({totalNaoLidas})
@@ -287,15 +327,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               <button
                 onClick={() => {
                   setShowAll(true);
-                  if (!notificacoes.length) {
-                    fetchNotificacoes({ limit: 50 });
+                  if (!allNotificacoes.length) {
+                    fetchAllNotificacoes();
                   }
                 }}
                 className={cn(
-                  'rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition-colors',
+                  "rounded-lg px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] transition-colors",
                   showAll
-                    ? 'border border-primary/20 bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? "border border-primary/20 bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 Todas
@@ -305,7 +345,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
 
           {/* Conteúdo */}
           <div className="max-h-80 overflow-y-auto bg-background/45">
-            {loading && (
+            {isLoading && (
               <div className="p-4 text-center text-muted-foreground">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="mt-2 text-sm">Carregando...</p>
@@ -319,22 +359,23 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
               </div>
             )}
 
-            {!loading && !error && displayNotifications.length === 0 && (
+            {!isLoading && !error && displayNotifications.length === 0 && (
               <div className="p-8 text-center text-muted-foreground">
                 <Bell className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
                 <p className="text-sm font-medium mb-1">
-                  {showAll ? 'Nenhuma notificação' : 'Nenhuma notificação não lida'}
+                  {showAll
+                    ? "Nenhuma notificação"
+                    : "Nenhuma notificação não lida"}
                 </p>
                 <p className="text-xs text-muted-foreground/80">
-                  {showAll 
-                    ? 'Você está em dia com suas notificações!' 
-                    : 'Todas as notificações foram lidas.'
-                  }
+                  {showAll
+                    ? "Você está em dia com suas notificações!"
+                    : "Todas as notificações foram lidas."}
                 </p>
               </div>
             )}
 
-            {!loading && !error && displayNotifications.length > 0 && (
+            {!isLoading && !error && displayNotifications.length > 0 && (
               <div className="divide-y divide-border/60">
                 {displayNotifications.map(renderNotificationItem)}
               </div>
@@ -342,13 +383,30 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ className }) => {
           </div>
 
           {/* Footer */}
-          {displayNotifications.length > 0 && (
-            <div className="border-t border-border/60 bg-muted/20 px-4 py-2">
-              <p className="text-center text-xs text-muted-foreground">
-                Atualizações automáticas a cada 30 segundos
+          <div className="border-t border-border/60 bg-muted/20 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {sseConnected ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    Tempo real ativo
+                  </span>
+                ) : (
+                  "Atualizações a cada 30s"
+                )}
               </p>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate("/notificacoes");
+                }}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+              >
+                Ver todas
+                <ExternalLink className="h-3 w-3" />
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { Logger, Module, OnModuleInit } from "@nestjs/common";
+import { Logger, Module, OnModuleInit, OnModuleDestroy } from "@nestjs/common";
 
 import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
@@ -27,20 +27,22 @@ import { RolesGuard } from "./guards/roles.guard";
     }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        // Use the same config namespace as JwtStrategy to avoid secret mismatch
-        secret:
-          configService.get<string>("auth.jwt.secret") ||
-          configService.get<string>(
-            "JWT_SECRET",
-            "sgc-itep-secret-key-change-in-production",
-          ),
-        signOptions: {
-          expiresIn:
-            configService.get<string>("auth.jwt.expiresIn") ||
-            configService.get<string>("JWT_EXPIRES_IN", "50m"),
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>("auth.jwt.secret");
+        if (!secret) {
+          throw new Error(
+            "JWT_SECRET is not configured. Set the JWT_SECRET environment variable.",
+          );
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn:
+              configService.get<string>("auth.jwt.expiresIn") ||
+              configService.get<string>("JWT_EXPIRES_IN", "50m"),
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
@@ -55,14 +57,15 @@ import { RolesGuard } from "./guards/roles.guard";
   ],
   exports: [AuthService, JwtAuthGuard, RolesGuard, JwtModule],
 })
-export class AuthModule implements OnModuleInit {
+export class AuthModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthModule.name);
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(private readonly authService: AuthService) {}
 
   async onModuleInit() {
     // Inicializa limpeza periódica de usuários inativos
-    setInterval(() => {
+    this.cleanupInterval = setInterval(() => {
       this.authService.cleanupInactiveUsers().catch((error) => {
         this.logger.error(
           "Erro na limpeza periódica de usuários inativos",
@@ -74,5 +77,12 @@ export class AuthModule implements OnModuleInit {
     this.logger.log(
       "✅ [AUTH MODULE] Sistema de rastreamento de usuários online inicializado",
     );
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
   }
 }

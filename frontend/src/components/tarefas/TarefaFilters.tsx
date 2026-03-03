@@ -31,7 +31,7 @@ interface TarefaFiltersProps {
   filters: QueryTarefaDto;
   onFiltersChange: (filters: QueryTarefaDto) => void;
   usuarios?: UserType[];
-  projetos?: any[];
+  projetos?: { id: number; nome: string }[];
   onClearFilters: () => void;
   loading?: boolean;
   showAdvanced?: boolean;
@@ -48,7 +48,10 @@ const TarefaFilters: React.FC<TarefaFiltersProps> = ({
   showAdvanced = false,
   onToggleAdvanced,
 }) => {
-  const handleFilterChange = (field: keyof QueryTarefaDto, value: any) => {
+  const handleFilterChange = (
+    field: keyof QueryTarefaDto,
+    value: QueryTarefaDto[keyof QueryTarefaDto],
+  ) => {
     onFiltersChange({
       ...filters,
       [field]: value,

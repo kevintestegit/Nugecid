@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { nugecidService } from "@/services/nugecidService";
 import type { ImportResultDto } from "@/types";
 
@@ -21,11 +22,12 @@ export const useNugecidImport = (onImportSuccess?: () => void) => {
       if (onImportSuccess) {
         onImportSuccess();
       }
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-          "Ocorreu um erro ao importar a planilha.",
-      );
+    } catch (err: unknown) {
+      const message = axios.isAxiosError(err)
+        ? (((err.response?.data as Record<string, unknown>)
+            ?.message as string) ?? "Ocorreu um erro ao importar a planilha.")
+        : "Ocorreu um erro ao importar a planilha.";
+      setError(message);
     } finally {
       setIsLoading(false);
     }

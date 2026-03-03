@@ -1,10 +1,45 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { getCardData, getRequisicoesPorMes, getStatusDistribuicao, CardData, FiltrosEstatisticas } from '@/services/estatisticasService';
-import { exportRelatorioMensalPdf, exportRelatorioPdf } from '@/services/estatisticasExportService';
-import { createLogger } from '@/utils/logger';
-import { FileText, BarChart as BarChartIcon, PieChart as PieChartIcon, Download, Calendar, Filter, X } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  getCardData,
+  getRequisicoesPorMes,
+  getStatusDistribuicao,
+  CardData,
+  ChartData,
+  FiltrosEstatisticas,
+} from "@/services/estatisticasService";
+import {
+  exportRelatorioMensalPdf,
+  exportRelatorioPdf,
+} from "@/services/estatisticasExportService";
+import { createLogger } from "@/utils/logger";
+import {
+  FileText,
+  BarChart as BarChartIcon,
+  PieChart as PieChartIcon,
+  Download,
+  Calendar,
+  Filter,
+  X,
+  RefreshCw,
+  FileSpreadsheet,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { SkeletonStatsCard, Skeleton } from "@/components/ui/Skeleton";
+import { cn } from "@/utils/cn";
 
 // Tipos específicos para os dados dos gráficos
 interface BarChartData {
@@ -18,20 +53,30 @@ interface PieChartData {
 }
 
 const LazyBarChart = lazy(() =>
-  import('@/components/ui/BarChart').then(module => ({ default: module.BarChart })),
+  import("@/components/ui/BarChart").then((module) => ({
+    default: module.BarChart,
+  })),
 );
 const LazyPieChart = lazy(() =>
-  import('@/components/ui/PieChart').then(module => ({ default: module.PieChart })),
+  import("@/components/ui/PieChart").then((module) => ({
+    default: module.PieChart,
+  })),
 );
 const LazyStatsCard = lazy(() =>
-  import('@/components/ui/StatsCard').then(module => ({ default: module.StatsCard })),
+  import("@/components/ui/StatsCard").then((module) => ({
+    default: module.StatsCard,
+  })),
 );
 const reportsLogger = createLogger("RelatoriosPage");
 
 export function RelatoriosPage() {
   const [cardData, setCardData] = useState<CardData | null>(null);
-  const [requisicoesPorMes, setRequisicoesPorMes] = useState<BarChartData[]>([]);
-  const [statusDistribuicao, setStatusDistribuicao] = useState<PieChartData[]>([]);
+  const [requisicoesPorMes, setRequisicoesPorMes] = useState<BarChartData[]>(
+    [],
+  );
+  const [statusDistribuicao, setStatusDistribuicao] = useState<PieChartData[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -41,8 +86,8 @@ export function RelatoriosPage() {
 
   // Estados para filtros
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
-  const [dataInicio, setDataInicio] = useState<string>('');
-  const [dataFim, setDataFim] = useState<string>('');
+  const [dataInicio, setDataInicio] = useState<string>("");
+  const [dataFim, setDataFim] = useState<string>("");
   const [filtrosAtivos, setFiltrosAtivos] = useState<FiltrosEstatisticas>({});
 
   const fetchData = useCallback(async (filtros: FiltrosEstatisticas) => {
@@ -59,12 +104,22 @@ export function RelatoriosPage() {
       const reqArr = Array.isArray(requisicoes) ? requisicoes : [];
       const statusArr = Array.isArray(status) ? status : [];
 
-      setRequisicoesPorMes(reqArr.map((a: any) => ({ name: a.name, total: Number(a.total) || 0 })));
-      setStatusDistribuicao(statusArr.map((s: any) => ({ name: s.name, value: Number(s.value) || 0 })));
+      setRequisicoesPorMes(
+        reqArr.map((a: ChartData) => ({
+          name: a.name,
+          total: Number(a.total) || 0,
+        })),
+      );
+      setStatusDistribuicao(
+        statusArr.map((s: ChartData) => ({
+          name: s.name,
+          value: Number(s.value) || 0,
+        })),
+      );
       setError(null);
     } catch (err) {
-      setError('Falha ao carregar os dados de estatísticas.');
-      reportsLogger.error('Erro ao carregar dados de estatísticas', err);
+      setError("Falha ao carregar os dados de estatísticas.");
+      reportsLogger.error("Erro ao carregar dados de estatísticas", err);
     } finally {
       setLoading(false);
     }
@@ -83,8 +138,8 @@ export function RelatoriosPage() {
   };
 
   const handleLimparFiltros = () => {
-    setDataInicio('');
-    setDataFim('');
+    setDataInicio("");
+    setDataFim("");
     setFiltrosAtivos({});
     setMostrarFiltros(false);
   };
@@ -94,8 +149,8 @@ export function RelatoriosPage() {
       setExportingPdf(true);
       await exportRelatorioPdf(filtrosAtivos);
     } catch (err) {
-      reportsLogger.error('Erro ao exportar PDF', err);
-      setError('Falha ao exportar relatório em PDF.');
+      reportsLogger.error("Erro ao exportar PDF", err);
+      setError("Falha ao exportar relatório em PDF.");
     } finally {
       setExportingPdf(false);
     }
@@ -106,196 +161,317 @@ export function RelatoriosPage() {
       setExportingMensalPdf(true);
       await exportRelatorioMensalPdf(selectedYear, selectedMonth);
     } catch (err) {
-      reportsLogger.error('Erro ao exportar PDF mensal', err);
-      setError('Falha ao exportar relatório mensal em PDF.');
+      reportsLogger.error("Erro ao exportar PDF mensal", err);
+      setError("Falha ao exportar relatório mensal em PDF.");
     } finally {
       setExportingMensalPdf(false);
     }
   };
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-64">Carregando...</div>;
-  }
-
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const months = [
-    { value: 1, label: 'Janeiro' },
-    { value: 2, label: 'Fevereiro' },
-    { value: 3, label: 'Março' },
-    { value: 4, label: 'Abril' },
-    { value: 5, label: 'Maio' },
-    { value: 6, label: 'Junho' },
-    { value: 7, label: 'Julho' },
-    { value: 8, label: 'Agosto' },
-    { value: 9, label: 'Setembro' },
-    { value: 10, label: 'Outubro' },
-    { value: 11, label: 'Novembro' },
-    { value: 12, label: 'Dezembro' },
+    { value: 1, label: "Janeiro" },
+    { value: 2, label: "Fevereiro" },
+    { value: 3, label: "Março" },
+    { value: 4, label: "Abril" },
+    { value: 5, label: "Maio" },
+    { value: 6, label: "Junho" },
+    { value: 7, label: "Julho" },
+    { value: 8, label: "Agosto" },
+    { value: 9, label: "Setembro" },
+    { value: 10, label: "Outubro" },
+    { value: 11, label: "Novembro" },
+    { value: 12, label: "Dezembro" },
   ];
 
   const temFiltrosAtivos = Object.keys(filtrosAtivos).length > 0;
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Relatórios</h2>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setMostrarFiltros(!mostrarFiltros)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-              temFiltrosAtivos
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            <Filter className="h-4 w-4" />
-            Filtros {temFiltrosAtivos && `(${Object.keys(filtrosAtivos).length})`}
-          </button>
-          <button
-            onClick={handleExportPdf}
-            disabled={exportingPdf}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Download className="h-4 w-4" />
-            {exportingPdf ? 'Exportando...' : 'Exportar PDF Geral'}
-          </button>
+    <div className="relative space-y-6">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 overflow-hidden rounded-[2rem]">
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_8%_10%,rgba(56,189,248,0.2),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(249,115,22,0.14),transparent_55%),linear-gradient(180deg,rgba(255,255,255,0.65),rgba(255,255,255,0))] dark:bg-[radial-gradient(120%_80%_at_8%_10%,rgba(14,116,144,0.24),transparent_55%),radial-gradient(120%_80%_at_92%_10%,rgba(194,65,12,0.18),transparent_55%),linear-gradient(180deg,rgba(2,6,23,0.72),rgba(2,6,23,0))]" />
+      </div>
+
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_28px_60px_-46px_rgba(15,23,42,0.75)] backdrop-blur md:p-8">
+        <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
+        <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Relatórios Gerenciais
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Visualize métricas, exporte dados e acompanhe o desempenho do
+              sistema
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => setMostrarFiltros(!mostrarFiltros)}
+              variant="outline"
+              size="sm"
+              className={cn(
+                "border-border/60 bg-background/70 backdrop-blur transition-all",
+                temFiltrosAtivos && "border-primary/50 text-primary",
+              )}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Filtros{" "}
+              {temFiltrosAtivos && `(${Object.keys(filtrosAtivos).length})`}
+            </Button>
+            <Button
+              onClick={handleExportPdf}
+              disabled={exportingPdf || loading}
+              variant="default"
+              size="sm"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+            >
+              {exportingPdf ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              Exportar PDF Geral
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Painel de Filtros */}
+      {/* Filtros Modal / Card */}
       {mostrarFiltros && (
-        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Filtros de Período</h3>
-            <button
-              onClick={() => setMostrarFiltros(false)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Início
-              </label>
-              <input
-                type="date"
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <Card className="relative z-10 overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] animate-in slide-in-from-top-2">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+                  <Filter className="h-4 w-4 text-primary" />
+                </span>
+                Filtros de Período
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMostrarFiltros(false)}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Data Fim
-              </label>
-              <input
-                type="date"
-                value={dataFim}
-                onChange={(e) => setDataFim(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Data Início
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Data Fim
+                </label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-3">
-            <Button onClick={handleAplicarFiltros} className="flex-1">
-              Aplicar Filtros
-            </Button>
-            <Button
-              onClick={handleLimparFiltros}
-              variant="outline"
-              className="flex-1"
-            >
-              Limpar Filtros
-            </Button>
-          </div>
-        </div>
+            <div className="flex gap-3">
+              <Button onClick={handleAplicarFiltros} size="sm">
+                Aplicar Filtros
+              </Button>
+              <Button onClick={handleLimparFiltros} variant="outline" size="sm">
+                Limpar Filtros
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Exibir erro se houver */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
+        <div className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-red-600">
+          <X className="h-5 w-5 flex-shrink-0" />
+          <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
-      {/* Seletor de mês/ano para relatório mensal */}
-      <div className="flex items-center gap-4 rounded-xl border border-border/70 bg-card/80 p-4 backdrop-blur-sm">
-        <Calendar className="h-5 w-5 text-muted-foreground" />
-        <span className="text-sm font-medium text-foreground">Relatório Mensal:</span>
-        <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-          <SelectTrigger className="w-40 border-border/80 bg-background/70 text-foreground">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {months.map((month) => (
-              <SelectItem key={month.value} value={month.value.toString()}>
-                {month.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-          <SelectTrigger className="w-24 border-border/80 bg-background/70 text-foreground">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map((year) => (
-              <SelectItem key={year} value={year.toString()}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Relatório Mensal Bar */}
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border/60 bg-card/85 p-4 shadow-[0_8px_30px_-20px_rgba(15,23,42,0.6)] backdrop-blur">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Calendar className="h-4 w-4" />
+          </span>
+          <span className="text-sm font-semibold text-foreground">
+            Relatório Mensal
+          </span>
+        </div>
+
+        <div className="flex flex-1 items-center gap-3">
+          <Select
+            value={selectedMonth.toString()}
+            onValueChange={(value) => setSelectedMonth(parseInt(value))}
+          >
+            <SelectTrigger className="w-[140px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month) => (
+                <SelectItem key={month.value} value={month.value.toString()}>
+                  {month.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={selectedYear.toString()}
+            onValueChange={(value) => setSelectedYear(parseInt(value))}
+          >
+            <SelectTrigger className="w-[100px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <Button
           onClick={handleExportMensalPdf}
-          disabled={exportingMensalPdf}
-          className="flex items-center gap-2"
+          disabled={exportingMensalPdf || loading}
+          variant="secondary"
+          size="sm"
+          className="ml-auto"
         >
-          <Download className="h-4 w-4" />
-          {exportingMensalPdf ? 'Exportando...' : 'Exportar PDF Mensal'}
+          {exportingMensalPdf ? (
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+          )}
+          Exportar PDF Mensal
         </Button>
       </div>
 
-      {/* Cards de Estatísticas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Suspense fallback={<div className="h-24 rounded-lg bg-muted/40" />}>
-          <LazyStatsCard
-            title="Total de Desarquivamentos"
-            value={cardData?.totalDesarquivamentos ?? 0}
-            icon={<FileText className="h-4 w-4 text-muted-foreground" />}
-          />
-        </Suspense>
-        <Suspense fallback={<div className="h-24 rounded-lg bg-muted/40" />}>
-          <LazyStatsCard
-            title="Requisições Pendentes"
-            value={cardData?.requisicoesPendentes ?? 0}
-            icon={<BarChartIcon className="h-4 w-4 text-muted-foreground" />}
-          />
-        </Suspense>
-        <Suspense fallback={<div className="h-24 rounded-lg bg-muted/40" />}>
-          <LazyStatsCard
-            title="Requisições (Este Mês)"
-            value={cardData?.requisicoesEsteMes ?? 0}
-            icon={<PieChartIcon className="h-4 w-4 text-muted-foreground" />}
-          />
-        </Suspense>
-      </div>
+      {/* KPIs */}
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-border/50 bg-card p-6 shadow-sm"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <Skeleton variant="text" width={140} height={20} />
+                <Skeleton variant="circular" width={40} height={40} />
+              </div>
+              <Skeleton
+                variant="text"
+                width={80}
+                height={32}
+                className="mb-2"
+              />
+              <Skeleton variant="text" width={120} height={14} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Suspense fallback={<SkeletonStatsCard />}>
+            <LazyStatsCard
+              title="Total de Desarquivamentos"
+              value={cardData?.totalDesarquivamentos ?? 0}
+              icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+            />
+          </Suspense>
+          <Suspense fallback={<SkeletonStatsCard />}>
+            <LazyStatsCard
+              title="Requisições Pendentes"
+              value={cardData?.requisicoesPendentes ?? 0}
+              icon={<BarChartIcon className="h-4 w-4 text-muted-foreground" />}
+            />
+          </Suspense>
+          <Suspense fallback={<SkeletonStatsCard />}>
+            <LazyStatsCard
+              title="Requisições (Este Mês)"
+              value={cardData?.requisicoesEsteMes ?? 0}
+              icon={<PieChartIcon className="h-4 w-4 text-muted-foreground" />}
+            />
+          </Suspense>
+        </div>
+      )}
 
       {/* Gráficos */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <div className="col-span-4">
-          <Suspense fallback={<div className="h-[340px] rounded-lg bg-muted/40" />}>
-            <LazyBarChart data={requisicoesPorMes} title="Requisições por Mês" />
-          </Suspense>
-        </div>
-        <div className="col-span-3">
-          <Suspense fallback={<div className="h-[340px] rounded-lg bg-muted/40" />}>
-            <LazyPieChart data={statusDistribuicao} title="Distribuição por Status" />
-          </Suspense>
-        </div>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+        <Card className="col-span-4 border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-base">Requisições por Mês</CardTitle>
+            <CardDescription>
+              Volume de solicitações ao longo do tempo
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="h-[300px] flex items-end justify-between gap-2 px-4 pb-4">
+                {[40, 70, 45, 90, 65, 80, 50].map((h, i) => (
+                  <Skeleton
+                    key={i}
+                    variant="rectangular"
+                    className="w-full rounded-t-sm"
+                    height={`${h}%`}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Suspense
+                fallback={
+                  <div className="h-[300px] animate-pulse rounded-lg bg-muted/40" />
+                }
+              >
+                <LazyBarChart data={requisicoesPorMes} title="" />
+              </Suspense>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-3 border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-base">Distribuição por Status</CardTitle>
+            <CardDescription>Situação atual das requisições</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="h-[300px] flex items-center justify-center">
+                <Skeleton variant="circular" width={200} height={200} />
+              </div>
+            ) : (
+              <Suspense
+                fallback={
+                  <div className="h-[300px] animate-pulse rounded-lg bg-muted/40" />
+                }
+              >
+                <LazyPieChart data={statusDistribuicao} title="" />
+              </Suspense>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

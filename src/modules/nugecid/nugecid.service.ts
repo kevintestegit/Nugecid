@@ -4,9 +4,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Logger,
+  Inject,
+  Optional,
 } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { EntityManager, Repository } from "typeorm";
 
 import { DesarquivamentoTypeOrmEntity } from "./infrastructure/entities/desarquivamento.typeorm-entity";
 import { DesarquivamentoCommentTypeOrmEntity } from "./infrastructure/entities/desarquivamento-comment.typeorm-entity";
@@ -36,16 +40,31 @@ export interface DashboardStats {
   recentes: DesarquivamentoTypeOrmEntity[];
 }
 
+export interface CreateDesarquivamentoOptions {
+  manager?: EntityManager;
+  skipAudit?: boolean;
+  skipNotifications?: boolean;
+}
+
 import { NugecidAuditService } from "./nugecid-audit.service";
-import { NotificacoesService } from "../notificacoes/services/notificacoes.service";
+import {
+  NotificacoesService,
+  CreateNotificacaoDto,
+} from "../notificacoes/services/notificacoes.service";
 import {
   TipoNotificacao,
   PrioridadeNotificacao,
 } from "../notificacoes/entities/notificacao.entity";
+import {
+  CACHE_VERSION_INITIAL,
+  CACHE_VERSION_KEYS,
+} from "../../common/constants/cache-version.constants";
+import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
 
 @Injectable()
 export class NugecidService {
   private readonly logger = new Logger(NugecidService.name);
+  private static readonly LIST_CACHE_TTL_SECONDS = 20;
 
   constructor(
     @InjectRepository(DesarquivamentoTypeOrmEntity)
@@ -56,6 +75,9 @@ export class NugecidService {
     private readonly userRepository: Repository<User>,
     private readonly nugecidAuditService: NugecidAuditService,
     private readonly notificacoesService: NotificacoesService,
+    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+    @Optional()
+    private readonly runtimeMetricsService?: RuntimeMetricsService,
   ) {}
 
   /**
@@ -64,6 +86,7 @@ export class NugecidService {
   async create(
     createDesarquivamentoDto: CreateDesarquivamentoDto,
     currentUser: User,
+    options: CreateDesarquivamentoOptions = {},
   ): Promise<DesarquivamentoTypeOrmEntity> {
     // numeroSolicitacao agora usa auto-increment do banco
     // Removido cálculo manual para evitar conflitos em importações
@@ -74,7 +97,11 @@ export class NugecidService {
         (createDesarquivamentoDto as any).tipoDesarquivamento,
     );
 
-    const desarquivamento = this.desarquivamentoRepository.create({
+    const repository =
+      options.manager?.getRepository(DesarquivamentoTypeOrmEntity) ??
+      this.desarquivamentoRepository;
+
+    const desarquivamento = repository.create({
       ...createDesarquivamentoDto,
       desarquivamentoFisicoDigital: tipoDesarq,
       tipoDesarquivamento: tipoDesarq,
@@ -85,29 +112,41 @@ export class NugecidService {
         StatusDesarquivamentoEnum.SOLICITADO,
     });
 
-    const saved = await this.desarquivamentoRepository.save(desarquivamento);
+    const saved = await repository.save(desarquivamento);
 
-    // Salva auditoria detalhada
-    await this.nugecidAuditService.saveDesarquivamentoAudit(
-      currentUser.id,
-      "CREATE",
-      saved,
-      null, // sem mudanças na criação
-    );
-
-    // Criar notificação para coordenadores/administradores
-    try {
-      await this.criarNotificacaoNovoDesarquivamento(saved, currentUser);
-    } catch (error) {
-      this.logger.error(
-        "Erro ao criar notificação de novo desarquivamento:",
-        error,
+    if (!options.skipAudit) {
+      // Salva auditoria detalhada
+      await this.nugecidAuditService.saveDesarquivamentoAudit(
+        currentUser.id,
+        "CREATE",
+        saved,
+        null, // sem mudanças na criação
       );
+    }
+
+    if (!options.skipNotifications) {
+      // Criar notificação para coordenadores/administradores
+      try {
+        await this.criarNotificacaoNovoDesarquivamento(saved, currentUser);
+      } catch (error) {
+        this.logger.error(
+          "Erro ao criar notificação de novo desarquivamento:",
+          error,
+        );
+      }
     }
 
     this.logger.log(
       `Desarquivamento criado: ${saved.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
+
+    if (!options.manager) {
+      await this.bumpPerformanceCacheVersions();
+    }
+
+    if (options.manager) {
+      return saved;
+    }
 
     return this.findOne(saved.id);
   }
@@ -124,13 +163,8 @@ export class NugecidService {
       sortBy = "createdAt",
       sortOrder = "DESC",
     } = queryDto;
-
-    const queryBuilder = this.desarquivamentoRepository
-      .createQueryBuilder("desarquivamento")
-      .leftJoinAndSelect("desarquivamento.criadoPor", "criadoPor")
-      .leftJoinAndSelect("desarquivamento.responsavel", "responsavel");
-
-    this.applyFilters(queryBuilder, queryDto);
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const limitNumber = Math.max(1, Math.min(100, Number(limit) || 10));
 
     const validSortFields = [
       "dataSolicitacao",
@@ -145,24 +179,65 @@ export class NugecidService {
     const sortField = validSortFields.includes(sortBy)
       ? sortBy
       : "dataSolicitacao";
-    queryBuilder.orderBy(
-      `desarquivamento.${sortField}`,
-      sortOrder as "ASC" | "DESC",
+    const sortDirection = sortOrder === "ASC" ? "ASC" : "DESC";
+
+    const cacheVersion = await this.getCacheVersion(
+      CACHE_VERSION_KEYS.NUGECID_LIST,
     );
+    const cacheKey = this.buildListCacheKey(
+      "active",
+      queryDto,
+      pageNumber,
+      limitNumber,
+      sortField,
+      sortDirection,
+      cacheVersion,
+    );
+    const cached = await this.getFromCache<PaginatedDesarquivamentos>(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
-    const offset = (page - 1) * limit;
-    queryBuilder.skip(offset).take(limit);
+    const dataQueryBuilder = this.desarquivamentoRepository
+      .createQueryBuilder("desarquivamento")
+      .leftJoinAndSelect("desarquivamento.criadoPor", "criadoPor")
+      .leftJoinAndSelect("desarquivamento.responsavel", "responsavel");
 
-    const [desarquivamentos, total] = await queryBuilder.getManyAndCount();
-    const totalPages = Math.ceil(total / limit);
+    this.applyFilters(dataQueryBuilder, queryDto);
 
-    return {
+    dataQueryBuilder.orderBy(`desarquivamento.${sortField}`, sortDirection);
+    if (typeof dataQueryBuilder.addOrderBy === "function") {
+      dataQueryBuilder.addOrderBy("desarquivamento.id", "DESC");
+    }
+
+    const offset = (pageNumber - 1) * limitNumber;
+    dataQueryBuilder.skip(offset).take(limitNumber);
+
+    const countQueryBuilder =
+      this.desarquivamentoRepository.createQueryBuilder("desarquivamento");
+    this.applyFilters(countQueryBuilder, queryDto);
+
+    const [desarquivamentos, total] = await this.executePaginatedQuery(
+      dataQueryBuilder,
+      countQueryBuilder,
+    );
+    const totalPages = Math.ceil(total / limitNumber);
+
+    const result = {
       desarquivamentos,
       total,
-      page,
-      limit,
+      page: pageNumber,
+      limit: limitNumber,
       totalPages,
     };
+
+    await this.setInCache(
+      cacheKey,
+      result,
+      NugecidService.LIST_CACHE_TTL_SECONDS,
+    );
+
+    return result;
   }
 
   private applyFilters(
@@ -174,11 +249,15 @@ export class NugecidService {
       status,
       tipoDesarquivamento,
       usuarioId,
+      responsavelId,
       dataInicio,
       dataFim,
       startDate,
       endDate,
       vencidos,
+      urgente,
+      instituto,
+      requerente,
     } = queryDto;
 
     if (search) {
@@ -207,8 +286,14 @@ export class NugecidService {
     }
 
     if (usuarioId) {
-      queryBuilder.andWhere("desarquivamento.criadoPor.id = :usuarioId", {
+      queryBuilder.andWhere("desarquivamento.criadoPorId = :usuarioId", {
         usuarioId,
+      });
+    }
+
+    if (responsavelId) {
+      queryBuilder.andWhere("desarquivamento.responsavelId = :responsavelId", {
+        responsavelId,
       });
     }
 
@@ -247,6 +332,24 @@ export class NugecidService {
       );
       queryBuilder.andWhere("desarquivamento.status != :finalizado", {
         finalizado: StatusDesarquivamentoEnum.FINALIZADO,
+      });
+    }
+
+    if (urgente !== undefined) {
+      queryBuilder.andWhere("desarquivamento.urgente = :urgente", {
+        urgente,
+      });
+    }
+
+    if (instituto) {
+      queryBuilder.andWhere("desarquivamento.instituto = :instituto", {
+        instituto,
+      });
+    }
+
+    if (requerente) {
+      queryBuilder.andWhere("desarquivamento.requerente ILIKE :requerente", {
+        requerente: `%${requerente}%`,
       });
     }
   }
@@ -442,6 +545,8 @@ export class NugecidService {
       `Desarquivamento atualizado: ${updated.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
 
+    await this.bumpPerformanceCacheVersions();
+
     return this.findOne(updated.id);
   }
 
@@ -484,6 +589,8 @@ export class NugecidService {
     this.logger.log(
       `Desarquivamento removido: ${desarquivamento.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
+
+    await this.bumpPerformanceCacheVersions();
   }
 
   /**
@@ -498,36 +605,74 @@ export class NugecidService {
       sortBy = "deletedAt",
       sortOrder = "DESC",
     } = queryDto;
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const limitNumber = Math.max(1, Math.min(100, Number(limit) || 10));
 
-    const queryBuilder = this.desarquivamentoRepository
+    const validSortFields = ["deletedAt", "nomeCompleto", "numeroNicLaudoAuto"];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "deletedAt";
+    const sortDirection = sortOrder === "ASC" ? "ASC" : "DESC";
+
+    const cacheVersion = await this.getCacheVersion(
+      CACHE_VERSION_KEYS.NUGECID_LIST,
+    );
+    const cacheKey = this.buildListCacheKey(
+      "deleted",
+      queryDto,
+      pageNumber,
+      limitNumber,
+      sortField,
+      sortDirection,
+      cacheVersion,
+    );
+    const cached = await this.getFromCache<PaginatedDesarquivamentos>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const dataQueryBuilder = this.desarquivamentoRepository
       .createQueryBuilder("desarquivamento")
       .withDeleted() // Adicionado para incluir os soft-deleted
       .where("desarquivamento.deletedAt IS NOT NULL")
       .leftJoinAndSelect("desarquivamento.criadoPor", "criadoPor")
       .leftJoinAndSelect("desarquivamento.responsavel", "responsavel");
 
-    this.applyFilters(queryBuilder, queryDto);
+    this.applyFilters(dataQueryBuilder, queryDto);
 
-    const validSortFields = ["deletedAt", "nomeCompleto", "numeroNicLaudoAuto"];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : "deletedAt";
-    queryBuilder.orderBy(
-      `desarquivamento.${sortField}`,
-      sortOrder as "ASC" | "DESC",
+    dataQueryBuilder.orderBy(`desarquivamento.${sortField}`, sortDirection);
+    if (typeof dataQueryBuilder.addOrderBy === "function") {
+      dataQueryBuilder.addOrderBy("desarquivamento.id", "DESC");
+    }
+
+    const offset = (pageNumber - 1) * limitNumber;
+    dataQueryBuilder.skip(offset).take(limitNumber);
+
+    const countQueryBuilder = this.desarquivamentoRepository
+      .createQueryBuilder("desarquivamento")
+      .withDeleted()
+      .where("desarquivamento.deletedAt IS NOT NULL");
+    this.applyFilters(countQueryBuilder, queryDto);
+
+    const [desarquivamentos, total] = await this.executePaginatedQuery(
+      dataQueryBuilder,
+      countQueryBuilder,
     );
+    const totalPages = Math.ceil(total / limitNumber);
 
-    const offset = (page - 1) * limit;
-    queryBuilder.skip(offset).take(limit);
-
-    const [desarquivamentos, total] = await queryBuilder.getManyAndCount();
-    const totalPages = Math.ceil(total / limit);
-
-    return {
+    const result = {
       desarquivamentos,
       total,
-      page,
-      limit,
+      page: pageNumber,
+      limit: limitNumber,
       totalPages,
     };
+
+    await this.setInCache(
+      cacheKey,
+      result,
+      NugecidService.LIST_CACHE_TTL_SECONDS,
+    );
+
+    return result;
   }
 
   /**
@@ -561,6 +706,174 @@ export class NugecidService {
     this.logger.log(
       `Desarquivamento restaurado: ${desarquivamento.numeroNicLaudoAuto} por ${currentUser.usuario}`,
     );
+
+    await this.bumpPerformanceCacheVersions();
+  }
+
+  private async bumpPerformanceCacheVersions(): Promise<void> {
+    await Promise.allSettled([
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.APP_DASHBOARD),
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.APP_GLOBAL_SEARCH),
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.ESTATISTICAS),
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.NUGECID_LIST),
+    ]);
+  }
+
+  private async executePaginatedQuery(
+    dataQueryBuilder: {
+      getMany?: () => Promise<DesarquivamentoTypeOrmEntity[]>;
+      getManyAndCount?: () => Promise<[DesarquivamentoTypeOrmEntity[], number]>;
+    },
+    countQueryBuilder: {
+      getCount?: () => Promise<number>;
+    },
+  ): Promise<[DesarquivamentoTypeOrmEntity[], number]> {
+    if (
+      typeof dataQueryBuilder.getMany === "function" &&
+      typeof countQueryBuilder.getCount === "function"
+    ) {
+      const [items, total] = await Promise.all([
+        dataQueryBuilder.getMany(),
+        countQueryBuilder.getCount(),
+      ]);
+      return [items, total];
+    }
+
+    if (typeof dataQueryBuilder.getManyAndCount === "function") {
+      return dataQueryBuilder.getManyAndCount();
+    }
+
+    throw new Error("QueryBuilder incompatível: método de paginação ausente.");
+  }
+
+  private async bumpCacheVersion(versionKey: string): Promise<void> {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    try {
+      const raw = await this.cacheManager.get<number | string>(versionKey);
+      const current = Number(raw);
+      const next =
+        Number.isFinite(current) && current > 0
+          ? current + 1
+          : CACHE_VERSION_INITIAL + 1;
+      await this.cacheManager.set(versionKey, next);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao invalidar cache (${versionKey}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async getCacheVersion(versionKey: string): Promise<number> {
+    if (!this.cacheManager) {
+      return CACHE_VERSION_INITIAL;
+    }
+
+    try {
+      const raw = await this.cacheManager.get<number | string>(versionKey);
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+      return CACHE_VERSION_INITIAL;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao obter versão de cache (${versionKey}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return CACHE_VERSION_INITIAL;
+    }
+  }
+
+  private buildListCacheKey(
+    scope: "active" | "deleted",
+    queryDto: QueryDesarquivamentoDto,
+    page: number,
+    limit: number,
+    sortField: string,
+    sortDirection: "ASC" | "DESC",
+    version: number,
+  ): string {
+    const normalizedFilters = {
+      search: queryDto.search?.trim().toLowerCase() || "",
+      status: [...(queryDto.status ?? [])].sort(),
+      tipoDesarquivamento: [...(queryDto.tipoDesarquivamento ?? [])].sort(),
+      usuarioId: queryDto.usuarioId ?? null,
+      responsavelId: queryDto.responsavelId ?? null,
+      dataInicio: queryDto.dataInicio ?? null,
+      dataFim: queryDto.dataFim ?? null,
+      startDate: queryDto.startDate ?? null,
+      endDate: queryDto.endDate ?? null,
+      vencidos: Boolean(queryDto.vencidos),
+      urgente:
+        queryDto.urgente === undefined ? null : Boolean(queryDto.urgente),
+      instituto: queryDto.instituto?.trim() || "",
+      requerente: queryDto.requerente?.trim().toLowerCase() || "",
+    };
+
+    return [
+      "nugecid:list",
+      scope,
+      `v:${version}`,
+      `p:${page}`,
+      `l:${limit}`,
+      `s:${sortField}`,
+      `d:${sortDirection}`,
+      `f:${JSON.stringify(normalizedFilters)}`,
+    ].join("|");
+  }
+
+  private async getFromCache<T>(key: string): Promise<T | undefined> {
+    if (!this.cacheManager) {
+      return undefined;
+    }
+
+    const namespace = "nugecid";
+    try {
+      const cached = await this.cacheManager.get<T>(key);
+      if (cached === undefined || cached === null) {
+        this.runtimeMetricsService?.recordCacheMiss(namespace);
+      } else {
+        this.runtimeMetricsService?.recordCacheHit(namespace);
+      }
+      return cached ?? undefined;
+    } catch (error) {
+      this.runtimeMetricsService?.recordCacheError(namespace);
+      this.logger.warn(
+        `Falha ao ler cache (${key}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return undefined;
+    }
+  }
+
+  private async setInCache(
+    key: string,
+    value: unknown,
+    ttlSeconds: number,
+  ): Promise<void> {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    const namespace = "nugecid";
+    try {
+      await this.cacheManager.set(key, value, ttlSeconds);
+      this.runtimeMetricsService?.recordCacheSet(namespace);
+    } catch (error) {
+      this.runtimeMetricsService?.recordCacheError(namespace);
+      this.logger.warn(
+        `Falha ao gravar cache (${key}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**
@@ -577,20 +890,20 @@ export class NugecidService {
         relations: ["role"],
       });
       const notifiedUserIds = new Set<number>();
+      const notificacoes: CreateNotificacaoDto[] = [];
+      const prioridade = desarquivamento.urgente
+        ? PrioridadeNotificacao.ALTA
+        : PrioridadeNotificacao.MEDIA;
 
-      // Criar notificação para cada coordenador
       for (const coord of coordenadores) {
-        // Evita duplicar notificações para o mesmo usuário
         if (notifiedUserIds.has(coord.id)) {
           continue;
         }
-
-        await this.notificacoesService.create({
+        notifiedUserIds.add(coord.id);
+        notificacoes.push({
           usuarioId: coord.id,
           tipo: TipoNotificacao.NOVO_DESARQUIVAMENTO,
-          prioridade: desarquivamento.urgente
-            ? PrioridadeNotificacao.ALTA
-            : PrioridadeNotificacao.MEDIA,
+          prioridade,
           titulo: "📄 Novo Desarquivamento Criado",
           descricao: `${criador.nome} criou solicitação #${desarquivamento.numeroSolicitacao} - ${desarquivamento.nomeCompleto}`,
           link: `/desarquivamentos/${desarquivamento.id}`,
@@ -600,17 +913,13 @@ export class NugecidService {
             criadoPor: criador.nome,
           },
         });
-        notifiedUserIds.add(coord.id);
       }
 
-      // Garantir que o criador também receba a notificação
       if (!notifiedUserIds.has(criador.id)) {
-        await this.notificacoesService.create({
+        notificacoes.push({
           usuarioId: criador.id,
           tipo: TipoNotificacao.NOVO_DESARQUIVAMENTO,
-          prioridade: desarquivamento.urgente
-            ? PrioridadeNotificacao.ALTA
-            : PrioridadeNotificacao.MEDIA,
+          prioridade,
           titulo: "📄 Sua solicitação foi registrada",
           descricao: `A solicitação #${desarquivamento.numeroSolicitacao} foi criada e aguarda análise.`,
           link: `/desarquivamentos/${desarquivamento.id}`,
@@ -620,6 +929,21 @@ export class NugecidService {
             criadoPor: criador.nome,
           },
         });
+      }
+
+      const notificacoesServiceCompat = this
+        .notificacoesService as NotificacoesService & {
+        createMany?: (dtos: CreateNotificacaoDto[]) => Promise<unknown>;
+      };
+
+      if (typeof notificacoesServiceCompat.createMany === "function") {
+        await notificacoesServiceCompat.createMany(notificacoes);
+      } else {
+        await Promise.all(
+          notificacoes.map((notificacaoDto) =>
+            this.notificacoesService.create(notificacaoDto),
+          ),
+        );
       }
 
       this.logger.log(
@@ -642,16 +966,31 @@ export class NugecidService {
       throw new NotFoundException("Desarquivamento não encontrado");
     }
 
-    // Busca todas as auditorias relacionadas a este desarquivamento
-    const auditorias = await this.nugecidAuditService.findByEntity(
-      "nugecid",
-      desarquivamentoId,
-    );
+    // Busca auditorias em múltiplos aliases de entidade para manter compatibilidade
+    const [auditoriasLegacy, auditoriasResource] = await Promise.all([
+      this.nugecidAuditService.findByEntity("nugecid", desarquivamentoId),
+      this.nugecidAuditService.findByEntity(
+        "DESARQUIVAMENTO",
+        desarquivamentoId,
+      ),
+    ]);
+
+    const auditorias = [...auditoriasLegacy, ...auditoriasResource]
+      .filter(
+        (audit, index, list) =>
+          list.findIndex((candidate) => candidate.id === audit.id) === index,
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      );
+
+    const auditoriasConsolidadas = this.consolidateViewEntries(auditorias);
 
     // Formata os dados para o frontend
     return {
       success: true,
-      data: auditorias.map((audit) => ({
+      data: auditoriasConsolidadas.map((audit) => ({
         id: audit.id,
         action: audit.action,
         actionLabel: audit.getActionLabel(),
@@ -668,5 +1007,29 @@ export class NugecidService {
         success: audit.success,
       })),
     };
+  }
+
+  private consolidateViewEntries<T extends { action: string; userId: number }>(
+    auditorias: T[],
+  ): T[] {
+    const nonViewEntries: T[] = [];
+    const latestViewByUser = new Map<number, T>();
+
+    for (const audit of auditorias) {
+      if (String(audit.action).toUpperCase() !== "VIEW") {
+        nonViewEntries.push(audit);
+        continue;
+      }
+
+      const current = latestViewByUser.get(audit.userId);
+      if (!current) {
+        latestViewByUser.set(audit.userId, audit);
+      }
+    }
+
+    return [...nonViewEntries, ...latestViewByUser.values()].sort(
+      (a: any, b: any) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
   }
 }

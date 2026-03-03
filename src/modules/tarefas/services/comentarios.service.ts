@@ -60,8 +60,25 @@ export class ComentariosService {
         autorId,
       );
     } catch (error) {
-      this.logger.warn("Falha ao processar men��es em coment�rio", { error });
+      this.logger.warn("Falha ao processar menções em comentário", { error });
     }
+
+    // Notificar o responsável da tarefa sobre o novo comentário (se não for o autor)
+    if (tarefa.responsavelId && tarefa.responsavelId !== autorId) {
+      this.notificacoesService
+        .notificarComentario(
+          tarefa.responsavelId,
+          autorId,
+          tarefa.id,
+          createComentarioDto.conteudo,
+        )
+        .catch((err) =>
+          this.logger.warn(
+            `Falha ao notificar comentário na tarefa ${tarefa.id}: ${err.message}`,
+          ),
+        );
+    }
+
     // Criar histórico
     await this.createHistoryEntry(
       createComentarioDto.tarefaId,

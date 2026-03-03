@@ -72,7 +72,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       return false
     }
     
-    const solicitacaoDate = new Date(d.dataSolicitacao)
+    const solicitacaoDate = new Date(d.createdAt || d.dataSolicitacao)
     const today = new Date()
     const diffTime = today.getTime() - solicitacaoDate.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -89,7 +89,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
   const hoje = new Date()
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
   const solicitacoesDoMes = desarquivamentos.filter(
-    d => new Date(d.dataSolicitacao) >= inicioMes
+    d => new Date(d.createdAt || d.dataSolicitacao) >= inicioMes
   ).length
 
   const stats: StatCard[] = [

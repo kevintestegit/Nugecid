@@ -3,7 +3,12 @@ import {
   NotFoundException,
   Logger,
   ForbiddenException,
+  BadRequestException,
+  Inject,
+  Optional,
 } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { randomUUID } from "crypto";
@@ -19,6 +24,13 @@ import {
 import { CreatePastaDto } from "./dto/create-pasta.dto";
 import { UpdatePastaDto } from "./dto/update-pasta.dto";
 import { NotificacoesService } from "../notificacoes/services";
+import { FileValidator } from "../../common/utils/file-validator";
+import { SyncAction, SyncRealtimeService } from "../sync/sync-realtime.service";
+import {
+  CACHE_VERSION_INITIAL,
+  CACHE_VERSION_KEYS,
+} from "../../common/constants/cache-version.constants";
+import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
 
 interface PastaFilesPayload {
   imagens?: Express.Multer.File[];
@@ -27,6 +39,16 @@ interface PastaFilesPayload {
 }
 
 const UPLOAD_ROOT = path.join(process.cwd(), "uploads", "pastas");
+const UPLOAD_ROOT_RESOLVED = path.resolve(UPLOAD_ROOT);
+
+const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const ALLOWED_SPREADSHEET_MIME_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/csv",
+  "text/plain",
+]);
 
 export interface PastaItemRow {
   id: string;
@@ -48,9 +70,20 @@ export interface ParsedPlanilha {
   itens: PastaItemRow[];
 }
 
+interface ParsedPlanilhaCacheEntry {
+  signature: string;
+  expiresAt: number;
+  parsed: ParsedPlanilha | null;
+}
+
+const PLANILHA_CACHE_TTL_MS = 5 * 60 * 1000;
+const PLANILHA_CACHE_MAX_ITEMS = 200;
+
 @Injectable()
 export class PastasService {
   private readonly logger = new Logger(PastasService.name);
+  private readonly planilhaCache = new Map<string, ParsedPlanilhaCacheEntry>();
+  private static readonly LIST_CACHE_TTL_SECONDS = 20;
 
   constructor(
     @InjectRepository(Pasta)
@@ -59,6 +92,10 @@ export class PastasService {
     private pastaArquivoRepository: Repository<PastaArquivo>,
     private readonly dataSource: DataSource,
     private readonly notificacoesService: NotificacoesService,
+    private readonly syncRealtimeService: SyncRealtimeService,
+    @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
+    @Optional()
+    private readonly runtimeMetricsService?: RuntimeMetricsService,
   ) {}
 
   private schemaReady: Promise<void> | null = null;
@@ -148,11 +185,26 @@ export class PastasService {
       });
     }
 
+    this.emitPastaRealtime("created", pasta.id, usuarioId, {
+      includePlanilhas: this.hasPlanilhaInPayload(files),
+      metadata: { nome: pasta.nome },
+    });
+
+    await this.bumpReadCachesVersion();
+
     return pastaCompleta;
   }
 
   async findAll(userId?: number): Promise<any[]> {
     await this.ensureSchema();
+    const cacheVersion = await this.getCacheVersion(
+      CACHE_VERSION_KEYS.PASTAS_LIST,
+    );
+    const cacheKey = `pastas:list:v${cacheVersion}:u:${userId ?? "all"}`;
+    const cached = await this.getFromCache<any[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     // Consulta leve: não carregar arquivos, apenas contar por tipo
     let queryBuilder = this.pastasRepository
@@ -185,6 +237,11 @@ export class PastasService {
     }
 
     const pastas = await queryBuilder.getMany();
+    await this.setInCache(
+      cacheKey,
+      pastas,
+      PastasService.LIST_CACHE_TTL_SECONDS,
+    );
     // Não precisamos mapear arquivos aqui; apenas retornamos contagens e metadados básicos
     return pastas;
   }
@@ -214,7 +271,15 @@ export class PastasService {
       payload.tags = this.normalizeTags(updatePastaDto.tags);
     }
     await this.pastasRepository.update(id, payload);
-    return this.findOne(id, userId);
+    const pastaAtualizada = await this.findOne(id, userId);
+
+    this.emitPastaRealtime("updated", id, userId, {
+      metadata: { nome: pastaAtualizada?.nome },
+    });
+
+    await this.bumpReadCachesVersion();
+
+    return pastaAtualizada;
   }
 
   async remove(id: string, userId?: number): Promise<void> {
@@ -224,12 +289,26 @@ export class PastasService {
       where: { pastaId: id },
     });
 
+    for (const arquivo of arquivos) {
+      if (arquivo.tipo === PastaArquivoTipo.PLANILHA) {
+        this.invalidateCachedParsedPlanilha(arquivo.id);
+      }
+    }
+
     await Promise.all(
       arquivos.map((arquivo) => this.deleteArquivoDoDisco(arquivo.caminho)),
     );
 
     await this.pastaArquivoRepository.delete({ pastaId: id });
     await this.pastasRepository.delete(id);
+
+    this.emitPastaRealtime("deleted", id, userId, {
+      includePlanilhas: arquivos.some(
+        (arquivo) => arquivo.tipo === PastaArquivoTipo.PLANILHA,
+      ),
+    });
+
+    await this.bumpReadCachesVersion();
   }
 
   async adicionarArquivos(
@@ -248,6 +327,10 @@ export class PastasService {
     this.ensureOwnership(pasta, userId);
 
     await this.persistArquivos(pasta, files);
+    this.emitPastaRealtime("updated", id, userId, {
+      includePlanilhas: this.hasPlanilhaInPayload(files),
+    });
+    await this.bumpReadCachesVersion();
     return this.findOne(id, userId);
   }
 
@@ -390,7 +473,7 @@ export class PastasService {
       throw new NotFoundException("Arquivo nao encontrado");
     }
 
-    const caminhoAbsoluto = path.join(UPLOAD_ROOT, arquivo.caminho);
+    const caminhoAbsoluto = this.resolveStoragePath(arquivo.caminho);
     return {
       caminhoAbsoluto,
       nome: arquivo.nomeOriginal,
@@ -418,10 +501,21 @@ export class PastasService {
       throw new NotFoundException("Arquivo nao encontrado");
     }
 
+    if (arquivo.tipo === PastaArquivoTipo.PLANILHA) {
+      this.invalidateCachedParsedPlanilha(arquivo.id);
+    }
+
     await this.deleteArquivoDoDisco(arquivo.caminho);
     await this.pastaArquivoRepository.delete({ id: arquivoId });
 
     await this.recalcularContagensArquivos(pastaId);
+
+    this.emitPastaRealtime("updated", pastaId, userId, {
+      includePlanilhas: arquivo.tipo === PastaArquivoTipo.PLANILHA,
+      metadata: { removedFileId: arquivoId },
+    });
+
+    await this.bumpReadCachesVersion();
 
     return this.findOne(pastaId, userId);
   }
@@ -454,13 +548,29 @@ export class PastasService {
     pasta: Pasta,
     arquivo: PastaArquivo,
   ): Promise<ParsedPlanilha | null> {
+    let signature: string | null = null;
+    const cacheAndReturn = (parsed: ParsedPlanilha | null) => {
+      if (signature) {
+        this.setCachedParsedPlanilha(arquivo.id, signature, parsed);
+      }
+      return parsed;
+    };
+
     try {
-      const caminho = path.join(UPLOAD_ROOT, arquivo.caminho);
+      const caminho = this.resolveStoragePath(arquivo.caminho);
       if (!existsSync(caminho)) {
+        this.invalidateCachedParsedPlanilha(arquivo.id);
         this.logger.warn(
           `Arquivo de planilha nao encontrado no disco: ${caminho}`,
         );
         return null;
+      }
+
+      const stats = await fs.stat(caminho);
+      signature = `${stats.size}:${stats.mtimeMs}`;
+      const cached = this.getCachedParsedPlanilha(arquivo.id, signature);
+      if (cached !== undefined) {
+        return cached;
       }
 
       const buffer = await fs.readFile(caminho);
@@ -471,12 +581,12 @@ export class PastasService {
 
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) {
-        return null;
+        return cacheAndReturn(null);
       }
 
       const worksheet = workbook.Sheets[sheetName];
       if (!worksheet) {
-        return null;
+        return cacheAndReturn(null);
       }
 
       const rawRows = XLSX.utils.sheet_to_json(worksheet, {
@@ -487,13 +597,13 @@ export class PastasService {
       }) as any[][];
 
       if (!rawRows.length) {
-        return {
+        return cacheAndReturn({
           planilhaId: arquivo.id,
           planilhaNome: arquivo.nomeOriginal,
           sheetName,
           colunas: [],
           itens: [],
-        };
+        });
       }
 
       const headerIndex = rawRows.findIndex(
@@ -505,13 +615,13 @@ export class PastasService {
       );
 
       if (headerIndex === -1) {
-        return {
+        return cacheAndReturn({
           planilhaId: arquivo.id,
           planilhaNome: arquivo.nomeOriginal,
           sheetName,
           colunas: [],
           itens: [],
-        };
+        });
       }
 
       const headerRow = Array.isArray(rawRows[headerIndex])
@@ -525,13 +635,13 @@ export class PastasService {
       );
 
       if (totalColumns === 0) {
-        return {
+        return cacheAndReturn({
           planilhaId: arquivo.id,
           planilhaNome: arquivo.nomeOriginal,
           sheetName,
           colunas: [],
           itens: [],
-        };
+        });
       }
 
       const colunas = this.normalizeHeaders(headerRow, totalColumns);
@@ -576,14 +686,19 @@ export class PastasService {
         });
       });
 
-      return {
+      return cacheAndReturn({
         planilhaId: arquivo.id,
         planilhaNome: arquivo.nomeOriginal,
         sheetName,
         colunas,
         itens,
-      };
+      });
     } catch (error) {
+      if (signature) {
+        this.setCachedParsedPlanilha(arquivo.id, signature, null);
+      } else {
+        this.invalidateCachedParsedPlanilha(arquivo.id);
+      }
       this.logger.warn(
         `Falha ao processar planilha "${arquivo.nomeOriginal}" da pasta "${pasta.nome}": ${
           error instanceof Error ? error.message : error
@@ -591,6 +706,50 @@ export class PastasService {
       );
       return null;
     }
+  }
+
+  private getCachedParsedPlanilha(
+    planilhaId: string,
+    signature: string,
+  ): ParsedPlanilha | null | undefined {
+    const entry = this.planilhaCache.get(planilhaId);
+    if (!entry) {
+      return undefined;
+    }
+
+    if (entry.expiresAt <= Date.now() || entry.signature !== signature) {
+      this.planilhaCache.delete(planilhaId);
+      return undefined;
+    }
+
+    return entry.parsed;
+  }
+
+  private setCachedParsedPlanilha(
+    planilhaId: string,
+    signature: string,
+    parsed: ParsedPlanilha | null,
+  ): void {
+    if (this.planilhaCache.has(planilhaId)) {
+      this.planilhaCache.delete(planilhaId);
+    }
+
+    if (this.planilhaCache.size >= PLANILHA_CACHE_MAX_ITEMS) {
+      const oldestKey = this.planilhaCache.keys().next().value;
+      if (oldestKey) {
+        this.planilhaCache.delete(oldestKey);
+      }
+    }
+
+    this.planilhaCache.set(planilhaId, {
+      signature,
+      expiresAt: Date.now() + PLANILHA_CACHE_TTL_MS,
+      parsed,
+    });
+  }
+
+  private invalidateCachedParsedPlanilha(planilhaId: string): void {
+    this.planilhaCache.delete(planilhaId);
   }
 
   private normalizeHeaders(headerRow: any[], totalColumns: number): string[] {
@@ -692,6 +851,54 @@ export class PastasService {
     return !!value && value.trim().length > 0;
   }
 
+  private hasPlanilhaInPayload(files?: PastaFilesPayload): boolean {
+    if (!files) {
+      return false;
+    }
+    return Boolean(files.planilha?.length || files.planilhas?.length);
+  }
+
+  private emitPastaRealtime(
+    action: SyncAction,
+    pastaId: string,
+    actorId?: number,
+    options?: {
+      includePlanilhas?: boolean;
+      metadata?: Record<string, unknown>;
+    },
+  ): void {
+    this.syncRealtimeService.emitDomainChange({
+      scope: "pastas",
+      action,
+      entityId: pastaId,
+      entityType: "pasta",
+      actorId: actorId ?? null,
+      metadata: options?.metadata,
+    });
+
+    if (options?.includePlanilhas) {
+      this.syncRealtimeService.emitDomainChange({
+        scope: "planilhas",
+        action: "updated",
+        entityType: "planilha",
+        actorId: actorId ?? null,
+        metadata: {
+          pastaId,
+        },
+      });
+    }
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      actorId: actorId ?? null,
+      metadata: {
+        section: "pastas",
+      },
+    });
+  }
+
   private normalizeTags(tags?: string[] | string): string[] {
     if (!tags) {
       return [];
@@ -739,23 +946,31 @@ export class PastasService {
       file: Express.Multer.File,
       tipo: PastaArquivoTipo,
     ) => {
-      const safeName = file.originalname.replace(/\s+/g, "_");
-      const filename = `${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
-      const destino = path.join(pastaDir, filename);
+      try {
+        const buffer = await this.readUploadedFileBuffer(file);
+        await this.validateIncomingFile(file, tipo, buffer);
+        const safeOriginalName = this.sanitizeOriginalFilename(
+          file.originalname,
+        );
+        const filename = this.buildStoredFilename(safeOriginalName);
+        const destino = path.join(pastaDir, filename);
 
-      await fs.writeFile(destino, file.buffer);
+        await this.persistUploadedFileToStorage(file, destino, buffer);
 
-      const relativePath = path.join(pasta.id, filename);
+        const relativePath = path.posix.join(pasta.id, filename);
 
-      arquivosParaSalvar.push(
-        this.pastaArquivoRepository.create({
-          pastaId: pasta.id,
-          tipo,
-          nomeOriginal: file.originalname,
-          caminho: relativePath.replace(/\\/g, "/"),
-          tamanhoBytes: file.size.toString(),
-        }),
-      );
+        arquivosParaSalvar.push(
+          this.pastaArquivoRepository.create({
+            pastaId: pasta.id,
+            tipo,
+            nomeOriginal: safeOriginalName,
+            caminho: relativePath,
+            tamanhoBytes: file.size.toString(),
+          }),
+        );
+      } finally {
+        await this.cleanupTempUpload(file);
+      }
     };
 
     for (const imagem of files.imagens ?? []) {
@@ -798,23 +1013,31 @@ export class PastasService {
       file: Express.Multer.File,
       tipo: PastaArquivoTipo,
     ) => {
-      const safeName = file.originalname.replace(/\s+/g, "_");
-      const filename = `${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
-      const destino = path.join(pastaDir, filename);
+      try {
+        const buffer = await this.readUploadedFileBuffer(file);
+        await this.validateIncomingFile(file, tipo, buffer);
+        const safeOriginalName = this.sanitizeOriginalFilename(
+          file.originalname,
+        );
+        const filename = this.buildStoredFilename(safeOriginalName);
+        const destino = path.join(pastaDir, filename);
 
-      await fs.writeFile(destino, file.buffer);
+        await this.persistUploadedFileToStorage(file, destino, buffer);
 
-      const relativePath = path.join(pasta.id, filename);
+        const relativePath = path.posix.join(pasta.id, filename);
 
-      arquivosParaSalvar.push(
-        manager.create(PastaArquivo, {
-          pastaId: pasta.id,
-          tipo,
-          nomeOriginal: file.originalname,
-          caminho: relativePath.replace(/\\/g, "/"),
-          tamanhoBytes: file.size.toString(),
-        }),
-      );
+        arquivosParaSalvar.push(
+          manager.create(PastaArquivo, {
+            pastaId: pasta.id,
+            tipo,
+            nomeOriginal: safeOriginalName,
+            caminho: relativePath,
+            tamanhoBytes: file.size.toString(),
+          }),
+        );
+      } finally {
+        await this.cleanupTempUpload(file);
+      }
     };
 
     for (const imagem of files.imagens ?? []) {
@@ -849,9 +1072,261 @@ export class PastasService {
   }
 
   private async deleteArquivoDoDisco(caminhoRelativo: string): Promise<void> {
-    const caminho = path.join(UPLOAD_ROOT, caminhoRelativo);
+    const caminho = this.resolveStoragePath(caminhoRelativo);
     if (existsSync(caminho)) {
       await fs.unlink(caminho).catch(() => undefined);
+    }
+  }
+
+  private async validateIncomingFile(
+    file: Express.Multer.File,
+    tipo: PastaArquivoTipo,
+    fileBuffer?: Buffer,
+  ): Promise<void> {
+    const buffer = fileBuffer ?? (await this.readUploadedFileBuffer(file));
+    if (!buffer.length) {
+      throw new BadRequestException("Arquivo inválido ou vazio");
+    }
+
+    if (tipo === PastaArquivoTipo.IMAGEM) {
+      await FileValidator.validateImage(buffer);
+      return;
+    }
+
+    await this.validateSpreadsheetFile(file, buffer);
+  }
+
+  private async validateSpreadsheetFile(
+    file: Express.Multer.File,
+    buffer: Buffer,
+  ): Promise<void> {
+    const extension = path.extname(file.originalname || "").toLowerCase();
+    if (!ALLOWED_SPREADSHEET_EXTENSIONS.has(extension)) {
+      throw new BadRequestException(
+        "Formato de planilha inválido. Use .xlsx, .xls ou .csv.",
+      );
+    }
+
+    const detectedMime = await FileValidator.detectFileType(buffer);
+    if (detectedMime) {
+      if (!ALLOWED_SPREADSHEET_MIME_TYPES.has(detectedMime)) {
+        throw new BadRequestException(
+          `Tipo de planilha inválido (${detectedMime}).`,
+        );
+      }
+      return;
+    }
+
+    if (extension !== ".csv" || !this.looksLikeCsv(buffer)) {
+      throw new BadRequestException(
+        "Não foi possível validar a planilha enviada com segurança.",
+      );
+    }
+  }
+
+  private async readUploadedFileBuffer(
+    file: Express.Multer.File,
+  ): Promise<Buffer> {
+    if (file?.buffer?.length) {
+      return file.buffer;
+    }
+
+    if (file?.path) {
+      try {
+        return await fs.readFile(file.path);
+      } catch {
+        throw new BadRequestException(
+          "Arquivo temporário não encontrado para processamento.",
+        );
+      }
+    }
+
+    throw new BadRequestException("Arquivo inválido ou vazio");
+  }
+
+  private async persistUploadedFileToStorage(
+    file: Express.Multer.File,
+    destinationPath: string,
+    fallbackBuffer: Buffer,
+  ): Promise<void> {
+    if (file?.path) {
+      try {
+        await fs.rename(file.path, destinationPath);
+        return;
+      } catch (error: unknown) {
+        if ((error as { code?: string })?.code !== "EXDEV") {
+          throw error;
+        }
+        await fs.writeFile(destinationPath, fallbackBuffer);
+        await this.cleanupTempUpload(file);
+        return;
+      }
+    }
+
+    await fs.writeFile(destinationPath, fallbackBuffer);
+  }
+
+  private async cleanupTempUpload(file: Express.Multer.File): Promise<void> {
+    if (!file?.path) {
+      return;
+    }
+    if (!existsSync(file.path)) {
+      return;
+    }
+    await fs.unlink(file.path).catch(() => undefined);
+  }
+
+  private looksLikeCsv(buffer: Buffer): boolean {
+    const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+    for (const byte of sample) {
+      if (byte === 0) {
+        return false;
+      }
+    }
+
+    const text = sample.toString("utf8");
+    if (!text.trim()) {
+      return false;
+    }
+
+    return /[,;\t]/.test(text) && /\r?\n/.test(text);
+  }
+
+  private sanitizeOriginalFilename(originalName: string): string {
+    const baseName = path.basename(originalName || "arquivo");
+    const sanitized = baseName
+      .normalize("NFKC")
+      .replace(/[^\w.\-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^\.+/, "")
+      .slice(0, 128);
+
+    return sanitized || "arquivo";
+  }
+
+  private buildStoredFilename(safeOriginalName: string): string {
+    const extension = path.extname(safeOriginalName).toLowerCase().slice(0, 10);
+    return `${Date.now()}-${randomUUID().slice(0, 8)}${extension}`;
+  }
+
+  private resolveStoragePath(relativePath: string): string {
+    const normalizedRelativePath = relativePath
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    if (!normalizedRelativePath) {
+      throw new BadRequestException("Caminho de arquivo inválido");
+    }
+    const absolutePath = path.resolve(
+      UPLOAD_ROOT_RESOLVED,
+      normalizedRelativePath,
+    );
+
+    if (
+      absolutePath !== UPLOAD_ROOT_RESOLVED &&
+      !absolutePath.startsWith(`${UPLOAD_ROOT_RESOLVED}${path.sep}`)
+    ) {
+      throw new BadRequestException("Caminho de arquivo inválido");
+    }
+
+    return absolutePath;
+  }
+
+  private async bumpReadCachesVersion(): Promise<void> {
+    await Promise.allSettled([
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.PASTAS_LIST),
+      this.bumpCacheVersion(CACHE_VERSION_KEYS.APP_GLOBAL_SEARCH),
+    ]);
+  }
+
+  private async bumpCacheVersion(versionKey: string): Promise<void> {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    try {
+      const raw = await this.cacheManager.get<number | string>(versionKey);
+      const current = Number(raw);
+      const next =
+        Number.isFinite(current) && current > 0
+          ? current + 1
+          : CACHE_VERSION_INITIAL + 1;
+      await this.cacheManager.set(versionKey, next);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao invalidar cache (${versionKey}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async getCacheVersion(versionKey: string): Promise<number> {
+    if (!this.cacheManager) {
+      return CACHE_VERSION_INITIAL;
+    }
+
+    try {
+      const raw = await this.cacheManager.get<number | string>(versionKey);
+      const parsed = Number(raw);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        return parsed;
+      }
+      return CACHE_VERSION_INITIAL;
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao obter versão de cache (${versionKey}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return CACHE_VERSION_INITIAL;
+    }
+  }
+
+  private async getFromCache<T>(key: string): Promise<T | undefined> {
+    if (!this.cacheManager) {
+      return undefined;
+    }
+
+    const namespace = "pastas";
+    try {
+      const cached = await this.cacheManager.get<T>(key);
+      if (cached === undefined || cached === null) {
+        this.runtimeMetricsService?.recordCacheMiss(namespace);
+      } else {
+        this.runtimeMetricsService?.recordCacheHit(namespace);
+      }
+      return cached ?? undefined;
+    } catch (error) {
+      this.runtimeMetricsService?.recordCacheError(namespace);
+      this.logger.warn(
+        `Falha ao ler cache (${key}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return undefined;
+    }
+  }
+
+  private async setInCache(
+    key: string,
+    value: unknown,
+    ttlSeconds: number,
+  ): Promise<void> {
+    if (!this.cacheManager) {
+      return;
+    }
+
+    const namespace = "pastas";
+    try {
+      await this.cacheManager.set(key, value, ttlSeconds);
+      this.runtimeMetricsService?.recordCacheSet(namespace);
+    } catch (error) {
+      this.runtimeMetricsService?.recordCacheError(namespace);
+      this.logger.warn(
+        `Falha ao gravar cache (${key}): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 

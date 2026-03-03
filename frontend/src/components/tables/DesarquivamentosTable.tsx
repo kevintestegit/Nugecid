@@ -93,16 +93,16 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
     }
   }
 
-  const isExpired = (dataSolicitacao: string) => {
-    // Calculate based on dataSolicitacao + 30 days
-    const deadline = new Date(dataSolicitacao)
+  const isExpired = (dataReferencia: string) => {
+    // Calculate based on creation date + 30 days
+    const deadline = new Date(dataReferencia)
     deadline.setDate(deadline.getDate() + 30)
     return deadline < new Date()
   }
 
-  const getDaysUntilExpiration = (dataSolicitacao: string) => {
+  const getDaysUntilExpiration = (dataReferencia: string) => {
     const today = new Date()
-    const deadline = new Date(dataSolicitacao)
+    const deadline = new Date(dataReferencia)
     deadline.setDate(deadline.getDate() + 30)
     const diffTime = deadline.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -230,7 +230,7 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
                   <SortButton field="status">Status</SortButton>
                 </TableHead>
                 <TableHead>
-                  <SortButton field="dataSolicitacao">Data Solicitação</SortButton>
+                  <SortButton field="createdAt">Data Criação</SortButton>
                 </TableHead>
                 <TableHead>
                   <SortButton field="setorDemandante">Setor</SortButton>
@@ -240,8 +240,9 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
             </TableHeader>
             <TableBody>
               {data.map((item) => {
-                const expired = isExpired(item.dataSolicitacao)
-                const daysUntilExpiration = getDaysUntilExpiration(item.dataSolicitacao)
+                const dataReferencia = item.createdAt || item.dataSolicitacao
+                const expired = isExpired(dataReferencia)
+                const daysUntilExpiration = getDaysUntilExpiration(dataReferencia)
                 
                 return (
                   <TableRow 
@@ -295,7 +296,7 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
                     <TableCell>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Calendar className="h-4 w-4" />
-                        {formatDate(item.dataSolicitacao)}
+                        {formatDate(dataReferencia)}
                       </div>
                     </TableCell>
                     

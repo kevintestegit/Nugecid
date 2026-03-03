@@ -27,11 +27,10 @@ RUN apk add --no-cache postgresql-client
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
 
 # Copy assets (logos for PDF/DOCX generation)
 COPY --from=builder /app/src/assets ./src/assets

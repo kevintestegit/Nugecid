@@ -31,6 +31,10 @@ import {
   useDownloadTermoDocx,
 } from "@/hooks/useDesarquivamentos";
 import {
+  useDesarquivamentoHistorico,
+  type HistoricoItem,
+} from "@/hooks/useDesarquivamentoHistorico";
+import {
   getStatusLabel,
   getTipoDesarquivamentoLabel,
   formatDate,
@@ -42,10 +46,125 @@ import { printRearquivamento } from "./print-templates";
 import brasaorn from "@/components/img/Brasão-RN.png";
 import brasaoitep from "@/components/img/brasao-itep-optimized.png";
 import { getInstitutoLabel } from "@/constants/institutos";
+import { getAuthHeader } from "@/utils/tokenStorage";
+import axios from "axios";
+import type {
+  Desarquivamento,
+  StatusDesarquivamento,
+  TipoDesarquivamento,
+} from "@/types";
 interface DesarquivamentoDetailModalProps {
   id: number;
   onClose: () => void;
 }
+
+/** Shape of a related record returned by the /api/nugecid/:id/related endpoint */
+interface RelatedRecord {
+  id: number;
+  status?: string;
+  tipoDocumento?: string;
+  tipoDesarquivamento?: TipoDesarquivamento;
+  nomeCompleto?: string;
+  numeroNicLaudoAuto?: string;
+  quantidadeItens?: number;
+  itens?: Array<{
+    tipo?: string;
+    tipoDocumento?: string;
+    descricaoTipo?: string;
+    nome?: string;
+    registro?: string;
+    titulo?: string;
+    observacao?: string;
+    descricao?: string;
+    detalhe?: string;
+  }>;
+}
+
+interface DetailRowData {
+  index: number;
+  type: string;
+  name: string;
+  code: string;
+  observation: string;
+}
+
+const STATUS_ALIAS_MAP: Record<string, string> = {
+  REARQUIVADO: "REARQUIVAMENTO_SOLICITADO",
+  REARQUIVAMENTO: "REARQUIVAMENTO_SOLICITADO",
+};
+
+const STATUS_CANDIDATES = [
+  "REARQUIVAMENTO_SOLICITADO",
+  "RETIRADO_PELO_SETOR",
+  "NAO_LOCALIZADO",
+  "NAO_COLETADO",
+  "DESARQUIVADO",
+  "FINALIZADO",
+  "SOLICITADO",
+  "REARQUIVADO",
+  "REARQUIVAMENTO",
+];
+
+const isValidTimestamp = (value?: string): value is string => {
+  if (!value) return false;
+  return !Number.isNaN(new Date(value).getTime());
+};
+
+const normalizeStatusValue = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, "_");
+  if (!normalized) return null;
+
+  return STATUS_ALIAS_MAP[normalized] ?? normalized;
+};
+
+const normalizeComparableText = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+
+const extractStatusFromDetailsText = (detailsText: unknown): string | null => {
+  if (typeof detailsText !== "string" || !detailsText.trim()) return null;
+
+  const comparableText = normalizeComparableText(detailsText);
+
+  for (const statusCandidate of STATUS_CANDIDATES) {
+    const candidate = normalizeComparableText(statusCandidate);
+    const candidateWithSpaces = candidate.replace(/_/g, " ");
+
+    if (
+      comparableText.includes(candidate) ||
+      comparableText.includes(candidateWithSpaces)
+    ) {
+      return normalizeStatusValue(statusCandidate);
+    }
+  }
+
+  return null;
+};
+
+const extractStatusFromHistoricoItem = (historyItem: HistoricoItem): string | null => {
+  const statusChange = historyItem.details?.changes?.status;
+
+  if (statusChange && typeof statusChange === "object") {
+    const changeRecord = statusChange as { to?: unknown; from?: unknown };
+    const normalizedFromChange = normalizeStatusValue(
+      changeRecord.to ?? changeRecord.from,
+    );
+    if (normalizedFromChange) {
+      return normalizedFromChange;
+    }
+  }
+
+  const normalizedStatusChange = normalizeStatusValue(statusChange);
+  if (normalizedStatusChange) {
+    return normalizedStatusChange;
+  }
+
+  return extractStatusFromDetailsText(historyItem.details?.details);
+};
 
 export const DesarquivamentoDetailModal: React.FC<
   DesarquivamentoDetailModalProps
@@ -58,6 +177,7 @@ export const DesarquivamentoDetailModal: React.FC<
   const comments = commentsResponse?.data ?? [];
   const addCommentMutation = useAddDesarquivamentoComment(id);
   const downloadDocxMutation = useDownloadTermoDocx();
+  const { data: historico = [] } = useDesarquivamentoHistorico(id);
   const [commentText, setCommentText] = useState("");
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
@@ -154,10 +274,13 @@ export const DesarquivamentoDetailModal: React.FC<
       await addCommentMutation.mutateAsync(trimmed);
       setCommentText("");
       toast.success("Comentário adicionado com sucesso.");
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        "Não foi possível adicionar o comentário.";
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.message as string | undefined) ||
+          "Não foi possível adicionar o comentário."
+        : error instanceof Error
+          ? error.message
+          : "Não foi possível adicionar o comentário.";
       toast.error(message);
     }
   };
@@ -172,6 +295,86 @@ export const DesarquivamentoDetailModal: React.FC<
     [],
   );
 
+  const movimentacaoDates = useMemo(() => {
+    const normalizedCurrentStatus = normalizeStatusValue(item?.status);
+
+    const fallbackDataDesarquivamentoFromStatus =
+      isValidTimestamp(item?.updatedAt) &&
+      !!normalizedCurrentStatus &&
+      [
+        "DESARQUIVADO",
+        "REARQUIVAMENTO_SOLICITADO",
+        "FINALIZADO",
+        "RETIRADO_PELO_SETOR",
+      ].includes(normalizedCurrentStatus)
+        ? item.updatedAt
+        : undefined;
+
+    const fallbackDataDevolucaoFromStatus =
+      isValidTimestamp(item?.updatedAt) &&
+      !!normalizedCurrentStatus &&
+      ["REARQUIVAMENTO_SOLICITADO", "FINALIZADO"].includes(
+        normalizedCurrentStatus,
+      )
+        ? item.updatedAt
+        : undefined;
+
+    const fallback = {
+      dataDesarquivamentoSAG:
+        item?.dataDesarquivamentoSAG || fallbackDataDesarquivamentoFromStatus,
+      dataDevolucaoSetor:
+        item?.dataDevolucaoSetor || fallbackDataDevolucaoFromStatus,
+    };
+
+    if (!item || historico.length === 0) {
+      return fallback;
+    }
+
+    const statusTimeline = [...historico]
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      )
+      .map((historyItem) => ({
+        timestamp: historyItem.timestamp,
+        status: extractStatusFromHistoricoItem(historyItem),
+      }))
+      .filter(
+        (
+          event,
+        ): event is {
+          timestamp: string;
+          status: string;
+        } => isValidTimestamp(event.timestamp) && !!event.status,
+      );
+
+    const findFirstStatusTimestamp = (
+      targetStatuses: readonly string[],
+    ): string | undefined =>
+      statusTimeline.find((event) => targetStatuses.includes(event.status))
+        ?.timestamp;
+
+    const historyDataDesarquivamento = findFirstStatusTimestamp([
+      "DESARQUIVADO",
+    ]);
+
+    const historyDataDevolucaoSetor = findFirstStatusTimestamp([
+      "REARQUIVAMENTO_SOLICITADO",
+      "FINALIZADO",
+    ]);
+
+    return {
+      dataDesarquivamentoSAG:
+        item.dataDesarquivamentoSAG ||
+        historyDataDesarquivamento ||
+        fallbackDataDesarquivamentoFromStatus,
+      dataDevolucaoSetor:
+        item.dataDevolucaoSetor ||
+        historyDataDevolucaoSetor ||
+        fallbackDataDevolucaoFromStatus,
+    };
+  }, [historico, item]);
+
   const handlePrintDesarquivamento = async () => {
     if (!item) {
       toast.error("Nao foi possivel localizar os dados para gerar o termo.");
@@ -182,7 +385,7 @@ export const DesarquivamentoDetailModal: React.FC<
       // Buscar registros relacionados pelo mesmo número de processo
       const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          ...getAuthHeader(),
         },
       });
 
@@ -193,12 +396,14 @@ export const DesarquivamentoDetailModal: React.FC<
       const relatedData = await relatedResponse.json();
       const relatedRecords = relatedData.success ? relatedData.data : [item];
 
-      const eligibleRecords = (relatedRecords || []).filter((record: any) => {
-        const statusValue = String(record?.status ?? "")
-          .trim()
-          .toUpperCase();
-        return statusValue === "DESARQUIVADO";
-      });
+      const eligibleRecords = (relatedRecords || []).filter(
+        (record: RelatedRecord) => {
+          const statusValue = String(record?.status ?? "")
+            .trim()
+            .toUpperCase();
+          return statusValue === "DESARQUIVADO";
+        },
+      );
 
       if (!eligibleRecords.length) {
         toast.error(
@@ -235,9 +440,7 @@ export const DesarquivamentoDetailModal: React.FC<
         user?.nome || user?.usuario || "Usuário não identificado",
       );
       const matricula = escapeHtml(
-        (user as any)?.matricula ||
-          (user as any)?.matriculaFuncionario ||
-          "Matrícula não informada",
+        user?.matricula || "Matrícula não informada",
       );
       const assinaturaDate = new Date();
       const dataAssinatura = escapeHtml(
@@ -252,8 +455,8 @@ export const DesarquivamentoDetailModal: React.FC<
       );
 
       // Gerar linhas para todos os registros elegíveis com numeração sequencial
-      const detailRows = eligibleRecords
-        .map((record: any, globalIndex: number) => {
+      const detailRows: DetailRowData[] = eligibleRecords
+        .map((record: RelatedRecord, globalIndex: number) => {
           const rawItems = Array.isArray(record?.itens) ? record.itens : [];
           const identifiers = (record.numeroNicLaudoAuto || "")
             .split(/[,;]+/)
@@ -276,7 +479,9 @@ export const DesarquivamentoDetailModal: React.FC<
 
           const baseType = escapeHtml(
             record.tipoDocumento ||
-              getTipoDesarquivamentoLabel(record.tipoDesarquivamento),
+              (record.tipoDesarquivamento
+                ? getTipoDesarquivamentoLabel(record.tipoDesarquivamento)
+                : ""),
           );
 
           // Para cada registro, gerar as linhas correspondentes
@@ -326,12 +531,12 @@ export const DesarquivamentoDetailModal: React.FC<
       );
       const tipoDocumentoPrincipal = escapeHtml(
         item.tipoDocumento ||
-          getTipoDesarquivamentoLabel(item.tipoDesarquivamento as any),
+          getTipoDesarquivamentoLabel(item.tipoDesarquivamento),
       );
       const nomeRegistro = escapeHtml(item.nomeCompleto ?? "-");
 
       const rowsHtml = detailRows
-        .map((row: any) => {
+        .map((row: DetailRowData) => {
           const isFirstRow = row.index === 1;
           const typeCell = isFirstRow
             ? placeholderTemplate.tipoDocumentoPrimeiroItem
@@ -708,7 +913,7 @@ export const DesarquivamentoDetailModal: React.FC<
       // Buscar registros relacionados pelo mesmo número de processo com status REARQUIVAMENTO_SOLICITADO
       const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          ...getAuthHeader(),
         },
       });
 
@@ -720,12 +925,14 @@ export const DesarquivamentoDetailModal: React.FC<
       const relatedRecords = relatedData.success ? relatedData.data : [item];
 
       // Filtrar apenas registros com status REARQUIVAMENTO_SOLICITADO
-      const eligibleRecords = (relatedRecords || []).filter((record: any) => {
-        const statusValue = String(record?.status ?? "")
-          .trim()
-          .toUpperCase();
-        return statusValue === "REARQUIVAMENTO_SOLICITADO";
-      });
+      const eligibleRecords = (relatedRecords || []).filter(
+        (record: RelatedRecord) => {
+          const statusValue = String(record?.status ?? "")
+            .trim()
+            .toUpperCase();
+          return statusValue === "REARQUIVAMENTO_SOLICITADO";
+        },
+      );
 
       if (!eligibleRecords.length) {
         toast.error(
@@ -755,9 +962,7 @@ export const DesarquivamentoDetailModal: React.FC<
         user?.nome || user?.usuario || "Usuário não identificado",
       );
       const matricula = escapeHtml(
-        (user as any)?.matricula ||
-          (user as any)?.matriculaFuncionario ||
-          "Matrícula não informada",
+        user?.matricula || "Matrícula não informada",
       );
       const assinaturaDate = new Date();
       const dataAssinatura = escapeHtml(
@@ -777,10 +982,12 @@ export const DesarquivamentoDetailModal: React.FC<
       const dataHoraRecebimento = escapeHtml(formatDate(new Date()) || "-");
 
       // Montar lista de itens para o template (NIC/Laudo no campo NÚMERO, tipoDocumento - NomeCompleto no campo DESCRIÇÃO)
-      const itens = eligibleRecords.map((record: any) => {
+      const itens = eligibleRecords.map((record: RelatedRecord) => {
         const tipo =
           record.tipoDocumento ||
-          getTipoDesarquivamentoLabel(record.tipoDesarquivamento) ||
+          (record.tipoDesarquivamento
+            ? getTipoDesarquivamentoLabel(record.tipoDesarquivamento)
+            : "") ||
           "";
         const nome = record.nomeCompleto || "";
         const descricao =
@@ -864,9 +1071,7 @@ export const DesarquivamentoDetailModal: React.FC<
                     Tipo
                   </div>
                   <div className="text-lg font-semibold text-gray-900">
-                    {getTipoDesarquivamentoLabel(
-                      item.tipoDesarquivamento as any,
-                    )}
+                    {getTipoDesarquivamentoLabel(item.tipoDesarquivamento)}
                   </div>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -874,17 +1079,15 @@ export const DesarquivamentoDetailModal: React.FC<
                     Status
                   </div>
                   <div className="text-lg font-semibold text-gray-900">
-                    {getStatusLabel(item.status as any)}
+                    {getStatusLabel(item.status)}
                   </div>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="text-xs text-gray-600 font-medium mb-1">
-                    Solicitação
+                    Criação
                   </div>
                   <div className="text-lg font-semibold text-gray-900">
-                    {formatDate(
-                      item.dataSolicitacao || (item as any).createdAt,
-                    )}
+                    {formatDate(item.createdAt || item.dataSolicitacao)}
                   </div>
                 </div>
                 {item.urgente && (
@@ -927,15 +1130,15 @@ export const DesarquivamentoDetailModal: React.FC<
                     label="Tipo de Documento"
                     value={item.tipoDocumento}
                   />
-                  {(item as any).quantidadeItens && (
+                  {item.quantidadeItens && (
                     <DetailRow
                       label="Quantidade de Itens"
-                      value={(item as any).quantidadeItens}
+                      value={item.quantidadeItens}
                     />
                   )}
                   <div className="md:col-span-2">
                     <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                      Descrição da Solicitação
+                      Observações
                     </div>
                     <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
                       {item.dadosAdicionais || "-"}
@@ -983,13 +1186,13 @@ export const DesarquivamentoDetailModal: React.FC<
                   </h4>
                 </div>
                 <div className="p-5 space-y-4">
-                  {(item as any).justificativa && (
+                  {item.justificativa && (
                     <div>
                       <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
                         Justificativa
                       </div>
                       <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
-                        {(item as any).justificativa}
+                        {item.justificativa}
                       </div>
                     </div>
                   )}
@@ -998,21 +1201,20 @@ export const DesarquivamentoDetailModal: React.FC<
                     value={item.finalidadeDesarquivamento}
                     fullWidth
                   />
-                  {((item as any).prazoDesarquivamento ||
-                    (item as any).prazoVencimento) && (
+                  {(item.prazoDesarquivamento || item.prazoVencimento) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-3 border-t border-gray-200">
-                      {(item as any).prazoDesarquivamento && (
+                      {item.prazoDesarquivamento && (
                         <DetailRow
                           label="Prazo de Desarquivamento"
-                          value={formatDate((item as any).prazoDesarquivamento)}
+                          value={formatDate(item.prazoDesarquivamento)}
                         />
                       )}
-                      {(item as any).prazoVencimento && (
+                      {item.prazoVencimento && (
                         <DetailRow
                           label="Prazo de Vencimento"
-                          value={formatDate((item as any).prazoVencimento)}
+                          value={formatDate(item.prazoVencimento)}
                           highlight={
-                            new Date((item as any).prazoVencimento) < new Date()
+                            new Date(item.prazoVencimento) < new Date()
                           }
                         />
                       )}
@@ -1031,35 +1233,33 @@ export const DesarquivamentoDetailModal: React.FC<
                 </div>
                 <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">
                   <DetailRow
-                    label="Data de Solicitação"
-                    value={formatDate(
-                      item.dataSolicitacao || (item as any).createdAt,
-                    )}
+                    label="Data de Criação"
+                    value={formatDate(item.createdAt || item.dataSolicitacao)}
                   />
                   <DetailRow
                     label="Data Desarquivamento - SAG"
                     value={
-                      item.dataDesarquivamentoSAG
-                        ? formatDate(item.dataDesarquivamentoSAG)
+                      movimentacaoDates.dataDesarquivamentoSAG
+                        ? formatDate(movimentacaoDates.dataDesarquivamentoSAG)
                         : "Aguardando"
                     }
-                    highlight={!item.dataDesarquivamentoSAG}
+                    highlight={!movimentacaoDates.dataDesarquivamentoSAG}
                   />
                   <DetailRow
                     label="Data Devolução pelo Setor"
                     value={
-                      item.dataDevolucaoSetor
-                        ? formatDate(item.dataDevolucaoSetor)
+                      movimentacaoDates.dataDevolucaoSetor
+                        ? formatDate(movimentacaoDates.dataDevolucaoSetor)
                         : "Aguardando"
                     }
-                    highlight={!item.dataDevolucaoSetor}
+                    highlight={!movimentacaoDates.dataDevolucaoSetor}
                   />
                 </div>
               </div>
 
               {/* Prorrogação */}
               {(item.solicitacaoProrrogacao ||
-                (item as any).solicitacaoProrrogacaoTexto) && (
+                item.solicitacaoProrrogacaoTexto) && (
                 <div className="bg-amber-50 rounded-lg border border-amber-200 overflow-hidden">
                   <div className="bg-amber-100 border-b border-amber-200 px-4 py-3 flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-amber-700" />
@@ -1072,13 +1272,13 @@ export const DesarquivamentoDetailModal: React.FC<
                       label="Prorrogação Solicitada"
                       value={item.solicitacaoProrrogacao ? "SIM" : "NÃO"}
                     />
-                    {(item as any).solicitacaoProrrogacaoTexto && (
+                    {item.solicitacaoProrrogacaoTexto && (
                       <div className="mt-3">
                         <div className="text-sm font-semibold text-amber-800 mb-2">
                           Justificativa:
                         </div>
                         <div className="text-sm text-gray-800 bg-white rounded-lg p-3 border border-amber-200">
-                          {(item as any).solicitacaoProrrogacaoTexto}
+                          {item.solicitacaoProrrogacaoTexto}
                         </div>
                       </div>
                     )}
@@ -1287,7 +1487,7 @@ const DetailRow = ({
   copyable = false,
 }: {
   label: string;
-  value?: any;
+  value?: string | number | boolean | null;
   fullWidth?: boolean;
   highlight?: boolean;
   copyable?: boolean;
@@ -1367,7 +1567,13 @@ const DetailRow = ({
   );
 };
 
-const Detail = ({ label, value }: { label: string; value?: any }) => (
+const Detail = ({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | number | boolean | null;
+}) => (
   <div>
     <div className="text-xs text-gray-500 mb-1">{label}</div>
     <div className="text-sm text-gray-900 break-words">{value || "-"}</div>

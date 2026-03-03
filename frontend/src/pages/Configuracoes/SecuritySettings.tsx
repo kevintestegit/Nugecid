@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -9,7 +9,7 @@ import {
   Label,
   Switch,
   Button,
-} from '@/components/ui';
+} from "@/components/ui";
 import {
   Shield,
   Clock,
@@ -19,11 +19,12 @@ import {
   RefreshCw,
   AlertCircle,
   Save,
-} from 'lucide-react';
-import { IpMonitoring } from '@/components/Security/IpMonitoring';
-import { apiService } from '@/services/api';
-import backupService from '@/services/backupService';
-import { toast } from 'sonner';
+} from "lucide-react";
+import { IpMonitoring } from "@/components/Security/IpMonitoring";
+import { apiService } from "@/services/api";
+import backupService from "@/services/backupService";
+import { toast } from "sonner";
+import axios from "axios";
 
 interface BlockedUser {
   id: number;
@@ -47,9 +48,11 @@ export const SecuritySettings: React.FC = () => {
     twoFactorAuth: false,
     passwordExpiry: 90,
     maxLoginAttempts: 5,
-    requireStrongPassword: true
+    requireStrongPassword: true,
   });
-  const [originalConfig, setOriginalConfig] = useState<SecurityConfig | null>(null);
+  const [originalConfig, setOriginalConfig] = useState<SecurityConfig | null>(
+    null,
+  );
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -65,7 +68,10 @@ export const SecuritySettings: React.FC = () => {
     try {
       const response = await backupService.getSystemSettings();
       // Handle both wrapped { success, data } and unwrapped response
-      const data = response?.data ?? response;
+      const rawData = response?.data;
+      const data = (
+        rawData && typeof rawData === "object" ? rawData : response
+      ) as typeof response;
       if (data) {
         const config: SecurityConfig = {
           sessionTimeout: data.sessionTimeout ?? 30,
@@ -78,7 +84,7 @@ export const SecuritySettings: React.FC = () => {
         setOriginalConfig(config);
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações de segurança:', error);
+      console.error("Erro ao carregar configurações de segurança:", error);
     } finally {
       setLoadingSettings(false);
     }
@@ -92,7 +98,7 @@ export const SecuritySettings: React.FC = () => {
         setBlockedUsers(response.data);
       }
     } catch (error) {
-      console.error('Erro ao carregar usuários bloqueados:', error);
+      console.error("Erro ao carregar usuários bloqueados:", error);
     } finally {
       setLoadingBlockedUsers(false);
     }
@@ -114,28 +120,33 @@ export const SecuritySettings: React.FC = () => {
         requireStrongPassword: config.requireStrongPassword,
       });
       setOriginalConfig(config);
-      toast.success('Configurações de segurança salvas');
-    } catch (error: any) {
-      toast.error(error?.message || 'Erro ao salvar configurações');
+      toast.success("Configurações de segurança salvas");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "Erro ao salvar configurações",
+      );
     } finally {
       setSavingSettings(false);
     }
   }, []);
 
   // Auto-save with debounce when config changes
-  const handleConfigChange = useCallback((newConfig: SecurityConfig) => {
-    setSecurityConfig(newConfig);
-    
-    // Clear previous timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-    
-    // Set new timeout to save after 1 second of inactivity
-    saveTimeoutRef.current = setTimeout(() => {
-      saveSettings(newConfig);
-    }, 1000);
-  }, [saveSettings]);
+  const handleConfigChange = useCallback(
+    (newConfig: SecurityConfig) => {
+      setSecurityConfig(newConfig);
+
+      // Clear previous timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Set new timeout to save after 1 second of inactivity
+      saveTimeoutRef.current = setTimeout(() => {
+        saveSettings(newConfig);
+      }, 1000);
+    },
+    [saveSettings],
+  );
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -152,26 +163,34 @@ export const SecuritySettings: React.FC = () => {
       const response = await apiService.unblockUser(userId);
       if (response.success) {
         toast.success(`Usuário ${userName} desbloqueado com sucesso`);
-        setBlockedUsers(prev => prev.filter(u => u.id !== userId));
+        setBlockedUsers((prev) => prev.filter((u) => u.id !== userId));
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Erro ao desbloquear usuário');
+    } catch (error: unknown) {
+      const message = axios.isAxiosError(error)
+        ? (((error.response?.data as Record<string, unknown>)
+            ?.message as string) ?? "Erro ao desbloquear usuário")
+        : "Erro ao desbloquear usuário";
+      toast.error(message);
     } finally {
       setUnblockingUserId(null);
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR');
+    return new Date(dateString).toLocaleString("pt-BR");
   };
 
-  const hasChanges = originalConfig && JSON.stringify(securityConfig) !== JSON.stringify(originalConfig);
+  const hasChanges =
+    originalConfig &&
+    JSON.stringify(securityConfig) !== JSON.stringify(originalConfig);
 
   if (loadingSettings) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
-        <span className="ml-2 text-gray-500">Carregando configurações...</span>
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">
+          Carregando configurações...
+        </span>
       </div>
     );
   }
@@ -208,17 +227,21 @@ export const SecuritySettings: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="session-timeout">Tempo limite da sessão (minutos)</Label>
+            <Label htmlFor="session-timeout">
+              Tempo limite da sessão (minutos)
+            </Label>
             <Input
               id="session-timeout"
               type="number"
               min="5"
               max="480"
               value={securityConfig.sessionTimeout}
-              onChange={(e) => handleConfigChange({ 
-                ...securityConfig, 
-                sessionTimeout: parseInt(e.target.value) || 30 
-              })}
+              onChange={(e) =>
+                handleConfigChange({
+                  ...securityConfig,
+                  sessionTimeout: parseInt(e.target.value) || 30,
+                })
+              }
             />
           </div>
         </CardContent>
@@ -238,17 +261,24 @@ export const SecuritySettings: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Autenticação de dois fatores</Label>
-              <p className="text-sm text-gray-500">Adicionar camada extra de segurança</p>
+              <Label className="text-sm font-medium">
+                Autenticação de dois fatores
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Adicionar camada extra de segurança
+              </p>
             </div>
             <Switch
               checked={securityConfig.twoFactorAuth}
-              onCheckedChange={(checked) => 
-                handleConfigChange({ ...securityConfig, twoFactorAuth: !!checked })
+              onCheckedChange={(checked) =>
+                handleConfigChange({
+                  ...securityConfig,
+                  twoFactorAuth: !!checked,
+                })
               }
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password-expiry">Expiração de senha (dias)</Label>
             <Input
@@ -257,13 +287,15 @@ export const SecuritySettings: React.FC = () => {
               min="30"
               max="365"
               value={securityConfig.passwordExpiry}
-              onChange={(e) => handleConfigChange({ 
-                ...securityConfig, 
-                passwordExpiry: parseInt(e.target.value) || 90 
-              })}
+              onChange={(e) =>
+                handleConfigChange({
+                  ...securityConfig,
+                  passwordExpiry: parseInt(e.target.value) || 90,
+                })
+              }
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="login-attempts">Tentativas de login máximas</Label>
             <Input
@@ -272,22 +304,31 @@ export const SecuritySettings: React.FC = () => {
               min="3"
               max="10"
               value={securityConfig.maxLoginAttempts}
-              onChange={(e) => handleConfigChange({ 
-                ...securityConfig, 
-                maxLoginAttempts: parseInt(e.target.value) || 5 
-              })}
+              onChange={(e) =>
+                handleConfigChange({
+                  ...securityConfig,
+                  maxLoginAttempts: parseInt(e.target.value) || 5,
+                })
+              }
             />
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Senha forte obrigatória</Label>
-              <p className="text-sm text-gray-500">Exigir senhas complexas</p>
+              <Label className="text-sm font-medium">
+                Senha forte obrigatória
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Exigir senhas complexas
+              </p>
             </div>
             <Switch
               checked={securityConfig.requireStrongPassword}
-              onCheckedChange={(checked) => 
-                handleConfigChange({ ...securityConfig, requireStrongPassword: !!checked })
+              onCheckedChange={(checked) =>
+                handleConfigChange({
+                  ...securityConfig,
+                  requireStrongPassword: !!checked,
+                })
               }
             />
           </div>
@@ -313,7 +354,9 @@ export const SecuritySettings: React.FC = () => {
               onClick={loadBlockedUsers}
               disabled={loadingBlockedUsers}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loadingBlockedUsers ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${loadingBlockedUsers ? "animate-spin" : ""}`}
+              />
               Atualizar
             </Button>
           </div>
@@ -321,11 +364,11 @@ export const SecuritySettings: React.FC = () => {
         <CardContent>
           {loadingBlockedUsers ? (
             <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
-              <span className="ml-2 text-gray-500">Carregando...</span>
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-muted-foreground">Carregando...</span>
             </div>
           ) : blockedUsers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <Shield className="h-12 w-12 mb-2 text-green-500" />
               <p className="text-sm">Nenhum usuário bloqueado no momento</p>
             </div>
@@ -341,14 +384,15 @@ export const SecuritySettings: React.FC = () => {
                       <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                      <p className="font-medium text-foreground dark:text-foreground">
                         {user.nome}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-muted-foreground">
                         @{user.usuario}
                       </p>
                       <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                        Bloqueado até: {formatDate(user.bloqueadoAte)} • {user.tentativasLogin} tentativas
+                        Bloqueado até: {formatDate(user.bloqueadoAte)} •{" "}
+                        {user.tentativasLogin} tentativas
                       </p>
                     </div>
                   </div>

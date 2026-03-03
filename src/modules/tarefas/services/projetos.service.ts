@@ -14,6 +14,7 @@ import {
   UpdateMembroProjetoDto,
 } from "../dto";
 import { User } from "../../users/entities/user.entity";
+import { SyncRealtimeService } from "../../sync/sync-realtime.service";
 
 @Injectable()
 export class ProjetosService {
@@ -26,6 +27,7 @@ export class ProjetosService {
     private readonly colunaRepository: Repository<Coluna>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly syncRealtimeService: SyncRealtimeService,
   ) {}
 
   private async isGlobalAdmin(userId: number): Promise<boolean> {
@@ -58,6 +60,14 @@ export class ProjetosService {
 
     // Criar colunas padrão
     await this.createDefaultColumns(savedProjeto.id);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "projetos",
+      action: "created",
+      entityId: savedProjeto.id,
+      entityType: "projeto",
+      actorId: criadorId,
+    });
 
     return this.findOne(savedProjeto.id, criadorId);
   }
@@ -121,6 +131,14 @@ export class ProjetosService {
     Object.assign(projeto, updateProjetoDto);
     await this.projetoRepository.save(projeto);
 
+    this.syncRealtimeService.emitDomainChange({
+      scope: "projetos",
+      action: "updated",
+      entityId: projeto.id,
+      entityType: "projeto",
+      actorId: userId,
+    });
+
     return this.findOne(id, userId);
   }
 
@@ -133,6 +151,14 @@ export class ProjetosService {
     }
 
     await this.projetoRepository.remove(projeto);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "projetos",
+      action: "deleted",
+      entityId: id,
+      entityType: "projeto",
+      actorId: userId,
+    });
   }
 
   async addMembro(
@@ -179,7 +205,21 @@ export class ProjetosService {
       papel: addMembroDto.papel,
     });
 
-    return this.membroProjetoRepository.save(membro);
+    const savedMembro = await this.membroProjetoRepository.save(membro);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "projetos",
+      action: "updated",
+      entityId: projetoId,
+      entityType: "membro-projeto",
+      actorId: userId,
+      metadata: {
+        membroId: savedMembro.id,
+        usuarioId: savedMembro.usuarioId,
+      },
+    });
+
+    return savedMembro;
   }
 
   async updateMembro(
@@ -225,7 +265,21 @@ export class ProjetosService {
     }
 
     Object.assign(membro, updateMembroDto);
-    return this.membroProjetoRepository.save(membro);
+    const savedMembro = await this.membroProjetoRepository.save(membro);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "projetos",
+      action: "updated",
+      entityId: projetoId,
+      entityType: "membro-projeto",
+      actorId: userId,
+      metadata: {
+        membroId: savedMembro.id,
+        usuarioId: savedMembro.usuarioId,
+      },
+    });
+
+    return savedMembro;
   }
 
   async removeMembro(
@@ -257,6 +311,18 @@ export class ProjetosService {
     }
 
     await this.membroProjetoRepository.remove(membro);
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "projetos",
+      action: "updated",
+      entityId: projetoId,
+      entityType: "membro-projeto",
+      actorId: userId,
+      metadata: {
+        membroId,
+        usuarioId: membro.usuarioId,
+      },
+    });
   }
 
   async listarMembros(

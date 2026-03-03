@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
   Label,
   Input,
   Textarea,
-} from '@/components/ui';
+} from "@/components/ui";
 import {
   Megaphone,
   Plus,
@@ -24,36 +24,25 @@ import {
   X,
   Upload,
   Image as ImageIcon,
-} from 'lucide-react';
-import { apiService } from '@/services/api';
-import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/Dialog';
-
-interface Announcement {
-  id: number;
-  title: string;
-  content: string;
-  imageUrl: string | null;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  startDate: string;
-  endDate: string;
-  active: boolean;
-  targetRoles: string[] | null;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: {
-    id: number;
-    nome: string;
-  };
-}
+} from "lucide-react";
+import { apiService } from "@/services/api";
+import axios from "axios";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
+import type { Announcement } from "@/types";
 
 const priorityLabels = {
-  low: { label: 'Baixa', color: 'bg-blue-100 text-blue-800' },
-  medium: { label: 'Média', color: 'bg-yellow-100 text-yellow-800' },
-  high: { label: 'Alta', color: 'bg-orange-100 text-orange-800' },
-  critical: { label: 'Crítica', color: 'bg-red-100 text-red-800' },
+  low: { label: "Baixa", color: "bg-blue-100 text-blue-800" },
+  medium: { label: "Média", color: "bg-yellow-100 text-yellow-800" },
+  high: { label: "Alta", color: "bg-orange-100 text-orange-800" },
+  critical: { label: "Crítica", color: "bg-red-100 text-red-800" },
 };
 
 export const AnnouncementsSettings: React.FC = () => {
@@ -65,12 +54,12 @@ export const AnnouncementsSettings: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    imageUrl: '',
-    priority: 'medium' as 'low' | 'medium' | 'high' | 'critical',
-    startDate: '',
-    endDate: '',
+    title: "",
+    content: "",
+    imageUrl: "",
+    priority: "medium" as "low" | "medium" | "high" | "critical",
+    startDate: "",
+    endDate: "",
     active: true,
     targetRoles: [] as string[],
   });
@@ -86,9 +75,9 @@ export const AnnouncementsSettings: React.FC = () => {
       if (response.success && response.data) {
         setAnnouncements(response.data);
       }
-    } catch (error: any) {
-      console.error('Erro ao carregar avisos:', error);
-      toast.error('Erro ao carregar avisos');
+    } catch (error: unknown) {
+      console.error("Erro ao carregar avisos:", error);
+      toast.error("Erro ao carregar avisos");
     } finally {
       setLoading(false);
     }
@@ -100,7 +89,7 @@ export const AnnouncementsSettings: React.FC = () => {
       setFormData({
         title: announcement.title,
         content: announcement.content,
-        imageUrl: announcement.imageUrl || '',
+        imageUrl: announcement.imageUrl || "",
         priority: announcement.priority,
         startDate: announcement.startDate.slice(0, 16),
         endDate: announcement.endDate.slice(0, 16),
@@ -115,10 +104,10 @@ export const AnnouncementsSettings: React.FC = () => {
       tomorrow.setDate(tomorrow.getDate() + 1);
 
       setFormData({
-        title: '',
-        content: '',
-        imageUrl: '',
-        priority: 'medium',
+        title: "",
+        content: "",
+        imageUrl: "",
+        priority: "medium",
         startDate: now.toISOString().slice(0, 16),
         endDate: tomorrow.toISOString().slice(0, 16),
         active: true,
@@ -140,15 +129,15 @@ export const AnnouncementsSettings: React.FC = () => {
     if (!file) return;
 
     // Validar tipo de arquivo
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      toast.error('Tipo de arquivo não permitido. Use JPEG, PNG, GIF ou WebP.');
+      toast.error("Tipo de arquivo não permitido. Use JPEG, PNG, GIF ou WebP.");
       return;
     }
 
     // Validar tamanho (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Arquivo muito grande. Tamanho máximo: 5MB');
+      toast.error("Arquivo muito grande. Tamanho máximo: 5MB");
       return;
     }
 
@@ -164,17 +153,21 @@ export const AnnouncementsSettings: React.FC = () => {
 
       // Upload para o servidor
       const formDataUpload = new FormData();
-      formDataUpload.append('image', file);
+      formDataUpload.append("image", file);
 
       const response = await apiService.uploadAnnouncementImage(formDataUpload);
 
       if (response.success && response.data?.url) {
         setFormData({ ...formData, imageUrl: response.data.url });
-        toast.success('Imagem enviada com sucesso!');
+        toast.success("Imagem enviada com sucesso!");
       }
-    } catch (error: any) {
-      console.error('Erro ao fazer upload da imagem:', error);
-      toast.error(error.response?.data?.message || 'Erro ao fazer upload da imagem');
+    } catch (error: unknown) {
+      console.error("Erro ao fazer upload da imagem:", error);
+      toast.error(
+        axios.isAxiosError(error)
+          ? error.response?.data?.message || "Erro ao fazer upload da imagem"
+          : "Erro ao fazer upload da imagem",
+      );
       setImagePreview(null);
     } finally {
       setUploading(false);
@@ -182,13 +175,18 @@ export const AnnouncementsSettings: React.FC = () => {
   };
 
   const handleRemoveImage = () => {
-    setFormData({ ...formData, imageUrl: '' });
+    setFormData({ ...formData, imageUrl: "" });
     setImagePreview(null);
   };
 
   const handleSave = async () => {
-    if (!formData.title || !formData.content || !formData.startDate || !formData.endDate) {
-      toast.error('Preencha todos os campos obrigatórios');
+    if (
+      !formData.title ||
+      !formData.content ||
+      !formData.startDate ||
+      !formData.endDate
+    ) {
+      toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
@@ -199,37 +197,42 @@ export const AnnouncementsSettings: React.FC = () => {
         startDate: new Date(formData.startDate).toISOString(),
         endDate: new Date(formData.endDate).toISOString(),
         imageUrl: formData.imageUrl || undefined,
-        targetRoles: formData.targetRoles.length > 0 ? formData.targetRoles : undefined,
+        targetRoles:
+          formData.targetRoles.length > 0 ? formData.targetRoles : undefined,
       };
 
       if (editingId) {
         await apiService.updateAnnouncement(editingId, payload);
-        toast.success('Aviso atualizado com sucesso!');
+        toast.success("Aviso atualizado com sucesso!");
       } else {
         await apiService.createAnnouncement(payload);
-        toast.success('Aviso criado com sucesso!');
+        toast.success("Aviso criado com sucesso!");
       }
 
       handleCloseModal();
       await loadAnnouncements();
-    } catch (error: any) {
-      console.error('Erro ao salvar aviso:', error);
-      toast.error(error.response?.data?.message || 'Erro ao salvar aviso');
+    } catch (error: unknown) {
+      console.error("Erro ao salvar aviso:", error);
+      toast.error(
+        axios.isAxiosError(error)
+          ? error.response?.data?.message || "Erro ao salvar aviso"
+          : "Erro ao salvar aviso",
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Tem certeza que deseja excluir este aviso?')) return;
+    if (!confirm("Tem certeza que deseja excluir este aviso?")) return;
 
     try {
       await apiService.deleteAnnouncement(id);
-      toast.success('Aviso excluído com sucesso!');
+      toast.success("Aviso excluído com sucesso!");
       await loadAnnouncements();
-    } catch (error: any) {
-      console.error('Erro ao excluir aviso:', error);
-      toast.error('Erro ao excluir aviso');
+    } catch (error: unknown) {
+      console.error("Erro ao excluir aviso:", error);
+      toast.error("Erro ao excluir aviso");
     }
   };
 
@@ -238,13 +241,11 @@ export const AnnouncementsSettings: React.FC = () => {
       await apiService.updateAnnouncement(announcement.id, {
         active: !announcement.active,
       });
-      toast.success(
-        announcement.active ? 'Aviso desativado' : 'Aviso ativado'
-      );
+      toast.success(announcement.active ? "Aviso desativado" : "Aviso ativado");
       await loadAnnouncements();
-    } catch (error: any) {
-      console.error('Erro ao alterar status:', error);
-      toast.error('Erro ao alterar status do aviso');
+    } catch (error: unknown) {
+      console.error("Erro ao alterar status:", error);
+      toast.error("Erro ao alterar status do aviso");
     }
   };
 
@@ -268,7 +269,8 @@ export const AnnouncementsSettings: React.FC = () => {
                 Avisos do Sistema
               </CardTitle>
               <CardDescription>
-                Crie e gerencie avisos que serão exibidos para os usuários na tela inicial
+                Crie e gerencie avisos que serão exibidos para os usuários na
+                tela inicial
               </CardDescription>
             </div>
             <Button onClick={() => handleOpenModal()} className="gap-2">
@@ -280,23 +282,24 @@ export const AnnouncementsSettings: React.FC = () => {
         <CardContent>
           {announcements.length === 0 ? (
             <div className="text-center py-12">
-              <Megaphone className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-600 mb-1">Nenhum aviso criado</p>
-              <p className="text-sm text-gray-400">
+              <Megaphone className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+              <p className="text-muted-foreground mb-1">Nenhum aviso criado</p>
+              <p className="text-sm text-muted-foreground/70">
                 Crie um aviso para começar
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {announcements.map((announcement) => {
-                const isActive = announcement.active &&
+                const isActive =
+                  announcement.active &&
                   new Date() >= new Date(announcement.startDate) &&
                   new Date() <= new Date(announcement.endDate);
 
                 return (
                   <div
                     key={announcement.id}
-                    className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -304,37 +307,58 @@ export const AnnouncementsSettings: React.FC = () => {
                           <h3 className="font-semibold text-lg truncate">
                             {announcement.title}
                           </h3>
-                          <Badge className={priorityLabels[announcement.priority].color}>
+                          <Badge
+                            className={
+                              priorityLabels[announcement.priority].color
+                            }
+                          >
                             {priorityLabels[announcement.priority].label}
                           </Badge>
                           {isActive && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-200"
+                            >
                               Ativo
                             </Badge>
                           )}
                           {!announcement.active && (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-600">
+                            <Badge
+                              variant="outline"
+                              className="bg-muted/50 text-muted-foreground"
+                            >
                               Inativo
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                           {announcement.content}
                         </p>
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
-                            {new Date(announcement.startDate).toLocaleDateString('pt-BR')} -{' '}
-                            {new Date(announcement.endDate).toLocaleDateString('pt-BR')}
+                            {new Date(
+                              announcement.startDate,
+                            ).toLocaleDateString("pt-BR")}{" "}
+                            -{" "}
+                            {new Date(announcement.endDate).toLocaleDateString(
+                              "pt-BR",
+                            )}
                           </span>
                           <span>
-                            Por: {announcement.createdBy?.nome}
+                            Por:{" "}
+                            {typeof announcement.createdBy === "object"
+                              ? announcement.createdBy?.nome
+                              : `ID ${announcement.createdBy}`}
                           </span>
                           <span>
-                            {formatDistanceToNow(new Date(announcement.createdAt), {
-                              addSuffix: true,
-                              locale: ptBR,
-                            })}
+                            {formatDistanceToNow(
+                              new Date(announcement.createdAt),
+                              {
+                                addSuffix: true,
+                                locale: ptBR,
+                              },
+                            )}
                           </span>
                         </div>
                       </div>
@@ -343,7 +367,7 @@ export const AnnouncementsSettings: React.FC = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleToggleActive(announcement)}
-                          title={announcement.active ? 'Desativar' : 'Ativar'}
+                          title={announcement.active ? "Desativar" : "Ativar"}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -377,7 +401,7 @@ export const AnnouncementsSettings: React.FC = () => {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? 'Editar Aviso' : 'Novo Aviso'}
+              {editingId ? "Editar Aviso" : "Novo Aviso"}
             </DialogTitle>
           </DialogHeader>
 
@@ -387,7 +411,9 @@ export const AnnouncementsSettings: React.FC = () => {
               <Input
                 id="title"
                 value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
                 placeholder="Ex: Manutenção programada"
                 maxLength={255}
               />
@@ -398,7 +424,9 @@ export const AnnouncementsSettings: React.FC = () => {
               <Textarea
                 id="content"
                 value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, content: e.target.value })
+                }
                 placeholder="Descreva o aviso..."
                 rows={4}
               />
@@ -409,7 +437,7 @@ export const AnnouncementsSettings: React.FC = () => {
               <Label htmlFor="image">Imagem (opcional)</Label>
 
               {imagePreview ? (
-                <div className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                <div className="relative border-2 border-dashed border-border rounded-lg p-4">
                   <img
                     src={imagePreview}
                     alt="Preview"
@@ -425,7 +453,7 @@ export const AnnouncementsSettings: React.FC = () => {
                   </button>
                 </div>
               ) : (
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
+                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-muted-foreground/50 transition-colors">
                   <input
                     type="file"
                     id="image"
@@ -440,21 +468,21 @@ export const AnnouncementsSettings: React.FC = () => {
                   >
                     {uploading ? (
                       <>
-                        <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                        <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
+                        <p className="text-sm text-muted-foreground">
                           Enviando imagem...
                         </p>
                       </>
                     ) : (
                       <>
-                        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                          <Upload className="h-8 w-8 text-gray-400" />
+                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                          <Upload className="h-8 w-8 text-muted-foreground" />
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <p className="text-sm font-medium text-foreground">
                             Clique para fazer upload
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className="text-xs text-muted-foreground">
                             JPEG, PNG, GIF ou WebP (máx. 5MB)
                           </p>
                         </div>
@@ -473,10 +501,14 @@ export const AnnouncementsSettings: React.FC = () => {
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    priority: e.target.value as any,
+                    priority: e.target.value as
+                      | "low"
+                      | "medium"
+                      | "high"
+                      | "critical",
                   })
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-border bg-background text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring"
               >
                 <option value="low">Baixa</option>
                 <option value="medium">Média</option>
