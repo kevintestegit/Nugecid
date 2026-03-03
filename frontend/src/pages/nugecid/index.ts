@@ -1,5 +1,0 @@
-export { default as NugecidListPage } from './NugecidListPage'
-export { default as NugecidCreatePage } from './NugecidCreatePage'
-export { default as NugecidEditPage } from './NugecidEditPage'
-export { default as NugecidDetailPage } from './NugecidDetailPage'
-export { default as DesarquivamentosExcluidosPage } from './DesarquivamentosExcluidosPage'

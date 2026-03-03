@@ -29,10 +29,9 @@ export class StaticAuthMiddleware implements NestMiddleware {
     // Verificar token JWT
     const authHeader = req.headers.authorization;
     const tokenFromCookie = req.cookies?.access_token as string | undefined;
-    const tokenFromQuery = req.query?.token as string | undefined;
     const token = authHeader?.startsWith("Bearer ")
       ? authHeader.substring(7)
-      : tokenFromCookie || tokenFromQuery;
+      : tokenFromCookie;
 
     if (!token) {
       this.logger.warn(
