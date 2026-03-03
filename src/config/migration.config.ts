@@ -8,7 +8,7 @@ const MigrationDataSource = new DataSource({
   host: process.env.DATABASE_HOST || "localhost",
   port: parseInt(process.env.DATABASE_PORT || "5432", 10),
   username: process.env.DATABASE_USERNAME || "postgres",
-  password: process.env.DATABASE_PASSWORD || "@Sanfona1",
+  password: process.env.DATABASE_PASSWORD || "",
   database: process.env.DATABASE_NAME || "sgc_itep",
   ssl:
     process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : false,

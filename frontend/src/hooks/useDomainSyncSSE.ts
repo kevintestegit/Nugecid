@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAccessToken } from "@/utils/tokenStorage";
 
 export interface DomainSyncEventDetail {
   scope: string;
@@ -18,7 +17,6 @@ const MAX_RECONNECT_DELAY_MS = 30000;
 export const useDomainSyncSSE = () => {
   const { user, isAuthenticated } = useAuth();
   const eventSourceRef = useRef<EventSource | null>(null);
-  const useTokenFallbackRef = useRef(false);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -51,11 +49,8 @@ export const useDomainSyncSSE = () => {
       eventSourceRef.current = null;
     }
 
-    const accessToken = useTokenFallbackRef.current ? getAccessToken() : null;
-    const streamUrl = accessToken
-      ? `/api/sync/stream?token=${encodeURIComponent(accessToken)}`
-      : "/api/sync/stream";
-    const eventSource = new EventSource(streamUrl, {
+    // Auth is handled via httpOnly cookies — no token query param needed
+    const eventSource = new EventSource("/api/sync/stream", {
       withCredentials: true,
     });
     eventSourceRef.current = eventSource;
@@ -84,12 +79,6 @@ export const useDomainSyncSSE = () => {
 
       eventSource.close();
 
-      if (!useTokenFallbackRef.current && getAccessToken()) {
-        useTokenFallbackRef.current = true;
-        connect();
-        return;
-      }
-
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -110,12 +99,10 @@ export const useDomainSyncSSE = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    useTokenFallbackRef.current = false;
     connect();
 
     return () => {
       isMountedRef.current = false;
-      useTokenFallbackRef.current = false;
       cleanup();
     };
   }, [cleanup, connect]);

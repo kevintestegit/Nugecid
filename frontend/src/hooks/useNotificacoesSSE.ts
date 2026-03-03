@@ -2,7 +2,6 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotificacoesStore } from "@/store/notificacoesStore";
 import { Notificacao } from "@/services/notificacoesService";
-import { getAccessToken } from "@/utils/tokenStorage";
 
 interface InitEventData {
   notificacoes: Notificacao[];
@@ -31,7 +30,6 @@ export const useNotificacoesSSE = () => {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isMountedRef = useRef(false);
-  const useTokenFallbackRef = useRef(false);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -65,11 +63,10 @@ export const useNotificacoesSSE = () => {
       eventSourceRef.current.close();
     }
 
-    const accessToken = useTokenFallbackRef.current ? getAccessToken() : null;
-    const url = accessToken
-      ? `/api/notificacoes/stream?token=${encodeURIComponent(accessToken)}`
-      : `/api/notificacoes/stream`;
-    const eventSource = new EventSource(url, { withCredentials: true });
+    // Auth is handled via httpOnly cookies — no token query param needed
+    const eventSource = new EventSource(`/api/notificacoes/stream`, {
+      withCredentials: true,
+    });
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
@@ -122,12 +119,6 @@ export const useNotificacoesSSE = () => {
       setSseConnected(false);
       eventSource.close();
 
-      if (!useTokenFallbackRef.current && getAccessToken()) {
-        useTokenFallbackRef.current = true;
-        connect();
-        return;
-      }
-
       if (
         typeof navigator !== "undefined" &&
         "onLine" in navigator &&
@@ -159,11 +150,9 @@ export const useNotificacoesSSE = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    useTokenFallbackRef.current = false;
     connect();
     return () => {
       isMountedRef.current = false;
-      useTokenFallbackRef.current = false;
       cleanup();
     };
   }, [connect, cleanup]);

@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Upload,
@@ -8,66 +8,80 @@ import {
   Download,
   Loader2,
   Trash2,
-} from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { SpreadsheetPreview } from '@/components/ui/SpreadsheetPreview';
+} from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { SpreadsheetPreview } from "@/components/ui/SpreadsheetPreview";
 import {
   PastaItem,
   usePastaDetalhes,
   usePastas,
   UploadArquivosInput,
-} from '@/hooks/usePastas';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { ImagePreviewModal, PreviewAttachment } from '@/components/desarquivamentos/ImagePreviewModal';
-import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
-import { getAuthHeader } from '@/utils/tokenStorage';
+} from "@/hooks/usePastas";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import {
+  ImagePreviewModal,
+  PreviewAttachment,
+} from "@/components/desarquivamentos/ImagePreviewModal";
+import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
 
 const PrateleiraDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const pastaId = id ?? '';
+  const pastaId = id ?? "";
   const { checkPermission } = useAuth();
   const canManageArquivos =
-    checkPermission('create', 'arquivos') ||
-    checkPermission('update', 'arquivos') ||
-    checkPermission('delete', 'arquivos');
+    checkPermission("create", "arquivos") ||
+    checkPermission("update", "arquivos") ||
+    checkPermission("delete", "arquivos");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [selectedPlanilhas, setSelectedPlanilhas] = useState<File[]>([]);
   const [previewImageId, setPreviewImageId] = useState<string | null>(null);
-  const [resolvedImageUrls, setResolvedImageUrls] = useState<Record<string, string>>({});
+  const [resolvedImageUrls, setResolvedImageUrls] = useState<
+    Record<string, string>
+  >({});
   const imageObjectUrlsRef = useRef<string[]>([]);
-  const [deleteArquivoItem, setDeleteArquivoItem] = useState<{ id: string; nome: string } | null>(null);
+  const [deleteArquivoItem, setDeleteArquivoItem] = useState<{
+    id: string;
+    nome: string;
+  } | null>(null);
   const ensureManagePermission = () => {
     if (canManageArquivos) {
       return true;
     }
-    toast.error('Você não tem permissão para alterar arquivos desta prateleira.');
+    toast.error(
+      "Você não tem permissão para alterar arquivos desta prateleira.",
+    );
     return false;
   };
 
   const { data, isLoading, error, refetch } = usePastaDetalhes(pastaId);
-  const { uploadArquivos, isUploadingArquivos, deleteArquivo, isDeletingArquivo } = usePastas();
+  const {
+    uploadArquivos,
+    isUploadingArquivos,
+    deleteArquivo,
+    isDeletingArquivo,
+  } = usePastas();
 
   const pasta = data?.pasta;
   const planilhas = useMemo(() => data?.planilhas ?? [], [data?.planilhas]);
   const totalItens = data?.totalItens ?? 0;
   const arquivos = useMemo(() => pasta?.arquivos ?? [], [pasta?.arquivos]);
 
-  const cardClass = "rounded-xl border border-border/50 bg-muted/20"
-  const cardTitleClass = "text-lg font-semibold text-foreground"
-  const cardDescriptionClass = "text-xs text-muted-foreground"
+  const cardClass = "rounded-xl border border-border/50 bg-muted/20";
+  const cardTitleClass = "text-lg font-semibold text-foreground";
+  const cardDescriptionClass = "text-xs text-muted-foreground";
 
   const imagens = useMemo(
-    () => arquivos.filter(arquivo => arquivo.tipo === 'IMAGEM'),
+    () => arquivos.filter((arquivo) => arquivo.tipo === "IMAGEM"),
     [arquivos],
   );
 
@@ -78,7 +92,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
     const loadProtectedPreviews = async () => {
       if (!imagens.length) {
-        imageObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        imageObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
         imageObjectUrlsRef.current = [];
         if (isActive) {
           setResolvedImageUrls({});
@@ -87,7 +101,7 @@ const PrateleiraDetailPage: React.FC = () => {
       }
 
       const loadedEntries = await Promise.all(
-        imagens.map(async imagem => {
+        imagens.map(async (imagem) => {
           const sourceUrl = imagem.previewUrl ?? imagem.url;
           if (!sourceUrl) {
             return null;
@@ -98,9 +112,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
           try {
             const response = await fetch(sourceUrl, {
-              headers: {
-                ...getAuthHeader(),
-              },
+              credentials: "include",
               signal: controller.signal,
             });
             if (!response.ok) {
@@ -113,7 +125,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
             return [imagem.id, objectUrl] as const;
           } catch (error) {
-            if ((error as { name?: string })?.name === 'AbortError') {
+            if ((error as { name?: string })?.name === "AbortError") {
               return null;
             }
             return null;
@@ -122,11 +134,11 @@ const PrateleiraDetailPage: React.FC = () => {
       );
 
       if (!isActive) {
-        nextObjectUrls.forEach(url => URL.revokeObjectURL(url));
+        nextObjectUrls.forEach((url) => URL.revokeObjectURL(url));
         return;
       }
 
-      imageObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      imageObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       imageObjectUrlsRef.current = nextObjectUrls;
 
       const nextResolvedMap = loadedEntries.reduce<Record<string, string>>(
@@ -146,20 +158,20 @@ const PrateleiraDetailPage: React.FC = () => {
 
     return () => {
       isActive = false;
-      controllers.forEach(controller => controller.abort());
+      controllers.forEach((controller) => controller.abort());
     };
   }, [imagens]);
 
   useEffect(
     () => () => {
-      imageObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      imageObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       imageObjectUrlsRef.current = [];
     },
     [],
   );
 
   const imagemEmPreview = useMemo<PreviewAttachment | null>(() => {
-    const imagem = imagens.find(item => item.id === previewImageId);
+    const imagem = imagens.find((item) => item.id === previewImageId);
     if (!imagem) {
       return null;
     }
@@ -174,7 +186,7 @@ const PrateleiraDetailPage: React.FC = () => {
     };
   }, [imagens, previewImageId, resolvedImageUrls]);
   const planilhaArquivos = useMemo(
-    () => arquivos.filter(arquivo => arquivo.tipo === 'PLANILHA'),
+    () => arquivos.filter((arquivo) => arquivo.tipo === "PLANILHA"),
     [arquivos],
   );
 
@@ -188,12 +200,12 @@ const PrateleiraDetailPage: React.FC = () => {
   }, [planilhas]);
 
   const handleVoltar = () => {
-    navigate('/arquivo', { replace: true });
+    navigate("/arquivo", { replace: true });
   };
 
   const handleImagemChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!ensureManagePermission()) {
-      event.target.value = '';
+      event.target.value = "";
       return;
     }
     const files = Array.from(event.target.files ?? []);
@@ -202,7 +214,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
   const handlePlanilhaChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!ensureManagePermission()) {
-      event.target.value = '';
+      event.target.value = "";
       return;
     }
     const files = Array.from(event.target.files ?? []);
@@ -213,7 +225,7 @@ const PrateleiraDetailPage: React.FC = () => {
     if (!ensureManagePermission()) return;
     try {
       await uploadArquivos(payload);
-      toast.success('Arquivos enviados com sucesso!');
+      toast.success("Arquivos enviados com sucesso!");
       setSelectedImages([]);
       setSelectedPlanilhas([]);
       setPreviewImageId(null);
@@ -221,7 +233,7 @@ const PrateleiraDetailPage: React.FC = () => {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
-      toast.error('Não foi possível enviar os arquivos.');
+      toast.error("Não foi possível enviar os arquivos.");
     }
   };
 
@@ -233,7 +245,6 @@ const PrateleiraDetailPage: React.FC = () => {
       imagens: selectedImages,
     });
   };
-
 
   const handleDeleteArquivo = (arquivoId: string, arquivoNome: string) => {
     if (!pastaId || !arquivoId) return;
@@ -249,11 +260,11 @@ const PrateleiraDetailPage: React.FC = () => {
       if (previewImageId === deleteArquivoItem.id) {
         setPreviewImageId(null);
       }
-      toast.success('Anexo removido com sucesso.');
+      toast.success("Anexo removido com sucesso.");
       await refetch();
     } catch (err) {
       console.error(err);
-      toast.error('Não foi possível remover o anexo.');
+      toast.error("Não foi possível remover o anexo.");
     } finally {
       setDeleteArquivoItem(null);
     }
@@ -278,18 +289,16 @@ const PrateleiraDetailPage: React.FC = () => {
 
   const downloadFileWithAuth = async (fileUrl: string, fileName: string) => {
     const response = await fetch(fileUrl, {
-      headers: {
-        ...getAuthHeader(),
-      },
+      credentials: "include",
     });
 
     if (!response.ok) {
-      throw new Error('Erro ao baixar arquivo');
+      throw new Error("Erro ao baixar arquivo");
     }
 
     const blob = await response.blob();
     const objectUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = objectUrl;
     link.download = fileName;
     document.body.appendChild(link);
@@ -299,15 +308,15 @@ const PrateleiraDetailPage: React.FC = () => {
   };
 
   const handleDownloadPreviewImage = async (anexoId: number | string) => {
-    const imagem = imagens.find(item => item.id === String(anexoId));
+    const imagem = imagens.find((item) => item.id === String(anexoId));
     if (!imagem?.url) {
       return;
     }
 
     try {
-      await downloadFileWithAuth(imagem.url, imagem.nomeOriginal || 'imagem');
+      await downloadFileWithAuth(imagem.url, imagem.nomeOriginal || "imagem");
     } catch (error) {
-      toast.error('Não foi possível baixar a imagem.');
+      toast.error("Não foi possível baixar a imagem.");
     }
   };
 
@@ -337,7 +346,7 @@ const PrateleiraDetailPage: React.FC = () => {
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-foreground">
-              {pasta?.nome ?? 'Prateleira'}
+              {pasta?.nome ?? "Prateleira"}
             </h1>
             {pasta?.descricao && (
               <p className="text-sm text-muted-foreground mt-1">
@@ -349,13 +358,13 @@ const PrateleiraDetailPage: React.FC = () => {
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-600">
             <ImageIcon className="h-4 w-4" />
-            {pasta?.imagens ?? 0}{' '}
-            {(pasta?.imagens ?? 0) === 1 ? 'imagem' : 'imagens'}
+            {pasta?.imagens ?? 0}{" "}
+            {(pasta?.imagens ?? 0) === 1 ? "imagem" : "imagens"}
           </div>
           <div className="flex items-center gap-1 rounded-full bg-amber-500/10 px-3 py-1 text-amber-600">
             <FileSpreadsheet className="h-4 w-4" />
-            {pasta?.planilhas ?? 0}{' '}
-            {(pasta?.planilhas ?? 0) === 1 ? 'planilha' : 'planilhas'}
+            {pasta?.planilhas ?? 0}{" "}
+            {(pasta?.planilhas ?? 0) === 1 ? "planilha" : "planilhas"}
           </div>
         </div>
       </div>
@@ -371,7 +380,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
       {pasta?.tags?.length ? (
         <div className="flex flex-wrap gap-2">
-          {pasta.tags.map(tag => (
+          {pasta.tags.map((tag) => (
             <Badge key={tag} variant="secondary">
               #{tag}
             </Badge>
@@ -382,7 +391,9 @@ const PrateleiraDetailPage: React.FC = () => {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className={cardClass}>
           <CardHeader>
-            <CardTitle className={cardTitleClass}>Fotos da Prateleira</CardTitle>
+            <CardTitle className={cardTitleClass}>
+              Fotos da Prateleira
+            </CardTitle>
             <CardDescription className={cardDescriptionClass}>
               Upload e visualização das imagens de referência da prateleira.
             </CardDescription>
@@ -392,13 +403,13 @@ const PrateleiraDetailPage: React.FC = () => {
               <Button
                 variant="outline"
                 onClick={() =>
-                  document.getElementById('upload-imagens-input')?.click()
+                  document.getElementById("upload-imagens-input")?.click()
                 }
                 disabled={!canManageArquivos || isUploadingArquivos}
                 title={
                   canManageArquivos
                     ? undefined
-                    : 'Apenas administradores ou coordenadores podem enviar imagens'
+                    : "Apenas administradores ou coordenadores podem enviar imagens"
                 }
               >
                 <ImageIcon className="h-4 w-4 mr-2" />
@@ -436,7 +447,7 @@ const PrateleiraDetailPage: React.FC = () => {
             </div>
             {selectedImages.length > 0 ? (
               <div className="flex flex-wrap gap-2 rounded-lg border border-dashed border-border/60 bg-background/70 p-3 text-xs text-muted-foreground">
-                {selectedImages.map(file => (
+                {selectedImages.map((file) => (
                   <span
                     key={file.name}
                     className="rounded-md bg-muted px-2 py-1 font-medium text-muted-foreground/80"
@@ -449,14 +460,14 @@ const PrateleiraDetailPage: React.FC = () => {
 
             {imagens.length ? (
               <div className="grid gap-2 md:grid-cols-3 sm:grid-cols-4">
-                {imagens.map(imagem => (
+                {imagens.map((imagem) => (
                   <div
                     key={imagem.id}
                     role="button"
                     tabIndex={0}
                     onClick={() => handleOpenPreview(imagem.id)}
-                    onKeyDown={event => {
-                      if (event.key === 'Enter' || event.key === ' ') {
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         handleOpenPreview(imagem.id);
                       }
@@ -479,7 +490,7 @@ const PrateleiraDetailPage: React.FC = () => {
                         size="icon"
                         variant="secondary"
                         className="h-8 w-8"
-                        onClick={event => {
+                        onClick={(event) => {
                           event.stopPropagation();
                           handleOpenPreview(imagem.id);
                         }}
@@ -491,7 +502,7 @@ const PrateleiraDetailPage: React.FC = () => {
                           size="icon"
                           variant="destructive"
                           className="h-8 w-8"
-                          onClick={event => {
+                          onClick={(event) => {
                             event.stopPropagation();
                             handleDeleteArquivo(imagem.id, imagem.nomeOriginal);
                           }}
@@ -506,12 +517,13 @@ const PrateleiraDetailPage: React.FC = () => {
                         {imagem.nomeOriginal}
                       </p>
                       <span className="text-[11px] text-primary-foreground/80">
-                        {new Date(imagem.dataUpload).toLocaleDateString('pt-BR')}
+                        {new Date(imagem.dataUpload).toLocaleDateString(
+                          "pt-BR",
+                        )}
                       </span>
                     </div>
                   </div>
                 ))}
-                
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-border/60 bg-background/70 py-10 text-center text-sm text-muted-foreground">
@@ -523,7 +535,9 @@ const PrateleiraDetailPage: React.FC = () => {
 
         <Card className={cardClass}>
           <CardHeader>
-            <CardTitle className={cardTitleClass}>Planilhas da Prateleira</CardTitle>
+            <CardTitle className={cardTitleClass}>
+              Planilhas da Prateleira
+            </CardTitle>
             <CardDescription className={cardDescriptionClass}>
               Envie planilhas para alimentar a lista de itens desta prateleira.
             </CardDescription>
@@ -533,13 +547,13 @@ const PrateleiraDetailPage: React.FC = () => {
               <Button
                 variant="outline"
                 onClick={() =>
-                  document.getElementById('upload-planilhas-input')?.click()
+                  document.getElementById("upload-planilhas-input")?.click()
                 }
                 disabled={!canManageArquivos || isUploadingArquivos}
                 title={
                   canManageArquivos
                     ? undefined
-                    : 'Apenas administradores ou coordenadores podem enviar planilhas'
+                    : "Apenas administradores ou coordenadores podem enviar planilhas"
                 }
               >
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -576,7 +590,7 @@ const PrateleiraDetailPage: React.FC = () => {
             </div>
             {selectedPlanilhas.length > 0 ? (
               <div className="flex flex-wrap gap-2 rounded-lg border border-dashed border-border/60 bg-background/70 p-3 text-xs text-muted-foreground">
-                {selectedPlanilhas.map(file => (
+                {selectedPlanilhas.map((file) => (
                   <span
                     key={file.name}
                     className="rounded-md bg-muted px-2 py-1 font-medium text-muted-foreground/80"
@@ -589,7 +603,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
             {planilhaArquivos.length ? (
               <div className="space-y-3">
-                {planilhaArquivos.map(planilha => (
+                {planilhaArquivos.map((planilha) => (
                   <div
                     key={planilha.id}
                     className="flex items-center justify-between rounded-lg border border-border/60 bg-background/70 px-4 py-3 text-sm transition-colors hover:bg-accent/50"
@@ -599,9 +613,9 @@ const PrateleiraDetailPage: React.FC = () => {
                         {planilha.nomeOriginal}
                       </p>
                       <span className="text-xs text-muted-foreground">
-                        Atualizada em{' '}
+                        Atualizada em{" "}
                         {new Date(planilha.dataUpload).toLocaleDateString(
-                          'pt-BR',
+                          "pt-BR",
                         )}
                       </span>
                     </div>
@@ -618,10 +632,10 @@ const PrateleiraDetailPage: React.FC = () => {
                           try {
                             await downloadFileWithAuth(
                               planilha.url,
-                              planilha.nomeOriginal || 'planilha',
+                              planilha.nomeOriginal || "planilha",
                             );
                           } catch (error) {
-                            toast.error('Não foi possível baixar a planilha.');
+                            toast.error("Não foi possível baixar a planilha.");
                           }
                         }}
                       >
@@ -633,7 +647,10 @@ const PrateleiraDetailPage: React.FC = () => {
                           variant="destructive"
                           className="h-8 w-8"
                           onClick={() =>
-                            handleDeleteArquivo(planilha.id, planilha.nomeOriginal)
+                            handleDeleteArquivo(
+                              planilha.id,
+                              planilha.nomeOriginal,
+                            )
                           }
                           disabled={isDeletingArquivo}
                         >
@@ -659,7 +676,7 @@ const PrateleiraDetailPage: React.FC = () => {
           <CardDescription>
             {totalItens > 0
               ? `Foram identificados ${totalItens} item(s) a partir das planilhas anexadas.`
-              : 'Aguardando upload de planilhas para catálogo de itens.'}
+              : "Aguardando upload de planilhas para catálogo de itens."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -672,20 +689,23 @@ const PrateleiraDetailPage: React.FC = () => {
 
           {destacandoPrimeirosItens.length ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              {destacandoPrimeirosItens.map(item => (
+              {destacandoPrimeirosItens.map((item) => (
                 <div
                   key={item.id}
                   className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground"
                 >
                   <p className="text-base font-semibold text-foreground">
-                    {item.destaque || 'Item de catálogo'}
+                    {item.destaque || "Item de catálogo"}
                   </p>
                   <div className="mt-2 grid gap-1">
                     {Object.entries(item.valores)
                       .filter(([, valor]) => valor && valor.trim().length > 0)
                       .slice(0, 4)
                       .map(([chave, valor]) => (
-                        <div key={chave} className="flex justify-between text-xs">
+                        <div
+                          key={chave}
+                          className="flex justify-between text-xs"
+                        >
                           <span className="font-medium text-foreground/70">
                             {chave}
                           </span>
@@ -702,7 +722,7 @@ const PrateleiraDetailPage: React.FC = () => {
 
           {planilhas.length ? (
             <div className="space-y-6">
-              {planilhas.map(planilha => (
+              {planilhas.map((planilha) => (
                 <div
                   key={planilha.planilhaId}
                   className="rounded-xl border border-border/60 bg-muted/20 p-5"
@@ -711,10 +731,11 @@ const PrateleiraDetailPage: React.FC = () => {
                     <div>
                       <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
                         <FileSpreadsheet className="h-4 w-4 text-primary" />
-                        {planilha.planilhaNome || 'Planilha'}
+                        {planilha.planilhaNome || "Planilha"}
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        Aba: {planilha.sheetName || 'Principal'} ({planilha.itens.length} itens)
+                        Aba: {planilha.sheetName || "Principal"} (
+                        {planilha.itens.length} itens)
                       </p>
                     </div>
                     <Button
@@ -722,7 +743,7 @@ const PrateleiraDetailPage: React.FC = () => {
                       size="sm"
                       onClick={async () => {
                         const arquivo = planilhaArquivos.find(
-                          item => item.id === planilha.planilhaId,
+                          (item) => item.id === planilha.planilhaId,
                         );
                         if (!arquivo?.url) {
                           return;
@@ -731,10 +752,10 @@ const PrateleiraDetailPage: React.FC = () => {
                         try {
                           await downloadFileWithAuth(
                             arquivo.url,
-                            arquivo.nomeOriginal || 'planilha',
+                            arquivo.nomeOriginal || "planilha",
                           );
                         } catch (error) {
-                          toast.error('Não foi possível baixar a planilha.');
+                          toast.error("Não foi possível baixar a planilha.");
                         }
                       }}
                     >
@@ -745,7 +766,7 @@ const PrateleiraDetailPage: React.FC = () => {
                   <div className="mt-4">
                     <SpreadsheetPreview
                       headers={planilha.colunas}
-                      data={planilha.itens.map(item => item.valores)}
+                      data={planilha.itens.map((item) => item.valores)}
                       maxHeight="max-h-[360px]"
                       showRowNumbers
                     />
@@ -767,7 +788,7 @@ const PrateleiraDetailPage: React.FC = () => {
         onClose={handleClosePreview}
         onDownload={handleDownloadPreviewImage}
         canEdit={false}
-        allImages={imagens.map(img => ({
+        allImages={imagens.map((img) => ({
           id: img.id,
           nomeOriginal: img.nomeOriginal,
           previewUrl: resolvedImageUrls[img.id] ?? img.previewUrl,
@@ -787,9 +808,9 @@ const PrateleiraDetailPage: React.FC = () => {
         confirmationType="checkbox"
         checkboxLabel="Sim, desejo excluir este anexo permanentemente"
         warningList={[
-          'Esta ação não pode ser desfeita',
-          'O arquivo será removido permanentemente',
-          'Não será possível recuperar este anexo'
+          "Esta ação não pode ser desfeita",
+          "O arquivo será removido permanentemente",
+          "Não será possível recuperar este anexo",
         ]}
       />
     </div>

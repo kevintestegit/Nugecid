@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { nugecidService } from "../services/nugecidService";
-import { getAuthHeader } from "@/utils/tokenStorage";
 
 interface DesarquivamentoExcluido {
   id: number;
@@ -74,9 +73,9 @@ export const useDesarquivamentosExcluidos = (
 
       const response = await fetch(`/api/nugecid?${queryParams.toString()}`, {
         method: "GET",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...getAuthHeader(),
         },
       });
 
@@ -101,9 +100,9 @@ export const useDesarquivamentosExcluidos = (
       try {
         const response = await fetch(`/api/nugecid/${id}/restore`, {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            ...getAuthHeader(),
           },
         });
 
@@ -146,9 +145,9 @@ export const useDesarquivamentosExcluidos = (
         const promises = ids.map((id) =>
           fetch(`/api/nugecid/${id}/restore`, {
             method: "POST",
+            credentials: "include",
             headers: {
               "Content-Type": "application/json",
-              ...getAuthHeader(),
             },
           }),
         );

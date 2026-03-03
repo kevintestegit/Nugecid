@@ -7,7 +7,7 @@ import UsuariosTable from "@/components/usuarios/UsuariosTable";
 import DeleteUserModal from "@/components/usuarios/DeleteUserModal";
 import CreateUserModal from "@/components/usuarios/CreateUserModal";
 import { PageError } from "@/components/ui/ErrorMessage";
-import { getAccessToken, getStoredUser } from "@/utils/tokenStorage";
+import { getStoredUser } from "@/utils/tokenStorage";
 
 const UsuariosPage: React.FC = () => {
   const [queryParams, setQueryParams] = useState<UsersQueryParams>({
@@ -34,7 +34,7 @@ const UsuariosPage: React.FC = () => {
       canManageUsers,
       authUser: (window as unknown as Record<string, unknown>).__authUser,
       localStorage_user: getStoredUser(),
-      localStorage_token: getAccessToken() ? "EXISTS" : "NOT_FOUND",
+      cookie_auth: "httpOnly (not accessible from JS)",
     });
 
     return (

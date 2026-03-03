@@ -6,8 +6,9 @@ const path = require("path");
 
 const BASE_URL = process.env.PERF_BASE_URL || "http://127.0.0.1:8080";
 const USERNAME = process.env.PERF_USERNAME || "kevin";
-const PASSWORD = process.env.PERF_PASSWORD || "@Sanfona1";
-const LOGIN_FORWARDED_FOR = process.env.PERF_LOGIN_FORWARDED_FOR || "10.199.0.1";
+const PASSWORD = process.env.PERF_PASSWORD || "";
+const LOGIN_FORWARDED_FOR =
+  process.env.PERF_LOGIN_FORWARDED_FOR || "10.199.0.1";
 const CONCURRENCY = Number(process.env.PERF_CONCURRENCY || 20);
 const REQUESTS_PER_SCENARIO = Number(process.env.PERF_REQUESTS || 300);
 const TIMEOUT_MS = Number(process.env.PERF_TIMEOUT_MS || 10000);
@@ -158,9 +159,7 @@ async function runScenario(name, pathname, token, forwardedForSeed) {
     }
   };
 
-  await Promise.all(
-    Array.from({ length: CONCURRENCY }, () => worker()),
-  );
+  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
 
   const totalDurationMs = Date.now() - startedAt;
   const sorted = [...latencies].sort((a, b) => a - b);
@@ -221,7 +220,8 @@ async function main() {
     },
     {
       name: "nugecid-list",
-      pathname: "/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC",
+      pathname:
+        "/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC",
     },
     {
       name: "pastas-list",
@@ -282,8 +282,7 @@ async function main() {
   console.log(`\nRelatório salvo em: ${outFile}`);
 }
 
-main()
-  .catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
-  });
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

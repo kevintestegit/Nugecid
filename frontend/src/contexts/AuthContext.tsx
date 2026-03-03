@@ -11,12 +11,6 @@ import { User, LoginDto, UserRole } from "@/types";
 import axios from "axios";
 import { apiService } from "@/services/api";
 import {
-  getAccessToken,
-  setAccessToken,
-  removeAccessToken,
-  getRefreshToken,
-  setRefreshToken,
-  removeRefreshToken,
   getStoredUser,
   setStoredUser,
   removeStoredUser,
@@ -43,6 +37,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshTokenRef = useRef<string | null>(null);
 
   const isAuthenticated = !!user;
 
@@ -64,16 +59,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshTokens = useCallback(async () => {
     try {
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) {
+      const currentRefreshToken = refreshTokenRef.current;
+      if (!currentRefreshToken) {
         console.warn("Tentativa de refresh sem token disponível");
         throw new Error("No refresh token available");
       }
 
-      const response = await apiService.refreshToken(refreshToken);
+      const response = await apiService.refreshToken(currentRefreshToken);
       if (response.success && response.data) {
-        const { accessToken } = response.data;
-        setAccessToken(accessToken);
+        // accessToken is now set via httpOnly cookie by the backend —
+        // no need to store it client-side.
 
         // Schedule next refresh
         clearRefreshTimer();
@@ -99,6 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       // Para outros erros (token inválido, expirado, etc.), fazer logout
+      refreshTokenRef.current = null;
       clearAuth();
       updateUser(null);
 
@@ -119,44 +115,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      const accessToken = getAccessToken();
-      const refreshToken = getRefreshToken();
+      // Show optimistic UI from cached user while we verify via cookie
       const localUser = getStoredUser();
-
-      if (accessToken && refreshToken && localUser) {
+      if (localUser) {
         updateUser(localUser);
+      }
 
-        // Schedule token refresh
-        scheduleTokenRefresh();
-
-        // Verificar se o token ainda é válido
-        try {
-          const response = await apiService.getCurrentUser();
-          if (response.success && response.data) {
-            updateUser(response.data);
+      // Verify auth by calling the API — the httpOnly cookie is sent
+      // automatically. If the cookie is valid we get the user back.
+      try {
+        const response = await apiService.getCurrentUser();
+        if (response.success && response.data) {
+          updateUser(response.data);
+          // If we still have a refresh token in memory, schedule refresh
+          if (refreshTokenRef.current) {
+            scheduleTokenRefresh();
           }
-        } catch (error: unknown) {
-          // Verificar se é erro de conectividade
-          const errCode = axios.isAxiosError(error) ? error.code : undefined;
-          const errMessage = error instanceof Error ? error.message : undefined;
-          if (errCode === "ERR_NETWORK" || errMessage?.includes("fetch")) {
-            // Manter usuário logado com dados do localStorage
-            return;
-          }
-
-          // Se o token expirou, tentar renovar
-          if (axios.isAxiosError(error) && error.response?.status === 401) {
-            await refreshTokens();
-          } else {
-            // Outro erro, limpar dados
-            removeAccessToken();
-            removeRefreshToken();
-            updateUser(null);
-          }
+        } else {
+          // Backend returned success:false — clear state
+          refreshTokenRef.current = null;
+          clearAuth();
+          updateUser(null);
         }
-      } else if (refreshToken && !accessToken) {
-        // Tenta renovar o token se apenas o refresh token estiver presente
-        await refreshTokens();
+      } catch (error: unknown) {
+        // Verificar se é erro de conectividade
+        const errCode = axios.isAxiosError(error) ? error.code : undefined;
+        const errMessage = error instanceof Error ? error.message : undefined;
+        if (errCode === "ERR_NETWORK" || errMessage?.includes("fetch")) {
+          // Manter usuário logado com dados do localStorage
+          return;
+        }
+
+        // If 401 and we have a refresh token, try refreshing
+        if (
+          axios.isAxiosError(error) &&
+          error.response?.status === 401 &&
+          refreshTokenRef.current
+        ) {
+          await refreshTokens();
+        } else {
+          // Outro erro, limpar dados
+          refreshTokenRef.current = null;
+          clearAuth();
+          updateUser(null);
+        }
       }
     } catch (error) {
       console.error("Erro ao verificar autenticação", error);
@@ -179,11 +181,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiService.login(credentials);
 
       if (response.success && response.data) {
-        const { user: userData, accessToken, refreshToken } = response.data;
+        const { user: userData, refreshToken } = response.data;
 
-        setAccessToken(accessToken);
+        // accessToken is set via httpOnly cookie by the backend.
+        // Store refresh token in memory only (not localStorage).
         if (refreshToken) {
-          setRefreshToken(refreshToken);
+          refreshTokenRef.current = refreshToken;
         }
         updateUser(userData);
 
@@ -204,8 +207,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error) {
       console.error("Erro ao fazer logout", error);
     } finally {
-      removeAccessToken();
-      removeRefreshToken();
+      refreshTokenRef.current = null;
+      clearAuth();
       updateUser(null);
 
       // Clear refresh timer

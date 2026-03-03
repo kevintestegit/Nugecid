@@ -1,10 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
-import {
-  getAccessToken,
-  setAccessToken,
-  getRefreshToken,
-  clearAuth,
-} from "@/utils/tokenStorage";
+import { clearAuth } from "@/utils/tokenStorage";
 import {
   ApiResponse,
   PaginatedResponse,
@@ -118,18 +113,10 @@ export class ApiService {
   }
 
   private setupInterceptors() {
-    // Request interceptor
+    // Request interceptor — cookies handle auth; no Bearer header needed
     this.api.interceptors.request.use(
-      (config) => {
-        const token = getAccessToken();
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      },
+      (config) => config,
+      (error) => Promise.reject(error),
     );
 
     // Response interceptor
@@ -153,8 +140,7 @@ export class ApiService {
           return Promise.reject(error);
         }
 
-        // IMPORTANTE: Não tentar renovar token se a requisição original já é de refresh
-        // Isso evita loop infinito quando o refresh token está inválido/expirado
+        // Não fazer logout em caso de falha no refresh
         if (originalRequest.url === "/auth/refresh") {
           apiLogWarn("Falha no refresh token - redirecionando para login");
           clearAuth();
@@ -162,42 +148,9 @@ export class ApiService {
           return Promise.reject(error);
         }
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-
-          try {
-            const refreshToken = getRefreshToken();
-            if (refreshToken) {
-              const response = await this.api.post("/auth/refresh", {
-                refreshToken,
-              });
-              const { accessToken } = response.data; // Direct access since backend returns { accessToken, expiresIn }
-
-              setAccessToken(accessToken);
-
-              // Retry the original request with the new token
-              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-              return this.api(originalRequest);
-            }
-          } catch (refreshError: unknown) {
-            // Só fazer logout se não for erro de conectividade
-            if (
-              axios.isAxiosError(refreshError) &&
-              refreshError.code !== "ERR_NETWORK" &&
-              !refreshError.message?.includes("ERR_ABORTED")
-            ) {
-              clearAuth();
-              window.location.href = "/login";
-            } else if (!axios.isAxiosError(refreshError)) {
-              // Unknown non-Axios error — still logout to be safe
-              clearAuth();
-              window.location.href = "/login";
-            }
-            return Promise.reject(refreshError);
-          }
-        }
-
-        // Só fazer logout para 401 se não for erro de conectividade
+        // On 401, clear local state and redirect to login.
+        // Token refresh is handled by AuthContext (which holds the
+        // refresh token in memory), not here.
         if (error.response?.status === 401) {
           clearAuth();
           window.location.href = "/login";
@@ -820,11 +773,12 @@ export class ApiService {
     signal?: AbortSignal,
   ): Promise<SearchResponse> {
     try {
-      const response: AxiosResponse<ApiResponse<SearchResponse> | SearchResponse> =
-        await this.api.get("/search", {
-          params,
-          signal,
-        });
+      const response: AxiosResponse<
+        ApiResponse<SearchResponse> | SearchResponse
+      > = await this.api.get("/search", {
+        params,
+        signal,
+      });
       const payload = response.data;
 
       if (isSearchResponse(payload)) {

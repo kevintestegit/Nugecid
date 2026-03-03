@@ -59,7 +59,6 @@ import { ImagePreviewModal } from "@/components/desarquivamentos/ImagePreviewMod
 import { AnexosSection } from "@/components/desarquivamentos/AnexosSection";
 import { HistoricoTimeline } from "@/components/desarquivamentos/HistoricoTimeline";
 import { getInstitutoLabel } from "@/constants/institutos";
-import { getAuthHeader } from "@/utils/tokenStorage";
 import {
   buildHistoricoMessage,
   isBusinessHistoricoEntry,
@@ -276,9 +275,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       // Se anexo tem URL (vem do backend com URL correta), usar ela
       if (anexo.url) {
         const response = await fetch(anexo.url, {
-          headers: {
-            ...getAuthHeader(),
-          },
+          credentials: "include",
         });
         if (!response.ok) throw new Error("Erro ao baixar anexo");
         blob = await response.blob();
@@ -294,9 +291,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         const response = await fetch(
           `/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/download`,
           {
-            headers: {
-              ...getAuthHeader(),
-            },
+            credentials: "include",
           },
         );
         if (!response.ok) throw new Error("Erro ao baixar anexo");
@@ -336,9 +331,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       // Se anexo tem previewUrl (URL correta do backend), usar ela
       if (anexo.previewUrl) {
         const response = await fetch(anexo.previewUrl, {
-          headers: {
-            ...getAuthHeader(),
-          },
+          credentials: "include",
         });
         if (!response.ok) throw new Error("Erro ao carregar visualização");
         blob = await response.blob();
@@ -354,9 +347,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         const response = await fetch(
           `/api/nugecid/processo/${encodedProcesso}/anexos/${anexo.id}/view`,
           {
-            headers: {
-              ...getAuthHeader(),
-            },
+            credentials: "include",
           },
         );
         if (!response.ok) throw new Error("Erro ao carregar visualização");
@@ -438,102 +429,99 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     [historicoAcoes],
   );
 
-  const historicoResumo = useMemo(
-    () => {
-      if (historicoRelevante.length > 0) {
-        return historicoRelevante.slice(-5).map((evento) => {
-          const mensagem = buildHistoricoMessage(evento);
-          return {
-            id: String(evento.id),
-            timestamp: evento.timestamp,
-            title: mensagem.title,
-            description: mensagem.description,
-            dotColor: getHistoryDotColor(mensagem.tone),
-            source: "audit" as const,
-          };
-        });
-      }
+  const historicoResumo = useMemo(() => {
+    if (historicoRelevante.length > 0) {
+      return historicoRelevante.slice(-5).map((evento) => {
+        const mensagem = buildHistoricoMessage(evento);
+        return {
+          id: String(evento.id),
+          timestamp: evento.timestamp,
+          title: mensagem.title,
+          description: mensagem.description,
+          dotColor: getHistoryDotColor(mensagem.tone),
+          source: "audit" as const,
+        };
+      });
+    }
 
-      if (!desarquivamento) {
-        return [];
-      }
+    if (!desarquivamento) {
+      return [];
+    }
 
-      const eventosMinimos = [
-        {
-          id: "registro-created",
-          timestamp: desarquivamento.createdAt,
-          title: "Solicitação criada",
-          description: "Registro de criação disponível nos dados do documento.",
-          dotColor: "bg-blue-500",
-          source: "registro" as const,
-        },
-      ];
+    const eventosMinimos = [
+      {
+        id: "registro-created",
+        timestamp: desarquivamento.createdAt,
+        title: "Solicitação criada",
+        description: "Registro de criação disponível nos dados do documento.",
+        dotColor: "bg-blue-500",
+        source: "registro" as const,
+      },
+    ];
 
-      if (desarquivamento.status !== StatusDesarquivamento.SOLICITADO) {
-        eventosMinimos.push({
-          id: "registro-status",
-          timestamp: desarquivamento.updatedAt || desarquivamento.createdAt,
-          title: `Status alterado para: ${getStatusLabel(desarquivamento.status)}`,
-          description:
-            "Mudança de status identificada pelos campos atuais do documento.",
-          dotColor:
-            desarquivamento.status === StatusDesarquivamento.FINALIZADO
-              ? "bg-green-500"
-              : "bg-cyan-500",
-          source: "registro" as const,
-        });
-      } else if (
-        desarquivamento.updatedAt &&
-        desarquivamento.updatedAt !== desarquivamento.createdAt
-      ) {
-        eventosMinimos.push({
-          id: "registro-update",
-          timestamp: desarquivamento.updatedAt,
-          title: "Dados da solicitação atualizados",
-          description:
-            "Atualização identificada pelos campos atuais do documento.",
-          dotColor: "bg-green-500",
-          source: "registro" as const,
-        });
-      }
+    if (desarquivamento.status !== StatusDesarquivamento.SOLICITADO) {
+      eventosMinimos.push({
+        id: "registro-status",
+        timestamp: desarquivamento.updatedAt || desarquivamento.createdAt,
+        title: `Status alterado para: ${getStatusLabel(desarquivamento.status)}`,
+        description:
+          "Mudança de status identificada pelos campos atuais do documento.",
+        dotColor:
+          desarquivamento.status === StatusDesarquivamento.FINALIZADO
+            ? "bg-green-500"
+            : "bg-cyan-500",
+        source: "registro" as const,
+      });
+    } else if (
+      desarquivamento.updatedAt &&
+      desarquivamento.updatedAt !== desarquivamento.createdAt
+    ) {
+      eventosMinimos.push({
+        id: "registro-update",
+        timestamp: desarquivamento.updatedAt,
+        title: "Dados da solicitação atualizados",
+        description:
+          "Atualização identificada pelos campos atuais do documento.",
+        dotColor: "bg-green-500",
+        source: "registro" as const,
+      });
+    }
 
-      if (desarquivamento.dataDesarquivamentoSAG) {
-        eventosMinimos.push({
-          id: "registro-data-sag",
-          timestamp:
-            desarquivamento.dataDesarquivamentoSAG || desarquivamento.updatedAt,
-          title: "Data de desarquivamento (SAG) registrada",
-          description: `Valor informado: ${formatDate(
-            desarquivamento.dataDesarquivamentoSAG,
-          )}.`,
-          dotColor: "bg-blue-500",
-          source: "registro" as const,
-        });
-      }
+    if (desarquivamento.dataDesarquivamentoSAG) {
+      eventosMinimos.push({
+        id: "registro-data-sag",
+        timestamp:
+          desarquivamento.dataDesarquivamentoSAG || desarquivamento.updatedAt,
+        title: "Data de desarquivamento (SAG) registrada",
+        description: `Valor informado: ${formatDate(
+          desarquivamento.dataDesarquivamentoSAG,
+        )}.`,
+        dotColor: "bg-blue-500",
+        source: "registro" as const,
+      });
+    }
 
-      if (desarquivamento.dataDevolucaoSetor) {
-        eventosMinimos.push({
-          id: "registro-data-devolucao",
-          timestamp:
-            desarquivamento.dataDevolucaoSetor || desarquivamento.updatedAt,
-          title: "Data de devolução pelo setor registrada",
-          description: `Valor informado: ${formatDate(
-            desarquivamento.dataDevolucaoSetor,
-          )}.`,
-          dotColor: "bg-blue-500",
-          source: "registro" as const,
-        });
-      }
+    if (desarquivamento.dataDevolucaoSetor) {
+      eventosMinimos.push({
+        id: "registro-data-devolucao",
+        timestamp:
+          desarquivamento.dataDevolucaoSetor || desarquivamento.updatedAt,
+        title: "Data de devolução pelo setor registrada",
+        description: `Valor informado: ${formatDate(
+          desarquivamento.dataDevolucaoSetor,
+        )}.`,
+        dotColor: "bg-blue-500",
+        source: "registro" as const,
+      });
+    }
 
-      return eventosMinimos
-        .sort(
-          (a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-        )
-        .slice(-5);
-    },
-    [desarquivamento, historicoRelevante],
-  );
+    return eventosMinimos
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      )
+      .slice(-5);
+  }, [desarquivamento, historicoRelevante]);
 
   const usandoHistoricoMinimo =
     historicoRelevante.length === 0 &&
@@ -1103,7 +1091,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             <Calendar className="h-5 w-5" />
             Histórico
           </CardTitle>
-          <CardDescription>Últimos eventos relevantes da solicitação</CardDescription>
+          <CardDescription>
+            Últimos eventos relevantes da solicitação
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
