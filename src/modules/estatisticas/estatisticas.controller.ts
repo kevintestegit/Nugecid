@@ -6,6 +6,8 @@ import {
   Param,
   Query,
   Request,
+  BadRequestException,
+  ParseIntPipe,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -159,26 +161,38 @@ export class EstatisticasController {
     },
   })
   async exportPdfMensal(
-    @Param("ano") ano: string,
-    @Param("mes") mes: string,
+    @Param("ano", ParseIntPipe) ano: number,
+    @Param("mes", ParseIntPipe) mes: number,
     @Query() paginacao: PaginacaoDto,
     @Res() res: Response,
     @Request() req: ExpressRequest,
   ) {
+    const maxAnoPermitido = new Date().getFullYear() + 1;
+    if (ano < 2000 || ano > maxAnoPermitido) {
+      throw new BadRequestException(
+        `Parâmetro "ano" inválido. Use um valor entre 2000 e ${maxAnoPermitido}.`,
+      );
+    }
+    if (mes < 1 || mes > 12) {
+      throw new BadRequestException(
+        'Parâmetro "mes" inválido. Use um valor entre 1 e 12.',
+      );
+    }
+
     const user = req.user as any;
     const isAdmin =
       user?.role?.name === "admin" || user?.role?.name === "coordenador";
 
     const pdfBuffer = await this.estatisticasService.generateRelatorioMensalPdf(
-      parseInt(ano),
-      parseInt(mes),
+      ano,
+      mes,
       {
         pagina: paginacao.pagina,
         limite: paginacao.limite,
       },
       isAdmin ? undefined : user?.id,
     );
-    const fileName = `relatorio-mensal-${ano}-${mes.padStart(2, "0")}.pdf`;
+    const fileName = `relatorio-mensal-${ano}-${String(mes).padStart(2, "0")}.pdf`;
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);

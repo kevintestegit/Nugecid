@@ -1,37 +1,42 @@
-import React, { useState } from 'react'
-import { Users, Plus } from 'lucide-react'
-import { useUsers, useUserPermissions } from '@/hooks/useUsers'
-import { UsersQueryParams } from '@/types'
-import UsuarioFilters from '@/components/usuarios/UsuarioFilters'
-import UsuariosTable from '@/components/usuarios/UsuariosTable'
-import DeleteUserModal from '@/components/usuarios/DeleteUserModal'
-import CreateUserModal from '@/components/usuarios/CreateUserModal'
-import { PageError } from '@/components/ui/ErrorMessage'
+import React, { useState } from "react";
+import { Users, Plus } from "lucide-react";
+import { useUsers, useUserPermissions } from "@/hooks/useUsers";
+import { UsersQueryParams } from "@/types";
+import UsuarioFilters from "@/components/usuarios/UsuarioFilters";
+import UsuariosTable from "@/components/usuarios/UsuariosTable";
+import DeleteUserModal from "@/components/usuarios/DeleteUserModal";
+import CreateUserModal from "@/components/usuarios/CreateUserModal";
+import { PageError } from "@/components/ui/ErrorMessage";
+import { getAccessToken, getStoredUser } from "@/utils/tokenStorage";
 
 const UsuariosPage: React.FC = () => {
   const [queryParams, setQueryParams] = useState<UsersQueryParams>({
     page: 1,
     limit: 10,
-    active: true
-  })
-  const [userToDelete, setUserToDelete] = useState<number | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  
-  const { canManageUsers, canViewUsers } = useUserPermissions()
-  const { data: usersResponse, isLoading, error, refetch } = useUsers(queryParams)
+    active: true,
+  });
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
+  const { canManageUsers, canViewUsers } = useUserPermissions();
+  const {
+    data: usersResponse,
+    isLoading,
+    error,
+    refetch,
+  } = useUsers(queryParams);
 
   // Redirecionar se não tiver permissão
   if (!canViewUsers) {
     // DEBUG: Log detalhado
-    console.error('❌ Acesso negado à página de usuários', {
+    console.error("❌ Acesso negado à página de usuários", {
       canViewUsers,
       canManageUsers,
-      authUser: (window as any).__authUser,
-      localStorage_user: localStorage.getItem('user'),
-      localStorage_token: localStorage.getItem('accessToken') ? 'EXISTS' : 'NOT_FOUND'
-    })
-    
+      authUser: (window as unknown as Record<string, unknown>).__authUser,
+      localStorage_user: getStoredUser(),
+      localStorage_token: getAccessToken() ? "EXISTS" : "NOT_FOUND",
+    });
+
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -47,31 +52,34 @@ const UsuariosPage: React.FC = () => {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   const handleFilterChange = (newParams: Partial<UsersQueryParams>) => {
-    setQueryParams(prev => ({
+    setQueryParams((prev) => ({
       ...prev,
       ...newParams,
-      page: 1 // Reset para primeira página ao filtrar
-    }))
-  }
+      page: 1, // Reset para primeira página ao filtrar
+    }));
+  };
 
   const handlePageChange = (page: number) => {
-    setQueryParams(prev => ({ ...prev, page }))
-  }
+    setQueryParams((prev) => ({ ...prev, page }));
+  };
 
   const handleDeleteUser = (userId: number) => {
-    setUserToDelete(userId)
-  }
+    setUserToDelete(userId);
+  };
 
   const handleCloseDeleteModal = () => {
-    setUserToDelete(null)
-  }
+    setUserToDelete(null);
+  };
 
   // Mostra tela de erro somente se houve erro E não há dados de usuários disponíveis.
-  if (error && (!usersResponse || !usersResponse.data || usersResponse.data.length === 0)) {
+  if (
+    error &&
+    (!usersResponse || !usersResponse.data || usersResponse.data.length === 0)
+  ) {
     return (
       <PageError
         title="Erro ao carregar usuários"
@@ -79,7 +87,7 @@ const UsuariosPage: React.FC = () => {
         onRetry={() => refetch()}
         onGoBack={() => window.history.back()}
       />
-    )
+    );
   }
 
   return (
@@ -90,25 +98,29 @@ const UsuariosPage: React.FC = () => {
         <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-orange-400/15 blur-3xl" />
 
         <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
-            <Users className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                Gerenciamento de Usuários
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Gerencie usuários do sistema
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Gerenciamento de Usuários</h1>
-            <p className="text-sm text-muted-foreground">Gerencie usuários do sistema</p>
-          </div>
+          {canManageUsers && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:ring-2 focus:ring-primary/40 focus:ring-offset-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Usuário
+            </button>
+          )}
         </div>
-        {canManageUsers && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:bg-primary/90 focus:ring-2 focus:ring-primary/40 focus:ring-offset-2"
-          >
-            <Plus className="h-4 w-4" />
-            Novo Usuário
-          </button>
-        )}
-      </div>
       </div>
 
       {/* Filtros */}
@@ -139,7 +151,7 @@ const UsuariosPage: React.FC = () => {
           userId={userToDelete}
           onClose={handleCloseDeleteModal}
           onSuccess={() => {
-            refetch()
+            refetch();
           }}
         />
       )}
@@ -149,13 +161,13 @@ const UsuariosPage: React.FC = () => {
         <CreateUserModal
           onClose={() => setShowCreateModal(false)}
           onSuccess={() => {
-            setShowCreateModal(false)
-            refetch()
+            setShowCreateModal(false);
+            refetch();
           }}
         />
       )}
     </div>
-  )
-}
+  );
+};
 
-export default UsuariosPage
+export default UsuariosPage;

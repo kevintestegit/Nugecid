@@ -36,16 +36,46 @@ export const getTipoLabel = (tipo: TipoSolicitacao): string => {
   return getTipoSolicitacaoLabel(tipo)
 }
 
+const ISO_DATE_ONLY_REGEX = /^(\d{4})-(\d{2})-(\d{2})$/
+const ISO_UTC_MIDNIGHT_REGEX = /^(\d{4})-(\d{2})-(\d{2})[T\s]00:00:00(?:\.\d{1,3})?(?:Z|[+-]00:00)$/i
+
+const parseDateForDisplay = (value: string | Date): Date | null => {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+
+  const normalizedValue = value?.trim()
+  if (!normalizedValue) {
+    return null
+  }
+
+  const dateOnlyMatch = normalizedValue.match(ISO_DATE_ONLY_REGEX)
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
+
+  const utcMidnightMatch = normalizedValue.match(ISO_UTC_MIDNIGHT_REGEX)
+  if (utcMidnightMatch) {
+    const [, year, month, day] = utcMidnightMatch
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
+
+  const parsedDate = new Date(normalizedValue)
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate
+}
+
 export const formatDate = (dateString: string | Date): string => {
   if (!dateString) return '-'
-  try {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date)
-  } catch (error) {
+
+  const date = parseDateForDisplay(dateString)
+  if (!date) {
     return 'Data inválida'
   }
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
 }

@@ -1,5 +1,5 @@
-import { Tarefa } from '../types/kanban.types';
-import { PrazoStatus, PrazoInfo } from '../types/kanban.types';
+import { Tarefa } from "../types/kanban.types";
+import { PrazoStatus, PrazoInfo } from "../types/kanban.types";
 
 /**
  * Calcula o status do prazo de uma tarefa
@@ -9,14 +9,14 @@ export const calcularPrazoStatus = (prazo?: string): PrazoInfo => {
     return {
       status: PrazoStatus.SEM_PRAZO,
       dias: null,
-      cor: '#6B7280',
-      label: 'Sem prazo',
+      cor: "#6B7280",
+      label: "Sem prazo",
     };
   }
 
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
-  
+
   const dataPrazo = new Date(prazo);
   dataPrazo.setHours(0, 0, 0, 0);
 
@@ -27,7 +27,7 @@ export const calcularPrazoStatus = (prazo?: string): PrazoInfo => {
     return {
       status: PrazoStatus.ATRASADO,
       dias: Math.abs(diffDays),
-      cor: '#DC2626',
+      cor: "#DC2626",
       label: `${Math.abs(diffDays)} dia(s) atrasado`,
     };
   }
@@ -36,8 +36,8 @@ export const calcularPrazoStatus = (prazo?: string): PrazoInfo => {
     return {
       status: PrazoStatus.ATRASADO,
       dias: 0,
-      cor: '#DC2626',
-      label: 'Vence hoje!',
+      cor: "#DC2626",
+      label: "Vence hoje!",
     };
   }
 
@@ -45,7 +45,7 @@ export const calcularPrazoStatus = (prazo?: string): PrazoInfo => {
     return {
       status: PrazoStatus.PROXIMO,
       dias: diffDays,
-      cor: '#F59E0B',
+      cor: "#F59E0B",
       label: `${diffDays} dia(s)`,
     };
   }
@@ -53,7 +53,7 @@ export const calcularPrazoStatus = (prazo?: string): PrazoInfo => {
   return {
     status: PrazoStatus.OK,
     dias: diffDays,
-    cor: '#16A34A',
+    cor: "#16A34A",
     label: `${diffDays} dia(s)`,
   };
 };
@@ -63,12 +63,12 @@ export const calcularPrazoStatus = (prazo?: string): PrazoInfo => {
  */
 export const getPrioridadeCor = (prioridade: string): string => {
   const cores: Record<string, string> = {
-    critica: '#DC2626',
-    alta: '#EA580C',
-    media: '#CA8A04',
-    baixa: '#16A34A',
+    critica: "#DC2626",
+    alta: "#EA580C",
+    media: "#CA8A04",
+    baixa: "#16A34A",
   };
-  return cores[prioridade] || '#6B7280';
+  return cores[prioridade] || "#6B7280";
 };
 
 /**
@@ -76,10 +76,10 @@ export const getPrioridadeCor = (prioridade: string): string => {
  */
 export const getPrioridadeLabel = (prioridade: string): string => {
   const labels: Record<string, string> = {
-    critica: 'Crítica',
-    alta: 'Alta',
-    media: 'Média',
-    baixa: 'Baixa',
+    critica: "Crítica",
+    alta: "Alta",
+    media: "Média",
+    baixa: "Baixa",
   };
   return labels[prioridade] || prioridade;
 };
@@ -89,21 +89,21 @@ export const getPrioridadeLabel = (prioridade: string): string => {
  */
 export const getTagColor = (tag: string): string => {
   const colors = [
-    '#3B82F6', // blue
-    '#8B5CF6', // purple
-    '#EC4899', // pink
-    '#F59E0B', // amber
-    '#10B981', // green
-    '#06B6D4', // cyan
-    '#EF4444', // red
-    '#6366F1', // indigo
+    "#3B82F6", // blue
+    "#8B5CF6", // purple
+    "#EC4899", // pink
+    "#F59E0B", // amber
+    "#10B981", // green
+    "#06B6D4", // cyan
+    "#EF4444", // red
+    "#6366F1", // indigo
   ];
-  
+
   let hash = 0;
   for (let i = 0; i < tag.length; i++) {
     hash = tag.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   return colors[Math.abs(hash) % colors.length];
 };
 
@@ -113,31 +113,31 @@ export const getTagColor = (tag: string): string => {
 export const formatarData = (data: string): string => {
   const date = new Date(data);
   const hoje = new Date();
-  
+
   // Se for hoje
   if (date.toDateString() === hoje.toDateString()) {
-    return 'Hoje';
+    return "Hoje";
   }
-  
+
   // Se foi ontem
   const ontem = new Date(hoje);
   ontem.setDate(ontem.getDate() - 1);
   if (date.toDateString() === ontem.toDateString()) {
-    return 'Ontem';
+    return "Ontem";
   }
-  
+
   // Se for amanhã
   const amanha = new Date(hoje);
   amanha.setDate(amanha.getDate() + 1);
   if (date.toDateString() === amanha.toDateString()) {
-    return 'Amanhã';
+    return "Amanhã";
   }
-  
+
   // Formato padrão
-  return date.toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 };
 
@@ -153,11 +153,11 @@ export const formatarDataRelativa = (data: string): string => {
   const diffHoras = Math.floor(diffMins / 60);
   const diffDias = Math.floor(diffHoras / 24);
 
-  if (diffSecs < 60) return 'Agora';
+  if (diffSecs < 60) return "Agora";
   if (diffMins < 60) return `${diffMins} min atrás`;
   if (diffHoras < 24) return `${diffHoras}h atrás`;
   if (diffDias < 7) return `${diffDias}d atrás`;
-  
+
   return formatarData(data);
 };
 
@@ -165,7 +165,7 @@ export const formatarDataRelativa = (data: string): string => {
  * Gera avatar com iniciais
  */
 export const getInitials = (nome: string): string => {
-  const parts = nome.trim().split(' ');
+  const parts = nome.trim().split(" ");
   if (parts.length >= 2) {
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
   }
@@ -177,15 +177,21 @@ export const getInitials = (nome: string): string => {
  */
 export const getAvatarColor = (nome: string): string => {
   const colors = [
-    '#EF4444', '#F59E0B', '#10B981', '#3B82F6', 
-    '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1',
+    "#EF4444",
+    "#F59E0B",
+    "#10B981",
+    "#3B82F6",
+    "#8B5CF6",
+    "#EC4899",
+    "#06B6D4",
+    "#6366F1",
   ];
-  
+
   let hash = 0;
   for (let i = 0; i < nome.length; i++) {
     hash = nome.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
+
   return colors[Math.abs(hash) % colors.length];
 };
 
@@ -193,12 +199,12 @@ export const getAvatarColor = (nome: string): string => {
  * Formata tamanho de arquivo
  */
 export const formatarTamanhoArquivo = (bytes: number): string => {
-  if (bytes === 0) return '0 Bytes';
-  
+  if (bytes === 0) return "0 Bytes";
+
   const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
 
@@ -209,61 +215,4 @@ export const isAtrasada = (tarefa: Tarefa): boolean => {
   if (!tarefa.prazo) return false;
   const prazoInfo = calcularPrazoStatus(tarefa.prazo);
   return prazoInfo.status === PrazoStatus.ATRASADO;
-};
-
-/**
- * Filtra tarefas por busca
- */
-export const filtrarTarefasPorBusca = (tarefas: Tarefa[], busca: string): Tarefa[] => {
-  if (!busca.trim()) return tarefas;
-  
-  const buscaLower = busca.toLowerCase();
-  return tarefas.filter(tarefa => 
-    tarefa.titulo.toLowerCase().includes(buscaLower) ||
-    tarefa.descricao?.toLowerCase().includes(buscaLower) ||
-    tarefa.tags?.some(tag => tag.toLowerCase().includes(buscaLower))
-  );
-};
-
-/**
- * Ordena tarefas
- */
-export const ordenarTarefas = (
-  tarefas: Tarefa[],
-  criterio: 'ordem' | 'prazo' | 'prioridade' | 'titulo'
-): Tarefa[] => {
-  const tarefasCopy = [...tarefas];
-  
-  switch (criterio) {
-    case 'ordem':
-      return tarefasCopy.sort((a, b) => a.ordem - b.ordem);
-    
-    case 'prazo':
-      return tarefasCopy.sort((a, b) => {
-        if (!a.prazo && !b.prazo) return 0;
-        if (!a.prazo) return 1;
-        if (!b.prazo) return -1;
-        return new Date(a.prazo).getTime() - new Date(b.prazo).getTime();
-      });
-    
-    case 'prioridade': {
-      const prioridadeOrdem: Record<string, number> = {
-        critica: 0,
-        alta: 1,
-        media: 2,
-        baixa: 3,
-      };
-      return tarefasCopy.sort((a, b) => 
-        prioridadeOrdem[a.prioridade] - prioridadeOrdem[b.prioridade]
-      );
-    }
-    
-    case 'titulo':
-      return tarefasCopy.sort((a, b) => 
-        a.titulo.localeCompare(b.titulo)
-      );
-    
-    default:
-      return tarefasCopy;
-  }
 };

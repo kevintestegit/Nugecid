@@ -199,7 +199,8 @@ export class AnexosController {
     @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { buffer, anexo } = await this.anexosService.downloadAnexo(id);
+    const { caminhoArquivo, anexo } =
+      await this.anexosService.downloadAnexo(id);
 
     res.setHeader("Content-Type", anexo.tipoMime);
     res.setHeader(
@@ -208,7 +209,7 @@ export class AnexosController {
     );
     res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
 
-    res.send(buffer);
+    res.sendFile(caminhoArquivo);
   }
 
   @Get(":id/view")
@@ -231,7 +232,8 @@ export class AnexosController {
     @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { buffer, anexo } = await this.anexosService.downloadAnexo(id);
+    const { caminhoArquivo, anexo } =
+      await this.anexosService.downloadAnexo(id);
 
     // Verificar se é um tipo suportado para visualização inline
     if (!anexo.canPreview()) {
@@ -246,7 +248,7 @@ export class AnexosController {
     res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
     // Para visualização inline, não usar Content-Disposition attachment
 
-    res.send(buffer);
+    res.sendFile(caminhoArquivo);
   }
 
   @Delete(":id")
@@ -323,7 +325,8 @@ export class AnexosProcessoController {
     @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { buffer, anexo } = await this.anexosService.downloadAnexo(id);
+    const { caminhoArquivo, anexo } =
+      await this.anexosService.downloadAnexo(id);
 
     res.setHeader("Content-Type", anexo.tipoMime);
     res.setHeader(
@@ -332,7 +335,7 @@ export class AnexosProcessoController {
     );
     res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
 
-    res.send(buffer);
+    res.sendFile(caminhoArquivo);
   }
 
   @Get(":id/view")
@@ -357,7 +360,8 @@ export class AnexosProcessoController {
     @Request() req: any,
     @Res() res: Response,
   ): Promise<void> {
-    const { buffer, anexo } = await this.anexosService.downloadAnexo(id);
+    const { caminhoArquivo, anexo } =
+      await this.anexosService.downloadAnexo(id);
 
     if (!anexo.canPreview()) {
       res.status(HttpStatus.BAD_REQUEST).json({
@@ -370,6 +374,6 @@ export class AnexosProcessoController {
     res.setHeader("Content-Type", anexo.tipoMime);
     res.setHeader("Content-Length", anexo.tamanhoBytes.toString());
 
-    res.send(buffer);
+    res.sendFile(caminhoArquivo);
   }
 }

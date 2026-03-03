@@ -43,6 +43,6 @@ describe('GeneralSettings', () => {
     expect(await screen.findByText('Aparência')).toBeInTheDocument()
     expect(screen.getByText('Notificações')).toBeInTheDocument()
     expect(screen.getByText('Notificações in-app')).toBeInTheDocument()
-    expect(screen.getByText('Push (Navegador)')).toBeInTheDocument()
+    expect(screen.getByText('Som')).toBeInTheDocument()
   })
 })

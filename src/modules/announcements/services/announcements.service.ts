@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThanOrEqual } from "typeorm";
+import { Repository, LessThanOrEqual, In } from "typeorm";
 import { SystemAnnouncement, AnnouncementViewed } from "../entities";
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from "../dto";
 import { User } from "../../users/entities/user.entity";
@@ -150,29 +150,28 @@ export class AnnouncementsService {
       .addOrderBy("announcement.startDate", "DESC")
       .getMany();
 
-    // Filtrar por role e visualizações
-    const filteredAnnouncements: SystemAnnouncement[] = [];
+    // Filtrar por role primeiro
+    const roleFiltered = announcements.filter((announcement) =>
+      announcement.shouldShowToUser(user.role.name),
+    );
 
-    for (const announcement of announcements) {
-      // Verificar se deve mostrar para este role
-      if (!announcement.shouldShowToUser(user.role.name)) {
-        continue;
-      }
-
-      // Verificar se já foi visualizado
-      const alreadyViewed = await this.viewedRepository.findOne({
-        where: {
-          announcementId: announcement.id,
-          userId,
-        },
-      });
-
-      if (!alreadyViewed) {
-        filteredAnnouncements.push(announcement);
-      }
+    if (!roleFiltered.length) {
+      return [];
     }
 
-    return filteredAnnouncements;
+    // Evita N+1: busca visualizações do usuário em lote
+    const viewed = await this.viewedRepository.find({
+      where: {
+        userId,
+        announcementId: In(roleFiltered.map((announcement) => announcement.id)),
+      },
+      select: ["announcementId"],
+    });
+
+    const viewedIds = new Set(viewed.map((item) => item.announcementId));
+    return roleFiltered.filter(
+      (announcement) => !viewedIds.has(announcement.id),
+    );
   }
 
   /**

@@ -1,10 +1,19 @@
-import { Controller, Get, Req, UseGuards, Res, Query } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Req,
+  UseGuards,
+  Res,
+  Query,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { Request, Response } from "express";
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from "@nestjs/swagger";
 
 import { AppService } from "./app.service";
 import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
 import { SessionAuthGuard } from "./modules/auth/guards/session-auth.guard";
+import { User } from "./modules/users/entities/user.entity";
 
 @ApiTags("app")
 @Controller()
@@ -67,7 +76,8 @@ export class AppController {
   }
 
   @Get("test-search")
-  @ApiOperation({ summary: "Teste simples de busca (sem autenticação)" })
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Teste simples de busca" })
   async testSearch() {
     return {
       message: "Endpoint de busca está funcionando!",
@@ -89,7 +99,7 @@ export class AppController {
     required: false,
     type: String,
     description:
-      "Tipos separados por vírgula: desarquivamento,usuario,tarefa,projeto",
+      "Tipos separados por vírgula: desarquivamento,usuario,tarefa,projeto,pasta,vestigio,notificacao,planilha",
   })
   @ApiQuery({
     name: "limit",
@@ -112,7 +122,13 @@ export class AppController {
     @Query("types") types?: string,
     @Query("limit") limit?: string,
     @Query("offset") offset?: string,
+    @Req() req?: Request,
   ) {
+    const currentUser = req?.user as User | undefined;
+    if (!currentUser?.id) {
+      throw new UnauthorizedException("Usuário autenticado não encontrado");
+    }
+
     const searchTypes = types
       ? types.split(",").map((t) => t.trim())
       : undefined;
@@ -124,6 +140,7 @@ export class AppController {
       types: searchTypes,
       limit: searchLimit,
       offset: searchOffset,
+      currentUser,
     });
     return results;
   }

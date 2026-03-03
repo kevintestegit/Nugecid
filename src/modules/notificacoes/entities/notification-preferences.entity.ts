@@ -26,9 +26,6 @@ export class NotificationPreferences {
   @Column({ name: "in_app_enabled", type: "boolean", default: true })
   inAppEnabled: boolean;
 
-  @Column({ name: "push_enabled", type: "boolean", default: false })
-  pushEnabled: boolean;
-
   @Column({ name: "sound_enabled", type: "boolean", default: true })
   soundEnabled: boolean;
 
@@ -54,21 +51,6 @@ export class NotificationPreferences {
   })
   enabledTypes: Record<string, boolean>;
 
-  // Push subscription (para Web Push API)
-  @Column({
-    name: "push_subscription",
-    type: "jsonb",
-    nullable: true,
-    comment: "Web Push API subscription object",
-  })
-  pushSubscription: {
-    endpoint: string;
-    keys: {
-      p256dh: string;
-      auth: string;
-    };
-  } | null;
-
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
@@ -88,15 +70,11 @@ export class NotificationPreferences {
     this.enabledTypes[type] = false;
   }
 
-  canReceiveNotification(type: string, channel: "in_app" | "push"): boolean {
+  canReceiveNotification(type: string, channel: "in_app"): boolean {
     const typeEnabled = this.isTypeEnabled(type);
 
     if (channel === "in_app") {
       return this.inAppEnabled && typeEnabled;
-    }
-
-    if (channel === "push") {
-      return this.pushEnabled && typeEnabled && this.pushSubscription !== null;
     }
 
     return false;

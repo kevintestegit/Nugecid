@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository, TableColumn } from "typeorm";
+import { Repository } from "typeorm";
 import { promises as fs } from "fs";
 import { existsSync } from "fs";
 import * as path from "path";
@@ -31,51 +31,12 @@ export class NugecidAnexosService implements OnModuleInit {
     private readonly anexoRepository: Repository<DesarquivamentoAnexoTypeOrmEntity>,
     @InjectRepository(DesarquivamentoTypeOrmEntity)
     private readonly desarquivamentoRepository: Repository<DesarquivamentoTypeOrmEntity>,
-    private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit(): Promise<void> {
     // Criar diretório de uploads se não existir (async)
     if (!existsSync(this.uploadPath)) {
       await fs.mkdir(this.uploadPath, { recursive: true });
-    }
-    await this.ensureSchema();
-  }
-
-  private async ensureSchema(): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-
-    try {
-      const hasTable = await queryRunner.hasTable("desarquivamento_anexos");
-      if (!hasTable) {
-        return;
-      }
-
-      const hasDescricao = await queryRunner.hasColumn(
-        "desarquivamento_anexos",
-        "descricao",
-      );
-      if (!hasDescricao) {
-        this.logger.warn(
-          'Coluna "descricao" n�o encontrada em desarquivamento_anexos. Criando coluna automaticamente.',
-        );
-        await queryRunner.addColumn(
-          "desarquivamento_anexos",
-          new TableColumn({
-            name: "descricao",
-            type: "text",
-            isNullable: true,
-          }),
-        );
-      }
-    } catch (error) {
-      this.logger.error(
-        "Falha ao garantir esquema da tabela desarquivamento_anexos",
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      await queryRunner.release();
     }
   }
 
@@ -246,9 +207,10 @@ export class NugecidAnexosService implements OnModuleInit {
     return anexo;
   }
 
-  async downloadAnexo(
-    id: number,
-  ): Promise<{ buffer: Buffer; anexo: DesarquivamentoAnexoTypeOrmEntity }> {
+  async downloadAnexo(id: number): Promise<{
+    caminhoArquivo: string;
+    anexo: DesarquivamentoAnexoTypeOrmEntity;
+  }> {
     const anexo = await this.findAnexoById(id);
 
     // Verificar se o arquivo existe
@@ -258,13 +220,7 @@ export class NugecidAnexosService implements OnModuleInit {
       );
     }
 
-    try {
-      const buffer = await fs.readFile(anexo.caminhoArquivo);
-      return { buffer, anexo };
-    } catch (error) {
-      this.logger.error("Erro ao ler arquivo:", error);
-      throw new BadRequestException("Erro ao ler o arquivo");
-    }
+    return { caminhoArquivo: anexo.caminhoArquivo, anexo };
   }
 
   async deleteAnexo(id: number, user: User): Promise<void> {

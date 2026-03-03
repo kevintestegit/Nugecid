@@ -1,5 +1,4 @@
 import { Injectable, Logger } from "@nestjs/common";
-import * as XLSX from "xlsx";
 import { NugecidService } from "./nugecid.service";
 import { QueryDesarquivamentoDto } from "./dto/query-desarquivamento.dto";
 import { User } from "../users/entities/user.entity";
@@ -14,6 +13,7 @@ export class NugecidExportService {
     queryDto: QueryDesarquivamentoDto,
     currentUser: User,
   ): Promise<Buffer> {
+    const XLSX = this.getXlsx();
     const result = await this.nugecidService.findAll({
       ...queryDto,
       limit: 10000, // Export all matching records
@@ -60,5 +60,10 @@ export class NugecidExportService {
     );
 
     return buffer;
+  }
+
+  private getXlsx(): typeof import("xlsx") {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require("xlsx") as typeof import("xlsx");
   }
 }

@@ -1,6 +1,6 @@
-import { toast as sonnerToast } from 'sonner';
-import { AlertTriangle } from 'lucide-react';
-import React from 'react';
+import { toast as sonnerToast } from "sonner";
+import { AlertTriangle } from "lucide-react";
+import React from "react";
 
 export const toast = {
   success: (message: string, description?: string) => {
@@ -45,8 +45,8 @@ export const toast = {
     }: {
       loading: string;
       success: string | ((data: T) => string);
-      error: string | ((error: any) => string);
-    }
+      error: string | ((error: unknown) => string);
+    },
   ) => {
     return sonnerToast.promise(promise, {
       loading,

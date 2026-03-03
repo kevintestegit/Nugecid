@@ -1,4 +1,4 @@
-import { api } from './api';
+import { api } from "./api";
 
 export interface CardData {
   totalDesarquivamentos: number;
@@ -6,7 +6,7 @@ export interface CardData {
   atendimentosEsteMes: number;
   requisicoesPendentes?: number;
   requisicoesEsteMes?: number;
-  recentes?: any[]; // Opcional, caso o backend envie
+  recentes?: Array<{ id: number; [key: string]: unknown }>; // Opcional, caso o backend envie
 }
 
 export interface FiltrosEstatisticas {
@@ -20,24 +20,28 @@ export interface ChartData {
   value?: number;
 }
 
-export const getCardData = async (filtros?: FiltrosEstatisticas): Promise<CardData> => {
+export const getCardData = async (
+  filtros?: FiltrosEstatisticas,
+): Promise<CardData> => {
   const params = new URLSearchParams();
-  if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio);
-  if (filtros?.dataFim) params.append('dataFim', filtros.dataFim);
+  if (filtros?.dataInicio) params.append("dataInicio", filtros.dataInicio);
+  if (filtros?.dataFim) params.append("dataFim", filtros.dataFim);
 
   const response = await api.get<{ success: boolean; data: CardData }>(
-    `/estatisticas/cards${params.toString() ? '?' + params.toString() : ''}`
+    `/estatisticas/cards${params.toString() ? "?" + params.toString() : ""}`,
   );
   return response.data?.data as CardData;
 };
 
-export const getRequisicoesPorMes = async (filtros?: FiltrosEstatisticas): Promise<ChartData[]> => {
+export const getRequisicoesPorMes = async (
+  filtros?: FiltrosEstatisticas,
+): Promise<ChartData[]> => {
   const params = new URLSearchParams();
-  if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio);
-  if (filtros?.dataFim) params.append('dataFim', filtros.dataFim);
+  if (filtros?.dataInicio) params.append("dataInicio", filtros.dataInicio);
+  if (filtros?.dataFim) params.append("dataFim", filtros.dataFim);
 
   const response = await api.get<{ success: boolean; data: ChartData[] }>(
-    `/estatisticas/requisicoes-por-mes${params.toString() ? '?' + params.toString() : ''}`
+    `/estatisticas/requisicoes-por-mes${params.toString() ? "?" + params.toString() : ""}`,
   );
   return (response.data?.data as ChartData[]) ?? [];
 };
@@ -45,33 +49,37 @@ export const getRequisicoesPorMes = async (filtros?: FiltrosEstatisticas): Promi
 // Alias para compatibilidade
 export const getAtendimentosPorMes = getRequisicoesPorMes;
 
-export const getStatusDistribuicao = async (filtros?: FiltrosEstatisticas): Promise<ChartData[]> => {
+export const getStatusDistribuicao = async (
+  filtros?: FiltrosEstatisticas,
+): Promise<ChartData[]> => {
   const params = new URLSearchParams();
-  if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio);
-  if (filtros?.dataFim) params.append('dataFim', filtros.dataFim);
+  if (filtros?.dataInicio) params.append("dataInicio", filtros.dataInicio);
+  if (filtros?.dataFim) params.append("dataFim", filtros.dataFim);
 
   const response = await api.get<{ success: boolean; data: ChartData[] }>(
-    `/estatisticas/status-distribuicao${params.toString() ? '?' + params.toString() : ''}`
+    `/estatisticas/status-distribuicao${params.toString() ? "?" + params.toString() : ""}`,
   );
   return (response.data?.data as ChartData[]) ?? [];
 };
 
-export const exportRelatorioPdf = async (filtros?: FiltrosEstatisticas): Promise<void> => {
+export const exportRelatorioPdf = async (
+  filtros?: FiltrosEstatisticas,
+): Promise<void> => {
   const params = new URLSearchParams();
-  if (filtros?.dataInicio) params.append('dataInicio', filtros.dataInicio);
-  if (filtros?.dataFim) params.append('dataFim', filtros.dataFim);
+  if (filtros?.dataInicio) params.append("dataInicio", filtros.dataInicio);
+  if (filtros?.dataFim) params.append("dataFim", filtros.dataFim);
 
   const response = await api.get(
-    `/estatisticas/pdf${params.toString() ? '?' + params.toString() : ''}`,
-    { responseType: 'blob' }
+    `/estatisticas/pdf${params.toString() ? "?" + params.toString() : ""}`,
+    { responseType: "blob" },
   );
 
   // Criar URL temporária para o blob e fazer download
-  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const blob = new Blob([response.data], { type: "application/pdf" });
   const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
-  link.download = `relatorio-estatisticas-${new Date().toISOString().split('T')[0]}.pdf`;
+  link.download = `relatorio-estatisticas-${new Date().toISOString().split("T")[0]}.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -82,23 +90,23 @@ export const exportRelatorioMensalPdf = async (
   ano: number,
   mes: number,
   pagina?: number,
-  limite?: number
+  limite?: number,
 ): Promise<void> => {
   const params = new URLSearchParams();
-  if (pagina) params.append('pagina', pagina.toString());
-  if (limite) params.append('limite', limite.toString());
+  if (pagina) params.append("pagina", pagina.toString());
+  if (limite) params.append("limite", limite.toString());
 
   const response = await api.get(
-    `/estatisticas/pdf-mensal/${ano}/${mes}${params.toString() ? '?' + params.toString() : ''}`,
-    { responseType: 'blob' }
+    `/estatisticas/pdf-mensal/${ano}/${mes}${params.toString() ? "?" + params.toString() : ""}`,
+    { responseType: "blob" },
   );
 
   // Criar URL temporária para o blob e fazer download
-  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const blob = new Blob([response.data], { type: "application/pdf" });
   const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
-  link.download = `relatorio-mensal-${ano}-${mes.toString().padStart(2, '0')}.pdf`;
+  link.download = `relatorio-mensal-${ano}-${mes.toString().padStart(2, "0")}.pdf`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

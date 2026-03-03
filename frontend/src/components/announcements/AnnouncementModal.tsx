@@ -1,42 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { X, AlertCircle, AlertTriangle, Info, Megaphone } from 'lucide-react';
-import { apiService } from '@/services/api';
-
-interface Announcement {
-  id: number;
-  title: string;
-  content: string;
-  imageUrl: string | null;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  startDate: string;
-  endDate: string;
-}
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
+import { X, AlertCircle, AlertTriangle, Info, Megaphone } from "lucide-react";
+import { apiService } from "@/services/api";
+import type { Announcement } from "@/types";
 
 const priorityConfig = {
   low: {
     icon: Info,
-    bgColor: 'from-blue-500 to-blue-600',
-    borderColor: 'border-blue-500',
-    iconColor: 'text-blue-500',
+    bgColor: "from-blue-500 to-blue-600",
+    borderColor: "border-blue-500",
+    iconColor: "text-blue-500",
   },
   medium: {
     icon: Megaphone,
-    bgColor: 'from-yellow-500 to-yellow-600',
-    borderColor: 'border-yellow-500',
-    iconColor: 'text-yellow-500',
+    bgColor: "from-yellow-500 to-yellow-600",
+    borderColor: "border-yellow-500",
+    iconColor: "text-yellow-500",
   },
   high: {
     icon: AlertTriangle,
-    bgColor: 'from-orange-500 to-orange-600',
-    borderColor: 'border-orange-500',
-    iconColor: 'text-orange-500',
+    bgColor: "from-orange-500 to-orange-600",
+    borderColor: "border-orange-500",
+    iconColor: "text-orange-500",
   },
   critical: {
     icon: AlertCircle,
-    bgColor: 'from-red-500 to-red-600',
-    borderColor: 'border-red-500',
-    iconColor: 'text-red-500',
+    bgColor: "from-red-500 to-red-600",
+    borderColor: "border-red-500",
+    iconColor: "text-red-500",
   },
 };
 
@@ -44,7 +35,9 @@ interface AnnouncementModalProps {
   onClose: () => void;
 }
 
-export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose }) => {
+export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
+  onClose,
+}) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -64,9 +57,9 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
 
   // Bloquear scroll da página quando o modal estiver aberto
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = "unset";
     };
   }, []);
 
@@ -81,8 +74,8 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
         setIsEmpty(true);
       }
     } catch (error) {
-      console.error('Erro ao carregar avisos:', error);
-      setError('Não foi possível carregar avisos agora.');
+      console.error("Erro ao carregar avisos:", error);
+      setError("Não foi possível carregar avisos agora.");
     } finally {
       setLoading(false);
     }
@@ -97,7 +90,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
         await apiService.markAnnouncementAsViewed(currentAnnouncement.id);
       }
     } catch (error) {
-      console.error('Erro ao marcar aviso como visualizado:', error);
+      console.error("Erro ao marcar aviso como visualizado:", error);
     }
 
     if (currentIndex < announcements.length - 1) {
@@ -124,14 +117,18 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-2xl mx-4 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         {/* Header com gradiente */}
-        <div className={`bg-gradient-to-r ${config.bgColor} p-6 text-white relative`}>
+        <div
+          className={`bg-gradient-to-r ${config.bgColor} p-6 text-white relative`}
+        >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
                 <Icon className="h-6 w-6" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold">{currentAnnouncement.title}</h2>
+                <h2 className="text-2xl font-bold">
+                  {currentAnnouncement.title}
+                </h2>
                 {announcements.length > 1 && (
                   <p className="text-sm text-white/80 mt-1">
                     Aviso {currentIndex + 1} de {announcements.length}
@@ -158,7 +155,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
                 alt={currentAnnouncement.title}
                 className="w-full h-auto object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).style.display = "none";
                 }}
               />
             </div>
@@ -194,17 +191,15 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {announcements.length > 1 ? (
                 <span>
-                  {dontShowAgain 
-                    ? 'Este aviso não será exibido novamente' 
-                    : 'Pressione "Entendi" para ver o próximo aviso'
-                  }
+                  {dontShowAgain
+                    ? "Este aviso não será exibido novamente"
+                    : 'Pressione "Entendi" para ver o próximo aviso'}
                 </span>
               ) : (
                 <span>
-                  {dontShowAgain 
-                    ? 'Este aviso não será exibido novamente' 
-                    : 'Pressione "Entendi" para continuar'
-                  }
+                  {dontShowAgain
+                    ? "Este aviso não será exibido novamente"
+                    : 'Pressione "Entendi" para continuar'}
                 </span>
               )}
             </div>
@@ -212,7 +207,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
               onClick={handleConfirm}
               className={`px-8 py-3 bg-gradient-to-r ${config.bgColor} text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200`}
             >
-              {currentIndex < announcements.length - 1 ? 'Próximo' : 'Entendi'}
+              {currentIndex < announcements.length - 1 ? "Próximo" : "Entendi"}
             </button>
           </div>
 
@@ -226,8 +221,8 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ onClose })
                     index === currentIndex
                       ? `w-8 bg-gradient-to-r ${config.bgColor}`
                       : index < currentIndex
-                      ? 'w-2 bg-green-500'
-                      : 'w-2 bg-gray-300 dark:bg-gray-600'
+                        ? "w-2 bg-green-500"
+                        : "w-2 bg-gray-300 dark:bg-gray-600"
                   }`}
                 />
               ))}

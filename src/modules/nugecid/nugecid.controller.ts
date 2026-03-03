@@ -58,6 +58,7 @@ import { NugecidExportService } from "./nugecid-export.service";
 import { NugecidDocxService } from "./nugecid-docx.service";
 import { NugecidService } from "./nugecid.service";
 import { NugecidAuditService } from "./nugecid-audit.service";
+import { StatusDesarquivamentoEnum } from "./domain/enums/status-desarquivamento.enum";
 
 // Guards and Decorators
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -66,6 +67,54 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { User } from "../users/entities/user.entity";
 import { RoleType } from "../users/enums/role-type.enum";
+
+type AuditFieldType = "status" | "date" | "boolean" | "number" | "text";
+
+type AuditTrackedField = {
+  field: string;
+  type: AuditFieldType;
+};
+
+const STATUS_ALIAS_MAP: Record<string, StatusDesarquivamentoEnum> = {
+  REARQUIVADO: StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO,
+  REARQUIVAMENTO: StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO,
+};
+
+const UPDATE_AUDIT_FIELDS: ReadonlyArray<AuditTrackedField> = [
+  { field: "status", type: "status" },
+  { field: "dataSolicitacao", type: "date" },
+  { field: "dataDesarquivamentoSAG", type: "date" },
+  { field: "dataDevolucaoSetor", type: "date" },
+  { field: "desarquivamentoFisicoDigital", type: "text" },
+  { field: "tipoDesarquivamento", type: "text" },
+  { field: "nomeCompleto", type: "text" },
+  { field: "numeroNicLaudoAuto", type: "text" },
+  { field: "numeroProcesso", type: "text" },
+  { field: "tipoDocumento", type: "text" },
+  { field: "setorDemandante", type: "text" },
+  { field: "servidorResponsavel", type: "text" },
+  { field: "finalidadeDesarquivamento", type: "text" },
+  { field: "solicitacaoProrrogacao", type: "boolean" },
+  { field: "solicitacaoProrrogacaoTexto", type: "text" },
+  { field: "dadosAdicionais", type: "text" },
+  { field: "numeroOficio", type: "text" },
+  { field: "urgente", type: "boolean" },
+  { field: "instituto", type: "text" },
+  { field: "requerente", type: "text" },
+  { field: "responsavelId", type: "number" },
+];
+
+const STATUSS_WITH_DESARQUIVAMENTO_DATE = new Set<StatusDesarquivamentoEnum>([
+  StatusDesarquivamentoEnum.DESARQUIVADO,
+  StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO,
+  StatusDesarquivamentoEnum.FINALIZADO,
+  StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR,
+]);
+
+const STATUSS_WITH_DEVOLUCAO_DATE = new Set<StatusDesarquivamentoEnum>([
+  StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO,
+  StatusDesarquivamentoEnum.FINALIZADO,
+]);
 
 @ApiTags("NUGECID - Desarquivamentos")
 @Controller("nugecid")
@@ -107,6 +156,15 @@ export class NugecidController {
       ...createDesarquivamentoDto,
       criadoPorId: currentUser.id,
     });
+
+    await this.nugecidAuditService.saveDesarquivamentoAudit(
+      currentUser.id,
+      "CREATE",
+      result as any,
+      null,
+      req.ip,
+      req.get("user-agent"),
+    );
 
     return res.status(HttpStatus.CREATED).json({
       success: true,
@@ -278,83 +336,8 @@ export class NugecidController {
     @CurrentUser() currentUser: User,
     @Res() res: Response,
   ) {
-    if (!file) {
-      throw new BadRequestException(
-        "Arquivo não enviado. Por favor, envie um arquivo Excel.",
-      );
-    }
-
-    if (!file.buffer || file.buffer.length === 0) {
-      throw new BadRequestException(
-        "O arquivo enviado está vazio. Verifique se o arquivo Excel tem dados.",
-      );
-    }
-
-    this.logger.log(
-      `[${new Date().toISOString()}] Alias import: ${file.originalname} (${file.size} bytes)`,
-    );
-
-    const result = await this.nugecidImportService.importFromXLSX(
-      file,
-      currentUser,
-    );
-
-    // Se TODOS os registros falharam, retornar erro HTTP 400
-    if (result.errorCount > 0 && result.successCount === 0) {
-      // Pegar os primeiros 10 erros para mostrar ao usuário
-      const primeirosErros = result.errors.slice(0, 10);
-      const mensagensErro = primeirosErros.map(
-        (erro) => `• Linha ${erro.row}: ${erro.details.message}`,
-      );
-
-      const mensagemResumo =
-        result.errors.length > 10
-          ? `\n\n... e mais ${result.errors.length - 10} erros.`
-          : "";
-
-      return res.status(HttpStatus.BAD_REQUEST).json({
-        success: false,
-        message: `Falha na importação: todos os ${result.totalRows} registros contêm erros de validação.`,
-        error: {
-          type: "VALIDATION_ERROR",
-          totalErrors: result.errorCount,
-          summary: `Nenhum registro foi importado. Corrija os erros abaixo na planilha e reimporte:\n\n${mensagensErro.join("\n")}${mensagemResumo}`,
-          errors: result.errors, // Todos os erros detalhados
-        },
-        data: {
-          totalRows: result.totalRows,
-          successCount: 0,
-          errorCount: result.errorCount,
-        },
-      });
-    }
-
-    // Se há erros parciais, retornar aviso mas com sucesso
-    if (result.errorCount > 0) {
-      const primeirosErros = result.errors.slice(0, 5);
-      const mensagensErro = primeirosErros.map(
-        (erro) => `• Linha ${erro.row}: ${erro.details.message}`,
-      );
-
-      return res.status(HttpStatus.OK).json({
-        success: true,
-        message: `Importação parcial: ${result.successCount} de ${result.totalRows} registros importados. ${result.errorCount} registros com erros.`,
-        warning: {
-          type: "PARTIAL_IMPORT",
-          errorsFound: result.errorCount,
-          summary: `Os seguintes registros não foram importados:\n\n${mensagensErro.join("\n")}`,
-          errors: result.errors,
-        },
-        data: result,
-      });
-    }
-
-    // Sucesso total
-    return res.status(HttpStatus.OK).json({
-      success: true,
-      message: `Importação concluída com sucesso: ${result.successCount} registros importados.`,
-      data: result,
-    });
+    // Delega para o método principal, evitando duplicação de código
+    return this.importDesarquivamentos(file, currentUser, res);
   }
 
   @Post("import-registros")
@@ -768,30 +751,6 @@ export class NugecidController {
     }
   }
 
-  @Get("export")
-  @ApiOperation({ summary: "Exportar desarquivamentos para Excel" })
-  @ApiQuery({ type: QueryDesarquivamentoDto })
-  @Roles(RoleType.ADMIN)
-  @ApiBearerAuth()
-  async exportToExcel(
-    @Query() queryDto: QueryDesarquivamentoDto,
-    @CurrentUser() currentUser: User,
-    @Res() res: Response,
-  ) {
-    const buffer = await this.nugecidExportService.exportToExcel(
-      queryDto,
-      currentUser,
-    );
-    const fileName = `desarquivamentos_${new Date().toISOString().split("T")[0]}.xlsx`;
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    );
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    res.send(buffer);
-  }
-
   @Get(":id/historico")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -935,16 +894,45 @@ export class NugecidController {
     @Param("id", ParseIntPipe) id: number,
     @Body() updateDesarquivamentoDto: UpdateDesarquivamentoDto,
     @CurrentUser() currentUser: User,
+    @Req() request: Request,
   ) {
     try {
+      const userRoles = [currentUser.role?.name || "USER"];
+      const beforeUpdate = await this.findDesarquivamentoByIdUseCase.execute({
+        id,
+        userId: currentUser.id,
+        userRoles,
+      });
+
+      const enrichedUpdateDto = this.applyStatusDateDefaults(
+        beforeUpdate as unknown as Record<string, unknown>,
+        updateDesarquivamentoDto,
+      );
+
       const result = await this.updateDesarquivamentoUseCase.execute({
         id,
-        ...updateDesarquivamentoDto,
+        ...enrichedUpdateDto,
         // Garante que dataDevolucaoSetor seja passada explicitamente mesmo se for null/undefined
-        dataDevolucaoSetor: updateDesarquivamentoDto.dataDevolucaoSetor,
+        dataDevolucaoSetor: enrichedUpdateDto.dataDevolucaoSetor,
         userId: currentUser.id,
-        userRoles: [currentUser.role?.name || "USER"],
+        userRoles,
       });
+
+      const changes = this.buildUpdateAuditChanges(
+        beforeUpdate as unknown as Record<string, unknown>,
+        result as unknown as Record<string, unknown>,
+      );
+
+      if (Object.keys(changes).length > 0) {
+        await this.nugecidAuditService.saveDesarquivamentoAudit(
+          currentUser.id,
+          "UPDATE",
+          result as any,
+          changes,
+          request.ip,
+          request.get("user-agent"),
+        );
+      }
 
       return {
         success: true,
@@ -970,6 +958,152 @@ export class NugecidController {
       }
       throw new BadRequestException(msg || "Erro ao atualizar desarquivamento");
     }
+  }
+
+  private buildUpdateAuditChanges(
+    beforeUpdate: Record<string, unknown>,
+    afterUpdate: Record<string, unknown>,
+  ): Record<string, { from?: unknown; to?: unknown }> {
+    return UPDATE_AUDIT_FIELDS.reduce<
+      Record<string, { from?: unknown; to?: unknown }>
+    >((acc, fieldConfig) => {
+      const { field, type } = fieldConfig;
+      const beforeValue = this.normalizeAuditFieldValue(
+        type,
+        beforeUpdate[field],
+      );
+      const afterValue = this.normalizeAuditFieldValue(
+        type,
+        afterUpdate[field],
+      );
+
+      if (beforeValue === afterValue) {
+        return acc;
+      }
+
+      acc[field] = { from: beforeValue, to: afterValue };
+      return acc;
+    }, {});
+  }
+
+  private applyStatusDateDefaults(
+    beforeUpdate: Record<string, unknown>,
+    updateDto: UpdateDesarquivamentoDto,
+  ): UpdateDesarquivamentoDto {
+    const requestedStatus = this.normalizeAuditFieldValue(
+      "status",
+      updateDto.status,
+    ) as StatusDesarquivamentoEnum | null;
+
+    if (!requestedStatus) {
+      return updateDto;
+    }
+
+    const previousStatus = this.normalizeAuditFieldValue(
+      "status",
+      beforeUpdate.status,
+    ) as StatusDesarquivamentoEnum | null;
+
+    if (previousStatus === requestedStatus) {
+      return updateDto;
+    }
+
+    const enriched: UpdateDesarquivamentoDto = { ...updateDto };
+    const now = new Date();
+
+    const alreadyHasDataDesarquivamento = this.normalizeAuditFieldValue(
+      "date",
+      beforeUpdate.dataDesarquivamentoSAG,
+    );
+    const alreadyHasDataDevolucao = this.normalizeAuditFieldValue(
+      "date",
+      beforeUpdate.dataDevolucaoSetor,
+    );
+
+    if (
+      enriched.dataDesarquivamentoSAG === undefined &&
+      !alreadyHasDataDesarquivamento &&
+      STATUSS_WITH_DESARQUIVAMENTO_DATE.has(requestedStatus)
+    ) {
+      enriched.dataDesarquivamentoSAG = now;
+    }
+
+    if (
+      enriched.dataDevolucaoSetor === undefined &&
+      !alreadyHasDataDevolucao &&
+      STATUSS_WITH_DEVOLUCAO_DATE.has(requestedStatus)
+    ) {
+      enriched.dataDevolucaoSetor = now;
+    }
+
+    return enriched;
+  }
+
+  private normalizeAuditFieldValue(
+    type: AuditFieldType,
+    value: unknown,
+  ): unknown {
+    if (value === undefined || value === null || value === "") {
+      return null;
+    }
+
+    if (type === "status") {
+      const normalizedStatus = String(value)
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, "_");
+
+      if (!normalizedStatus) {
+        return null;
+      }
+
+      return STATUS_ALIAS_MAP[normalizedStatus] ?? normalizedStatus;
+    }
+
+    if (type === "date") {
+      const date = new Date(String(value));
+      if (Number.isNaN(date.getTime())) {
+        const fallback = String(value).trim();
+        return fallback.length > 0 ? fallback : null;
+      }
+      return date.toISOString();
+    }
+
+    if (type === "boolean") {
+      if (typeof value === "boolean") {
+        return value;
+      }
+
+      if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["true", "1", "sim"].includes(normalized)) return true;
+        if (["false", "0", "nao", "não"].includes(normalized)) return false;
+      }
+
+      return Boolean(value);
+    }
+
+    if (type === "number") {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+
+      if (typeof value === "string") {
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) {
+          return numeric;
+        }
+      }
+
+      return String(value);
+    }
+
+    if (typeof value === "string") {
+      const normalized = value.trim();
+      return normalized.length > 0 ? normalized : null;
+    }
+
+    return String(value);
   }
 
   @Delete(":id")

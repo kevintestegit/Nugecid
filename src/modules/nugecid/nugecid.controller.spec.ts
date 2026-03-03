@@ -34,7 +34,9 @@ describe("NugecidController", () => {
   const mockUpdateUseCase = { execute: jest.fn() };
   const mockDeleteUseCase = { execute: jest.fn() };
   const mockNugecidImportService = { importFromXLSX: jest.fn() };
-  const mockAuditService = { saveDesarquivamentoAudit: jest.fn() };
+  const mockAuditService = {
+    saveDesarquivamentoAudit: jest.fn().mockResolvedValue(undefined),
+  };
 
   const currentUser = {
     id: 2,
@@ -112,12 +114,24 @@ describe("NugecidController", () => {
     await controller.create(
       dto as any,
       currentUser,
-      { headers: {} } as any,
+      {
+        headers: {},
+        ip: "127.0.0.1",
+        get: jest.fn().mockReturnValue("jest"),
+      } as any,
       res,
     );
 
     expect(mockCreateUseCase.execute).toHaveBeenCalledWith(
       expect.objectContaining({ criadoPorId: currentUser.id }),
+    );
+    expect(mockAuditService.saveDesarquivamentoAudit).toHaveBeenCalledWith(
+      currentUser.id,
+      "CREATE",
+      created,
+      null,
+      "127.0.0.1",
+      "jest",
     );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.CREATED);
     expect(res.json).toHaveBeenCalledWith({
@@ -171,20 +185,50 @@ describe("NugecidController", () => {
   });
 
   it("update e remove devem encaminhar para os use cases", async () => {
+    mockFindByIdUseCase.execute.mockResolvedValue({
+      id: 1,
+      status: "SOLICITADO",
+      dataDesarquivamentoSAG: null,
+      dataDevolucaoSetor: null,
+    });
     mockUpdateUseCase.execute.mockResolvedValue({
       id: 1,
       status: "FINALIZADO",
+      dataDesarquivamentoSAG: "2026-02-04T00:00:00.000Z",
+      dataDevolucaoSetor: "2026-02-05T00:00:00.000Z",
     });
     mockDeleteUseCase.execute.mockResolvedValue(undefined);
+
+    const req = { ip: "127.0.0.1", get: jest.fn().mockReturnValue("jest") };
 
     const updateResult = await controller.update(
       1,
       { status: "FINALIZADO" } as any,
       currentUser,
+      req as any,
     );
     const removeResult = await controller.remove("1", currentUser);
 
-    expect(mockUpdateUseCase.execute).toHaveBeenCalled();
+    expect(mockUpdateUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        status: "FINALIZADO",
+        dataDesarquivamentoSAG: expect.any(Date),
+        dataDevolucaoSetor: expect.any(Date),
+        userId: currentUser.id,
+        userRoles: [currentUser.role.name],
+      }),
+    );
+    expect(mockAuditService.saveDesarquivamentoAudit).toHaveBeenCalledWith(
+      currentUser.id,
+      "UPDATE",
+      expect.objectContaining({ id: 1, status: "FINALIZADO" }),
+      expect.objectContaining({
+        status: { from: "SOLICITADO", to: "FINALIZADO" },
+      }),
+      "127.0.0.1",
+      "jest",
+    );
     expect(updateResult).toEqual(
       expect.objectContaining({
         success: true,

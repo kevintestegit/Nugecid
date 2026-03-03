@@ -1,5 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Card,
   CardContent,
@@ -10,8 +16,8 @@ import {
   Input,
   Label,
   Switch,
-  Badge
-} from '@/components/ui';
+  Badge,
+} from "@/components/ui";
 import {
   User,
   Lock,
@@ -20,24 +26,29 @@ import {
   EyeOff,
   Upload,
   Trash2,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { apiService } from '@/services/api';
-import { UserSettings as UserSettingsType } from '@/types';
+} from "lucide-react";
+import { toast } from "sonner";
+import { apiService } from "@/services/api";
+import { UserSettings as UserSettingsType } from "@/types";
 
 export const UserSettings: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const derivePreferences = useCallback((settings?: UserSettingsType | null) => ({
-    showEmail: settings?.showEmail ?? true,
-    showPhone: settings?.showPhone ?? false,
-    autoSave: settings?.autoSave ?? true,
-    compactView: settings?.compactView ?? false,
-    itemsPerPage: settings?.itemsPerPage ?? 10,
-  }), []);
+  const derivePreferences = useCallback(
+    (settings?: UserSettingsType | null) => ({
+      showEmail: settings?.showEmail ?? true,
+      showPhone: settings?.showPhone ?? false,
+      autoSave: settings?.autoSave ?? true,
+      compactView: settings?.compactView ?? false,
+      itemsPerPage: settings?.itemsPerPage ?? 10,
+    }),
+    [],
+  );
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
-  const [userConfig, setUserConfig] = useState(() => derivePreferences(user?.settings));
+  const [userConfig, setUserConfig] = useState(() =>
+    derivePreferences(user?.settings),
+  );
 
   const baselinePreferences = useMemo(
     () => derivePreferences(user?.settings),
@@ -52,16 +63,21 @@ export const UserSettings: React.FC = () => {
     () => JSON.stringify(userConfig) !== JSON.stringify(baselinePreferences),
     [userConfig, baselinePreferences],
   );
-  
-  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(user?.avatarUrl ?? undefined);
+
+  const [avatarPreview, setAvatarPreview] = useState<string | undefined>(
+    user?.avatarUrl ?? undefined,
+  );
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const userInitial = user?.nome?.charAt(0)?.toUpperCase() ?? user?.usuario?.charAt(0)?.toUpperCase() ?? '?';
-  
+  const userInitial =
+    user?.nome?.charAt(0)?.toUpperCase() ??
+    user?.usuario?.charAt(0)?.toUpperCase() ??
+    "?";
+
   const [showPassword, setShowPassword] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     if (!avatarFile) {
@@ -79,32 +95,33 @@ export const UserSettings: React.FC = () => {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Selecione um arquivo de imagem valido');
-      event.target.value = '';
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione um arquivo de imagem valido");
+      event.target.value = "";
       return;
     }
 
     const maxSize = 2 * 1024 * 1024; // 2MB
     if (file.size > maxSize) {
-      toast.error('A imagem deve ter no maximo 2 MB');
-      event.target.value = '';
+      toast.error("A imagem deve ter no maximo 2 MB");
+      event.target.value = "";
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : undefined;
+      const result =
+        typeof reader.result === "string" ? reader.result : undefined;
       setAvatarPreview(result);
       setAvatarFile(file);
     };
     reader.onerror = () => {
-      toast.error('Nao foi possível carregar a imagem selecionada');
+      toast.error("Nao foi possível carregar a imagem selecionada");
     };
     reader.readAsDataURL(file);
 
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
@@ -113,7 +130,7 @@ export const UserSettings: React.FC = () => {
       return;
     }
     if (!avatarFile) {
-      toast.error('Selecione uma imagem antes de salvar');
+      toast.error("Selecione uma imagem antes de salvar");
       return;
     }
 
@@ -121,7 +138,7 @@ export const UserSettings: React.FC = () => {
     try {
       const response = await apiService.uploadMyAvatar(avatarFile);
       if (!response.success || !response.data?.avatarUrl) {
-        throw new Error(response.message || 'Erro ao atualizar avatar');
+        throw new Error(response.message || "Erro ao atualizar avatar");
       }
 
       // Buscar dados atualizados do usuário do backend
@@ -140,10 +157,10 @@ export const UserSettings: React.FC = () => {
       }
 
       setAvatarFile(null);
-      toast.success('Foto de perfil atualizada!');
+      toast.success("Foto de perfil atualizada!");
     } catch (error) {
-      console.error('Erro ao atualizar a foto de perfil', error);
-      toast.error('Erro ao atualizar a foto de perfil');
+      console.error("Erro ao atualizar a foto de perfil", error);
+      toast.error("Erro ao atualizar a foto de perfil");
     } finally {
       setIsSavingAvatar(false);
     }
@@ -164,7 +181,7 @@ export const UserSettings: React.FC = () => {
     try {
       const response = await apiService.deleteMyAvatar();
       if (!response.success) {
-        throw new Error(response.message || 'Erro ao remover avatar');
+        throw new Error(response.message || "Erro ao remover avatar");
       }
 
       // Buscar dados atualizados do usuário do backend
@@ -178,10 +195,10 @@ export const UserSettings: React.FC = () => {
         setAvatarPreview(undefined);
       }
 
-      toast.success('Foto de perfil removida');
+      toast.success("Foto de perfil removida");
     } catch (error) {
-      console.error('Erro ao remover foto de perfil', error);
-      toast.error('Erro ao remover a foto de perfil');
+      console.error("Erro ao remover foto de perfil", error);
+      toast.error("Erro ao remover a foto de perfil");
     } finally {
       setIsSavingAvatar(false);
     }
@@ -203,7 +220,7 @@ export const UserSettings: React.FC = () => {
       });
 
       if (!response.success || !response.data) {
-        throw new Error(response.message || 'Erro ao atualizar preferências');
+        throw new Error(response.message || "Erro ao atualizar preferências");
       }
 
       const updatedSettings: UserSettingsType = {
@@ -217,10 +234,10 @@ export const UserSettings: React.FC = () => {
       });
 
       setUserConfig(derivePreferences(updatedSettings));
-      toast.success('Preferências atualizadas!');
+      toast.success("Preferências atualizadas!");
     } catch (error) {
-      console.error('Erro ao atualizar preferências', error);
-      toast.error('Erro ao atualizar preferências');
+      console.error("Erro ao atualizar preferências", error);
+      toast.error("Erro ao atualizar preferências");
     } finally {
       setIsSavingPreferences(false);
     }
@@ -228,23 +245,23 @@ export const UserSettings: React.FC = () => {
 
   const handlePasswordChange = async () => {
     if (newPassword !== confirmPassword) {
-      toast.error('As senhas não coincidem');
+      toast.error("As senhas não coincidem");
       return;
     }
     if (newPassword.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres');
+      toast.error("A senha deve ter pelo menos 6 caracteres");
       return;
     }
-    
+
     setIsLoading(true);
     try {
       // Simular alteração de senha
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Senha alterada com sucesso!');
-      setNewPassword('');
-      setConfirmPassword('');
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      toast.success("Senha alterada com sucesso!");
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (error) {
-      toast.error('Erro ao alterar senha');
+      toast.error("Erro ao alterar senha");
     } finally {
       setIsLoading(false);
     }
@@ -269,7 +286,7 @@ export const UserSettings: React.FC = () => {
               {avatarPreview ? (
                 <img
                   src={avatarPreview}
-                  alt={user?.nome ?? 'Foto do usuario'}
+                  alt={user?.nome ?? "Foto do usuario"}
                   className="h-20 w-20 rounded-full object-cover border border-border/60 shadow-sm"
                 />
               ) : (
@@ -278,9 +295,12 @@ export const UserSettings: React.FC = () => {
                 </div>
               )}
               <div>
-                <p className="text-sm font-semibold text-foreground">Foto do usuá
-                  rio</p>
-                <p className="text-xs text-muted-foreground">PNG ou JPG até 2 MB.</p>
+                <p className="text-sm font-semibold text-foreground">
+                  Foto do usuá rio
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  PNG ou JPG até 2 MB.
+                </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -307,7 +327,7 @@ export const UserSettings: React.FC = () => {
                 disabled={!avatarFile || isSavingAvatar}
                 className="gap-2"
               >
-                {isSavingAvatar ? 'Salvando...' : 'Salvar foto'}
+                {isSavingAvatar ? "Salvando..." : "Salvar foto"}
               </Button>
               {(avatarPreview || user?.avatarUrl) && (
                 <Button
@@ -328,31 +348,34 @@ export const UserSettings: React.FC = () => {
               <Label htmlFor="user-name">Nome completo</Label>
               <Input
                 id="user-name"
-                value={user?.nome || ''}
+                value={user?.nome || ""}
                 disabled
-                className="bg-gray-50"
+                className="bg-muted"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="user-username">Usuário</Label>
               <Input
                 id="user-username"
-                value={user?.usuario || ''}
+                value={user?.usuario || ""}
                 disabled
-                className="bg-gray-50"
+                className="bg-muted"
               />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="user-role">Perfil</Label>
             <div className="flex items-center gap-2">
-              <Badge 
-                variant={user?.role?.name === 'admin' ? 'default' : 'secondary'}
+              <Badge
+                variant={user?.role?.name === "admin" ? "default" : "secondary"}
                 className="capitalize"
               >
-                {user?.role?.name === 'admin' ? 'Administrador' : 
-                 user?.role?.name === 'coordenador' ? 'Coordenador' : 'Usuário'}
+                {user?.role?.name === "admin"
+                  ? "Administrador"
+                  : user?.role?.name === "coordenador"
+                    ? "Coordenador"
+                    : "Usuário"}
               </Badge>
             </div>
           </div>
@@ -376,7 +399,7 @@ export const UserSettings: React.FC = () => {
             <div className="relative">
               <Input
                 id="new-password"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Digite sua nova senha"
@@ -384,30 +407,34 @@ export const UserSettings: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirmar nova senha</Label>
             <Input
               id="confirm-password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirme sua nova senha"
             />
           </div>
-          
-          <Button 
+
+          <Button
             onClick={handlePasswordChange}
             disabled={!newPassword || !confirmPassword || isLoading}
             className="w-full md:w-auto"
           >
-            {isLoading ? 'Alterando...' : 'Alterar Senha'}
+            {isLoading ? "Alterando..." : "Alterar Senha"}
           </Button>
         </CardContent>
       </Card>
@@ -419,20 +446,20 @@ export const UserSettings: React.FC = () => {
             <Settings className="h-5 w-5" />
             Preferências
           </CardTitle>
-          <CardDescription>
-            Configure suas preferências de uso
-          </CardDescription>
+          <CardDescription>Configure suas preferências de uso</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">Exibir e-mail</Label>
-              <p className="text-sm text-gray-500">Mostrar seu e-mail para outros usuários autorizados</p>
+              <p className="text-sm text-muted-foreground">
+                Mostrar seu e-mail para outros usuários autorizados
+              </p>
             </div>
             <Switch
               checked={userConfig.showEmail}
               onCheckedChange={(checked) =>
-                setUserConfig(prev => ({ ...prev, showEmail: !!checked }))
+                setUserConfig((prev) => ({ ...prev, showEmail: !!checked }))
               }
             />
           </div>
@@ -440,52 +467,64 @@ export const UserSettings: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-sm font-medium">Exibir telefone</Label>
-              <p className="text-sm text-gray-500">Compartilhar telefone em perfis e detalhes de tarefas</p>
+              <p className="text-sm text-muted-foreground">
+                Compartilhar telefone em perfis e detalhes de tarefas
+              </p>
             </div>
             <Switch
               checked={userConfig.showPhone}
               onCheckedChange={(checked) =>
-                setUserConfig(prev => ({ ...prev, showPhone: !!checked }))
+                setUserConfig((prev) => ({ ...prev, showPhone: !!checked }))
               }
             />
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Salvamento automático</Label>
-              <p className="text-sm text-gray-500">Salvar alterações automaticamente</p>
+              <Label className="text-sm font-medium">
+                Salvamento automático
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Salvar alterações automaticamente
+              </p>
             </div>
             <Switch
               checked={userConfig.autoSave}
-              onCheckedChange={(checked) => 
-                setUserConfig(prev => ({ ...prev, autoSave: !!checked }))
+              onCheckedChange={(checked) =>
+                setUserConfig((prev) => ({ ...prev, autoSave: !!checked }))
               }
             />
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Visualização compacta</Label>
-              <p className="text-sm text-gray-500">Usar menos espaço nas listas</p>
+              <Label className="text-sm font-medium">
+                Visualização compacta
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Usar menos espaço nas listas
+              </p>
             </div>
             <Switch
               checked={userConfig.compactView}
-              onCheckedChange={(checked) => 
-                setUserConfig(prev => ({ ...prev, compactView: !!checked }))
+              onCheckedChange={(checked) =>
+                setUserConfig((prev) => ({ ...prev, compactView: !!checked }))
               }
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="items-per-page">Itens por página</Label>
             <select
               id="items-per-page"
               value={userConfig.itemsPerPage}
-              onChange={(e) => setUserConfig(prev => ({ 
-                ...prev, 
-                itemsPerPage: parseInt(e.target.value) 
-              }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              onChange={(e) =>
+                setUserConfig((prev) => ({
+                  ...prev,
+                  itemsPerPage: parseInt(e.target.value),
+                }))
+              }
+              className="w-full px-3 py-2 border border-border bg-background text-foreground rounded-md focus:ring-2 focus:ring-ring focus:border-ring"
             >
               <option value={5}>5 itens</option>
               <option value={10}>10 itens</option>
@@ -501,7 +540,7 @@ export const UserSettings: React.FC = () => {
               disabled={!preferencesChanged || isSavingPreferences}
               className="w-full md:w-auto"
             >
-              {isSavingPreferences ? 'Salvando...' : 'Salvar preferências'}
+              {isSavingPreferences ? "Salvando..." : "Salvar preferências"}
             </Button>
           </div>
         </CardContent>

@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsDateString,
   IsArray,
+  IsIn,
   Min,
   Max,
 } from "class-validator";
@@ -152,18 +153,46 @@ export class QueryTarefaDto {
 
   @ApiPropertyOptional({
     description: "Campo para ordenação",
-    example: "criadoEm",
+    example: "createdAt",
     enum: [
+      "id",
       "titulo",
+      "descricao",
       "prioridade",
       "prazo",
+      "updatedAt",
+      "ordem",
+      "coluna",
+      "projeto",
+      "responsavel",
+      "createdAt",
       "criadoEm",
       "atualizadoEm",
-      "ordem",
     ],
   })
   @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString({ message: "O campo de ordenação deve ser uma string" })
+  @IsIn(
+    [
+      "id",
+      "titulo",
+      "descricao",
+      "prioridade",
+      "prazo",
+      "updatedAt",
+      "ordem",
+      "coluna",
+      "projeto",
+      "responsavel",
+      "createdAt",
+      "criadoEm",
+      "atualizadoEm",
+    ],
+    {
+      message: "Campo de ordenação inválido",
+    },
+  )
   sortBy?: string = "criadoEm";
 
   @ApiPropertyOptional({
@@ -172,6 +201,12 @@ export class QueryTarefaDto {
     enum: ["ASC", "DESC"],
   })
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === "string" ? value.trim().toUpperCase() : value,
+  )
   @IsString({ message: "A direção deve ser uma string" })
+  @IsIn(["ASC", "DESC"], {
+    message: "A direção deve ser ASC ou DESC",
+  })
   sortOrder?: "ASC" | "DESC" = "DESC";
 }

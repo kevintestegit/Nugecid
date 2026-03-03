@@ -86,7 +86,7 @@ export class FindAllDesarquivamentosUseCase {
     const options: FindAllOptions = {
       page: request.page || 1,
       limit: Math.min(request.limit || 10, 100), // Limitar a 100 registros por página
-      sortBy: request.sortBy || "dataSolicitacao",
+      sortBy: request.sortBy || "createdAt",
       sortOrder: request.sortOrder || "DESC",
       filters: {
         ...request.filters,
@@ -163,6 +163,11 @@ export class FindAllDesarquivamentosUseCase {
       "numeroNicLaudoAuto",
       "numeroProcesso",
       "dataSolicitacao",
+      "tipoDocumento",
+      "setorDemandante",
+      "servidorResponsavel",
+      "finalidadeDesarquivamento",
+      "solicitacaoProrrogacao",
       "dataDesarquivamentoSAG",
       "dataDevolucaoSetor",
       "urgente",

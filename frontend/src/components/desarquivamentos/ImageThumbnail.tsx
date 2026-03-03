@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react'
-import { apiService } from '@/services/api'
+import React, { useEffect, useState } from "react";
+import { getAuthHeader } from "@/utils/tokenStorage";
 
 interface ImageThumbnailProps {
-  desarquivamentoId: number | null
-  numeroProcesso?: string | null
-  anexoId: number
-  nomeOriginal: string
-  tipoMime: string
-  previewUrl?: string
+  desarquivamentoId: number | null;
+  numeroProcesso?: string | null;
+  anexoId: number;
+  nomeOriginal: string;
+  tipoMime: string;
+  previewUrl?: string;
 }
 
 export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
@@ -18,74 +18,101 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
   tipoMime,
   previewUrl,
 }) => {
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    let objectUrl: string | null = null
+    let objectUrl: string | null = null;
+    let isActive = true;
+    const controller = new AbortController();
 
     const loadImage = async () => {
       try {
-        setLoading(true)
-        setError(false)
+        if (!isActive) return;
+        setLoading(true);
+        setError(false);
 
-        let blob: Blob
-        
+        let blob: Blob;
+
         // Se tem previewUrl, usar ela (vem do backend com a URL correta)
         if (previewUrl) {
           const response = await fetch(previewUrl, {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+              ...getAuthHeader(),
             },
-          })
-          if (!response.ok) throw new Error('Erro ao carregar imagem')
-          blob = await response.blob()
+            signal: controller.signal,
+          });
+          if (!response.ok) throw new Error("Erro ao carregar imagem");
+          blob = await response.blob();
         } else if (desarquivamentoId) {
           // Anexo de solicitação
-          blob = await apiService.viewDesarquivamentoAnexo(
-            desarquivamentoId,
-            anexoId
-          )
+          const response = await fetch(
+            `/api/nugecid/${desarquivamentoId}/anexos/${anexoId}/view`,
+            {
+              headers: {
+                ...getAuthHeader(),
+              },
+              signal: controller.signal,
+            },
+          );
+          if (!response.ok) throw new Error("Erro ao carregar imagem");
+          blob = await response.blob();
         } else if (numeroProcesso) {
           // Anexo de processo - usar rota de processo
-          const encodedProcesso = encodeURIComponent(numeroProcesso)
-          const response = await fetch(`/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/view`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+          const encodedProcesso = encodeURIComponent(numeroProcesso);
+          const response = await fetch(
+            `/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/view`,
+            {
+              headers: {
+                ...getAuthHeader(),
+              },
+              signal: controller.signal,
             },
-          })
-          if (!response.ok) throw new Error('Erro ao carregar imagem')
-          blob = await response.blob()
+          );
+          if (!response.ok) throw new Error("Erro ao carregar imagem");
+          blob = await response.blob();
         } else {
-          throw new Error('Nem desarquivamentoId nem numeroProcesso fornecidos')
+          throw new Error(
+            "Nem desarquivamentoId nem numeroProcesso fornecidos",
+          );
         }
 
         // Cria URL temporária
-        objectUrl = URL.createObjectURL(blob)
-        setImageUrl(objectUrl)
-        setLoading(false)
+        objectUrl = URL.createObjectURL(blob);
+        if (!isActive) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        setImageUrl(objectUrl);
+        setLoading(false);
       } catch (err) {
-        console.error('Erro ao carregar miniatura:', err)
-        setError(true)
-        setLoading(false)
+        if ((err as { name?: string })?.name === "AbortError") {
+          return;
+        }
+        if (!isActive) return;
+        console.error("Erro ao carregar miniatura:", err);
+        setError(true);
+        setLoading(false);
       }
-    }
+    };
 
     // Só carrega se for imagem
-    if (tipoMime.startsWith('image/')) {
-      loadImage()
+    if (tipoMime.startsWith("image/")) {
+      loadImage();
     } else {
-      setLoading(false)
+      setLoading(false);
     }
 
     // Cleanup: libera a URL ao desmontar
     return () => {
+      isActive = false;
+      controller.abort();
       if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
+        URL.revokeObjectURL(objectUrl);
       }
-    }
-  }, [desarquivamentoId, numeroProcesso, anexoId, tipoMime, previewUrl])
+    };
+  }, [desarquivamentoId, numeroProcesso, anexoId, tipoMime, previewUrl]);
 
   // Mostrar ícone enquanto carrega
   if (loading) {
@@ -93,38 +120,38 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
       <div className="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
         <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full"></div>
       </div>
-    )
+    );
   }
 
   // Se deu erro ou não é imagem, mostrar ícone colorido
-  if (error || !tipoMime.startsWith('image/')) {
+  if (error || !tipoMime.startsWith("image/")) {
     return (
       <div
         className={`h-12 w-12 rounded flex items-center justify-center text-white text-xs font-bold ${
-          tipoMime.startsWith('image/')
-            ? 'bg-green-500'
-            : tipoMime === 'application/pdf'
-              ? 'bg-red-500'
-              : 'bg-blue-500'
+          tipoMime.startsWith("image/")
+            ? "bg-green-500"
+            : tipoMime === "application/pdf"
+              ? "bg-red-500"
+              : "bg-blue-500"
         }`}
       >
-        {tipoMime.startsWith('image/')
-          ? 'IMG'
-          : tipoMime === 'application/pdf'
-            ? 'PDF'
-            : 'DOC'}
+        {tipoMime.startsWith("image/")
+          ? "IMG"
+          : tipoMime === "application/pdf"
+            ? "PDF"
+            : "DOC"}
       </div>
-    )
+    );
   }
 
   // Mostrar miniatura da imagem
   return (
     <div className="h-12 w-12 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
       <img
-        src={imageUrl || ''}
+        src={imageUrl || ""}
         alt={nomeOriginal}
         className="h-full w-full object-cover"
       />
     </div>
-  )
-}
+  );
+};

@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { randomUUID } from "crypto";
-import { join } from "path";
+import { basename, extname, join, resolve, sep } from "path";
 import * as fs from "fs/promises";
 import { existsSync } from "fs";
 import * as XLSX from "xlsx";
@@ -17,6 +17,17 @@ import {
   ParsedPlanilha,
   PastaItemRow,
 } from "../pastas/pastas.service";
+import { FileValidator } from "../../common/utils/file-validator";
+import { SyncRealtimeService } from "../sync/sync-realtime.service";
+
+const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const ALLOWED_SPREADSHEET_MIME_TYPES = new Set([
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/csv",
+  "text/plain",
+]);
 
 export interface PlanilhaControleResponse {
   id: string;
@@ -63,6 +74,7 @@ export class PlanilhasService {
     private readonly planilhasRepository: Repository<PlanilhaControle>,
     private readonly dataSource: DataSource,
     private readonly pastasService: PastasService,
+    private readonly syncRealtimeService: SyncRealtimeService,
   ) {}
 
   private async ensureSchema(): Promise<void> {
@@ -102,17 +114,18 @@ export class PlanilhasService {
       throw new BadRequestException("Nenhum arquivo de planilha foi enviado.");
     }
 
+    await this.validateUploadedSpreadsheet(file);
     await this.ensureSchema();
     await fs.mkdir(this.uploadDir, { recursive: true });
 
-    const safeName = file.originalname.replace(/\s+/g, "_");
-    const filename = `${Date.now()}-${randomUUID()}-${safeName}`;
-    const destino = join(this.uploadDir, filename);
+    const safeOriginalName = this.sanitizeOriginalFilename(file.originalname);
+    const filename = this.buildStoredFilename(safeOriginalName);
+    const destino = this.resolveUploadPath(filename);
 
     await fs.writeFile(destino, file.buffer);
 
     const planilha = this.planilhasRepository.create({
-      nomeOriginal: file.originalname,
+      nomeOriginal: safeOriginalName,
       caminho: filename,
       tamanhoBytes: file.size.toString(),
     });
@@ -122,6 +135,20 @@ export class PlanilhasService {
     this.logger.log(
       `Planilha geral salva com sucesso: ${planilha.id} (${planilha.nomeOriginal})`,
     );
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "planilhas",
+      action: "created",
+      entityId: planilha.id,
+      entityType: "planilha",
+      metadata: { nomeOriginal: planilha.nomeOriginal },
+    });
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      metadata: { section: "planilhas" },
+    });
 
     return this.mapToResponse(planilha);
   }
@@ -146,7 +173,7 @@ export class PlanilhasService {
 
     await this.planilhasRepository.delete(planilha.id);
 
-    const caminhoAbsoluto = join(this.uploadDir, planilha.caminho);
+    const caminhoAbsoluto = this.resolveUploadPath(planilha.caminho);
     if (existsSync(caminhoAbsoluto)) {
       await fs.unlink(caminhoAbsoluto).catch((err) => {
         this.logger.warn(
@@ -154,6 +181,20 @@ export class PlanilhasService {
         );
       });
     }
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "planilhas",
+      action: "deleted",
+      entityId: planilha.id,
+      entityType: "planilha",
+      metadata: { nomeOriginal: planilha.nomeOriginal },
+    });
+    this.syncRealtimeService.emitDomainChange({
+      scope: "dashboard",
+      action: "updated",
+      entityType: "dashboard",
+      metadata: { section: "planilhas" },
+    });
   }
 
   async obterArquivo(
@@ -168,7 +209,7 @@ export class PlanilhasService {
       throw new NotFoundException("Planilha nao encontrada.");
     }
 
-    const caminhoAbsoluto = join(this.uploadDir, registro.caminho);
+    const caminhoAbsoluto = this.resolveUploadPath(registro.caminho);
     if (!existsSync(caminhoAbsoluto)) {
       throw new NotFoundException(
         "Arquivo fisico da planilha nao foi localizado.",
@@ -345,7 +386,7 @@ export class PlanilhasService {
       return null;
     }
 
-    const caminhoAbsoluto = join(this.uploadDir, registro.caminho);
+    const caminhoAbsoluto = this.resolveUploadPath(registro.caminho);
     if (!existsSync(caminhoAbsoluto)) {
       this.logger.warn(
         `Arquivo da planilha de controle nao encontrado: ${caminhoAbsoluto}`,
@@ -413,6 +454,10 @@ export class PlanilhasService {
       return null;
     }
 
+    const pastaColumn = headerRow.find((coluna) =>
+      coluna.toLowerCase().includes("pasta"),
+    );
+
     const linhas = dataRows.map((row, index) => {
       const linha: PlanilhaGeralLinha = {};
       normalizedHeaders.forEach((coluna) => {
@@ -437,10 +482,6 @@ export class PlanilhasService {
 
       return linha;
     });
-
-    const pastaColumn = headerRow.find((coluna) =>
-      coluna.toLowerCase().includes("pasta"),
-    );
 
     const gruposMap = new Map<
       string,
@@ -599,6 +640,90 @@ export class PlanilhasService {
     }
 
     return numero;
+  }
+
+  private async validateUploadedSpreadsheet(
+    file: Express.Multer.File,
+  ): Promise<void> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException("Arquivo de planilha inválido ou vazio.");
+    }
+
+    const extension = extname(file.originalname || "").toLowerCase();
+    if (!ALLOWED_SPREADSHEET_EXTENSIONS.has(extension)) {
+      throw new BadRequestException(
+        "Formato de planilha inválido. Use .xlsx, .xls ou .csv.",
+      );
+    }
+
+    const detectedMime = await FileValidator.detectFileType(file.buffer);
+    if (detectedMime) {
+      if (!ALLOWED_SPREADSHEET_MIME_TYPES.has(detectedMime)) {
+        throw new BadRequestException(
+          `Tipo de planilha inválido (${detectedMime}).`,
+        );
+      }
+      return;
+    }
+
+    if (extension !== ".csv" || !this.looksLikeCsv(file.buffer)) {
+      throw new BadRequestException(
+        "Não foi possível validar a planilha enviada com segurança.",
+      );
+    }
+  }
+
+  private looksLikeCsv(buffer: Buffer): boolean {
+    const sample = buffer.subarray(0, Math.min(buffer.length, 4096));
+    for (const byte of sample) {
+      if (byte === 0) {
+        return false;
+      }
+    }
+
+    const text = sample.toString("utf8");
+    if (!text.trim()) {
+      return false;
+    }
+
+    return /[,;\t]/.test(text) && /\r?\n/.test(text);
+  }
+
+  private sanitizeOriginalFilename(originalName: string): string {
+    const baseName = basename(originalName || "planilha");
+    const sanitized = baseName
+      .normalize("NFKC")
+      .replace(/[^\w.\-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^\.+/, "")
+      .slice(0, 128);
+
+    return sanitized || "planilha";
+  }
+
+  private buildStoredFilename(safeOriginalName: string): string {
+    const extension = extname(safeOriginalName).toLowerCase().slice(0, 10);
+    return `${Date.now()}-${randomUUID()}${extension}`;
+  }
+
+  private resolveUploadPath(relativePath: string): string {
+    const uploadRoot = resolve(this.uploadDir);
+    const normalizedRelativePath = relativePath
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+    if (!normalizedRelativePath) {
+      throw new BadRequestException("Caminho de planilha inválido.");
+    }
+    const absolutePath = resolve(uploadRoot, normalizedRelativePath);
+
+    if (
+      absolutePath !== uploadRoot &&
+      !absolutePath.startsWith(`${uploadRoot}${sep}`)
+    ) {
+      throw new BadRequestException("Caminho de planilha inválido.");
+    }
+
+    return absolutePath;
   }
 
   private mapToResponse(planilha: PlanilhaControle): PlanilhaControleResponse {

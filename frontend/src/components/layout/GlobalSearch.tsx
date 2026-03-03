@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   Search,
   FileText,
@@ -8,8 +9,11 @@ import {
   X,
   CheckSquare,
   Kanban,
-  Shield,
   FolderOpen,
+  AlertCircle,
+  Fingerprint,
+  Bell,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiService } from "@/services/api";
@@ -20,7 +24,9 @@ export const GlobalSearch: React.FC = () => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -58,12 +64,15 @@ export const GlobalSearch: React.FC = () => {
   }, []);
 
   // Navegação com teclado
-  const handleSelectResult = useCallback((result: SearchResult) => {
-    navigate(result.url);
-    setIsOpen(false);
-    setQuery("");
-    setResults([]);
-  }, [navigate]);
+  const handleSelectResult = useCallback(
+    (result: SearchResult) => {
+      navigate(result.url);
+      setIsOpen(false);
+      setQuery("");
+      setResults([]);
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     if (!isOpen || !results || results.length === 0) return;
@@ -89,10 +98,34 @@ export const GlobalSearch: React.FC = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleSelectResult, isOpen, results, selectedIndex]);
 
+  useEffect(() => {
+    const handleDomainSync = () => {
+      if (query.trim().length >= 2) {
+        setRefreshNonce((previous) => previous + 1);
+      }
+    };
+
+    window.addEventListener("sgc:domain-sync", handleDomainSync);
+    return () => {
+      window.removeEventListener("sgc:domain-sync", handleDomainSync);
+    };
+  }, [query]);
+
   // Buscar resultados
   useEffect(() => {
-    if (!query.trim()) {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
       setResults([]);
+      setSearchError(null);
+      setIsOpen(false);
+      return;
+    }
+
+    // Mantém frontend alinhado com a regra do backend (mínimo 2 caracteres).
+    if (trimmedQuery.length < 2) {
+      setResults([]);
+      setSearchError(null);
       setIsOpen(false);
       return;
     }
@@ -101,14 +134,18 @@ export const GlobalSearch: React.FC = () => {
     let active = true;
     const searchTimeout = setTimeout(async () => {
       setIsLoading(true);
+      setSearchError(null);
       setIsOpen(true);
       try {
-        const response = await apiService.search({
-          query: query.trim(),
-          limit: 20,
-        }, controller.signal);
+        const response = await apiService.search(
+          {
+            query: trimmedQuery,
+            limit: 20,
+          },
+          controller.signal,
+        );
 
-        const searchData = response as any;
+        const searchData = response;
 
         if (!active) return;
         if (Array.isArray(searchData?.results)) {
@@ -120,11 +157,14 @@ export const GlobalSearch: React.FC = () => {
         }
 
         setSelectedIndex(0);
-      } catch (error: any) {
-        if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+      } catch (error: unknown) {
+        if (axios.isCancel(error)) {
           return;
         }
-        setResults([]);
+        if (active) {
+          setResults([]);
+          setSearchError("Erro ao realizar a busca. Tente novamente.");
+        }
       } finally {
         if (active) {
           setIsLoading(false);
@@ -137,11 +177,12 @@ export const GlobalSearch: React.FC = () => {
       clearTimeout(searchTimeout);
       controller.abort();
     };
-  }, [query]);
+  }, [query, refreshNonce]);
 
   const handleClear = () => {
     setQuery("");
     setResults([]);
+    setSearchError(null);
     setIsOpen(false);
     inputRef.current?.focus();
   };
@@ -156,10 +197,14 @@ export const GlobalSearch: React.FC = () => {
         return <CheckSquare className="h-4 w-4" />;
       case "projeto":
         return <Kanban className="h-4 w-4" />;
-      case "custodia":
-        return <Shield className="h-4 w-4" />;
       case "pasta":
         return <FolderOpen className="h-4 w-4" />;
+      case "vestigio":
+        return <Fingerprint className="h-4 w-4" />;
+      case "notificacao":
+        return <Bell className="h-4 w-4" />;
+      case "planilha":
+        return <FileSpreadsheet className="h-4 w-4" />;
       default:
         return <Search className="h-4 w-4" />;
     }
@@ -175,10 +220,14 @@ export const GlobalSearch: React.FC = () => {
         return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300";
       case "projeto":
         return "bg-orange-100 text-orange-600 dark:bg-orange-900 dark:text-orange-300";
-      case "custodia":
-        return "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300";
       case "pasta":
         return "bg-cyan-100 text-cyan-600 dark:bg-cyan-900 dark:text-cyan-300";
+      case "vestigio":
+        return "bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300";
+      case "notificacao":
+        return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+      case "planilha":
+        return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300";
       default:
         return "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300";
     }
@@ -227,6 +276,11 @@ export const GlobalSearch: React.FC = () => {
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : searchError ? (
+                <div className="py-8 text-center">
+                  <AlertCircle className="mx-auto h-10 w-10 text-destructive/60" />
+                  <p className="mt-3 text-sm text-destructive">{searchError}</p>
                 </div>
               ) : results && results.length > 0 ? (
                 <div className="space-y-1">

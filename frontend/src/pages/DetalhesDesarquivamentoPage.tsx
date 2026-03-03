@@ -1,14 +1,34 @@
-import React, { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useDesarquivamento, useDownloadTermoPdf, useDownloadTermoDocx, useDesarquivamentoComments, useAddDesarquivamentoComment } from '@/hooks/useDesarquivamentos'
-import { useDesarquivamentosAnexos, useUploadDesarquivamentoAnexo, useDownloadDesarquivamentoAnexo, useDeleteDesarquivamentoAnexo, useViewDesarquivamentoAnexo, useUpdateDesarquivamentoAnexo } from '@/hooks/useDesarquivamentosAnexos'
-import { useAuth } from '@/contexts/AuthContext'
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { PageLoading } from '@/components/ui/Loading'
-import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import {
+  useDesarquivamento,
+  useDownloadTermoPdf,
+  useDownloadTermoDocx,
+  useDesarquivamentoComments,
+  useAddDesarquivamentoComment,
+} from "@/hooks/useDesarquivamentos";
+import { useDesarquivamentoHistorico } from "@/hooks/useDesarquivamentoHistorico";
+import {
+  useDesarquivamentosAnexos,
+  useUploadDesarquivamentoAnexo,
+  useDownloadDesarquivamentoAnexo,
+  useDeleteDesarquivamentoAnexo,
+  useViewDesarquivamentoAnexo,
+  useUpdateDesarquivamentoAnexo,
+} from "@/hooks/useDesarquivamentosAnexos";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/Button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { PageLoading } from "@/components/ui/Loading";
+import { Input } from "@/components/ui/Input";
+import { Label } from "@/components/ui/Label";
 import {
   ArrowLeft,
   Edit,
@@ -29,21 +49,27 @@ import {
   Paperclip,
   X,
   Copy,
-  Check
-} from 'lucide-react'
-import { getStatusLabel } from '@/utils/format'
-import { StatusDesarquivamento } from '@/types'
-import { formatDateTime } from '@/lib/utils'
-import { toast } from 'sonner'
-import { ImagePreviewModal } from '@/components/desarquivamentos/ImagePreviewModal'
-import { AnexosSection } from '@/components/desarquivamentos/AnexosSection'
-import { HistoricoTimeline } from '@/components/desarquivamentos/HistoricoTimeline'
-import { getInstitutoLabel } from '@/constants/institutos'
+  Check,
+} from "lucide-react";
+import { getStatusLabel } from "@/utils/format";
+import { StatusDesarquivamento, DesarquivamentoAnexo } from "@/types";
+import { formatDateTime } from "@/lib/utils";
+import { toast } from "sonner";
+import { ImagePreviewModal } from "@/components/desarquivamentos/ImagePreviewModal";
+import { AnexosSection } from "@/components/desarquivamentos/AnexosSection";
+import { HistoricoTimeline } from "@/components/desarquivamentos/HistoricoTimeline";
+import { getInstitutoLabel } from "@/constants/institutos";
+import { getAuthHeader } from "@/utils/tokenStorage";
+import {
+  buildHistoricoMessage,
+  isBusinessHistoricoEntry,
+  type HistoricoMessageTone,
+} from "@/utils/desarquivamentoHistoricoMessages";
 
 const DetalhesDesarquivamentoPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: response, isLoading, error } = useDesarquivamento(id);
   const desarquivamento = response?.data;
@@ -53,86 +79,100 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO,
   ].includes(desarquivamento?.status as StatusDesarquivamento);
 
-  const downloadPdfMutation = useDownloadTermoPdf()
-  const downloadDocxMutation = useDownloadTermoDocx()
+  const downloadPdfMutation = useDownloadTermoPdf();
+  const downloadDocxMutation = useDownloadTermoDocx();
 
   const { data: commentsResponse, isLoading: isLoadingComments } =
     useDesarquivamentoComments(Number(id));
+  const { data: historicoAcoes = [] } = useDesarquivamentoHistorico(Number(id));
   const comments = commentsResponse?.data ?? [];
   const addCommentMutation = useAddDesarquivamentoComment(Number(id));
-  const [commentText, setCommentText] = useState('');
+  const [commentText, setCommentText] = useState("");
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Anexos - Separados por tipo
-  const { data: anexosDesarquivamento, isLoading: isLoadingAnexosDesarq } = 
-    useDesarquivamentosAnexos(Number(id), 'desarquivamento');
-  const { data: anexosRearquivamento, isLoading: isLoadingAnexosRearq } = 
-    useDesarquivamentosAnexos(Number(id), 'rearquivamento');
-  
+  const { data: anexosDesarquivamento, isLoading: isLoadingAnexosDesarq } =
+    useDesarquivamentosAnexos(Number(id), "desarquivamento");
+  const { data: anexosRearquivamento, isLoading: isLoadingAnexosRearq } =
+    useDesarquivamentosAnexos(Number(id), "rearquivamento");
+
   const uploadAnexoMutation = useUploadDesarquivamentoAnexo();
   const downloadAnexoMutation = useDownloadDesarquivamentoAnexo();
   const deleteAnexoMutation = useDeleteDesarquivamentoAnexo();
   const viewAnexoMutation = useViewDesarquivamentoAnexo();
   const updateAnexoMutation = useUpdateDesarquivamentoAnexo();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewAnexo, setPreviewAnexo] = useState<any>(null);
+  const [previewAnexo, setPreviewAnexo] = useState<DesarquivamentoAnexo | null>(
+    null,
+  );
 
-  const canEdit = user?.role?.name === 'admin' || user?.role?.name === 'coordenador'
+  const canEdit =
+    user?.role?.name === "admin" || user?.role?.name === "coordenador";
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    if (!previousOverflow || previousOverflow === 'hidden') {
-      document.body.style.overflow = 'auto'
+    const previousOverflow = document.body.style.overflow;
+    if (!previousOverflow || previousOverflow === "hidden") {
+      document.body.style.overflow = "auto";
     }
 
     return () => {
       if (!previousOverflow) {
-        document.body.style.overflow = ''
+        document.body.style.overflow = "";
       } else {
-        document.body.style.overflow = previousOverflow
+        document.body.style.overflow = previousOverflow;
       }
-    }
-  }, [])
+    };
+  }, []);
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = commentText.trim();
     if (!trimmed) {
-      toast.error('Digite um comentário antes de enviar.');
+      toast.error("Digite um comentário antes de enviar.");
       return;
     }
 
     try {
       await addCommentMutation.mutateAsync(trimmed);
-      setCommentText('');
-      toast.success('Comentário adicionado com sucesso.');
-    } catch (error: any) {
+      setCommentText("");
+      toast.success("Comentário adicionado com sucesso.");
+    } catch (error: unknown) {
       const message =
-        error?.response?.data?.message ||
-        'Não foi possível adicionar o comentário.';
-      toast.error(message);
+        error instanceof Error && "response" in error
+          ? (error as { response?: { data?: { message?: string } } }).response
+              ?.data?.message
+          : undefined;
+      toast.error(message || "Não foi possível adicionar o comentário.");
     }
   };
 
-  const handleUploadDesarquivamento = async (file: File, descricao: string, anexarAoProcesso?: boolean) => {
+  const handleUploadDesarquivamento = async (
+    file: File,
+    descricao: string,
+    anexarAoProcesso?: boolean,
+  ) => {
     if (!id) return;
     await uploadAnexoMutation.mutateAsync({
       desarquivamentoId: Number(id),
       file,
       descricao: descricao.trim() || undefined,
-      tipoAnexo: 'desarquivamento',
-      anexarAoProcesso
+      tipoAnexo: "desarquivamento",
+      anexarAoProcesso,
     });
   };
 
-  const handleUploadRearquivamento = async (file: File, descricao: string, anexarAoProcesso?: boolean) => {
+  const handleUploadRearquivamento = async (
+    file: File,
+    descricao: string,
+    anexarAoProcesso?: boolean,
+  ) => {
     if (!id) return;
     await uploadAnexoMutation.mutateAsync({
       desarquivamentoId: Number(id),
       file,
       descricao: descricao.trim() || undefined,
-      tipoAnexo: 'rearquivamento',
-      anexarAoProcesso
+      tipoAnexo: "rearquivamento",
+      anexarAoProcesso,
     });
   };
 
@@ -147,23 +187,23 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     };
 
     const fallbackCopy = () => {
-      const textArea = document.createElement('textarea');
+      const textArea = document.createElement("textarea");
       textArea.value = value;
-      textArea.style.position = 'fixed';
-      textArea.style.opacity = '0';
-      textArea.style.pointerEvents = 'none';
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      textArea.style.pointerEvents = "none";
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
       try {
-        const successful = document.execCommand('copy');
+        const successful = document.execCommand("copy");
         if (successful) {
           markAsCopied();
         } else {
-          throw new Error('execCommand falhou');
+          throw new Error("execCommand falhou");
         }
       } catch (error) {
-        toast.error('Não foi possível copiar o conteúdo.');
+        toast.error("Não foi possível copiar o conteúdo.");
       } finally {
         document.body.removeChild(textArea);
       }
@@ -182,29 +222,35 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     fallbackCopy();
   };
 
-  const handleDownloadTermo = (format: 'pdf' | 'docx') => {
+  const handleDownloadTermo = (format: "pdf" | "docx") => {
     if (!id || isNaN(Number(id))) {
-      toast.error('Identificador invalido para o termo.');
+      toast.error("Identificador invalido para o termo.");
       return;
     }
 
     if (!canGerarTermo) {
-      toast.error('Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.');
+      toast.error(
+        "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.",
+      );
       return;
     }
 
-    const mutation = format === 'pdf' ? downloadPdfMutation : downloadDocxMutation;
+    const mutation =
+      format === "pdf" ? downloadPdfMutation : downloadDocxMutation;
 
     mutation.mutate(Number(id), {
       onSuccess: () => {
         toast.success(
-          format === 'pdf'
-            ? 'Termo em PDF gerado com sucesso.'
-            : 'Termo em Word gerado com sucesso.'
+          format === "pdf"
+            ? "Termo em PDF gerado com sucesso."
+            : "Termo em Word gerado com sucesso.",
         );
       },
-      onError: (error: any) => {
-        const message = error?.message || 'Nao foi possivel gerar o termo.';
+      onError: (error: unknown) => {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel gerar o termo.";
         toast.error(message);
       },
     });
@@ -213,26 +259,29 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   const handleDownloadAnexo = async (anexoId: number) => {
     if (!id) return;
 
-    const allAnexos = [...(anexosDesarquivamento ?? []), ...(anexosRearquivamento ?? [])];
-    const anexo = allAnexos.find(a => a.id === anexoId);
+    const allAnexos = [
+      ...(anexosDesarquivamento ?? []),
+      ...(anexosRearquivamento ?? []),
+    ];
+    const anexo = allAnexos.find((a) => a.id === anexoId);
 
     if (!anexo) {
-      toast.error('Anexo não encontrado');
+      toast.error("Anexo não encontrado");
       return;
     }
 
     try {
-      let blob: Blob
+      let blob: Blob;
 
       // Se anexo tem URL (vem do backend com URL correta), usar ela
       if (anexo.url) {
         const response = await fetch(anexo.url, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            ...getAuthHeader(),
           },
-        })
-        if (!response.ok) throw new Error('Erro ao baixar anexo')
-        blob = await response.blob()
+        });
+        if (!response.ok) throw new Error("Erro ao baixar anexo");
+        blob = await response.blob();
       } else if (anexo.desarquivamentoId) {
         // Anexo de solicitação
         blob = await downloadAnexoMutation.mutateAsync({
@@ -241,29 +290,32 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         });
       } else if (anexo.numeroProcesso) {
         // Anexo de processo
-        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso)
-        const response = await fetch(`/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/download`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso);
+        const response = await fetch(
+          `/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/download`,
+          {
+            headers: {
+              ...getAuthHeader(),
+            },
           },
-        })
-        if (!response.ok) throw new Error('Erro ao baixar anexo')
-        blob = await response.blob()
+        );
+        if (!response.ok) throw new Error("Erro ao baixar anexo");
+        blob = await response.blob();
       } else {
-        throw new Error('Anexo sem vínculo válido')
+        throw new Error("Anexo sem vínculo válido");
       }
 
       // Criar URL para download
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = anexo?.nomeOriginal || 'anexo';
+      link.download = anexo?.nomeOriginal || "anexo";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (error: any) {
-      toast.error('Erro ao baixar anexo.');
+    } catch (error: unknown) {
+      toast.error("Erro ao baixar anexo.");
     }
   };
 
@@ -275,21 +327,21 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
     });
   };
 
-  const handleViewAnexo = async (anexo: any) => {
+  const handleViewAnexo = async (anexo: DesarquivamentoAnexo) => {
     if (!id) return;
 
     try {
-      let blob: Blob
-      
+      let blob: Blob;
+
       // Se anexo tem previewUrl (URL correta do backend), usar ela
       if (anexo.previewUrl) {
         const response = await fetch(anexo.previewUrl, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            ...getAuthHeader(),
           },
-        })
-        if (!response.ok) throw new Error('Erro ao carregar visualização')
-        blob = await response.blob()
+        });
+        if (!response.ok) throw new Error("Erro ao carregar visualização");
+        blob = await response.blob();
       } else if (anexo.desarquivamentoId) {
         // Anexo de solicitação
         blob = await viewAnexoMutation.mutateAsync({
@@ -298,24 +350,27 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         });
       } else if (anexo.numeroProcesso) {
         // Anexo de processo
-        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso)
-        const response = await fetch(`/api/nugecid/processo/${encodedProcesso}/anexos/${anexo.id}/view`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+        const encodedProcesso = encodeURIComponent(anexo.numeroProcesso);
+        const response = await fetch(
+          `/api/nugecid/processo/${encodedProcesso}/anexos/${anexo.id}/view`,
+          {
+            headers: {
+              ...getAuthHeader(),
+            },
           },
-        })
-        if (!response.ok) throw new Error('Erro ao carregar visualização')
-        blob = await response.blob()
+        );
+        if (!response.ok) throw new Error("Erro ao carregar visualização");
+        blob = await response.blob();
       } else {
-        throw new Error('Anexo sem vínculo válido')
+        throw new Error("Anexo sem vínculo válido");
       }
 
       // Criar URL temporária do blob
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
       setPreviewAnexo(anexo);
-    } catch (error: any) {
-      toast.error('Erro ao carregar visualização.');
+    } catch (error: unknown) {
+      toast.error("Erro ao carregar visualização.");
     }
   };
 
@@ -340,23 +395,153 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
+    if (!dateString) return "N/A";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+      return date.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       });
     } catch {
-      return 'Data inválida';
+      return "Data inválida";
     }
   };
 
+  const getHistoryDotColor = (tone: HistoricoMessageTone): string => {
+    switch (tone) {
+      case "create":
+        return "bg-blue-500";
+      case "status":
+        return "bg-cyan-500";
+      case "update":
+        return "bg-green-500";
+      case "comment":
+        return "bg-amber-500";
+      case "delete":
+        return "bg-red-500";
+      default:
+        return "bg-slate-500";
+    }
+  };
+
+  const historicoRelevante = useMemo(
+    () =>
+      historicoAcoes
+        .filter(isBusinessHistoricoEntry)
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        ),
+    [historicoAcoes],
+  );
+
+  const historicoResumo = useMemo(
+    () => {
+      if (historicoRelevante.length > 0) {
+        return historicoRelevante.slice(-5).map((evento) => {
+          const mensagem = buildHistoricoMessage(evento);
+          return {
+            id: String(evento.id),
+            timestamp: evento.timestamp,
+            title: mensagem.title,
+            description: mensagem.description,
+            dotColor: getHistoryDotColor(mensagem.tone),
+            source: "audit" as const,
+          };
+        });
+      }
+
+      if (!desarquivamento) {
+        return [];
+      }
+
+      const eventosMinimos = [
+        {
+          id: "registro-created",
+          timestamp: desarquivamento.createdAt,
+          title: "Solicitação criada",
+          description: "Registro de criação disponível nos dados do documento.",
+          dotColor: "bg-blue-500",
+          source: "registro" as const,
+        },
+      ];
+
+      if (desarquivamento.status !== StatusDesarquivamento.SOLICITADO) {
+        eventosMinimos.push({
+          id: "registro-status",
+          timestamp: desarquivamento.updatedAt || desarquivamento.createdAt,
+          title: `Status alterado para: ${getStatusLabel(desarquivamento.status)}`,
+          description:
+            "Mudança de status identificada pelos campos atuais do documento.",
+          dotColor:
+            desarquivamento.status === StatusDesarquivamento.FINALIZADO
+              ? "bg-green-500"
+              : "bg-cyan-500",
+          source: "registro" as const,
+        });
+      } else if (
+        desarquivamento.updatedAt &&
+        desarquivamento.updatedAt !== desarquivamento.createdAt
+      ) {
+        eventosMinimos.push({
+          id: "registro-update",
+          timestamp: desarquivamento.updatedAt,
+          title: "Dados da solicitação atualizados",
+          description:
+            "Atualização identificada pelos campos atuais do documento.",
+          dotColor: "bg-green-500",
+          source: "registro" as const,
+        });
+      }
+
+      if (desarquivamento.dataDesarquivamentoSAG) {
+        eventosMinimos.push({
+          id: "registro-data-sag",
+          timestamp:
+            desarquivamento.dataDesarquivamentoSAG || desarquivamento.updatedAt,
+          title: "Data de desarquivamento (SAG) registrada",
+          description: `Valor informado: ${formatDate(
+            desarquivamento.dataDesarquivamentoSAG,
+          )}.`,
+          dotColor: "bg-blue-500",
+          source: "registro" as const,
+        });
+      }
+
+      if (desarquivamento.dataDevolucaoSetor) {
+        eventosMinimos.push({
+          id: "registro-data-devolucao",
+          timestamp:
+            desarquivamento.dataDevolucaoSetor || desarquivamento.updatedAt,
+          title: "Data de devolução pelo setor registrada",
+          description: `Valor informado: ${formatDate(
+            desarquivamento.dataDevolucaoSetor,
+          )}.`,
+          dotColor: "bg-blue-500",
+          source: "registro" as const,
+        });
+      }
+
+      return eventosMinimos
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        )
+        .slice(-5);
+    },
+    [desarquivamento, historicoRelevante],
+  );
+
+  const usandoHistoricoMinimo =
+    historicoRelevante.length === 0 &&
+    historicoResumo.length > 0 &&
+    historicoResumo.every((evento) => evento.source === "registro");
+
   if (isLoading) {
-    return <PageLoading />
+    return <PageLoading />;
   }
 
   if (!isIdValid) {
@@ -370,17 +555,16 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           <p className="mb-4 text-muted-foreground">
             O ID fornecido na URL é inválido.
           </p>
-          <Button onClick={() => navigate('/desarquivamentos')} variant="outline">
+          <Button
+            onClick={() => navigate("/desarquivamentos")}
+            variant="outline"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para lista
           </Button>
         </div>
       </div>
-    )
-  }
-
-  if (isLoading) {
-    return <PageLoading />
+    );
   }
 
   if (error || !desarquivamento) {
@@ -394,40 +578,43 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           <p className="mb-4 text-muted-foreground">
             A solicitação que você está procurando não existe ou foi removida.
           </p>
-          <Button onClick={() => navigate('/desarquivamentos')} variant="outline">
+          <Button
+            onClick={() => navigate("/desarquivamentos")}
+            variant="outline"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para lista
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   const getStatusIcon = (status: StatusDesarquivamento) => {
     switch (status) {
       case StatusDesarquivamento.FINALIZADO:
-        return <CheckCircle className="h-5 w-5 text-green-600" />
+        return <CheckCircle className="h-5 w-5 text-green-600" />;
       case StatusDesarquivamento.NAO_LOCALIZADO:
-        return <XCircle className="h-5 w-5 text-red-600" />
+        return <XCircle className="h-5 w-5 text-red-600" />;
       case StatusDesarquivamento.DESARQUIVADO:
-        return <Eye className="h-5 w-5 text-blue-600" />
+        return <Eye className="h-5 w-5 text-blue-600" />;
       default:
-        return <Clock className="h-5 w-5 text-yellow-600" />
+        return <Clock className="h-5 w-5 text-yellow-600" />;
     }
-  }
+  };
 
   const getStatusColor = (status: StatusDesarquivamento) => {
     switch (status) {
       case StatusDesarquivamento.FINALIZADO:
-        return 'default'
+        return "default";
       case StatusDesarquivamento.NAO_LOCALIZADO:
-        return 'destructive'
+        return "destructive";
       case StatusDesarquivamento.DESARQUIVADO:
-        return 'secondary'
+        return "secondary";
       default:
-        return 'outline'
+        return "outline";
     }
-  }
+  };
 
   // Removido prazoVencimento pois não existe na entidade
   const isPrazoVencido = false;
@@ -441,59 +628,69 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
       <div className="relative overflow-hidden rounded-3xl border border-border/60 bg-card/85 p-6 shadow-[0_24px_55px_-42px_rgba(15,23,42,0.75)] backdrop-blur md:p-7">
         <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-cyan-400/15 blur-3xl" />
         <div className="pointer-events-none absolute -left-8 -bottom-10 h-28 w-28 rounded-full bg-orange-400/15 blur-3xl" />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/desarquivamentos')}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Solicitação #{desarquivamento?.numeroSolicitacao || 'N/A'}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Detalhes da solicitação de desarquivamento
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/desarquivamentos")}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                Solicitação #{desarquivamento?.numeroSolicitacao || "N/A"}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Detalhes da solicitação de desarquivamento
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 sm:mt-0 flex gap-2">
+            {canEdit && (
+              <>
+                <Button asChild>
+                  <Link to={`/desarquivamentos/${id}/editar`}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadTermo("pdf")}
+                  title={
+                    !canGerarTermo
+                      ? "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
+                      : undefined
+                  }
+                  disabled={downloadPdfMutation.isPending || !canGerarTermo}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {downloadPdfMutation.isPending ? "Baixando..." : "Termo PDF"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadTermo("docx")}
+                  title={
+                    !canGerarTermo
+                      ? "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
+                      : undefined
+                  }
+                  disabled={downloadDocxMutation.isPending || !canGerarTermo}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  {downloadDocxMutation.isPending
+                    ? "Baixando..."
+                    : "Termo Word"}
+                </Button>
+              </>
+            )}
           </div>
         </div>
-        <div className="mt-4 sm:mt-0 flex gap-2">
-          {canEdit && (
-            <>
-              <Button asChild>
-                <Link to={`/desarquivamentos/${id}/editar`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Link>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDownloadTermo('pdf')}
-                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.' : undefined}
-                disabled={downloadPdfMutation.isPending || !canGerarTermo}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {downloadPdfMutation.isPending ? 'Baixando...' : 'Termo PDF'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDownloadTermo('docx')}
-                title={!canGerarTermo ? 'Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.' : undefined}
-                disabled={downloadDocxMutation.isPending || !canGerarTermo}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {downloadDocxMutation.isPending ? 'Baixando...' : 'Termo Word'}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
       </div>
 
       {/* Status Card */}
@@ -504,9 +701,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               {getStatusIcon(desarquivamento.status)}
               <div>
                 <CardTitle>Status da Solicitação</CardTitle>
-                <CardDescription>
-                  Situação atual do processo
-                </CardDescription>
+                <CardDescription>Situação atual do processo</CardDescription>
               </div>
             </div>
             <Badge variant={getStatusColor(desarquivamento.status)}>
@@ -522,16 +717,21 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 {formatDate(desarquivamento.createdAt)}
               </p>
             </div>
-            {desarquivamento.updatedAt && desarquivamento.updatedAt !== desarquivamento.createdAt && (
-              <div>
-                <p className="text-sm text-muted-foreground">Última Atualização</p>
-                <p className="text-foreground">
-                  {formatDate(desarquivamento.updatedAt)}
-                </p>
-              </div>
-            )}
+            {desarquivamento.updatedAt &&
+              desarquivamento.updatedAt !== desarquivamento.createdAt && (
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Última Atualização
+                  </p>
+                  <p className="text-foreground">
+                    {formatDate(desarquivamento.updatedAt)}
+                  </p>
+                </div>
+              )}
             <div>
-              <p className="text-sm text-muted-foreground">Prazo de Vencimento</p>
+              <p className="text-sm text-muted-foreground">
+                Prazo de Vencimento
+              </p>
               <p className="text-muted-foreground/70">Não definido</p>
             </div>
           </div>
@@ -549,29 +749,42 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground">Número NIC/LAUDO/AUTO</p>
-              <p className="font-mono text-lg font-medium">{desarquivamento.numeroNicLaudoAuto || 'N/A'}</p>
+              <p className="text-sm text-muted-foreground">
+                Número NIC/LAUDO/AUTO
+              </p>
+              <p className="font-mono text-lg font-medium">
+                {desarquivamento.numeroNicLaudoAuto || "N/A"}
+              </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Número do Processo</p>
+              <p className="text-sm text-muted-foreground">
+                Número do Processo
+              </p>
               <div className="mt-1 flex items-center gap-2">
-                <p className="font-mono text-lg font-medium break-all">{desarquivamento.numeroProcesso || 'N/A'}</p>
+                <p className="font-mono text-lg font-medium break-all">
+                  {desarquivamento.numeroProcesso || "N/A"}
+                </p>
                 {desarquivamento.numeroProcesso && (
                   <>
                     <button
                       type="button"
-                      onClick={() => handleCopyToClipboard(desarquivamento.numeroProcesso, 'numeroProcesso')}
+                      onClick={() =>
+                        handleCopyToClipboard(
+                          desarquivamento.numeroProcesso,
+                          "numeroProcesso",
+                        )
+                      }
                       className="rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                       title="Copiar número do processo"
                       aria-label="Copiar número do processo"
                     >
-                      {copiedField === 'numeroProcesso' ? (
+                      {copiedField === "numeroProcesso" ? (
                         <Check className="h-4 w-4 text-emerald-600" />
                       ) : (
                         <Copy className="h-4 w-4" />
                       )}
                     </button>
-                    {copiedField === 'numeroProcesso' && (
+                    {copiedField === "numeroProcesso" && (
                       <span className="text-xs text-emerald-600">Copiado</span>
                     )}
                   </>
@@ -582,23 +795,30 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             <div>
               <p className="text-sm text-muted-foreground">Nº do Ofício</p>
               <div className="mt-1 flex items-center gap-2">
-                <p className="font-mono text-lg font-medium break-all">{desarquivamento.numeroOficio || 'N/A'}</p>
+                <p className="font-mono text-lg font-medium break-all">
+                  {desarquivamento.numeroOficio || "N/A"}
+                </p>
                 {desarquivamento.numeroOficio && (
                   <>
                     <button
                       type="button"
-                      onClick={() => handleCopyToClipboard(desarquivamento.numeroOficio, 'numeroOficio')}
+                      onClick={() =>
+                        handleCopyToClipboard(
+                          desarquivamento.numeroOficio,
+                          "numeroOficio",
+                        )
+                      }
                       className="rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                       title="Copiar número do ofício"
                       aria-label="Copiar número do ofício"
                     >
-                      {copiedField === 'numeroOficio' ? (
+                      {copiedField === "numeroOficio" ? (
                         <Check className="h-4 w-4 text-emerald-600" />
                       ) : (
                         <Copy className="h-4 w-4" />
                       )}
                     </button>
-                    {copiedField === 'numeroOficio' && (
+                    {copiedField === "numeroOficio" && (
                       <span className="text-xs text-emerald-600">Copiado</span>
                     )}
                   </>
@@ -606,16 +826,16 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               </div>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Tipo de Desarquivamento</p>
+              <p className="text-sm text-muted-foreground">
+                Tipo de Desarquivamento
+              </p>
               <Badge variant="outline" className="mt-1">
                 {desarquivamento.tipoDesarquivamento}
               </Badge>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Tipo de Documento</p>
-              <p className="text-foreground">
-                {desarquivamento.tipoDocumento}
-              </p>
+              <p className="text-foreground">{desarquivamento.tipoDocumento}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Instituto</p>
@@ -626,7 +846,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             <div>
               <p className="text-sm text-muted-foreground">Requerente</p>
               <p className="text-foreground">
-                {desarquivamento.requerente || '-'}
+                {desarquivamento.requerente || "-"}
               </p>
             </div>
             <div>
@@ -636,7 +856,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Servidor Responsável</p>
+              <p className="text-sm text-muted-foreground">
+                Servidor Responsável
+              </p>
               <p className="text-foreground">
                 {desarquivamento.servidorResponsavel}
               </p>
@@ -666,29 +888,49 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               <p className="font-medium">{desarquivamento.nomeCompleto}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Usuário Solicitante</p>
-              <p className="font-medium">{desarquivamento.usuario?.nome || 'N/A'}</p>
+              <p className="text-sm text-muted-foreground">
+                Usuário Solicitante
+              </p>
+              <p className="font-medium">
+                {desarquivamento.usuario?.nome || "N/A"}
+              </p>
             </div>
             {desarquivamento.responsavel && (
               <div>
-                <p className="text-sm text-muted-foreground">Responsável pelo Atendimento</p>
-                <p className="font-medium">{desarquivamento.responsavel.nome}</p>
+                <p className="text-sm text-muted-foreground">
+                  Responsável pelo Atendimento
+                </p>
+                <p className="font-medium">
+                  {desarquivamento.responsavel.nome}
+                </p>
               </div>
             )}
             <div>
-              <p className="text-sm text-muted-foreground">Data de Solicitação</p>
-              <p className="font-medium">{formatDate(desarquivamento.dataSolicitacao)}</p>
+              <p className="text-sm text-muted-foreground">Data de Criação</p>
+              <p className="font-medium">
+                {formatDate(
+                  desarquivamento.createdAt || desarquivamento.dataSolicitacao,
+                )}
+              </p>
             </div>
             {desarquivamento.dataDesarquivamentoSAG && (
               <div>
-                <p className="text-sm text-muted-foreground">Data do Desarquivamento - SAG</p>
-                <p className="font-medium">{formatDate(desarquivamento.dataDesarquivamentoSAG)}</p>
+                <p className="text-sm text-muted-foreground">
+                  Data do Desarquivamento - SAG
+                </p>
+                <p className="font-medium">
+                  {formatDate(desarquivamento.dataDesarquivamentoSAG)}
+                </p>
               </div>
             )}
             {desarquivamento.dataDevolucaoSetor && (
               <div>
-                <p className="text-sm text-muted-foreground">Data da Devolução pelo Setor</p>
-                <p className="font-medium">{formatDate(desarquivamento.dataDevolucaoSetor)}</p>
+                <p className="text-sm text-muted-foreground">
+                  Data da Devolução pelo Setor
+                </p>
+                <p className="font-medium">
+                  {formatDate(desarquivamento.dataDevolucaoSetor)}
+                </p>
               </div>
             )}
           </CardContent>
@@ -708,7 +950,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm text-muted-foreground font-medium mb-2">Finalidade do Desarquivamento *</p>
+            <p className="text-sm text-muted-foreground font-medium mb-2">
+              Finalidade do Desarquivamento *
+            </p>
             <p className="text-foreground whitespace-pre-wrap bg-background/60 p-3 rounded-md border border-border/60">
               {desarquivamento.finalidadeDesarquivamento}
             </p>
@@ -716,7 +960,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
           {desarquivamento.justificativa && (
             <div>
-              <p className="text-sm text-muted-foreground font-medium mb-2">Justificativa</p>
+              <p className="text-sm text-muted-foreground font-medium mb-2">
+                Justificativa
+              </p>
               <p className="text-foreground whitespace-pre-wrap bg-background/60 p-3 rounded-md border border-border/60">
                 {desarquivamento.justificativa}
               </p>
@@ -726,17 +972,23 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {desarquivamento.prazoDesarquivamento && (
               <div>
-                <p className="text-sm text-muted-foreground font-medium">Prazo de Desarquivamento</p>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Prazo de Desarquivamento
+                </p>
                 <p className="text-foreground text-base">
                   {formatDate(desarquivamento.prazoDesarquivamento)}
                 </p>
               </div>
             )}
-            
+
             {desarquivamento.prazoVencimento && (
               <div>
-                <p className="text-sm text-muted-foreground font-medium">Prazo de Vencimento</p>
-                <p className={`text-base font-medium ${new Date(desarquivamento.prazoVencimento) < new Date() ? 'text-red-600' : 'text-foreground'}`}>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Prazo de Vencimento
+                </p>
+                <p
+                  className={`text-base font-medium ${new Date(desarquivamento.prazoVencimento) < new Date() ? "text-red-600" : "text-foreground"}`}
+                >
                   {formatDate(desarquivamento.prazoVencimento)}
                   {new Date(desarquivamento.prazoVencimento) < new Date() && (
                     <span className="ml-2 text-xs">(Vencido)</span>
@@ -749,10 +1001,10 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
           {desarquivamento.solicitacaoProrrogacao && (
             <div className="pt-2 border-t border-border/60">
               <div className="flex items-center gap-2 mb-2">
-                <p className="text-sm text-muted-foreground font-medium">Solicitação de Prorrogação</p>
-                <Badge variant="secondary">
-                  Sim
-                </Badge>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Solicitação de Prorrogação
+                </p>
+                <Badge variant="secondary">Sim</Badge>
               </div>
               {desarquivamento.solicitacaoProrrogacaoTexto && (
                 <p className="text-sm text-foreground bg-amber-50 p-3 rounded-md border border-amber-200 whitespace-pre-wrap">
@@ -764,7 +1016,9 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
           {desarquivamento.dadosAdicionais && (
             <div className="pt-2 border-t border-border/60">
-              <p className="text-sm text-muted-foreground font-medium mb-2">Descrição da Solicitação</p>
+              <p className="text-sm text-muted-foreground font-medium mb-2">
+                Observações
+              </p>
               <p className="text-foreground whitespace-pre-wrap bg-background/60 p-3 rounded-md border border-border/60">
                 {desarquivamento.dadosAdicionais}
               </p>
@@ -780,9 +1034,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             <MessageCircle className="h-5 w-5" />
             Comentários
           </CardTitle>
-          <CardDescription>
-            Comentários sobre esta solicitação
-          </CardDescription>
+          <CardDescription>Comentários sobre esta solicitação</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmitComment} className="space-y-2">
@@ -790,15 +1042,13 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
               className="min-h-[90px] w-full rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/80 focus:border-primary/40 focus:ring-2 focus:ring-primary/25"
               placeholder="Escreva um comentário sobre esta solicitação..."
               value={commentText}
-              onChange={e => setCommentText(e.target.value)}
+              onChange={(e) => setCommentText(e.target.value)}
               maxLength={2000}
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                Registrado como{' '}
-                <strong>
-                  {user?.nome || user?.usuario || 'Usuário'}
-                </strong>
+                Registrado como{" "}
+                <strong>{user?.nome || user?.usuario || "Usuário"}</strong>
               </span>
               <button
                 type="submit"
@@ -825,8 +1075,11 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                 Nenhum comentário registrado até o momento.
               </p>
             ) : (
-              comments.map(comment => (
-                <div key={comment.id} className="rounded-md border border-border/60 bg-background/55 px-3 py-2">
+              comments.map((comment) => (
+                <div
+                  key={comment.id}
+                  className="rounded-md border border-border/60 bg-background/55 px-3 py-2"
+                >
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span className="font-medium text-foreground">
                       {comment.authorName}
@@ -850,65 +1103,65 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
             <Calendar className="h-5 w-5" />
             Histórico
           </CardTitle>
-          <CardDescription>
-            Registro de alterações na solicitação
-          </CardDescription>
+          <CardDescription>Últimos eventos relevantes da solicitação</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-start gap-3 border-b border-border/60 pb-4 last:border-b-0">
-              <div className="w-2 h-2 bg-blue-500 rounded-full mt-2" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium">Solicitação criada</p>
-                  <span className="text-sm text-muted-foreground">
-                    {formatDate(desarquivamento.createdAt)}
+            {usandoHistoricoMinimo && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50/70 p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <Badge variant="outline">Histórico mínimo</Badge>
+                  <span className="text-xs font-medium text-sky-800">
+                    Fonte: campos do documento
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Solicitação de desarquivamento criada no sistema
+                <p className="text-xs text-sky-900">
+                  O log detalhado de ações não está disponível para este item.
                 </p>
               </div>
-            </div>
-
-            {desarquivamento.updatedAt !== desarquivamento.createdAt && (
-              <div className="flex items-start gap-3 border-b border-border/60 pb-4 last:border-b-0">
-                <div className="w-2 h-2 bg-green-500 rounded-full mt-2" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">Solicitação atualizada</p>
-                    <span className="text-sm text-muted-foreground">
-                      {formatDate(desarquivamento.updatedAt)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Última modificação realizada na solicitação
-                  </p>
-                </div>
-              </div>
             )}
-
-            {desarquivamento.status !== StatusDesarquivamento.SOLICITADO && (
-              <div className="flex items-start gap-3">
-                <div className={`w-2 h-2 rounded-full mt-2 ${
-                  desarquivamento.status === StatusDesarquivamento.FINALIZADO ? 'bg-green-500' :
-                  desarquivamento.status === StatusDesarquivamento.NAO_LOCALIZADO ? 'bg-red-500' :
-                  'bg-blue-500'
-                }`} />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">
-                      Status alterado para {getStatusLabel(desarquivamento.status)}
-                    </p>
-                    <span className="text-sm text-muted-foreground">
-                      {formatDate(desarquivamento.updatedAt)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Status da solicitação foi atualizado
-                  </p>
+            {historicoResumo.length === 0 ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <Badge variant="outline">Dados Ausentes</Badge>
+                  <span className="text-xs font-medium text-amber-800">
+                    Tratamento: Sinalizar para revisão
+                  </span>
                 </div>
+                <p className="text-sm text-amber-900">
+                  Este documento não possui histórico de ações detalhado.
+                </p>
+                <p className="text-xs text-amber-800 mt-1">
+                  Nenhuma inferência foi aplicada para preencher eventos não
+                  registrados.
+                </p>
               </div>
+            ) : (
+              historicoResumo.map((evento, index) => (
+                <div
+                  key={evento.id}
+                  className={`flex items-start gap-3 ${
+                    index < historicoResumo.length - 1
+                      ? "border-b border-border/60 pb-4"
+                      : ""
+                  }`}
+                >
+                  <div
+                    className={`w-2 h-2 rounded-full mt-2 ${evento.dotColor}`}
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{evento.title}</p>
+                      <span className="text-sm text-muted-foreground">
+                        {evento.timestamp ? formatDate(evento.timestamp) : "-"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {evento.description}
+                    </p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </CardContent>
@@ -960,24 +1213,15 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         previewUrl={previewUrl}
         onClose={closePreview}
         onUpdateDescricao={handleUpdateDescricao}
-        onDownload={anexoId => handleDownloadAnexo(Number(anexoId))}
+        onDownload={(anexoId) => handleDownloadAnexo(Number(anexoId))}
         canEdit={canEdit}
-        allImages={[...(anexosDesarquivamento ?? []), ...(anexosRearquivamento ?? [])]}
+        allImages={[
+          ...(anexosDesarquivamento ?? []),
+          ...(anexosRearquivamento ?? []),
+        ]}
       />
     </div>
-  )
-}
+  );
+};
 
-export default DetalhesDesarquivamentoPage
-
-
-
-
-
-
-
-
-
-
-
-
+export default DetalhesDesarquivamentoPage;

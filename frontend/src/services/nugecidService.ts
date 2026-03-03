@@ -16,7 +16,7 @@ const getById = (id: number): Promise<Nugecid> => {
 const getPaginated = (
   page: number,
   limit: number,
-  filters: any,
+  filters: Record<string, unknown>,
 ): Promise<NugecidPage> => {
   return api
     .get(API_URL, { params: { page, limit, ...filters } })
@@ -35,7 +35,7 @@ const remove = (id: number): Promise<void> => {
   return api.delete(`${API_URL}/${id}`);
 };
 
-const exportToExcel = (filters: any): Promise<Blob> => {
+const exportToExcel = (filters: Record<string, unknown>): Promise<Blob> => {
   return api.get(`${API_URL}/export`, {
     params: filters,
     responseType: "blob",

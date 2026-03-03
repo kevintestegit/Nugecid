@@ -1,34 +1,40 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react'
-import { UserPlus, Shield, X, Loader2, Trash2 } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/Dialog'
-import { Input } from '../ui/Input'
-import { Button } from '../ui/Button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/Select'
-import { Avatar } from './Avatar'
-import { kanbanService } from '../../services/kanbanService'
-import { MembroProjeto, PapelMembro } from '../../types/kanban.types'
-import { cn } from '../../lib/utils'
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { UserPlus, Shield, X, Loader2, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/Dialog";
+import { Input } from "../ui/Input";
+import { Button } from "../ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/Select";
+import { Avatar } from "./Avatar";
+import { kanbanService } from "../../services/kanbanService";
+import { MembroProjeto, PapelMembro } from "../../types/kanban.types";
+import { cn } from "../../lib/utils";
 
 type UserOption = {
-  id: number
-  nome?: string
-  usuario?: string
-  avatarUrl?: string | null
-}
+  id: number;
+  nome?: string;
+  usuario?: string;
+  avatarUrl?: string | null;
+};
 
 interface ProjectMembersModalProps {
-  open: boolean
-  projetoId: number
-  initialMembers?: MembroProjeto[]
-  onClose: () => void
-  onChanged?: () => Promise<void> | void
+  open: boolean;
+  projetoId: number;
+  initialMembers?: MembroProjeto[];
+  onClose: () => void;
+  onChanged?: () => Promise<void> | void;
 }
 
 const papelLabels: Record<PapelMembro, string> = {
-  admin: 'Admin',
-  editor: 'Editor',
-  viewer: 'Viewer',
-}
+  admin: "Admin",
+  editor: "Editor",
+  viewer: "Viewer",
+};
 
 export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
   open,
@@ -38,108 +44,116 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
   onChanged,
 }) => {
   const normalizeMembers = useCallback(
-    (list: any): MembroProjeto[] => (Array.isArray(list) ? list : []),
+    (list: unknown): MembroProjeto[] => (Array.isArray(list) ? list : []),
     [],
   );
 
-  const [members, setMembers] = useState<MembroProjeto[]>(normalizeMembers(initialMembers))
-  const [searchTerm, setSearchTerm] = useState('')
-  const [suggestions, setSuggestions] = useState<UserOption[]>([])
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [members, setMembers] = useState<MembroProjeto[]>(
+    normalizeMembers(initialMembers),
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [suggestions, setSuggestions] = useState<UserOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setMembers(normalizeMembers(initialMembers));
   }, [initialMembers, normalizeMembers]);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const loadMembers = async () => {
-      setLoading(true)
+      setLoading(true);
       try {
-        const data = await kanbanService.getProjetoMembros(projetoId)
-        setMembers(normalizeMembers(data))
+        const data = await kanbanService.getProjetoMembros(projetoId);
+        setMembers(normalizeMembers(data));
       } catch (error) {
-        console.error('Erro ao carregar membros do projeto', error)
+        console.error("Erro ao carregar membros do projeto", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-    loadMembers()
-  }, [normalizeMembers, open, projetoId])
+    };
+    loadMembers();
+  }, [normalizeMembers, open, projetoId]);
 
   useEffect(() => {
-    let active = true
+    let active = true;
     const fetchSuggestions = async () => {
       if (!searchTerm.trim()) {
-        setSuggestions([])
-        return
+        setSuggestions([]);
+        return;
       }
       try {
         const data = await kanbanService.searchUsuariosParaProjeto(
           projetoId,
           searchTerm.trim(),
-        )
-        if (active) setSuggestions(data)
+        );
+        if (active) setSuggestions(data);
       } catch (error) {
-        console.error('Erro ao buscar usuários', error)
+        console.error("Erro ao buscar usuários", error);
       }
-    }
-    fetchSuggestions()
+    };
+    fetchSuggestions();
     return () => {
-      active = false
-    }
-  }, [searchTerm, projetoId])
+      active = false;
+    };
+  }, [searchTerm, projetoId]);
 
   const handleAdd = async (user: UserOption, papel: PapelMembro) => {
-    setSaving(true)
+    setSaving(true);
     try {
       const novo = await kanbanService.addProjetoMembro(projetoId, {
         usuarioId: user.id,
         papel,
-      })
-      setMembers((prev) => [novo, ...prev])
-      setSearchTerm('')
-      setSuggestions([])
-      await onChanged?.()
+      });
+      setMembers((prev) => [novo, ...prev]);
+      setSearchTerm("");
+      setSuggestions([]);
+      await onChanged?.();
     } catch (error) {
-      console.error('Erro ao adicionar membro', error)
+      console.error("Erro ao adicionar membro", error);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
-  const handleRoleChange = useCallback(async (membro: MembroProjeto, papel: PapelMembro) => {
-    setSaving(true)
-    try {
-      const atualizado = await kanbanService.updateProjetoMembro(
-        projetoId,
-        membro.id,
-        { papel },
-      )
-      setMembers((prev) =>
-        prev.map((m) => (m.id === membro.id ? atualizado : m)),
-      )
-      await onChanged?.()
-    } catch (error) {
-      console.error('Erro ao alterar papel', error)
-    } finally {
-      setSaving(false)
-    }
-  }, [onChanged, projetoId])
+  const handleRoleChange = useCallback(
+    async (membro: MembroProjeto, papel: PapelMembro) => {
+      setSaving(true);
+      try {
+        const atualizado = await kanbanService.updateProjetoMembro(
+          projetoId,
+          membro.id!,
+          { papel },
+        );
+        setMembers((prev) =>
+          prev.map((m) => (m.id === membro.id ? atualizado : m)),
+        );
+        await onChanged?.();
+      } catch (error) {
+        console.error("Erro ao alterar papel", error);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onChanged, projetoId],
+  );
 
-  const handleRemove = useCallback(async (membro: MembroProjeto) => {
-    setSaving(true)
-    try {
-      await kanbanService.removeProjetoMembro(projetoId, membro.id)
-      setMembers((prev) => prev.filter((m) => m.id !== membro.id))
-      await onChanged?.()
-    } catch (error) {
-      console.error('Erro ao remover membro', error)
-    } finally {
-      setSaving(false)
-    }
-  }, [onChanged, projetoId])
+  const handleRemove = useCallback(
+    async (membro: MembroProjeto) => {
+      setSaving(true);
+      try {
+        await kanbanService.removeProjetoMembro(projetoId, membro.id!);
+        setMembers((prev) => prev.filter((m) => m.id !== membro.id));
+        await onChanged?.();
+      } catch (error) {
+        console.error("Erro ao remover membro", error);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onChanged, projetoId],
+  );
 
   const memberCards = useMemo(
     () =>
@@ -152,15 +166,21 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
             <Avatar usuario={membro.usuario} size="sm" />
             <div className="flex flex-col">
               <span className="text-sm font-medium">
-                {membro.usuario?.nome || membro.usuario?.usuario || `#${membro.usuarioId}`}
+                {membro.usuario?.nome ||
+                  membro.usuario?.usuario ||
+                  `#${membro.usuarioId}`}
               </span>
-              <span className="text-xs text-gray-500">ID {membro.usuarioId}</span>
+              <span className="text-xs text-gray-500">
+                ID {membro.usuarioId}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Select
               value={membro.papel}
-              onValueChange={(value) => handleRoleChange(membro, value as PapelMembro)}
+              onValueChange={(value) =>
+                handleRoleChange(membro, value as PapelMembro)
+              }
               disabled={saving}
             >
               <SelectTrigger className="w-32">
@@ -185,7 +205,7 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
         </div>
       )),
     [handleRemove, handleRoleChange, members, normalizeMembers, saving],
-  )
+  );
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -200,7 +220,8 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
         <div className="space-y-4">
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <p className="text-sm text-gray-700 mb-3">
-              Adicione usuários ao projeto e defina o papel (Admin, Editor ou Viewer).
+              Adicione usuários ao projeto e defina o papel (Admin, Editor ou
+              Viewer).
             </p>
             <div className="flex flex-col gap-3">
               <Input
@@ -213,10 +234,11 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                   {suggestions.map((sugestao) => {
                     const suggestionUser = {
                       id: sugestao.id,
-                      nome: sugestao.nome ?? sugestao.usuario ?? `#${sugestao.id}`,
-                      usuario: sugestao.usuario ?? sugestao.nome ?? '',
+                      nome:
+                        sugestao.nome ?? sugestao.usuario ?? `#${sugestao.id}`,
+                      usuario: sugestao.usuario ?? sugestao.nome ?? "",
                       avatarUrl: sugestao.avatarUrl ?? null,
-                    }
+                    };
 
                     return (
                       <div
@@ -227,10 +249,14 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                           <Avatar usuario={suggestionUser} size="sm" />
                           <div className="flex flex-col">
                             <span className="text-sm font-medium">
-                              {sugestao.nome || sugestao.usuario || `#${sugestao.id}`}
+                              {sugestao.nome ||
+                                sugestao.usuario ||
+                                `#${sugestao.id}`}
                             </span>
                             {sugestao.usuario && (
-                              <span className="text-xs text-gray-500">@{sugestao.usuario}</span>
+                              <span className="text-xs text-gray-500">
+                                @{sugestao.usuario}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -254,34 +280,38 @@ export const ProjectMembersModal: React.FC<ProjectMembersModalProps> = ({
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => handleAdd(sugestao, 'editor')}
+                            onClick={() => handleAdd(sugestao, "editor")}
                             disabled={saving}
                           >
                             <UserPlus className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
               )}
             </div>
           </div>
 
-          <div className={cn('space-y-2', loading && 'opacity-60')}>
+          <div className={cn("space-y-2", loading && "opacity-60")}>
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-800">
                 Membros ({members.length})
               </span>
-              {saving && <Loader2 className="w-4 h-4 animate-spin text-gray-500" />}
+              {saving && (
+                <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+              )}
             </div>
             {members.length === 0 && !loading && (
-              <div className="text-sm text-gray-500">Nenhum membro adicionado ainda.</div>
+              <div className="text-sm text-gray-500">
+                Nenhum membro adicionado ainda.
+              </div>
             )}
             {memberCards}
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  )
-}
+  );
+};

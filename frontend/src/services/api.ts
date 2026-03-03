@@ -1,4 +1,10 @@
-import axios, { AxiosInstance, AxiosResponse } from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import {
+  getAccessToken,
+  setAccessToken,
+  getRefreshToken,
+  clearAuth,
+} from "@/utils/tokenStorage";
 import {
   ApiResponse,
   PaginatedResponse,
@@ -20,6 +26,19 @@ import {
   DesarquivamentoComment,
   SearchParams,
   SearchResponse,
+  RoleSettings,
+  DesarquivamentoAnexo,
+  IpAccessStat,
+  IpAccessDetail,
+  BlockedIp,
+  BlockedUser,
+  UnblockedUser,
+  NotificationPreferences,
+  Announcement,
+  CreateAnnouncementDto,
+  AnnouncementStats,
+  AnnouncementImageUpload,
+  ImportResultDto,
 } from "@/types";
 import { createLogger } from "@/utils/logger";
 
@@ -32,6 +51,55 @@ const apiLogError = (...args: unknown[]) => {
   const [message, ...rest] = args;
   apiLogger.error(String(message ?? "error"), rest.length ? rest : undefined);
 };
+
+/** Safely extract a human-readable message from an unknown caught value. */
+function extractErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.message || error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+/** Safely extract Axios response metadata from an unknown caught value. */
+function extractAxiosErrorInfo(error: unknown): {
+  status?: number;
+  data?: unknown;
+  message: string;
+} {
+  if (axios.isAxiosError(error)) {
+    return {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    };
+  }
+  return { message: extractErrorMessage(error) };
+}
+
+function createEmptySearchResponse(query: string): SearchResponse {
+  return {
+    results: [],
+    total: 0,
+    query,
+    typesCounts: {},
+  };
+}
+
+function isSearchResponse(value: unknown): value is SearchResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<SearchResponse>;
+  return (
+    Array.isArray(candidate.results) &&
+    typeof candidate.total === "number" &&
+    typeof candidate.query === "string"
+  );
+}
 
 export class ApiService {
   private api: AxiosInstance;
@@ -53,7 +121,7 @@ export class ApiService {
     // Request interceptor
     this.api.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem("accessToken");
+        const token = getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -89,9 +157,7 @@ export class ApiService {
         // Isso evita loop infinito quando o refresh token está inválido/expirado
         if (originalRequest.url === "/auth/refresh") {
           apiLogWarn("Falha no refresh token - redirecionando para login");
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("user");
+          clearAuth();
           window.location.href = "/login";
           return Promise.reject(error);
         }
@@ -100,28 +166,31 @@ export class ApiService {
           originalRequest._retry = true;
 
           try {
-            const refreshToken = localStorage.getItem("refreshToken");
+            const refreshToken = getRefreshToken();
             if (refreshToken) {
               const response = await this.api.post("/auth/refresh", {
                 refreshToken,
               });
               const { accessToken } = response.data; // Direct access since backend returns { accessToken, expiresIn }
 
-              localStorage.setItem("accessToken", accessToken);
+              setAccessToken(accessToken);
 
               // Retry the original request with the new token
               originalRequest.headers.Authorization = `Bearer ${accessToken}`;
               return this.api(originalRequest);
             }
-          } catch (refreshError: any) {
+          } catch (refreshError: unknown) {
             // Só fazer logout se não for erro de conectividade
             if (
+              axios.isAxiosError(refreshError) &&
               refreshError.code !== "ERR_NETWORK" &&
               !refreshError.message?.includes("ERR_ABORTED")
             ) {
-              localStorage.removeItem("accessToken");
-              localStorage.removeItem("refreshToken");
-              localStorage.removeItem("user");
+              clearAuth();
+              window.location.href = "/login";
+            } else if (!axios.isAxiosError(refreshError)) {
+              // Unknown non-Axios error — still logout to be safe
+              clearAuth();
               window.location.href = "/login";
             }
             return Promise.reject(refreshError);
@@ -130,9 +199,7 @@ export class ApiService {
 
         // Só fazer logout para 401 se não for erro de conectividade
         if (error.response?.status === 401) {
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("refreshToken");
-          localStorage.removeItem("user");
+          clearAuth();
           window.location.href = "/login";
         }
 
@@ -142,16 +209,24 @@ export class ApiService {
   }
 
   // Métodos genéricos
-  async get<T = any>(url: string, config?: any): Promise<AxiosResponse<T>> {
+  async get<T = unknown>(
+    url: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<T>> {
     return this.api.get<T>(url, config);
   }
 
-  async post<T = any>(
+  async post<T = unknown>(
     url: string,
-    data?: any,
-    config?: any,
+    data?: unknown,
+    config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<T>> {
     return this.api.post<T>(url, data, config);
+  }
+
+  /** Expose the underlying AxiosInstance for advanced use cases (e.g. raw interceptors). */
+  getAxiosInstance(): AxiosInstance {
+    return this.api;
   }
 
   // Auth endpoints
@@ -199,13 +274,13 @@ export class ApiService {
       const response: AxiosResponse<PaginatedResponse<Desarquivamento>> =
         await this.api.get("/nugecid", { params });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log for debugging and return a safe fallback so UI can render gracefully
       // without showing the generic error screen when transient caching/network
       // issues occur (304/Not Modified handled by proxy/browser can surface
       // as errors in some setups).
       // eslint-disable-next-line no-console
-      apiLogError(" getDesarquivamentos error:", error?.message || error);
+      apiLogError(" getDesarquivamentos error:", extractErrorMessage(error));
 
       return {
         success: false,
@@ -236,7 +311,9 @@ export class ApiService {
     return response.data;
   }
 
-  async exportDesarquivamentos(params?: Record<string, any>): Promise<Blob> {
+  async exportDesarquivamentos(
+    params?: Record<string, unknown>,
+  ): Promise<Blob> {
     const response: AxiosResponse<Blob> = await this.api.get(
       "/nugecid/export",
       {
@@ -307,7 +384,9 @@ export class ApiService {
     const { normalizeDesarquivamentoData } = await import(
       "@/utils/normalization"
     );
-    const normalizedData = normalizeDesarquivamentoData(data);
+    const normalizedData = normalizeDesarquivamentoData(
+      data as unknown as Record<string, unknown>,
+    );
     const response: AxiosResponse<ApiResponse<Desarquivamento>> =
       await this.api.post("/nugecid", normalizedData);
     return response.data;
@@ -321,7 +400,9 @@ export class ApiService {
     const { normalizeDesarquivamentoData } = await import(
       "@/utils/normalization"
     );
-    const normalizedData = normalizeDesarquivamentoData(data);
+    const normalizedData = normalizeDesarquivamentoData(
+      data as unknown as Record<string, unknown>,
+    );
 
     const response: AxiosResponse<ApiResponse<Desarquivamento>> =
       await this.api.patch(`/nugecid/${id}`, normalizedData);
@@ -361,8 +442,8 @@ export class ApiService {
       );
 
       return response.data;
-    } catch (error: any) {
-      if (axios.isAxiosError && axios.isAxiosError(error)) {
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
         // Re-throw com informações mais detalhadas
         throw new Error(
           error.response?.data?.message ||
@@ -383,19 +464,18 @@ export class ApiService {
     return response.data;
   }
 
-  async importDesarquivamentos(file: File): Promise<ApiResponse<any>> {
+  async importDesarquivamentos(
+    file: File,
+  ): Promise<ApiResponse<ImportResultDto>> {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-      "/nugecid/import-desarquivamentos",
-      formData,
-      {
+    const response: AxiosResponse<ApiResponse<ImportResultDto>> =
+      await this.api.post("/nugecid/import-desarquivamentos", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      },
-    );
+      });
     return response.data;
   }
 
@@ -407,13 +487,13 @@ export class ApiService {
         { params },
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log for debugging and return a safe fallback so UI can render gracefully
       // without showing the generic error screen when transient caching/network
       // issues occur (304/Not Modified handled by proxy/browser can surface
       // as errors in some setups).
       // eslint-disable-next-line no-console
-      apiLogError(" getUsers error:", error?.message || error);
+      apiLogError(" getUsers error:", extractErrorMessage(error));
 
       return {
         success: false,
@@ -468,41 +548,18 @@ export class ApiService {
   }
 
   // Role settings endpoints (admin)
-  async getRoleSettings(
-    roleId: number,
-  ): Promise<
-    ApiResponse<{
-      theme?: "light" | "dark";
-      notifications?: {
-        email?: boolean;
-        push?: boolean;
-        desktop?: boolean;
-        sound?: boolean;
-      };
-    }>
-  > {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(
-      `/users/roles/${roleId}/settings`,
-    );
+  async getRoleSettings(roleId: number): Promise<ApiResponse<RoleSettings>> {
+    const response: AxiosResponse<ApiResponse<RoleSettings>> =
+      await this.api.get(`/users/roles/${roleId}/settings`);
     return response.data;
   }
 
   async updateRoleSettings(
     roleId: number,
-    settings: {
-      theme?: "light" | "dark";
-      notifications?: {
-        email?: boolean;
-        push?: boolean;
-        desktop?: boolean;
-        sound?: boolean;
-      };
-    },
-  ): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.patch(
-      `/users/roles/${roleId}/settings`,
-      settings,
-    );
+    settings: RoleSettings,
+  ): Promise<ApiResponse<RoleSettings>> {
+    const response: AxiosResponse<ApiResponse<RoleSettings>> =
+      await this.api.patch(`/users/roles/${roleId}/settings`, settings);
     return response.data;
   }
 
@@ -550,10 +607,10 @@ export class ApiService {
       const response: AxiosResponse<PaginatedResponse<Desarquivamento>> =
         await this.api.get("/nugecid/lixeira", { params });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       apiLogError(
         " getDesarquivamentosLixeira error:",
-        error?.message || error,
+        extractErrorMessage(error),
       );
 
       return {
@@ -578,11 +635,12 @@ export class ApiService {
       const response: AxiosResponse<ApiResponse<Desarquivamento>> =
         await this.api.patch(`/nugecid/lixeira/${id}/restaurar`);
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " restoreDesarquivamento error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -596,11 +654,12 @@ export class ApiService {
         `/nugecid/lixeira/${id}/permanente`,
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " deleteDesarquivamentoPermanente error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -610,19 +669,18 @@ export class ApiService {
   async getDesarquivamentosAnexos(
     desarquivamentoId: number,
     tipoAnexo?: "desarquivamento" | "rearquivamento",
-  ): Promise<ApiResponse<any[]>> {
+  ): Promise<ApiResponse<DesarquivamentoAnexo[]>> {
     try {
       const params = tipoAnexo ? { tipo: tipoAnexo } : {};
-      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-        `/nugecid/${desarquivamentoId}/anexos`,
-        { params },
-      );
+      const response: AxiosResponse<ApiResponse<DesarquivamentoAnexo[]>> =
+        await this.api.get(`/nugecid/${desarquivamentoId}/anexos`, { params });
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " getDesarquivamentosAnexos error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -634,7 +692,7 @@ export class ApiService {
     descricao?: string,
     tipoAnexo?: "desarquivamento" | "rearquivamento",
     anexarAoProcesso?: boolean,
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<DesarquivamentoAnexo>> {
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -648,21 +706,23 @@ export class ApiService {
         formData.append("anexarAoProcesso", String(anexarAoProcesso));
       }
 
-      const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-        `/nugecid/${desarquivamentoId}/anexos/upload`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
+      const response: AxiosResponse<ApiResponse<DesarquivamentoAnexo>> =
+        await this.api.post(
+          `/nugecid/${desarquivamentoId}/anexos/upload`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
           },
-        },
-      );
+        );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " uploadDesarquivamentoAnexo error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -672,18 +732,20 @@ export class ApiService {
     desarquivamentoId: number,
     anexoId: number,
     descricao: string,
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<DesarquivamentoAnexo>> {
     try {
-      const response: AxiosResponse<ApiResponse<any>> = await this.api.patch(
-        `/nugecid/${desarquivamentoId}/anexos/${anexoId}`,
-        { descricao },
-      );
+      const response: AxiosResponse<ApiResponse<DesarquivamentoAnexo>> =
+        await this.api.patch(
+          `/nugecid/${desarquivamentoId}/anexos/${anexoId}`,
+          { descricao },
+        );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " updateDesarquivamentoAnexo error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -701,11 +763,12 @@ export class ApiService {
         },
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " downloadDesarquivamentoAnexo error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -723,11 +786,12 @@ export class ApiService {
         },
       );
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " viewDesarquivamentoAnexo error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -739,11 +803,12 @@ export class ApiService {
   ): Promise<void> {
     try {
       await this.api.delete(`/nugecid/${desarquivamentoId}/anexos/${anexoId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " deleteDesarquivamentoAnexo error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -755,27 +820,34 @@ export class ApiService {
     signal?: AbortSignal,
   ): Promise<SearchResponse> {
     try {
-      const response: AxiosResponse<SearchResponse> = await this.api.get(
-        "/search",
-        { params, signal },
-      );
-      return response.data;
-    } catch (error: any) {
-      if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-        return {
-          results: [],
-          total: 0,
-          query: params.query,
-          typesCounts: {},
-        };
+      const response: AxiosResponse<ApiResponse<SearchResponse> | SearchResponse> =
+        await this.api.get("/search", {
+          params,
+          signal,
+        });
+      const payload = response.data;
+
+      if (isSearchResponse(payload)) {
+        return payload;
       }
-      apiLogError(" search error:", error?.message || error);
-      return {
-        results: [],
-        total: 0,
-        query: params.query,
-        typesCounts: {},
-      };
+
+      if (payload && typeof payload === "object" && "data" in payload) {
+        const nestedPayload = payload.data;
+        if (isSearchResponse(nestedPayload)) {
+          return nestedPayload;
+        }
+      }
+
+      apiLogWarn(" search response with unexpected format:", payload);
+      return createEmptySearchResponse(params.query);
+    } catch (error: unknown) {
+      if (axios.isCancel(error)) {
+        // Request cancelado pelo AbortController — não é erro real
+        return createEmptySearchResponse(params.query);
+      }
+      apiLogError(" search error:", extractErrorMessage(error));
+      // Propagar o erro para que o chamador possa distinguir "sem resultados" de "falha"
+      throw error;
     }
   }
 
@@ -783,17 +855,15 @@ export class ApiService {
   async getIpAccessStats(
     days: number = 7,
     limit: number = 100,
-  ): Promise<ApiResponse<any[]>> {
+  ): Promise<ApiResponse<IpAccessStat[]>> {
     try {
-      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-        "/security/ip-access-stats",
-        {
+      const response: AxiosResponse<ApiResponse<IpAccessStat[]>> =
+        await this.api.get("/security/ip-access-stats", {
           params: { days, limit },
-        },
-      );
+        });
       return response.data;
-    } catch (error: any) {
-      apiLogError(" getIpAccessStats error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" getIpAccessStats error:", extractErrorMessage(error));
       throw error;
     }
   }
@@ -801,34 +871,30 @@ export class ApiService {
   async getIpAccessDetails(
     ipAddress: string,
     days: number = 30,
-  ): Promise<ApiResponse<any[]>> {
+  ): Promise<ApiResponse<IpAccessDetail[]>> {
     try {
-      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-        `/security/ip-access-details/${ipAddress}`,
-        {
+      const response: AxiosResponse<ApiResponse<IpAccessDetail[]>> =
+        await this.api.get(`/security/ip-access-details/${ipAddress}`, {
           params: { days },
-        },
-      );
+        });
       return response.data;
-    } catch (error: any) {
-      apiLogError(" getIpAccessDetails error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" getIpAccessDetails error:", extractErrorMessage(error));
       throw error;
     }
   }
 
   async listBlockedIps(
     includeInactive: boolean = false,
-  ): Promise<ApiResponse<any[]>> {
+  ): Promise<ApiResponse<BlockedIp[]>> {
     try {
-      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-        "/security/blocked-ips",
-        {
+      const response: AxiosResponse<ApiResponse<BlockedIp[]>> =
+        await this.api.get("/security/blocked-ips", {
           params: { includeInactive },
-        },
-      );
+        });
       return response.data;
-    } catch (error: any) {
-      apiLogError(" listBlockedIps error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" listBlockedIps error:", extractErrorMessage(error));
       throw error;
     }
   }
@@ -837,31 +903,28 @@ export class ApiService {
     ipAddress: string,
     reason?: string,
     expiresAt?: string,
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<BlockedIp>> {
     try {
-      const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-        "/security/blocked-ips",
-        {
+      const response: AxiosResponse<ApiResponse<BlockedIp>> =
+        await this.api.post("/security/blocked-ips", {
           ipAddress,
           reason,
           expiresAt,
-        },
-      );
+        });
       return response.data;
-    } catch (error: any) {
-      apiLogError(" blockIp error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" blockIp error:", extractErrorMessage(error));
       throw error;
     }
   }
 
-  async unblockIp(ipAddress: string): Promise<ApiResponse<any>> {
+  async unblockIp(ipAddress: string): Promise<ApiResponse<BlockedIp>> {
     try {
-      const response: AxiosResponse<ApiResponse<any>> = await this.api.delete(
-        `/security/blocked-ips/${ipAddress}`,
-      );
+      const response: AxiosResponse<ApiResponse<BlockedIp>> =
+        await this.api.delete(`/security/blocked-ips/${ipAddress}`);
       return response.data;
-    } catch (error: any) {
-      apiLogError(" unblockIp error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" unblockIp error:", extractErrorMessage(error));
       throw error;
     }
   }
@@ -870,56 +933,36 @@ export class ApiService {
     failedAttemptsThreshold?: number;
     timeWindowMinutes?: number;
     blockDurationHours?: number;
-  }): Promise<ApiResponse<any[]>> {
+  }): Promise<ApiResponse<BlockedIp[]>> {
     try {
-      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.post(
-        "/security/auto-block",
-        config || {},
-      );
+      const response: AxiosResponse<ApiResponse<BlockedIp[]>> =
+        await this.api.post("/security/auto-block", config || {});
       return response.data;
-    } catch (error: any) {
-      apiLogError(" autoBlockSuspiciousIps error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" autoBlockSuspiciousIps error:", extractErrorMessage(error));
       throw error;
     }
   }
 
   // Blocked users endpoints
-  async listBlockedUsers(): Promise<
-    ApiResponse<
-      {
-        id: number;
-        usuario: string;
-        nome: string;
-        bloqueadoAte: string;
-        tentativasLogin: number;
-      }[]
-    >
-  > {
+  async listBlockedUsers(): Promise<ApiResponse<BlockedUser[]>> {
     try {
-      const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-        "/security/blocked-users",
-      );
+      const response: AxiosResponse<ApiResponse<BlockedUser[]>> =
+        await this.api.get("/security/blocked-users");
       return response.data;
-    } catch (error: any) {
-      apiLogError(" listBlockedUsers error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" listBlockedUsers error:", extractErrorMessage(error));
       throw error;
     }
   }
 
-  async unblockUser(userId: number): Promise<
-    ApiResponse<{
-      id: number;
-      usuario: string;
-      nome: string;
-    }>
-  > {
+  async unblockUser(userId: number): Promise<ApiResponse<UnblockedUser>> {
     try {
-      const response: AxiosResponse<ApiResponse<any>> = await this.api.delete(
-        `/security/blocked-users/${userId}`,
-      );
+      const response: AxiosResponse<ApiResponse<UnblockedUser>> =
+        await this.api.delete(`/security/blocked-users/${userId}`);
       return response.data;
-    } catch (error: any) {
-      apiLogError(" unblockUser error:", error?.message || error);
+    } catch (error: unknown) {
+      apiLogError(" unblockUser error:", extractErrorMessage(error));
       throw error;
     }
   }
@@ -927,11 +970,12 @@ export class ApiService {
   async deletePastaArquivo(pastaId: string, arquivoId: string): Promise<void> {
     try {
       await this.api.delete(`/pastas/${pastaId}/arquivos/${arquivoId}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errInfo = extractAxiosErrorInfo(error);
       apiLogError(
         " deletePastaArquivo error:",
-        error?.response?.status,
-        error?.response?.data || error?.message,
+        errInfo.status,
+        errInfo.data || errInfo.message,
       );
       throw error;
     }
@@ -939,122 +983,66 @@ export class ApiService {
 
   // Notification preferences endpoints
   async getNotificationPreferences(): Promise<
-    ApiResponse<{
-      id: number;
-      userId: number;
-      inAppEnabled: boolean;
-      pushEnabled: boolean;
-      soundEnabled: boolean;
-      enabledTypes: Record<string, boolean>;
-      pushSubscription: any | null;
-      createdAt: string;
-      updatedAt: string;
-    }>
+    ApiResponse<NotificationPreferences>
   > {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(
-      "/notificacoes/preferences",
-    );
+    const response: AxiosResponse<ApiResponse<NotificationPreferences>> =
+      await this.api.get("/notificacoes/preferences");
     return response.data;
   }
 
   async updateNotificationPreferences(preferences: {
     inAppEnabled?: boolean;
-    pushEnabled?: boolean;
     soundEnabled?: boolean;
     enabledTypes?: Record<string, boolean>;
-    pushSubscription?: any | null;
-  }): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.patch(
-      "/notificacoes/preferences",
-      preferences,
-    );
+  }): Promise<ApiResponse<NotificationPreferences>> {
+    const response: AxiosResponse<ApiResponse<NotificationPreferences>> =
+      await this.api.patch("/notificacoes/preferences", preferences);
     return response.data;
   }
 
-  async resetNotificationPreferences(): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-      "/notificacoes/preferences/reset",
-    );
-    return response.data;
-  }
-
-  async updatePushSubscription(subscription: {
-    endpoint: string;
-    keys: {
-      p256dh: string;
-      auth: string;
-    };
-  }): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-      "/notificacoes/preferences/push-subscription",
-      subscription,
-    );
-    return response.data;
-  }
-
-  async removePushSubscription(): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.delete(
-      "/notificacoes/preferences/push-subscription",
-    );
+  async resetNotificationPreferences(): Promise<
+    ApiResponse<NotificationPreferences>
+  > {
+    const response: AxiosResponse<ApiResponse<NotificationPreferences>> =
+      await this.api.post("/notificacoes/preferences/reset");
     return response.data;
   }
 
   // System Announcements endpoints
-  async getAnnouncements(includeInactive = false): Promise<ApiResponse<any[]>> {
-    const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-      `/announcements?includeInactive=${includeInactive}`,
-    );
+  async getAnnouncements(
+    includeInactive = false,
+  ): Promise<ApiResponse<Announcement[]>> {
+    const response: AxiosResponse<ApiResponse<Announcement[]>> =
+      await this.api.get(`/announcements?includeInactive=${includeInactive}`);
     return response.data;
   }
 
-  async getActiveAnnouncements(): Promise<ApiResponse<any[]>> {
-    const response: AxiosResponse<ApiResponse<any[]>> = await this.api.get(
-      "/announcements/active",
-    );
+  async getActiveAnnouncements(): Promise<ApiResponse<Announcement[]>> {
+    const response: AxiosResponse<ApiResponse<Announcement[]>> =
+      await this.api.get("/announcements/active");
     return response.data;
   }
 
-  async getAnnouncement(id: number): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(
-      `/announcements/${id}`,
-    );
+  async getAnnouncement(id: number): Promise<ApiResponse<Announcement>> {
+    const response: AxiosResponse<ApiResponse<Announcement>> =
+      await this.api.get(`/announcements/${id}`);
     return response.data;
   }
 
-  async createAnnouncement(data: {
-    title: string;
-    content: string;
-    imageUrl?: string;
-    priority: "low" | "medium" | "high" | "critical";
-    startDate: string;
-    endDate: string;
-    active?: boolean;
-    targetRoles?: string[];
-  }): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-      "/announcements",
-      data,
-    );
+  async createAnnouncement(
+    data: CreateAnnouncementDto,
+  ): Promise<ApiResponse<Announcement>> {
+    const response: AxiosResponse<ApiResponse<Announcement>> =
+      await this.api.post("/announcements", data);
     return response.data;
   }
 
   async updateAnnouncement(
     id: number,
-    data: Partial<{
-      title: string;
-      content: string;
-      imageUrl?: string;
-      priority: "low" | "medium" | "high" | "critical";
-      startDate: string;
-      endDate: string;
-      active?: boolean;
-      targetRoles?: string[];
-    }>,
-  ): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.patch(
-      `/announcements/${id}`,
-      data,
-    );
+    data: Partial<CreateAnnouncementDto>,
+  ): Promise<ApiResponse<Announcement>> {
+    const response: AxiosResponse<ApiResponse<Announcement>> =
+      await this.api.patch(`/announcements/${id}`, data);
     return response.data;
   }
 
@@ -1062,43 +1050,36 @@ export class ApiService {
     await this.api.delete(`/announcements/${id}`);
   }
 
-  async markAnnouncementAsViewed(id: number): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-      `/announcements/${id}/mark-viewed`,
-    );
+  async markAnnouncementAsViewed(
+    id: number,
+  ): Promise<ApiResponse<Announcement>> {
+    const response: AxiosResponse<ApiResponse<Announcement>> =
+      await this.api.post(`/announcements/${id}/mark-viewed`);
     return response.data;
   }
 
-  async getAnnouncementStats(id: number): Promise<ApiResponse<any>> {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.get(
-      `/announcements/${id}/stats`,
-    );
+  async getAnnouncementStats(
+    id: number,
+  ): Promise<ApiResponse<AnnouncementStats>> {
+    const response: AxiosResponse<ApiResponse<AnnouncementStats>> =
+      await this.api.get(`/announcements/${id}/stats`);
     return response.data;
   }
 
-  async uploadAnnouncementImage(formData: FormData): Promise<
-    ApiResponse<{
-      filename: string;
-      originalName: string;
-      size: number;
-      mimetype: string;
-      url: string;
-    }>
-  > {
-    const response: AxiosResponse<ApiResponse<any>> = await this.api.post(
-      "/announcements/upload-image",
-      formData,
-      {
+  async uploadAnnouncementImage(
+    formData: FormData,
+  ): Promise<ApiResponse<AnnouncementImageUpload>> {
+    const response: AxiosResponse<ApiResponse<AnnouncementImageUpload>> =
+      await this.api.post("/announcements/upload-image", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-      },
-    );
+      });
     return response.data;
   }
 }
 
 const apiService = new ApiService();
-const api = (apiService as any).api as AxiosInstance;
+const api = apiService.getAxiosInstance();
 
 export { api, apiService };

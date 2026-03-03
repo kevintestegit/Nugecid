@@ -1,0 +1,210 @@
+{
+  "generatedAt": "2026-02-27T14:06:34.985Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "requestsPerScenario": 200,
+  "concurrency": 20,
+  "cold": [
+    {
+      "name": "health",
+      "path": "/api/health",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 398.40637450199205,
+      "latencyMs": {
+        "min": 14.106603,
+        "p50": 26.151729,
+        "p90": 97.593695,
+        "p95": 105.861296,
+        "p99": 144.573284,
+        "max": 169.24626,
+        "avg": 48.254048344999994
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "nugecid-list",
+      "path": "/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 105.54089709762533,
+      "latencyMs": {
+        "min": 97.940537,
+        "p50": 170.245309,
+        "p90": 254.136888,
+        "p95": 301.260612,
+        "p99": 318.282765,
+        "max": 385.929996,
+        "avg": 186.53174117000003
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "pastas-list",
+      "path": "/api/pastas",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 169.63528413910092,
+      "latencyMs": {
+        "min": 45.604638,
+        "p50": 109.259766,
+        "p90": 182.099807,
+        "p95": 196.92905,
+        "p99": 208.187016,
+        "max": 224.931789,
+        "avg": 115.14205499499997
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "notificacoes-list",
+      "path": "/api/notificacoes?page=1&limit=20",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 163.1321370309951,
+      "latencyMs": {
+        "min": 46.87432,
+        "p50": 120.547738,
+        "p90": 169.288643,
+        "p95": 180.077384,
+        "p99": 201.629505,
+        "max": 202.117458,
+        "avg": 120.36421955999995
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "global-search",
+      "path": "/api/search?query=pro&limit=20&offset=0",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 126.34238787113077,
+      "latencyMs": {
+        "min": 66.90279,
+        "p50": 147.422679,
+        "p90": 223.844366,
+        "p95": 235.732806,
+        "p99": 273.988151,
+        "max": 279.57453,
+        "avg": 155.29377326499997
+      },
+      "status": {
+        "200": 200
+      }
+    }
+  ],
+  "warm": [
+    {
+      "name": "health",
+      "path": "/api/health",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 593.4718100890208,
+      "latencyMs": {
+        "min": 4.112415,
+        "p50": 20.068691,
+        "p90": 67.198867,
+        "p95": 72.235144,
+        "p99": 91.012665,
+        "max": 96.0116,
+        "avg": 32.63100421000001
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "nugecid-list",
+      "path": "/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 146.41288433382135,
+      "latencyMs": {
+        "min": 79.758772,
+        "p50": 130.820255,
+        "p90": 173.93579,
+        "p95": 189.121154,
+        "p99": 214.210662,
+        "max": 242.145642,
+        "avg": 134.529195895
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "pastas-list",
+      "path": "/api/pastas",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 209.64360587002096,
+      "latencyMs": {
+        "min": 36.531816,
+        "p50": 87.336649,
+        "p90": 169.872166,
+        "p95": 202.473586,
+        "p99": 235.45573,
+        "max": 235.738649,
+        "avg": 94.115517055
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "notificacoes-list",
+      "path": "/api/notificacoes?page=1&limit=20",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 221.97558268590456,
+      "latencyMs": {
+        "min": 33.437873,
+        "p50": 86.204149,
+        "p90": 127.033631,
+        "p95": 155.4299,
+        "p99": 182.165333,
+        "max": 182.606299,
+        "avg": 87.33882988500004
+      },
+      "status": {
+        "200": 200
+      }
+    },
+    {
+      "name": "global-search",
+      "path": "/api/search?query=pro&limit=20&offset=0",
+      "requests": 200,
+      "errors": 0,
+      "errorRatePct": 0,
+      "rps": 175.90149516270887,
+      "latencyMs": {
+        "min": 41.696184,
+        "p50": 105.025972,
+        "p90": 160.841617,
+        "p95": 169.12228,
+        "p99": 183.554687,
+        "max": 233.309255,
+        "avg": 111.17498420999995
+      },
+      "status": {
+        "200": 200
+      }
+    }
+  ]
+}

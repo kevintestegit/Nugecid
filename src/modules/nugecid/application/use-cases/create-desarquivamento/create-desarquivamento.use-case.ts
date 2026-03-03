@@ -12,7 +12,7 @@ import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.consta
 export interface CreateDesarquivamentoRequest {
   tipoDesarquivamento: string;
   nomeCompleto: string;
-  numeroNicLaudoAuto: string;
+  numeroNicLaudoAuto?: string | null;
   numeroProcesso?: string; // OPCIONAL
   tipoDocumento: string;
   dataSolicitacao: string;
@@ -123,7 +123,7 @@ export class CreateDesarquivamentoUseCase {
           sanitizedRequest.tipoDesarquivamento as TipoDesarquivamentoEnum,
         status: statusVO,
         nomeCompleto: sanitizedRequest.nomeCompleto,
-        numeroNicLaudoAuto: sanitizedRequest.numeroNicLaudoAuto,
+        numeroNicLaudoAuto: sanitizedRequest.numeroNicLaudoAuto ?? null,
         numeroProcesso: sanitizedRequest.numeroProcesso,
         tipoDocumento: sanitizedRequest.tipoDocumento,
         dataSolicitacao: new Date(sanitizedRequest.dataSolicitacao),
@@ -219,13 +219,6 @@ export class CreateDesarquivamentoUseCase {
       throw new Error("Nome completo é obrigatório");
     }
 
-    if (
-      !request.numeroNicLaudoAuto ||
-      request.numeroNicLaudoAuto.trim().length === 0
-    ) {
-      throw new Error("Número NIC/Laudo/Auto é obrigatório");
-    }
-
     // Número do processo pode ser vazio em ambiente de testes/importação
 
     if (!request.criadoPorId || request.criadoPorId <= 0) {
@@ -318,7 +311,7 @@ export class CreateDesarquivamentoUseCase {
   ): CreateDesarquivamentoResponse {
     return {
       id: desarquivamento.id?.value || 0,
-      codigoBarras: desarquivamento.numeroNicLaudoAuto, // Using numeroNicLaudoAuto as unique identifier
+      codigoBarras: desarquivamento.numeroNicLaudoAuto || "", // Using numeroNicLaudoAuto as unique identifier
       tipoSolicitacao: desarquivamento.tipoDesarquivamento,
       status: desarquivamento.status.value,
       nomeSolicitante: desarquivamento.nomeCompleto,

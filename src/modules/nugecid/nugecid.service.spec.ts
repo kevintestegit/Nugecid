@@ -63,6 +63,7 @@ describe("NugecidService", () => {
 
   const mockNugecidAuditService = {
     saveDesarquivamentoAudit: jest.fn().mockResolvedValue({}),
+    findByEntity: jest.fn().mockResolvedValue([]),
   };
 
   const mockNotificacoesService = {
@@ -183,5 +184,64 @@ describe("NugecidService", () => {
       relations: ["usuario", "responsavel"],
     });
     expect(result).toEqual(mockEntity);
+  });
+
+  it("deve consolidar visualizações repetidas no histórico", async () => {
+    mockDesarquivamentoRepository.findOne.mockResolvedValue(mockEntity);
+
+    const makeAudit = (overrides: Record<string, unknown>) => ({
+      id: 0,
+      action: "VIEW",
+      timestamp: new Date("2026-02-04T08:18:00.000Z"),
+      userId: currentUser.id,
+      user: {
+        id: currentUser.id,
+        nome: "Editor",
+        usuario: "editor",
+      },
+      details: {},
+      ipAddress: "127.0.0.1",
+      success: true,
+      getActionLabel: jest.fn().mockReturnValue("Visualização"),
+      ...overrides,
+    });
+
+    const viewOld = makeAudit({
+      id: 10,
+      action: "VIEW",
+      timestamp: new Date("2026-02-04T08:18:00.000Z"),
+    });
+    const viewNew = makeAudit({
+      id: 11,
+      action: "VIEW",
+      timestamp: new Date("2026-02-04T09:18:00.000Z"),
+    });
+    const statusUpdate = makeAudit({
+      id: 12,
+      action: "UPDATE",
+      timestamp: new Date("2026-02-04T09:30:00.000Z"),
+      details: {
+        details: "Status alterado",
+        changes: {
+          status: { from: "SOLICITADO", to: "DESARQUIVADO" },
+        },
+      },
+      getActionLabel: jest.fn().mockReturnValue("Atualização"),
+    });
+
+    mockNugecidAuditService.findByEntity
+      .mockResolvedValueOnce([viewNew, statusUpdate])
+      .mockResolvedValueOnce([viewOld]);
+
+    const result = await service.getHistorico(1);
+
+    expect(mockNugecidAuditService.findByEntity).toHaveBeenCalledTimes(2);
+    expect(result.success).toBe(true);
+    expect(result.data.filter((item) => item.action === "VIEW")).toHaveLength(
+      1,
+    );
+    expect(result.data.filter((item) => item.action === "UPDATE")).toHaveLength(
+      1,
+    );
   });
 });

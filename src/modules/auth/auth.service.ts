@@ -13,6 +13,7 @@ import { Repository, In } from "typeorm";
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { RedisService } from "../redis/redis.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 
@@ -44,7 +45,10 @@ export interface LoginV2Response {
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
-  private onlineUsers = new Map<number, { lastActivity: Date }>();
+  private static readonly ONLINE_USER_PREFIX = "sgc:online:";
+  private static readonly ONLINE_USER_TTL = 5 * 60; // 5 minutes
+  private static readonly ACTIVITY_UPDATE_DEBOUNCE_MS = 30_000;
+  private readonly lastActivityUpdateAt = new Map<number, number>();
   private accessTokenExpiresIn: string;
   private refreshTokenExpiresIn: string;
   private refreshTokenSecret: string;
@@ -59,6 +63,7 @@ export class AuthService implements OnModuleInit {
     private readonly auditoriaRepository: Repository<Auditoria>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {}
 
   onModuleInit(): void {
@@ -77,10 +82,13 @@ export class AuthService implements OnModuleInit {
 
     this.accessTokenSecret =
       this.configService.get<string>("auth.jwt.secret") ||
-      this.configService.get<string>(
-        "JWT_SECRET",
-        "sgc-itep-secret-key-change-in-production",
+      this.configService.get<string>("JWT_SECRET");
+
+    if (!this.accessTokenSecret) {
+      throw new Error(
+        "JWT_SECRET is not configured. Set the JWT_SECRET environment variable.",
       );
+    }
   }
 
   /**
@@ -180,6 +188,14 @@ export class AuthService implements OnModuleInit {
     const user = await this.validateUser(loginDto.usuario, loginDto.senha);
 
     if (!user) {
+      // Salva auditoria de tentativa de login falhada
+      await this.saveLoginAudit(
+        null,
+        ipAddress,
+        userAgent,
+        false,
+        "Credenciais inválidas",
+      );
       throw new UnauthorizedException("Credenciais inválidas");
     }
 
@@ -208,8 +224,8 @@ export class AuthService implements OnModuleInit {
     // Salva auditoria de login bem-sucedido
     await this.saveLoginAudit(user.id, ipAddress, userAgent, true);
 
-    // Adiciona usuário à lista de online
-    this.onlineUsers.set(user.id, { lastActivity: new Date() });
+    // Adiciona usuário à lista de online (Redis)
+    await this.setUserOnline(user.id);
 
     this.logger.log(`Login bem-sucedido para usuário: ${user.usuario}`);
 
@@ -257,8 +273,8 @@ export class AuthService implements OnModuleInit {
     // Salva auditoria de login bem-sucedido
     await this.saveLoginAudit(user.id, ipAddress, userAgent, true);
 
-    // Adiciona usuário à lista de online
-    this.onlineUsers.set(user.id, { lastActivity: new Date() });
+    // Adiciona usuário à lista de online (Redis)
+    await this.setUserOnline(user.id);
 
     this.logger.log(`Login API v2 bem-sucedido para usuário: ${user.usuario}`);
 
@@ -392,8 +408,8 @@ export class AuthService implements OnModuleInit {
     userAgent: string,
   ): Promise<void> {
     await this.saveLogoutAudit(userId, ipAddress, userAgent);
-    // Remove usuário da lista de online
-    this.onlineUsers.delete(userId);
+    // Remove usuário da lista de online (Redis)
+    await this.removeUserOnline(userId);
     this.logger.log(`Logout realizado para usuário ID: ${userId}`);
   }
 
@@ -506,6 +522,27 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
+   * Marca usuário como online no Redis (com TTL de 5 minutos)
+   */
+  private async setUserOnline(userId: number): Promise<void> {
+    const key = `${AuthService.ONLINE_USER_PREFIX}${userId}`;
+    await this.redisService.set(
+      key,
+      new Date().toISOString(),
+      AuthService.ONLINE_USER_TTL,
+    );
+  }
+
+  /**
+   * Remove usuário da lista de online
+   */
+  private async removeUserOnline(userId: number): Promise<void> {
+    const key = `${AuthService.ONLINE_USER_PREFIX}${userId}`;
+    this.lastActivityUpdateAt.delete(userId);
+    await this.redisService.del(key);
+  }
+
+  /**
    * Obtém lista de usuários online
    */
   async getOnlineUsers(): Promise<
@@ -518,15 +555,30 @@ export class AuthService implements OnModuleInit {
       lastActivity: Date;
     }[]
   > {
-    // Limpa usuários inativos antes de retornar
-    await this.cleanupInactiveUsers();
+    const keys = await this.redisService.keys(
+      `${AuthService.ONLINE_USER_PREFIX}*`,
+    );
 
-    const onlineUserIds = Array.from(this.onlineUsers.keys());
-    if (onlineUserIds.length === 0) {
+    if (keys.length === 0) {
       this.logger.debug("Nenhum usuário online encontrado");
       return [];
     }
 
+    // Extract user IDs from keys
+    const onlineEntries: { userId: number; lastActivity: Date }[] = [];
+    for (const key of keys) {
+      const idStr = key.replace(AuthService.ONLINE_USER_PREFIX, "");
+      const userId = parseInt(idStr, 10);
+      if (isNaN(userId)) continue;
+
+      const timestamp = await this.redisService.get(key);
+      onlineEntries.push({
+        userId,
+        lastActivity: timestamp ? new Date(timestamp) : new Date(),
+      });
+    }
+
+    const onlineUserIds = onlineEntries.map((e) => e.userId);
     this.logger.debug(
       `Encontrados ${onlineUserIds.length} usuários online: ${onlineUserIds.join(", ")}`,
     );
@@ -537,50 +589,50 @@ export class AuthService implements OnModuleInit {
       select: ["id", "nome", "usuario", "avatarUrl"],
     });
 
-    const result = users.map((user) => ({
-      id: user.id,
-      nome: user.nome,
-      usuario: user.usuario,
-      avatarUrl: user.avatarUrl ?? null,
-      role: user.role?.name || "user",
-      lastActivity: this.onlineUsers.get(user.id)?.lastActivity || new Date(),
-    }));
+    const result = users.map((user) => {
+      const entry = onlineEntries.find((e) => e.userId === user.id);
+      return {
+        id: user.id,
+        nome: user.nome,
+        usuario: user.usuario,
+        avatarUrl: user.avatarUrl ?? null,
+        role: user.role?.name || "user",
+        lastActivity: entry?.lastActivity || new Date(),
+      };
+    });
 
     this.logger.debug(`Retornando ${result.length} usuários online`);
     return result;
   }
 
   /**
-   * Atualiza a atividade do usuário
+   * Atualiza a atividade do usuário (renova TTL no Redis)
    */
   async updateUserActivity(userId: number): Promise<void> {
-    this.onlineUsers.set(userId, { lastActivity: new Date() });
+    const now = Date.now();
+    const lastUpdatedAt = this.lastActivityUpdateAt.get(userId) ?? 0;
+    if (now - lastUpdatedAt < AuthService.ACTIVITY_UPDATE_DEBOUNCE_MS) {
+      return;
+    }
+
+    this.lastActivityUpdateAt.set(userId, now);
+    await this.setUserOnline(userId);
     this.logger.debug(`Atividade atualizada para usuário ${userId}`);
   }
 
   /**
-   * Limpa usuários inativos (mais de 5 minutos sem atividade)
+   * Limpa usuários inativos - com Redis, o TTL cuida disso automaticamente.
+   * Este método é mantido para compatibilidade de interface.
    */
   async cleanupInactiveUsers(): Promise<void> {
-    const now = new Date();
-    const inactiveThreshold = 5 * 60 * 1000; // 5 minutos
-    const inactiveUsers: number[] = [];
-
-    for (const [userId, data] of this.onlineUsers.entries()) {
-      const timeDiff = now.getTime() - data.lastActivity.getTime();
-      if (timeDiff > inactiveThreshold) {
-        inactiveUsers.push(userId);
-      }
-    }
-
-    if (inactiveUsers.length > 0) {
-      inactiveUsers.forEach((userId) => {
-        this.onlineUsers.delete(userId);
-      });
-      this.logger.log(
-        `Removidos ${inactiveUsers.length} usuários inativos: ${inactiveUsers.join(", ")}`,
-      );
-    }
+    // Com Redis TTL, a limpeza é automática.
+    // Este método pode ser usado para logging/monitoramento.
+    const keys = await this.redisService.keys(
+      `${AuthService.ONLINE_USER_PREFIX}*`,
+    );
+    this.logger.debug(
+      `Usuários online ativos: ${keys.length} (cleanup automático via TTL)`,
+    );
   }
 
   /**

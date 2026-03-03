@@ -1,75 +1,170 @@
-import { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNotificacoesStore } from "@/store/notificacoesStore";
+import { Notificacao } from "@/services/notificacoesService";
+import { getAccessToken } from "@/utils/tokenStorage";
 
-interface NotificacaoSSE {
-  notificacoes: any[];
+interface InitEventData {
+  notificacoes: Notificacao[];
   total: number;
   timestamp: string;
 }
 
+interface NovaNotificacaoEventData {
+  notificacao: Notificacao;
+  timestamp: string;
+}
+
+const RECONNECT_BASE_DELAY_MS = 3000;
+const MAX_RECONNECT_DELAY_MS = 30000;
+
+/**
+ * Connects to the SSE endpoint and pushes events into the Zustand store.
+ * - `init` event: sets the full unread list (sent once on connection open).
+ * - `nova-notificacao` event: adds a single new notification in real-time.
+ * - `heartbeat` event: ignored (keeps connection alive).
+ *
+ * This hook should be mounted ONCE (in Layout or App), not per-component.
+ */
 export const useNotificacoesSSE = () => {
-  const [notificacoes, setNotificacoes] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [connected, setConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
   const { user } = useAuth();
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isMountedRef = useRef(false);
+  const useTokenFallbackRef = useRef(false);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
-  useEffect(() => {
-    if (!user) {
-      return;
+  const { setNaoLidas, addNotificacao, setSseConnected, setError } =
+    useNotificacoesStore();
+
+  const cleanup = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setSseConnected(false);
+  }, [setSseConnected]);
+
+  const connect = useCallback(() => {
+    if (!user || !isMountedRef.current) return;
+
+    // Clear any pending reconnect timeout to prevent double connections
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
 
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      return;
+    // Close previous connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
 
-    // Criar EventSource com token no URL (SSE não suporta headers)
-    const url = `/api/notificacoes/stream?token=${encodeURIComponent(token)}`;
-    const eventSource = new EventSource(url);
-
+    const accessToken = useTokenFallbackRef.current ? getAccessToken() : null;
+    const url = accessToken
+      ? `/api/notificacoes/stream?token=${encodeURIComponent(accessToken)}`
+      : `/api/notificacoes/stream`;
+    const eventSource = new EventSource(url, { withCredentials: true });
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
-      setConnected(true);
+      if (!isMountedRef.current) return;
+      setSseConnected(true);
       setError(null);
+      reconnectAttemptsRef.current = 0;
     };
 
-    eventSource.addEventListener('notificacoes', (event: MessageEvent) => {
+    // Handle "init" event — full batch of unread notifications on connect
+    eventSource.addEventListener("init", (event: MessageEvent) => {
       try {
-        const data: NotificacaoSSE = JSON.parse(event.data);
-        
-        setNotificacoes(data.notificacoes);
-        setTotal(data.total);
-      } catch (err) {
-        // Silencioso
+        const data: InitEventData = JSON.parse(event.data);
+        setNaoLidas(data.notificacoes, data.total);
+      } catch {
+        // Silent
       }
     });
 
-    eventSource.onerror = (err) => {
-      setConnected(false);
-      setError('Erro na conexão de notificações em tempo real');
-      
-      // Fechar conexão em caso de erro
-      eventSource.close();
-    };
-
-    // Cleanup ao desmontar ou trocar de usuário
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
+    // Handle "nova-notificacao" event — single new notification in real-time
+    eventSource.addEventListener("nova-notificacao", (event: MessageEvent) => {
+      try {
+        const data: NovaNotificacaoEventData = JSON.parse(event.data);
+        addNotificacao(data.notificacao);
+        window.dispatchEvent(
+          new CustomEvent("sgc:realtime-notificacao", {
+            detail: { notificacao: data.notificacao },
+          }),
+        );
+      } catch {
+        // Silent
       }
-      setConnected(false);
-    };
-  }, [user]);
+    });
 
-  return {
-    notificacoes,
-    total,
-    connected,
-    error,
-    isRealTime: connected,
-  };
+    // Handle legacy "notificacoes" event for backward compatibility
+    eventSource.addEventListener("notificacoes", (event: MessageEvent) => {
+      try {
+        const data: InitEventData = JSON.parse(event.data);
+        setNaoLidas(data.notificacoes, data.total);
+      } catch {
+        // Silent
+      }
+    });
+
+    // Heartbeat is automatically handled by EventSource (no action needed)
+
+    eventSource.onerror = () => {
+      if (!isMountedRef.current) return;
+
+      setSseConnected(false);
+      eventSource.close();
+
+      if (!useTokenFallbackRef.current && getAccessToken()) {
+        useTokenFallbackRef.current = true;
+        connect();
+        return;
+      }
+
+      if (
+        typeof navigator !== "undefined" &&
+        "onLine" in navigator &&
+        !navigator.onLine
+      ) {
+        setError("Sem conexão com a internet. Aguardando reconexão...");
+      } else {
+        setError("Conexão em tempo real instável. Tentando reconectar...");
+      }
+
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+
+      const attempts = reconnectAttemptsRef.current;
+      const delay = Math.min(
+        RECONNECT_BASE_DELAY_MS * Math.pow(2, attempts),
+        MAX_RECONNECT_DELAY_MS,
+      );
+      reconnectAttemptsRef.current = attempts + 1;
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connect();
+      }, delay);
+    };
+  }, [user, setSseConnected, setError, setNaoLidas, addNotificacao]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    useTokenFallbackRef.current = false;
+    connect();
+    return () => {
+      isMountedRef.current = false;
+      useTokenFallbackRef.current = false;
+      cleanup();
+    };
+  }, [connect, cleanup]);
 };

@@ -25,8 +25,8 @@ export class Auditoria {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: "user_id", nullable: false })
-  userId: number;
+  @Column({ name: "user_id", nullable: true })
+  userId: number | null;
 
   @Column({ type: "varchar", enum: AuditAction, nullable: false })
   action: AuditAction;
@@ -79,7 +79,7 @@ export class Auditoria {
 
   // Métodos
   static createLoginAudit(
-    userId: number,
+    userId: number | null,
     ipAddress: string,
     userAgent: string,
     success: boolean,

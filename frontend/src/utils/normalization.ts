@@ -20,7 +20,8 @@ export function normalizeTipoDesarquivamento(value: string): string {
   const normalized = normalize(value);
 
   if (normalized.includes("DIGITAL")) return "DIGITAL";
-  if (normalized.includes("NAO") && normalized.includes("LOCALIZADO")) return "NAO_LOCALIZADO";
+  if (normalized.includes("NAO") && normalized.includes("LOCALIZADO"))
+    return "NAO_LOCALIZADO";
   if (normalized.includes("FISICO")) return "FISICO";
 
   // Default para FISICO se não reconhecer
@@ -37,10 +38,12 @@ export function normalizeStatus(value: string): string {
 
   if (normalized.includes("FINALIZADO")) return "FINALIZADO";
   if (normalized.includes("DESARQUIVADO")) return "DESARQUIVADO";
-  if (normalized.includes("NAO") && normalized.includes("COLETADO")) return "NAO_COLETADO";
+  if (normalized.includes("NAO") && normalized.includes("COLETADO"))
+    return "NAO_COLETADO";
   if (normalized.includes("REARQUIVAMENTO")) return "REARQUIVAMENTO_SOLICITADO";
   if (normalized.includes("RETIRADO")) return "RETIRADO_PELO_SETOR";
-  if (normalized.includes("NAO") && normalized.includes("LOCALIZADO")) return "NAO_LOCALIZADO";
+  if (normalized.includes("NAO") && normalized.includes("LOCALIZADO"))
+    return "NAO_LOCALIZADO";
 
   return "SOLICITADO";
 }
@@ -48,18 +51,20 @@ export function normalizeStatus(value: string): string {
 /**
  * Normaliza data YYYY-MM-DD para ISO 8601
  */
-export function normalizeDate(value: string | Date | undefined | null): string | undefined {
+export function normalizeDate(
+  value: string | Date | undefined | null,
+): string | undefined {
   if (!value) return undefined;
 
   try {
     // Se já for uma string ISO 8601, retorna como está
-    if (typeof value === 'string' && value.includes('T')) {
+    if (typeof value === "string" && value.includes("T")) {
       return value;
     }
 
     // Se for YYYY-MM-DD, converte para ISO 8601
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(value + 'T00:00:00.000Z').toISOString();
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(value + "T00:00:00.000Z").toISOString();
     }
 
     // Se for Date object, converte para ISO 8601
@@ -73,7 +78,7 @@ export function normalizeDate(value: string | Date | undefined | null): string |
       return date.toISOString();
     }
   } catch (error) {
-    console.error('[normalization] Erro ao normalizar data:', error);
+    console.error("[normalization] Erro ao normalizar data:", error);
   }
 
   return undefined;
@@ -82,7 +87,10 @@ export function normalizeDate(value: string | Date | undefined | null): string |
 /**
  * Limita o tamanho de uma string ao máximo especificado
  */
-export function truncateString(value: string | undefined, maxLength: number): string | undefined {
+export function truncateString(
+  value: string | undefined,
+  maxLength: number,
+): string | undefined {
   if (!value) return value;
   const trimmed = value.trim();
   return trimmed.length > maxLength ? trimmed.substring(0, maxLength) : trimmed;
@@ -91,29 +99,43 @@ export function truncateString(value: string | undefined, maxLength: number): st
 /**
  * Aplica normalização em um objeto CreateDesarquivamentoDto antes de enviar ao backend
  */
-export function normalizeDesarquivamentoData(data: any): any {
-  const normalized: any = {
+export function normalizeDesarquivamentoData(
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {
     ...data,
   };
 
   // Só normaliza se o campo estiver presente
   if (data.tipoDesarquivamento) {
-    normalized.tipoDesarquivamento = normalizeTipoDesarquivamento(data.tipoDesarquivamento);
+    normalized.tipoDesarquivamento = normalizeTipoDesarquivamento(
+      String(data.tipoDesarquivamento),
+    );
   }
 
   if (data.desarquivamentoFisicoDigital) {
-    normalized.desarquivamentoFisicoDigital = normalizeTipoDesarquivamento(data.desarquivamentoFisicoDigital);
+    normalized.desarquivamentoFisicoDigital = normalizeTipoDesarquivamento(
+      String(data.desarquivamentoFisicoDigital),
+    );
   }
 
   if (data.status) {
-    normalized.status = normalizeStatus(data.status);
+    normalized.status = normalizeStatus(String(data.status));
   }
 
   // Normaliza datas para ISO 8601
-  const dateFields = ['dataSolicitacao', 'dataDesarquivamentoSAG', 'dataDevolucaoSetor'];
+  const dateFields = [
+    "dataSolicitacao",
+    "dataDesarquivamentoSAG",
+    "dataDevolucaoSetor",
+  ];
   for (const field of dateFields) {
     if (data[field]) {
-      const normalizedDate = normalizeDate(data[field]);
+      const normalizedDate = normalizeDate(
+        data[field] instanceof Date
+          ? (data[field] as Date)
+          : String(data[field]),
+      );
       if (normalizedDate) {
         normalized[field] = normalizedDate;
       }
@@ -122,39 +144,54 @@ export function normalizeDesarquivamentoData(data: any): any {
 
   // Limita o tamanho de campos de texto
   if (data.numeroNicLaudoAuto) {
-    normalized.numeroNicLaudoAuto = truncateString(data.numeroNicLaudoAuto, 100);
+    normalized.numeroNicLaudoAuto = truncateString(
+      String(data.numeroNicLaudoAuto),
+      100,
+    );
   }
 
   if (data.nomeCompleto) {
-    normalized.nomeCompleto = truncateString(data.nomeCompleto, 255);
+    normalized.nomeCompleto = truncateString(String(data.nomeCompleto), 255);
   }
 
   if (data.numeroProcesso) {
-    normalized.numeroProcesso = truncateString(data.numeroProcesso, 50);
+    normalized.numeroProcesso = truncateString(String(data.numeroProcesso), 50);
   }
 
   if (data.tipoDocumento) {
-    normalized.tipoDocumento = truncateString(data.tipoDocumento, 100);
+    normalized.tipoDocumento = truncateString(String(data.tipoDocumento), 100);
   }
 
   if (data.numeroOficio) {
-    normalized.numeroOficio = truncateString(data.numeroOficio, 255);
+    normalized.numeroOficio = truncateString(String(data.numeroOficio), 255);
   }
 
   if (data.setorDemandante) {
-    normalized.setorDemandante = truncateString(data.setorDemandante, 255);
+    normalized.setorDemandante = truncateString(
+      String(data.setorDemandante),
+      255,
+    );
   }
 
   if (data.servidorResponsavel) {
-    normalized.servidorResponsavel = truncateString(data.servidorResponsavel, 255);
+    normalized.servidorResponsavel = truncateString(
+      String(data.servidorResponsavel),
+      255,
+    );
   }
 
   if (data.solicitacaoProrrogacaoTexto) {
-    normalized.solicitacaoProrrogacaoTexto = truncateString(data.solicitacaoProrrogacaoTexto, 2000);
+    normalized.solicitacaoProrrogacaoTexto = truncateString(
+      String(data.solicitacaoProrrogacaoTexto),
+      2000,
+    );
   }
 
   if (data.dadosAdicionais) {
-    normalized.dadosAdicionais = truncateString(data.dadosAdicionais, 2000);
+    normalized.dadosAdicionais = truncateString(
+      String(data.dadosAdicionais),
+      2000,
+    );
   }
 
   return normalized;

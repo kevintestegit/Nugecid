@@ -1,36 +1,39 @@
-import { api } from './api';
+import axios from "axios";
+import { api } from "./api";
 
 export interface UserPreference {
   key: string;
-  value: any;
+  value: unknown;
   updatedAt: string;
 }
 
 export class PreferencesService {
-  private baseUrl = '/users/me/preferences';
+  private baseUrl = "/users/me/preferences";
 
-  async getAll(): Promise<Record<string, any>> {
-    const response = await api.get<Record<string, any>>(this.baseUrl);
+  async getAll(): Promise<Record<string, unknown>> {
+    const response = await api.get<Record<string, unknown>>(this.baseUrl);
     return response.data;
   }
 
-  async get(key: string): Promise<any> {
+  async get(key: string): Promise<unknown> {
     try {
-      const response = await api.get<{ key: string; value: any }>(`${this.baseUrl}/${key}`);
+      const response = await api.get<{ key: string; value: unknown }>(
+        `${this.baseUrl}/${key}`,
+      );
       return response.data.value;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
         return null;
       }
       throw error;
     }
   }
 
-  async set(key: string, value: any): Promise<UserPreference> {
-    const response = await api.post<{ message: string; preference: UserPreference }>(
-      this.baseUrl,
-      { key, value }
-    );
+  async set(key: string, value: unknown): Promise<UserPreference> {
+    const response = await api.post<{
+      message: string;
+      preference: UserPreference;
+    }>(this.baseUrl, { key, value });
     return response.data.preference;
   }
 

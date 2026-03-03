@@ -1,14 +1,18 @@
-import { Module } from "@nestjs/common";
+import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { ThrottlerModule } from "@nestjs/throttler";
 import { CacheModule } from "@nestjs/cache-manager";
 import { ScheduleModule } from "@nestjs/schedule";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { MulterModule } from "@nestjs/platform-express";
+import { SentryModule } from "@sentry/nestjs/setup";
 import { join } from "path";
+import { config as dotenvConfig } from "dotenv";
 import * as redisStore from "cache-manager-redis-store";
+
+// Middleware
+import { StaticAuthMiddleware } from "./common/middleware/static-auth.middleware";
 
 // Configuration
 import {
@@ -23,7 +27,6 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { NugecidModule } from "./modules/nugecid/nugecid.module";
 import { AuditoriaModule } from "./modules/audit/auditoria.module";
-import { SeedingModule } from "./modules/seeding/seeding.module";
 import { RegistrosModule } from "./modules/registros/registros.module";
 import { EstatisticasModule } from "./modules/estatisticas/estatisticas.module";
 import { HealthModule } from "./modules/health/health.module";
@@ -37,6 +40,10 @@ import { SecurityModule } from "./modules/security/security.module";
 import { AnnouncementsModule } from "./modules/announcements/announcements.module";
 import { VestigiosModule } from "./modules/vestigios/vestigios.module";
 import { EscavadorSeirnModule } from "./modules/escavador-seirn/escavador-seirn.module";
+import { RedisModule } from "./modules/redis/redis.module";
+import { QueuesModule } from "./modules/queues/queues.module";
+import { SyncModule } from "./modules/sync/sync.module";
+import { ObservabilityModule } from "./modules/observability/observability.module";
 
 // Controllers and Services
 import { AppController } from "./app.controller";
@@ -48,9 +55,19 @@ import { DesarquivamentoTypeOrmEntity } from "./modules/nugecid/infrastructure/e
 import { Tarefa } from "./modules/tarefas/entities/tarefa.entity";
 import { Projeto } from "./modules/tarefas/entities/projeto.entity";
 import { Pasta } from "./modules/pastas/entities/pasta.entity";
+import { Vestigio } from "./modules/vestigios/entities/vestigio.entity";
+import { Notificacao } from "./modules/notificacoes/entities/notificacao.entity";
+import { PlanilhaControle } from "./modules/planilhas/entities/planilha-controle.entity";
+
+dotenvConfig({ path: ".env", override: false });
+dotenvConfig({ path: ".env.local", override: true });
+const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
 
 @Module({
   imports: [
+    // Sentry must be first
+    SentryModule.forRoot(),
+
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
@@ -66,6 +83,9 @@ import { Pasta } from "./modules/pastas/entities/pasta.entity";
       Tarefa,
       Projeto,
       Pasta,
+      Vestigio,
+      Notificacao,
+      PlanilhaControle,
     ]),
 
     // Database
@@ -78,6 +98,7 @@ import { Pasta } from "./modules/pastas/entities/pasta.entity";
     // Cache (Redis - opcional)
     CacheModule.registerAsync({
       imports: [ConfigModule],
+      isGlobal: true,
       useFactory: async (configService: ConfigService) => {
         const redisUrl = configService.get<string>("REDIS_URL");
         if (redisUrl) {
@@ -86,28 +107,14 @@ import { Pasta } from "./modules/pastas/entities/pasta.entity";
             url: redisUrl,
             ttl: 30, // 30 seconds - atualização rápida
             max: 100,
-            isGlobal: true,
           };
         }
         // Fallback para cache em memória
         return {
           ttl: 30, // 30 seconds - atualização rápida
           max: 100,
-          isGlobal: true,
         };
       },
-      inject: [ConfigService],
-    }),
-
-    // Rate Limiting
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => [
-        {
-          ttl: configService.get<number>("THROTTLE_TTL", 60),
-          limit: configService.get<number>("THROTTLE_LIMIT", 10),
-        },
-      ],
       inject: [ConfigService],
     }),
 
@@ -158,11 +165,13 @@ import { Pasta } from "./modules/pastas/entities/pasta.entity";
     }),
 
     // Application Modules
+    ObservabilityModule,
+    SyncModule,
+    RedisModule,
     AuthModule,
     UsersModule,
     NugecidModule,
     AuditoriaModule,
-    SeedingModule,
     RegistrosModule,
     EstatisticasModule,
     HealthModule,
@@ -176,8 +185,13 @@ import { Pasta } from "./modules/pastas/entities/pasta.entity";
     AnnouncementsModule,
     VestigiosModule,
     EscavadorSeirnModule,
+    ...(queueFeatureEnabled ? [QueuesModule] : []),
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(StaticAuthMiddleware).forRoutes("/uploads");
+  }
+}

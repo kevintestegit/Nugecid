@@ -70,10 +70,7 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
     return variants[tipo] || "outline";
   };
 
-  const isOverdue = (
-    dataSolicitacao: string,
-    status: StatusDesarquivamento,
-  ) => {
+  const isOverdue = (dataReferencia: string, status: StatusDesarquivamento) => {
     if (
       status === StatusDesarquivamento.FINALIZADO ||
       status === StatusDesarquivamento.DESARQUIVADO ||
@@ -82,7 +79,7 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
       return false;
     }
 
-    const solicitacaoDate = new Date(dataSolicitacao);
+    const solicitacaoDate = new Date(dataReferencia);
     const today = new Date();
     const diffTime = today.getTime() - solicitacaoDate.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -151,30 +148,31 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
               <TableHead>Nº NIC/LAUDO/AUTO/IT</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Data Solicitação</TableHead>
+              <TableHead>Data Criação</TableHead>
               <TableHead>Setor Demandante</TableHead>
               <TableHead>Prorrogação</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {desarquivamentos.map((desarquivamento) => (
-              <TableRow
-                key={desarquivamento.id}
-                className={cn(
-                  "hover:bg-gray-50",
-                  isOverdue(
-                    desarquivamento.dataSolicitacao,
-                    desarquivamento.status,
-                  ) && "bg-red-50 hover:bg-red-100",
-                )}
-              >
+            {desarquivamentos.map((desarquivamento) => {
+              const dataReferencia =
+                desarquivamento.createdAt || desarquivamento.dataSolicitacao;
+
+              return (
+                <TableRow
+                  key={desarquivamento.id}
+                  className={cn(
+                    "hover:bg-gray-50",
+                    isOverdue(dataReferencia, desarquivamento.status) &&
+                      "bg-red-50 hover:bg-red-100",
+                  )}
+                >
                 <TableCell>
                   <div className="flex items-center space-x-3">
-                    {isOverdue(
-                      desarquivamento.dataSolicitacao,
-                      desarquivamento.status,
-                    ) && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                    {isOverdue(dataReferencia, desarquivamento.status) && (
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                    )}
                     <div>
                       <p className="font-medium text-gray-900">
                         {desarquivamento.nomeCompleto}
@@ -215,9 +213,7 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
                 <TableCell>
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
-                    <span className="text-sm">
-                      {formatDate(desarquivamento.dataSolicitacao)}
-                    </span>
+                    <span className="text-sm">{formatDate(dataReferencia)}</span>
                   </div>
                 </TableCell>
 
@@ -271,14 +267,17 @@ const DesarquivamentosTable: React.FC<DesarquivamentosTableProps> = ({
                     </Button>
                   </div>
                 </TableCell>
-              </TableRow>
-            ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
 
       {/* Legenda para itens em atraso */}
-      {desarquivamentos.some((d) => isOverdue(d.dataSolicitacao, d.status)) && (
+      {desarquivamentos.some((d) =>
+        isOverdue(d.createdAt || d.dataSolicitacao, d.status),
+      ) && (
         <div className="px-6 py-3 bg-red-50 border-t border-red-200">
           <div className="flex items-center space-x-2 text-sm text-red-700">
             <AlertTriangle className="w-4 h-4" />

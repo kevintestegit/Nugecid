@@ -1,4 +1,4 @@
-﻿import {
+import {
   Injectable,
   NotFoundException,
   ForbiddenException,
@@ -25,10 +25,26 @@ import {
   FiltrosTarefasDto,
 } from "../dto";
 import { User } from "../../users/entities/user.entity";
+import { SyncRealtimeService } from "../../sync/sync-realtime.service";
+import { TarefasFiltrosService } from "./tarefas-filtros.service";
 
 @Injectable()
 export class TarefasService {
   private readonly logger = new Logger(TarefasService.name);
+  private static readonly SORTABLE_COLUMNS: Record<string, string> = {
+    id: "tarefa.id",
+    titulo: "tarefa.titulo",
+    descricao: "tarefa.descricao",
+    prazo: "tarefa.prazo",
+    prioridade: "tarefa.prioridade",
+    updatedAt: "tarefa.updatedAt",
+    atualizadoEm: "tarefa.updatedAt",
+    coluna: "coluna.nome",
+    projeto: "projeto.nome",
+    responsavel: "responsavel.nome",
+    createdAt: "tarefa.createdAt",
+    criadoEm: "tarefa.createdAt",
+  };
 
   constructor(
     @InjectRepository(Tarefa)
@@ -47,6 +63,8 @@ export class TarefasService {
     private readonly checklistRepository: Repository<Checklist>,
     private readonly notificacoesService: NotificacoesService,
     private readonly dataSource: DataSource,
+    private readonly syncRealtimeService: SyncRealtimeService,
+    private readonly tarefasFiltrosService: TarefasFiltrosService,
   ) {}
 
   async create(
@@ -148,23 +166,35 @@ export class TarefasService {
       savedTarefa.id,
     );
 
+    this.syncRealtimeService.emitDomainChange({
+      scope: "tarefas",
+      action: "created",
+      entityId: savedTarefa.id,
+      entityType: "tarefa",
+      actorId: criadorId,
+      metadata: {
+        projetoId: savedTarefa.projetoId,
+        colunaId: savedTarefa.colunaId,
+      },
+    });
+
     return this.findOne(savedTarefa.id, criadorId);
   }
 
   async findAll(projetoId: number, userId: number): Promise<Tarefa[]> {
-    // Verificar se o projeto existe e se o usuÃ¡rio tem acesso
+    // Verificar se o projeto existe e se o usuário tem acesso
     const projeto = await this.projetoRepository.findOne({
       where: { id: projetoId },
       relations: ["membros"],
     });
 
     if (!projeto) {
-      throw new NotFoundException("Projeto nÃ£o encontrado");
+      throw new NotFoundException("Projeto não encontrado");
     }
 
     if (!projeto.canUserView(userId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para acessar este projeto",
+        "Você não tem permissão para acessar este projeto",
       );
     }
 
@@ -189,7 +219,7 @@ export class TarefasService {
       hasPrev: boolean;
     };
   }> {
-    // Verificar se o projeto existe e se o usuÃ¡rio tem acesso
+    // Verificar se o projeto existe e se o usuário tem acesso
     if (queryDto.projeto_id) {
       const projeto = await this.projetoRepository.findOne({
         where: { id: queryDto.projeto_id },
@@ -197,20 +227,20 @@ export class TarefasService {
       });
 
       if (!projeto) {
-        throw new NotFoundException("Projeto nÃ£o encontrado");
+        throw new NotFoundException("Projeto não encontrado");
       }
 
       if (!projeto.canUserView(userId)) {
         throw new ForbiddenException(
-          "VocÃª nÃ£o tem permissÃ£o para acessar este projeto",
+          "Você não tem permissão para acessar este projeto",
         );
       }
     }
 
-    // Verificar se o repositÃ³rio estÃ¡ inicializado corretamente
+    // Verificar se o repositório está inicializado corretamente
     if (!this.tarefaRepository || !this.tarefaRepository.metadata) {
       throw new Error(
-        "RepositÃ³rio de tarefas nÃ£o estÃ¡ inicializado corretamente",
+        "Repositório de tarefas não está inicializado corretamente",
       );
     }
 
@@ -276,69 +306,52 @@ export class TarefasService {
       const hoje = new Date();
       queryBuilder.andWhere("tarefa.prazo < :hoje", { hoje });
       queryBuilder.andWhere("coluna.nome != :concluido", {
-        concluido: "ConcluÃ­do",
+        concluido: "Concluído",
       });
     }
 
-    // Aplicar ordenaÃ§Ã£o
+    // Aplicar ordenação
     const sortBy = queryDto.sortBy || "createdAt";
-    const sortOrder = queryDto.sortOrder || "DESC";
+    const sortOrder = this.normalizeSortOrder(queryDto.sortOrder);
+    const sortColumn = this.resolveSortColumn(sortBy);
 
-    // LÃ³gica de ordenaÃ§Ã£o
+    // Lógica de ordenação
     switch (sortBy) {
-      case "id":
-        queryBuilder.orderBy("tarefa.id", sortOrder as "ASC" | "DESC");
-        break;
-      case "titulo":
-        queryBuilder.orderBy("tarefa.titulo", sortOrder as "ASC" | "DESC");
-        break;
-      case "descricao":
-        queryBuilder.orderBy("tarefa.descricao", sortOrder as "ASC" | "DESC");
-        break;
-      case "prazo":
-        queryBuilder.orderBy("tarefa.prazo", sortOrder as "ASC" | "DESC");
-        break;
-      case "prioridade":
-        queryBuilder.orderBy("tarefa.prioridade", sortOrder as "ASC" | "DESC");
-        break;
-      case "updatedAt":
-        queryBuilder.orderBy("tarefa.updatedAt", sortOrder as "ASC" | "DESC");
-        break;
       case "ordem":
         queryBuilder
           .orderBy("tarefa.colunaId", "ASC")
-          .addOrderBy("tarefa.ordem", sortOrder as "ASC" | "DESC");
+          .addOrderBy("tarefa.ordem", sortOrder);
         break;
+      case "id":
+      case "titulo":
+      case "descricao":
+      case "prazo":
+      case "prioridade":
+      case "updatedAt":
+      case "atualizadoEm":
       case "coluna":
-        queryBuilder.orderBy("coluna.nome", sortOrder as "ASC" | "DESC");
-        break;
       case "projeto":
-        queryBuilder.orderBy("projeto.nome", sortOrder as "ASC" | "DESC");
-        break;
       case "responsavel":
-        queryBuilder.orderBy("responsavel.nome", sortOrder as "ASC" | "DESC");
-        break;
+      case "criadoEm":
       case "createdAt":
       default:
-        queryBuilder.orderBy("tarefa.createdAt", sortOrder as "ASC" | "DESC");
+        queryBuilder.orderBy(sortColumn, sortOrder);
         break;
     }
 
-    // Contar total
     let total = 0;
     let tarefas: Tarefa[] = [];
 
-    // Aplicar paginaÃ§Ã£o
+    // Aplicar paginação
     const page = queryDto.page || 1;
     const limit = queryDto.limit && queryDto.limit > 0 ? queryDto.limit : 10;
     const skip = (page - 1) * limit;
 
     try {
-      total = await queryBuilder.getCount();
-
-      queryBuilder.skip(skip).take(limit);
-
-      tarefas = await queryBuilder.getMany();
+      [tarefas, total] = await queryBuilder
+        .skip(skip)
+        .take(limit)
+        .getManyAndCount();
     } catch (error) {
       this.logger.error(
         "Erro ao executar query de tarefas",
@@ -347,7 +360,7 @@ export class TarefasService {
 
       if (error instanceof QueryFailedError) {
         throw new InternalServerErrorException(
-          "NÃ£o foi possÃ­vel carregar as tarefas no momento. Tente novamente mais tarde.",
+          "Não foi possível carregar as tarefas no momento. Tente novamente mais tarde.",
         );
       }
 
@@ -509,6 +522,22 @@ export class TarefasService {
         null,
         changes.join("; "),
       );
+
+      // Notificar o responsável da tarefa sobre as alterações (se não for o autor da mudança)
+      if (savedTarefa.responsavelId && savedTarefa.responsavelId !== userId) {
+        this.notificacoesService
+          .notificarTarefaAlterada(
+            savedTarefa.responsavelId,
+            userId,
+            savedTarefa.id,
+            changes,
+          )
+          .catch((err) =>
+            this.logger.warn(
+              `Falha ao notificar alteração da tarefa ${savedTarefa.id}: ${err.message}`,
+            ),
+          );
+      }
     }
 
     if (novosResponsaveis && novosResponsaveis.length > 0) {
@@ -518,6 +547,18 @@ export class TarefasService {
         savedTarefa.id,
       );
     }
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "tarefas",
+      action: "updated",
+      entityId: savedTarefa.id,
+      entityType: "tarefa",
+      actorId: userId,
+      metadata: {
+        projetoId: savedTarefa.projetoId,
+        colunaId: savedTarefa.colunaId,
+      },
+    });
 
     return this.findOne(id, userId);
   }
@@ -541,6 +582,18 @@ export class TarefasService {
 
       // Reordenar tarefas após remoção
       await this.reorderTasksWithManager(manager, colunaId, ordem, "delete");
+    });
+
+    this.syncRealtimeService.emitDomainChange({
+      scope: "tarefas",
+      action: "deleted",
+      entityId: id,
+      entityType: "tarefa",
+      actorId: userId,
+      metadata: {
+        projetoId: tarefa.projetoId,
+        colunaId,
+      },
     });
   }
 
@@ -666,6 +719,18 @@ export class TarefasService {
     resultado.comentarios = comentarios;
     resultado.checklists = checklists;
 
+    this.syncRealtimeService.emitDomainChange({
+      scope: "tarefas",
+      action: "moved",
+      entityId: id,
+      entityType: "tarefa",
+      actorId: userId,
+      metadata: {
+        projetoId: resultado.projetoId,
+        colunaId: resultado.colunaId,
+      },
+    });
+
     return resultado;
   }
 
@@ -677,35 +742,6 @@ export class TarefasService {
       relations: ["usuario"],
       order: { dataAcao: "DESC" },
     });
-  }
-
-  async debugTarefa(id: number, _userId: number): Promise<any> {
-    const tarefa = await this.tarefaRepository.findOne({
-      where: { id },
-      relations: ["coluna", "projeto"],
-    });
-
-    if (!tarefa) {
-      throw new NotFoundException("Tarefa nÃ£o encontrada");
-    }
-
-    // Query direta no banco
-    const rawData = await this.tarefaRepository.query(
-      "SELECT id, titulo, coluna_id, ordem FROM tarefas WHERE id = $1",
-      [id],
-    );
-
-    return {
-      entidade: {
-        id: tarefa.id,
-        titulo: tarefa.titulo,
-        colunaId: tarefa.colunaId,
-        ordem: tarefa.ordem,
-        colunaNome: tarefa.coluna?.nome,
-      },
-      bancoDados: rawData[0],
-      match: tarefa.colunaId === rawData[0]?.coluna_id,
-    };
   }
 
   private async notificarAtribuicaoTarefa(
@@ -786,70 +822,6 @@ export class TarefasService {
     }
 
     return responsaveis;
-  }
-  private async reorderTasks(
-    colunaId: number,
-    targetOrder: number,
-    operation: "insert" | "update" | "delete",
-    currentOrder?: number,
-  ): Promise<void> {
-    // Usar transação com row-level locking para evitar race conditions
-    await this.dataSource.transaction(async (manager) => {
-      // SELECT ... FOR UPDATE: bloqueia as linhas para garantir atomicidade
-      const tarefas = await manager
-        .createQueryBuilder(Tarefa, "tarefa")
-        .where("tarefa.colunaId = :colunaId", { colunaId })
-        .orderBy("tarefa.ordem", "ASC")
-        .setLock("pessimistic_write") // FOR UPDATE lock
-        .getMany();
-
-      const tarefasParaAtualizar: Tarefa[] = [];
-
-      switch (operation) {
-        case "insert":
-          for (const tarefa of tarefas) {
-            if (tarefa.ordem >= targetOrder) {
-              tarefa.ordem += 1;
-              tarefasParaAtualizar.push(tarefa);
-            }
-          }
-          break;
-
-        case "update":
-          if (!currentOrder) return;
-
-          if (targetOrder > currentOrder) {
-            for (const tarefa of tarefas) {
-              if (tarefa.ordem > currentOrder && tarefa.ordem <= targetOrder) {
-                tarefa.ordem -= 1;
-                tarefasParaAtualizar.push(tarefa);
-              }
-            }
-          } else {
-            for (const tarefa of tarefas) {
-              if (tarefa.ordem >= targetOrder && tarefa.ordem < currentOrder) {
-                tarefa.ordem += 1;
-                tarefasParaAtualizar.push(tarefa);
-              }
-            }
-          }
-          break;
-
-        case "delete":
-          for (const tarefa of tarefas) {
-            if (tarefa.ordem > targetOrder) {
-              tarefa.ordem -= 1;
-              tarefasParaAtualizar.push(tarefa);
-            }
-          }
-          break;
-      }
-
-      // Save em batch (uma única query)
-      if (tarefasParaAtualizar.length > 0) {
-        await manager.save(tarefasParaAtualizar);
-      }
-    });
   }
 
   private async createHistoryEntry(
@@ -980,7 +952,7 @@ export class TarefasService {
       .leftJoinAndSelect("tarefa.responsaveis", "responsaveis")
       .where("tarefa.projetoId = :projetoId", { projetoId })
       .andWhere("tarefa.prazo < :hoje", { hoje })
-      .andWhere("coluna.nome != :concluido", { concluido: "ConcluÃ­do" })
+      .andWhere("coluna.nome != :concluido", { concluido: "Concluído" })
       .orderBy("tarefa.prazo", "ASC")
       .getMany();
   }
@@ -1010,7 +982,7 @@ export class TarefasService {
         "concluidas",
       )
       .addSelect(
-        `SUM(CASE WHEN coluna.nome = 'Em Andamento' THEN 1 ELSE 0 END)`,
+        `SUM(CASE WHEN coluna.nome = 'Em Progresso' THEN 1 ELSE 0 END)`,
         "emAndamento",
       )
       .addSelect(
@@ -1081,7 +1053,7 @@ export class TarefasService {
       const hoje = new Date();
       queryBuilder.andWhere("tarefa.prazo < :hoje", { hoje });
       queryBuilder.andWhere("coluna.nome != :concluido", {
-        concluido: "ConcluÃ­do",
+        concluido: "Concluído",
       });
     }
 
@@ -1096,14 +1068,14 @@ export class TarefasService {
 
     if (!tarefaOriginal.projeto.canUserEdit(userId)) {
       throw new ForbiddenException(
-        "VocÃª nÃ£o tem permissÃ£o para duplicar esta tarefa",
+        "Você não tem permissão para duplicar esta tarefa",
       );
     }
 
     const createDto: CreateTarefaDto = {
       projetoId: tarefaOriginal.projetoId,
       colunaId: tarefaOriginal.colunaId,
-      titulo: `${tarefaOriginal.titulo} (CÃ³pia)`,
+      titulo: `${tarefaOriginal.titulo} (Cópia)`,
       descricao: tarefaOriginal.descricao,
       prioridade: tarefaOriginal.prioridade,
       tags: tarefaOriginal.tags,
@@ -1159,19 +1131,29 @@ export class TarefasService {
     return this.moveTarefa(id, moveTarefaDto, userId);
   }
 
-  // ========== NOVOS MÃ‰TODOS DE FILTROS AVANÃ‡ADOS ==========
+  // ========== NOVOS MÉTODOS DE FILTROS AVANÇADOS ==========
 
   async buscarComFiltros(
     filtros: FiltrosTarefasDto,
   ): Promise<{ tarefas: Tarefa[]; grupos?: Record<string, Tarefa[]> }> {
-    const { TarefasFiltrosService } = await import("./tarefas-filtros.service");
-    const filtrosService = new TarefasFiltrosService(this.tarefaRepository);
-    return filtrosService.buscarEAgrupar(filtros);
+    return this.tarefasFiltrosService.buscarEAgrupar(filtros);
   }
 
   async getEstatisticas(filtros: FiltrosTarefasDto): Promise<any> {
-    const { TarefasFiltrosService } = await import("./tarefas-filtros.service");
-    const filtrosService = new TarefasFiltrosService(this.tarefaRepository);
-    return filtrosService.getEstatisticas(filtros);
+    return this.tarefasFiltrosService.getEstatisticas(filtros);
+  }
+
+  private normalizeSortOrder(sortOrder?: string): "ASC" | "DESC" {
+    return String(sortOrder || "DESC").toUpperCase() === "ASC" ? "ASC" : "DESC";
+  }
+
+  private resolveSortColumn(sortBy?: string): string {
+    if (!sortBy) {
+      return TarefasService.SORTABLE_COLUMNS["createdAt"];
+    }
+    return (
+      TarefasService.SORTABLE_COLUMNS[sortBy] ??
+      TarefasService.SORTABLE_COLUMNS["createdAt"]
+    );
   }
 }

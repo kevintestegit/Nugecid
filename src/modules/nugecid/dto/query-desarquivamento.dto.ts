@@ -133,7 +133,8 @@ export class QueryDesarquivamentoDto {
   responsavelId?: number;
 
   @ApiPropertyOptional({
-    description: "Data inicial para filtro (formato: YYYY-MM-DD)",
+    description:
+      "Data inicial para filtro por data de criação (formato: YYYY-MM-DD)",
     example: "2024-01-01",
     type: "string",
     format: "date",
@@ -146,7 +147,8 @@ export class QueryDesarquivamentoDto {
   dataInicio?: string;
 
   @ApiPropertyOptional({
-    description: "Data final para filtro (formato: YYYY-MM-DD)",
+    description:
+      "Data final para filtro por data de criação (formato: YYYY-MM-DD)",
     example: "2024-12-31",
     type: "string",
     format: "date",
@@ -159,7 +161,8 @@ export class QueryDesarquivamentoDto {
   dataFim?: string;
 
   @ApiPropertyOptional({
-    description: "Data inicial para filtro de intervalo (formato: YYYY-MM-DD)",
+    description:
+      "Data inicial para filtro de intervalo por data de criação (formato: YYYY-MM-DD)",
     example: "2024-01-01",
     type: "string",
     format: "date",
@@ -172,7 +175,8 @@ export class QueryDesarquivamentoDto {
   startDate?: string;
 
   @ApiPropertyOptional({
-    description: "Data final para filtro de intervalo (formato: YYYY-MM-DD)",
+    description:
+      "Data final para filtro de intervalo por data de criação (formato: YYYY-MM-DD)",
     example: "2024-12-31",
     type: "string",
     format: "date",
@@ -238,29 +242,41 @@ export class QueryDesarquivamentoDto {
 
   @ApiPropertyOptional({
     description: "Campo para ordenação",
-    example: "dataSolicitacao",
+    example: "createdAt",
     enum: [
       "dataSolicitacao",
+      "createdAt",
       "nomeCompleto",
       "numeroNicLaudoAuto",
       "numeroProcesso",
       "status",
       "tipoDesarquivamento",
+      "tipoDocumento",
+      "setorDemandante",
+      "servidorResponsavel",
+      "finalidadeDesarquivamento",
+      "solicitacaoProrrogacao",
       "dataDesarquivamentoSAG",
       "dataDevolucaoSetor",
     ],
-    default: "dataSolicitacao",
+    default: "createdAt",
   })
   @IsOptional()
   @IsString({ message: "Campo de ordenação deve ser uma string" })
   @IsIn(
     [
       "dataSolicitacao",
+      "createdAt",
       "nomeCompleto",
       "numeroNicLaudoAuto",
       "numeroProcesso",
       "status",
       "tipoDesarquivamento",
+      "tipoDocumento",
+      "setorDemandante",
+      "servidorResponsavel",
+      "finalidadeDesarquivamento",
+      "solicitacaoProrrogacao",
       "dataDesarquivamentoSAG",
       "dataDevolucaoSetor",
     ],
@@ -268,7 +284,7 @@ export class QueryDesarquivamentoDto {
       message: "Campo de ordenação deve ser um dos valores válidos",
     },
   )
-  sortBy?: string = "dataSolicitacao";
+  sortBy?: string = "createdAt";
 
   @ApiPropertyOptional({
     description: "Direção da ordenação",

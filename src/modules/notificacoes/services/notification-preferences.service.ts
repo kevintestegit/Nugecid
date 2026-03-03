@@ -36,7 +36,6 @@ export class NotificationPreferencesService {
       preferences = this.preferencesRepository.create({
         userId,
         inAppEnabled: true,
-        pushEnabled: false,
         soundEnabled: true,
         enabledTypes: {
           solicitacao_pendente: true,
@@ -81,10 +80,6 @@ export class NotificationPreferencesService {
       preferences.inAppEnabled = updateDto.inAppEnabled;
     }
 
-    if (updateDto.pushEnabled !== undefined) {
-      preferences.pushEnabled = updateDto.pushEnabled;
-    }
-
     if (updateDto.soundEnabled !== undefined) {
       preferences.soundEnabled = updateDto.soundEnabled;
     }
@@ -96,38 +91,7 @@ export class NotificationPreferencesService {
       };
     }
 
-    if (updateDto.pushSubscription !== undefined) {
-      preferences.pushSubscription = updateDto.pushSubscription;
-    }
-
     return this.preferencesRepository.save(preferences);
-  }
-
-  /**
-   * Atualiza a push subscription de um usuário
-   */
-  async updatePushSubscription(
-    userId: number,
-    subscription: {
-      endpoint: string;
-      keys: {
-        p256dh: string;
-        auth: string;
-      };
-    } | null,
-  ): Promise<NotificationPreferences> {
-    const preferences = await this.getOrCreatePreferences(userId);
-    preferences.pushSubscription = subscription;
-    return this.preferencesRepository.save(preferences);
-  }
-
-  /**
-   * Remove a push subscription de um usuário
-   */
-  async removePushSubscription(
-    userId: number,
-  ): Promise<NotificationPreferences> {
-    return this.updatePushSubscription(userId, null);
   }
 
   /**
@@ -136,7 +100,7 @@ export class NotificationPreferencesService {
   async canReceiveNotification(
     userId: number,
     notificationType: string,
-    channel: "in_app" | "push" = "in_app",
+    channel: "in_app" = "in_app",
   ): Promise<boolean> {
     const preferences = await this.getOrCreatePreferences(userId);
     return preferences.canReceiveNotification(notificationType, channel);
@@ -173,9 +137,7 @@ export class NotificationPreferencesService {
     const preferences = await this.getOrCreatePreferences(userId);
 
     preferences.inAppEnabled = true;
-    preferences.pushEnabled = false;
     preferences.soundEnabled = true;
-    preferences.pushSubscription = null;
     preferences.enabledTypes = {
       solicitacao_pendente: true,
       novo_processo: true,

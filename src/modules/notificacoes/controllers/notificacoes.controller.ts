@@ -25,7 +25,8 @@ import {
   ApiQuery,
   ApiExcludeEndpoint,
 } from "@nestjs/swagger";
-import { Observable, interval, switchMap, map } from "rxjs";
+import { Observable, interval, map, merge, from } from "rxjs";
+import { finalize } from "rxjs/operators";
 import { JwtService } from "@nestjs/jwt";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { IsPublic } from "../../../common/decorators/is-public.decorator";
@@ -118,6 +119,20 @@ export class NotificacoesController {
     enum: PrioridadeNotificacao,
     description: "Filtrar por prioridade",
   })
+  @ApiQuery({
+    name: "cursorCreatedAt",
+    required: false,
+    type: String,
+    description:
+      "Cursor de paginação por data (ISO-8601). Quando informado, usa keyset pagination.",
+  })
+  @ApiQuery({
+    name: "cursorId",
+    required: false,
+    type: Number,
+    description:
+      "Cursor de desempate por ID (usar junto com cursorCreatedAt para keyset).",
+  })
   @ApiResponse({
     status: HttpStatus.OK,
     description: "Lista de notificações retornada com sucesso",
@@ -136,6 +151,10 @@ export class NotificacoesController {
     page: number;
     limit: number;
     totalPages: number;
+    nextCursor?: {
+      createdAt: string;
+      id: number;
+    };
   }> {
     return this.notificacoesService.findByUsuario(req.user.id, queryDto);
   }
@@ -167,6 +186,10 @@ export class NotificacoesController {
     page: number;
     limit: number;
     totalPages: number;
+    nextCursor?: {
+      createdAt: string;
+      id: number;
+    };
   }> {
     return this.notificacoesService.findByUsuario(req.user.id, { lida: false });
   }
@@ -178,11 +201,19 @@ export class NotificacoesController {
     @Request() req: any,
     @Query("token") token?: string,
   ): Observable<MessageEvent> {
-    // SSE não suporta headers, então aceita token via query string
+    // SSE não suporta headers customizados.
+    // Prioridade de autenticação: 1) cookie httpOnly, 2) query string (fallback)
     let userId: number;
 
     if (req.user) {
       userId = req.user.id;
+    } else if (req.cookies?.access_token) {
+      try {
+        const payload = this.jwtService.verify(req.cookies.access_token);
+        userId = payload.sub;
+      } catch (error) {
+        throw new UnauthorizedException("Token do cookie inválido ou expirado");
+      }
     } else if (token) {
       try {
         const payload = this.jwtService.verify(token);
@@ -194,18 +225,17 @@ export class NotificacoesController {
       throw new UnauthorizedException("Token não fornecido");
     }
 
-    return interval(5000).pipe(
-      switchMap(async () => {
-        const result = await this.notificacoesService.findByUsuario(userId, {
-          lida: false,
-          limit: 50,
-        });
-        return result;
+    // 1) Emit all current unread notifications as "init" event
+    const init$ = from(
+      this.notificacoesService.findByUsuario(userId, {
+        lida: false,
+        limit: 50,
       }),
+    ).pipe(
       map(
         (result) =>
           ({
-            type: "notificacoes",
+            type: "init",
             data: {
               notificacoes: result.data,
               total: result.total,
@@ -213,6 +243,38 @@ export class NotificacoesController {
             },
           }) as MessageEvent,
       ),
+    );
+
+    // 2) Stream individual new notifications in real-time via Subject
+    const realtime$ = this.notificacoesService.getUserStream(userId).pipe(
+      map(
+        (notificacao) =>
+          ({
+            type: "nova-notificacao",
+            data: {
+              notificacao,
+              timestamp: new Date().toISOString(),
+            },
+          }) as MessageEvent,
+      ),
+    );
+
+    // 3) Heartbeat every 30s to keep the connection alive
+    const heartbeat$ = interval(30000).pipe(
+      map(
+        () =>
+          ({
+            type: "heartbeat",
+            data: { timestamp: new Date().toISOString() },
+          }) as MessageEvent,
+      ),
+    );
+
+    // Merge all streams; clean up user subject when SSE connection closes
+    return merge(init$, realtime$, heartbeat$).pipe(
+      finalize(() => {
+        this.notificacoesService.removeUserStream(userId);
+      }),
     );
   }
 
@@ -272,57 +334,6 @@ export class NotificacoesController {
       success: true,
       data: preferences,
       message: "Preferências resetadas para valores padrão",
-    };
-  }
-
-  @Post("preferences/push-subscription")
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Atualizar push subscription" })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "Push subscription atualizada com sucesso",
-  })
-  async updatePushSubscription(
-    @Request() req: any,
-    @Body()
-    subscription: {
-      endpoint: string;
-      keys: {
-        p256dh: string;
-        auth: string;
-      };
-    },
-  ) {
-    const preferences =
-      await this.notificationPreferencesService.updatePushSubscription(
-        req.user.id,
-        subscription,
-      );
-
-    return {
-      success: true,
-      data: preferences,
-      message: "Push subscription atualizada com sucesso",
-    };
-  }
-
-  @Delete("preferences/push-subscription")
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Remover push subscription" })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: "Push subscription removida com sucesso",
-  })
-  async removePushSubscription(@Request() req: any) {
-    const preferences =
-      await this.notificationPreferencesService.removePushSubscription(
-        req.user.id,
-      );
-
-    return {
-      success: true,
-      data: preferences,
-      message: "Push subscription removida com sucesso",
     };
   }
 

@@ -110,24 +110,6 @@ export class EnabledTypesDto {
   evento_auditoria?: boolean;
 }
 
-export class PushSubscriptionDto {
-  @ApiProperty({ description: "Push subscription endpoint" })
-  endpoint: string;
-
-  @ApiProperty({
-    description: "Push subscription keys",
-    type: "object",
-    properties: {
-      p256dh: { type: "string" },
-      auth: { type: "string" },
-    },
-  })
-  keys: {
-    p256dh: string;
-    auth: string;
-  };
-}
-
 export class UpdateNotificationPreferencesDto {
   @ApiProperty({
     required: false,
@@ -136,11 +118,6 @@ export class UpdateNotificationPreferencesDto {
   @IsOptional()
   @IsBoolean()
   inAppEnabled?: boolean;
-
-  @ApiProperty({ required: false, description: "Habilitar notificações push" })
-  @IsOptional()
-  @IsBoolean()
-  pushEnabled?: boolean;
 
   @ApiProperty({
     required: false,
@@ -160,15 +137,4 @@ export class UpdateNotificationPreferencesDto {
   @ValidateNested()
   @Type(() => EnabledTypesDto)
   enabledTypes?: EnabledTypesDto;
-
-  @ApiProperty({
-    required: false,
-    description: "Push subscription data",
-    type: PushSubscriptionDto,
-  })
-  @IsOptional()
-  @IsObject()
-  @ValidateNested()
-  @Type(() => PushSubscriptionDto)
-  pushSubscription?: PushSubscriptionDto | null;
 }

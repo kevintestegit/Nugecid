@@ -124,12 +124,10 @@ export class TypeOrmUserRepository implements IUserRepository {
       }
     }
 
-    // Debug: Query gerada para paginação
-    const total = await queryBuilder.getCount();
-    const entities = await queryBuilder
+    const [entities, total] = await queryBuilder
       .skip((page - 1) * limit)
       .take(limit)
-      .getMany();
+      .getManyAndCount();
 
     const users = UserMapper.toDomainArray(entities);
     const totalPages = Math.ceil(total / limit);

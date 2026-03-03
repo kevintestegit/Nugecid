@@ -48,7 +48,8 @@
     "tailwindcss-animate": "^1.0.7",
     "xlsx": "^0.18.5",
     "yet-another-react-lightbox": "^3.25.0",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tanstack/react-query-devtools": "^5.8.4",

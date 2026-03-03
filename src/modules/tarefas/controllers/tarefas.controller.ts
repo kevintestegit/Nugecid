@@ -201,15 +201,6 @@ export class TarefasController {
     return this.tarefasService.moveTarefa(id, moveTarefaDto, req.user.id);
   }
 
-  @Get(":id/debug")
-  @ApiOperation({ summary: "Debug - Ver dados da tarefa direto do banco" })
-  async debugTarefa(
-    @Param("id", ParseIntPipe) id: number,
-    @Request() req: any,
-  ): Promise<any> {
-    return this.tarefasService.debugTarefa(id, req.user.id);
-  }
-
   @Post(":id/duplicar")
   @ApiOperation({ summary: "Duplicar tarefa" })
   @ApiResponse({

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -70,7 +71,16 @@ type Vestigio = {
   updatedAt: string;
 };
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 const BancoVestigios: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [vestigios, setVestigios] = useState<Vestigio[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -86,6 +96,25 @@ const BancoVestigios: React.FC = () => {
   const [printLayout, setPrintLayout] = useState<"one-per-page" | "multiple">(
     "multiple",
   );
+  const [pendingVestigioId, setPendingVestigioId] = useState<string | null>(
+    null,
+  );
+  const [focusedVestigioId, setFocusedVestigioId] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const idFromUrl = searchParams.get("vestigioId");
+    const queryFromUrl = searchParams.get("q");
+
+    if (queryFromUrl) {
+      setSearchTerm(queryFromUrl);
+    }
+
+    if (idFromUrl) {
+      setPendingVestigioId(idFromUrl);
+    }
+  }, [searchParams]);
 
   const fetchVestigios = useCallback(async () => {
     setLoading(true);
@@ -120,6 +149,34 @@ const BancoVestigios: React.FC = () => {
   useEffect(() => {
     fetchVestigios();
   }, [fetchVestigios]);
+
+  useEffect(() => {
+    if (!pendingVestigioId || !Array.isArray(vestigios) || !vestigios.length) {
+      return;
+    }
+
+    const target = vestigios.find((item) => item.id === pendingVestigioId);
+    if (!target) {
+      return;
+    }
+
+    setSelectedVestigio(target);
+    setDialogOpen(true);
+    setFocusedVestigioId(target.id);
+    setPendingVestigioId(null);
+
+    const params = new URLSearchParams(searchParams);
+    params.delete("vestigioId");
+    setSearchParams(params, { replace: true });
+
+    const timeout = window.setTimeout(() => {
+      const row = document.getElementById(`vestigio-row-${target.id}`);
+      row?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setFocusedVestigioId(null);
+    }, 120);
+
+    return () => window.clearTimeout(timeout);
+  }, [pendingVestigioId, searchParams, setSearchParams, vestigios]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este vestígio?")) {
@@ -190,7 +247,7 @@ const BancoVestigios: React.FC = () => {
         return `
         <div class="etiqueta-container ${needsPageBreak ? "page-break" : ""}">
           <div class="etiqueta">
-            <pre>${vestigio.etiquetaCompleta}</pre>
+            <pre>${escapeHtml(vestigio.etiquetaCompleta || "")}</pre>
             <img src="${QR_CODE_DATA_URL}" alt="QR code" />
           </div>
         </div>
@@ -472,7 +529,15 @@ const BancoVestigios: React.FC = () => {
                   </TableRow>
                 ) : (
                   filteredVestigios.map((vestigio) => (
-                    <TableRow key={vestigio.id}>
+                    <TableRow
+                      key={vestigio.id}
+                      id={`vestigio-row-${vestigio.id}`}
+                      className={
+                        focusedVestigioId === vestigio.id
+                          ? "bg-primary/10 transition-colors"
+                          : undefined
+                      }
+                    >
                       <TableCell>
                         <Checkbox
                           checked={selectedForPrint.has(vestigio.id)}
