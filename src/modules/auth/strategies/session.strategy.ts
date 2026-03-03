@@ -30,7 +30,7 @@ export class SessionStrategy extends PassportStrategy(Strategy, "session") {
       }
 
       return user;
-    } catch (error) {
+    } catch {
       // Remove sessão inválida
       req.session.destroy(() => {});
       throw new UnauthorizedException("Sessão inválida");

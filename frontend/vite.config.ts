@@ -1,72 +1,69 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(() => {
   const sourcemap = process.env.GENERATE_SOURCEMAP === "true";
+  const frontendPort = Number.parseInt(process.env.VITE_PORT || "3001", 10);
+  const apiProxyTarget =
+    process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:3000";
+  const sentryRelease =
+    process.env.VITE_SENTRY_RELEASE || process.env.SENTRY_RELEASE;
+  const sentryPluginEnabled = Boolean(
+    process.env.SENTRY_AUTH_TOKEN &&
+      process.env.SENTRY_ORG &&
+      process.env.SENTRY_PROJECT &&
+      sentryRelease,
+  );
+  const sentryPlugins = sentryPluginEnabled
+    ? sentryVitePlugin({
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+        org: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
+        release: {
+          name: sentryRelease,
+        },
+        sourcemaps: {
+          assets: "./dist/**",
+        },
+      })
+    : [];
+  const plugins = [react(), ...sentryPlugins];
+  const chunkGroups = {
+    vendor: ["react", "react-dom", "react-router-dom"],
+    ui: [
+      "@radix-ui/react-alert-dialog",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-select",
+      "@radix-ui/react-toast",
+      "class-variance-authority",
+      "clsx",
+      "tailwind-merge",
+    ],
+    forms: ["react-hook-form", "@hookform/resolvers", "zod"],
+    charts: ["recharts"],
+    dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
+    date: ["date-fns"],
+    utils: ["axios", "lucide-react"],
+  } satisfies Record<string, string[]>;
+  const manualChunkEntries = Object.entries(chunkGroups);
+  const manualChunks = (moduleId: string) => {
+    const matchedGroup = manualChunkEntries.find(([, dependencies]) =>
+      dependencies.some(
+        (dependency) =>
+          moduleId.includes(`/node_modules/${dependency}/`) ||
+          moduleId.includes(`\\node_modules\\${dependency}\\`),
+      ),
+    );
 
-  const chunkByPackage = (id: string): string | undefined => {
-    if (!id.includes("node_modules")) return undefined;
-
-    // Charts stack used by reports pages.
-    if (id.includes("node_modules/recharts")) return "charts-recharts";
-    if (id.includes("node_modules/d3-")) return "charts-d3";
-
-    // React runtime and router are shared across the whole app.
-    if (
-      id.includes("node_modules/react/") ||
-      id.includes("node_modules/react-dom/") ||
-      id.includes("node_modules/react-router/") ||
-      id.includes("node_modules/react-router-dom/") ||
-      id.includes("node_modules/scheduler/")
-    ) {
-      return "vendor-react";
-    }
-
-    // Design-system and command UI foundations.
-    if (
-      id.includes("node_modules/@radix-ui/") ||
-      id.includes("node_modules/cmdk/")
-    ) {
-      return "vendor-ui";
-    }
-
-    // Form and validation stack.
-    if (
-      id.includes("node_modules/react-hook-form/") ||
-      id.includes("node_modules/@hookform/resolvers/") ||
-      id.includes("node_modules/zod/")
-    ) {
-      return "vendor-forms";
-    }
-
-    // Drag-and-drop stack for kanban and related screens.
-    if (id.includes("node_modules/@dnd-kit/")) return "vendor-dnd";
-
-    // Data and transport foundations.
-    if (id.includes("node_modules/@tanstack/")) return "vendor-query";
-    if (id.includes("node_modules/axios/")) return "vendor-http";
-    if (id.includes("node_modules/date-fns/")) return "vendor-date";
-
-    // Domain-heavy libraries with lower change frequency.
-    if (id.includes("node_modules/xlsx/")) return "vendor-xlsx";
-    if (id.includes("node_modules/yet-another-react-lightbox/")) return "vendor-lightbox";
-
-    // Remaining frequently reused UI helpers.
-    if (
-      id.includes("node_modules/lucide-react/") ||
-      id.includes("node_modules/sonner/") ||
-      id.includes("node_modules/react-day-picker/")
-    ) {
-      return "vendor-widgets";
-    }
-
-    return undefined;
+    return matchedGroup?.[0];
   };
 
   return {
-    plugins: [react()],
+    plugins,
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
@@ -74,18 +71,18 @@ export default defineConfig(() => {
     },
     server: {
       host: true,
-      port: 3001,
-      strictPort: true,
+      port: Number.isFinite(frontendPort) ? frontendPort : 3001,
+      strictPort: false,
       proxy: {
         "/api": {
-          target: "http://backend:3000",
-          changeOrigin: true,
+          target: apiProxyTarget,
+          changeOrigin: false,
           secure: false,
           rewrite: (path) => path,
         },
         "/uploads": {
-          target: "http://backend:3000",
-          changeOrigin: true,
+          target: apiProxyTarget,
+          changeOrigin: false,
           secure: false,
           rewrite: (path) => path,
         },
@@ -96,14 +93,58 @@ export default defineConfig(() => {
     },
     build: {
       outDir: "dist",
-      sourcemap,
+      sourcemap: sourcemap || sentryPluginEnabled,
+      target: "esnext",
+      minify: "terser",
+      cssMinify: true,
       rollupOptions: {
         output: {
-          manualChunks(id) {
-            return chunkByPackage(id);
+          manualChunks,
+          // Separar código CSS em chunks menores
+          assetFileNames: (assetInfo) => {
+            const assetName = assetInfo.name ?? "";
+
+            if (/\.css$/i.test(assetName)) {
+              return "css/[name]-[hash][extname]";
+            }
+
+            return "assets/[name]-[hash][extname]";
           },
+          // Garantir nomes consistentes para chunks
+          chunkFileNames: "js/[name]-[hash].js",
+          entryFileNames: "js/[name]-[hash].js",
+        },
+        // Não incluir assets muito grandes no bundle inicial.
+        external: (id: string) => /heavy-assets/.test(id),
+      },
+      // Otimizações de chunk
+      chunkSizeWarningLimit: 500,
+      // Terser options para melhor minificação
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+          pure_funcs: ["console.log", "console.info", "console.debug"],
+        },
+        mangle: {
+          safari10: true,
         },
       },
+    },
+    // Otimizações de CSS
+    css: {
+      devSourcemap: true,
+    },
+    // Otimizações de dependências
+    optimizeDeps: {
+      include: [
+        "react",
+        "react-dom",
+        "react-router-dom",
+        "axios",
+        "@tanstack/react-query",
+      ],
+      exclude: ["recharts"], // Carregar sob demanda
     },
   };
 });

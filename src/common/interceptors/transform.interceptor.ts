@@ -7,6 +7,10 @@ import {
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
 import { Response } from "express";
+import {
+  buildApiSuccessResponse,
+  isApiResponseEnvelope,
+} from "../http/api-response";
 
 /**
  * Interceptor para transformar respostas da API
@@ -31,11 +35,6 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
           return data;
         }
 
-        // Se o data já tem a estrutura esperada, retornar como está
-        if (data && typeof data === "object" && "success" in data) {
-          return data;
-        }
-
         // Se é uma resposta de arquivo ou stream, não transformar
         if (data instanceof Buffer || data instanceof ArrayBuffer) {
           return data;
@@ -47,28 +46,38 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
           return data;
         }
 
-        // Transformar resposta para formato padrão
-        const transformedResponse = {
-          success: true,
-          statusCode: response.statusCode,
-          timestamp: new Date().toISOString(),
-          path: request.url,
-          method: request.method,
-          data: data,
-        };
+        // Se já está envelopado, apenas completa metadados ausentes.
+        if (isApiResponseEnvelope(data)) {
+          return {
+            statusCode: response.statusCode,
+            timestamp: new Date().toISOString(),
+            path: request.url,
+            method: request.method,
+            ...data,
+          };
+        }
 
-        // Adicionar metadados de paginação se existirem
         if (
           data &&
           typeof data === "object" &&
           "data" in data &&
           "meta" in data
         ) {
-          transformedResponse.data = data.data;
-          transformedResponse["meta"] = data.meta;
+          return buildApiSuccessResponse({
+            data: (data as { data: unknown }).data,
+            meta: (data as { meta: unknown }).meta,
+            statusCode: response.statusCode,
+            path: request.url,
+            method: request.method,
+          });
         }
 
-        return transformedResponse;
+        return buildApiSuccessResponse({
+          data,
+          statusCode: response.statusCode,
+          path: request.url,
+          method: request.method,
+        });
       }),
     );
   }

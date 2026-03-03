@@ -25,6 +25,8 @@ import { NugecidDocxService } from "./nugecid-docx.service";
 import { NugecidService } from "./nugecid.service";
 import { NugecidAuditService } from "./nugecid-audit.service";
 import { TipoDesarquivamentoEnum } from "./domain/enums/tipo-desarquivamento.enum";
+import { AntivirusService } from "../security/antivirus.service";
+import { ConfigService } from "@nestjs/config";
 
 describe("NugecidController", () => {
   let controller: NugecidController;
@@ -34,6 +36,7 @@ describe("NugecidController", () => {
   const mockUpdateUseCase = { execute: jest.fn() };
   const mockDeleteUseCase = { execute: jest.fn() };
   const mockNugecidImportService = { importFromXLSX: jest.fn() };
+  const mockNugecidPdfService = { generatePreviewHtml: jest.fn() };
   const mockAuditService = {
     saveDesarquivamentoAudit: jest.fn().mockResolvedValue(undefined),
   };
@@ -75,11 +78,19 @@ describe("NugecidController", () => {
         { provide: ImportRegistrosUseCase, useValue: { execute: jest.fn() } },
         { provide: NugecidImportService, useValue: mockNugecidImportService },
         { provide: NugecidStatsService, useValue: {} },
-        { provide: NugecidPdfService, useValue: {} },
+        { provide: NugecidPdfService, useValue: mockNugecidPdfService },
         { provide: NugecidExportService, useValue: {} },
         { provide: NugecidDocxService, useValue: {} },
         { provide: NugecidService, useValue: {} },
         { provide: NugecidAuditService, useValue: mockAuditService },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue("http://localhost:3001") },
+        },
+        {
+          provide: AntivirusService,
+          useValue: { scanUploadedFile: jest.fn(), scanBuffer: jest.fn() },
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -241,6 +252,18 @@ describe("NugecidController", () => {
         success: true,
         message: "Desarquivamento removido com sucesso",
       }),
+    );
+  });
+
+  it("getTermoDeEntregaPreview deve redirecionar para a SPA", async () => {
+    const res = {
+      redirect: jest.fn(),
+    } as any as Response;
+
+    await controller.getTermoDeEntregaPreview(96, res);
+
+    expect(res.redirect).toHaveBeenCalledWith(
+      "http://localhost:3001/desarquivamentos/96/termo/visualizar",
     );
   });
 

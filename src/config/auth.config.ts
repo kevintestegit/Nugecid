@@ -15,11 +15,14 @@ function validateSecret(
     return crypto.randomBytes(32).toString("hex");
   }
 
-  if (
-    secret.includes("change-in-production") ||
-    secret.includes("change-me") ||
-    secret.includes("replace-with")
-  ) {
+  const placeholderPatterns = [
+    "change-in-production",
+    "change-me",
+    "replace-with",
+    "your-super-secret",
+    "um-token-secreto",
+  ];
+  if (placeholderPatterns.some((p) => secret.includes(p))) {
     throw new Error(
       `${secretName} is using a default/placeholder value! ` +
         `This is not secure.`,
@@ -34,7 +37,15 @@ function validateSecret(
 }
 
 export default registerAs("auth", () => {
-  const nodeEnv = process.env.NODE_ENV || "development";
+  const sessionSecureEnv = (process.env.SESSION_SECURE || "")
+    .trim()
+    .toLowerCase();
+  const sessionSecure =
+    sessionSecureEnv === "true"
+      ? true
+      : sessionSecureEnv === "false"
+        ? false
+        : ("auto" as const);
 
   return {
     jwt: {
@@ -49,7 +60,7 @@ export default registerAs("auth", () => {
     session: {
       secret: validateSecret(process.env.SESSION_SECRET, "SESSION_SECRET"),
       maxAge: parseInt(process.env.SESSION_MAX_AGE || "86400000", 10),
-      secure: nodeEnv === "production",
+      secure: sessionSecure,
       httpOnly: true,
       sameSite: "strict" as const,
     },

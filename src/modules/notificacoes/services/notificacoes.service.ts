@@ -10,7 +10,7 @@ import {
 import { CACHE_MANAGER } from "@nestjs/cache-manager";
 import type { Cache } from "cache-manager";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, In, Brackets } from "typeorm";
+import { Repository, LessThan, In, Brackets, MoreThan, IsNull } from "typeorm";
 import { Subject, Observable } from "rxjs";
 import {
   Notificacao,
@@ -27,6 +27,7 @@ import {
   CACHE_VERSION_KEYS,
 } from "../../../common/constants/cache-version.constants";
 import { RuntimeMetricsService } from "../../observability/runtime-metrics.service";
+import { PushNotificationsService } from "./push-notifications.service";
 
 export interface CreateNotificacaoDto {
   tipo: TipoNotificacao;
@@ -77,6 +78,7 @@ export class NotificacoesService implements OnModuleDestroy {
     private readonly desarquivamentoRepository: Repository<DesarquivamentoTypeOrmEntity>,
     @InjectRepository(NotificationPreferences)
     private readonly preferencesRepository: Repository<NotificationPreferences>,
+    private readonly pushNotificationsService: PushNotificationsService,
     @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
     @Optional()
     private readonly runtimeMetricsService?: RuntimeMetricsService,
@@ -130,10 +132,182 @@ export class NotificacoesService implements OnModuleDestroy {
   }
 
   private async saveAndEmit(notificacao: Notificacao): Promise<Notificacao> {
+    const notificacaoDuplicada = await this.findRecentDuplicate(notificacao);
+    if (notificacaoDuplicada) {
+      return notificacaoDuplicada;
+    }
+
     const saved = await this.notificacaoRepository.save(notificacao);
-    this.emitToUser(saved.usuarioId, saved);
+    await this.dispatchSavedNotifications([saved]);
     await this.bumpReadCachesVersion();
     return saved;
+  }
+
+  private async dispatchSavedNotifications(
+    notificacoes: Notificacao[],
+  ): Promise<void> {
+    if (!notificacoes.length) {
+      return;
+    }
+
+    const preferenciasPorUsuario = await this.getPreferencesByUserIds(
+      notificacoes.map((notificacao) => notificacao.usuarioId),
+    );
+
+    notificacoes.forEach((notificacao) => {
+      if (
+        this.canDeliverNotification(
+          preferenciasPorUsuario.get(notificacao.usuarioId),
+          notificacao.tipo,
+          "in_app",
+        )
+      ) {
+        this.emitToUser(notificacao.usuarioId, notificacao);
+      }
+    });
+
+    const notificacoesPush = notificacoes.filter((notificacao) =>
+      this.canDeliverNotification(
+        preferenciasPorUsuario.get(notificacao.usuarioId),
+        notificacao.tipo,
+        "push",
+      ),
+    );
+
+    await Promise.allSettled(
+      notificacoesPush.map((notificacao) =>
+        this.pushNotificationsService.sendToUser(
+          notificacao.usuarioId,
+          notificacao,
+        ),
+      ),
+    );
+  }
+
+  private canDeliverNotification(
+    preferences:
+      | Pick<
+          NotificationPreferences,
+          "enabledTypes" | "inAppEnabled" | "desktopEnabled" | "pushEnabled"
+        >
+      | undefined,
+    notificationType: string,
+    channel: "in_app" | "push",
+  ): boolean {
+    if (!preferences) {
+      return true;
+    }
+
+    const typeEnabled = preferences.enabledTypes?.[notificationType] ?? false;
+    if (!typeEnabled) {
+      return false;
+    }
+
+    if (channel === "in_app") {
+      return preferences.inAppEnabled;
+    }
+
+    return preferences.pushEnabled;
+  }
+
+  private getDeduplicationFingerprint(
+    notificacao: Pick<
+      CreateNotificacaoDto,
+      | "tipo"
+      | "titulo"
+      | "descricao"
+      | "usuarioId"
+      | "solicitacaoId"
+      | "processoId"
+      | "tarefaId"
+      | "projetoId"
+      | "remetenteId"
+      | "link"
+    >,
+  ): string {
+    return JSON.stringify({
+      tipo: notificacao.tipo,
+      titulo: notificacao.titulo,
+      descricao: notificacao.descricao,
+      usuarioId: notificacao.usuarioId,
+      solicitacaoId: notificacao.solicitacaoId ?? null,
+      processoId: notificacao.processoId ?? null,
+      tarefaId: notificacao.tarefaId ?? null,
+      projetoId: notificacao.projetoId ?? null,
+      remetenteId: notificacao.remetenteId ?? null,
+      link: notificacao.link ?? null,
+    });
+  }
+
+  private async findRecentDuplicate(
+    notificacao: Pick<
+      CreateNotificacaoDto,
+      | "tipo"
+      | "titulo"
+      | "descricao"
+      | "usuarioId"
+      | "solicitacaoId"
+      | "processoId"
+      | "tarefaId"
+      | "projetoId"
+      | "remetenteId"
+      | "link"
+    >,
+  ): Promise<Notificacao | null> {
+    const dedupeThreshold = new Date();
+    dedupeThreshold.setDate(dedupeThreshold.getDate() - 1);
+
+    const notificacaoExistente = await this.notificacaoRepository.findOne({
+      where: {
+        tipo: notificacao.tipo,
+        titulo: notificacao.titulo,
+        descricao: notificacao.descricao,
+        usuarioId: notificacao.usuarioId,
+        createdAt: MoreThan(dedupeThreshold),
+        deletedAt: IsNull(),
+        ...(typeof notificacao.solicitacaoId === "number"
+          ? { solicitacaoId: notificacao.solicitacaoId }
+          : {}),
+        ...(typeof notificacao.processoId === "number"
+          ? { processoId: notificacao.processoId }
+          : {}),
+        ...(typeof notificacao.tarefaId === "number"
+          ? { tarefaId: notificacao.tarefaId }
+          : {}),
+        ...(typeof notificacao.projetoId === "number"
+          ? { projetoId: notificacao.projetoId }
+          : {}),
+        ...(typeof notificacao.remetenteId === "number"
+          ? { remetenteId: notificacao.remetenteId }
+          : {}),
+        ...(typeof notificacao.link === "string"
+          ? { link: notificacao.link }
+          : {}),
+      },
+      order: { createdAt: "DESC", id: "DESC" },
+    });
+
+    if (notificacaoExistente) {
+      this.logger.debug(
+        `Notificação duplicada evitada para usuário ${notificacao.usuarioId} (${notificacao.tipo})`,
+      );
+    }
+
+    return notificacaoExistente;
+  }
+
+  private async getPreferencesByUserIds(
+    userIds: number[],
+  ): Promise<Map<number, NotificationPreferences>> {
+    const uniqueUserIds = Array.from(new Set(userIds));
+    if (!uniqueUserIds.length) {
+      return new Map();
+    }
+
+    const preferencias = await this.loadPreferencesForUsers(uniqueUserIds);
+    return new Map(
+      preferencias.map((preferencia) => [preferencia.userId, preferencia]),
+    );
   }
 
   private async bumpReadCachesVersion(): Promise<void> {
@@ -257,10 +431,7 @@ export class NotificacoesService implements OnModuleDestroy {
       new Set(createNotificacaoDtos.map((dto) => dto.usuarioId)),
     );
 
-    const [usuarios, preferencias] = await Promise.all([
-      this.loadUsersByIds(userIds),
-      this.loadPreferencesForUsers(userIds),
-    ]);
+    const usuarios = await this.loadUsersByIds(userIds);
 
     const usuariosExistentes = new Set(usuarios.map((usuario) => usuario.id));
     const usuariosAusentes = userIds.filter(
@@ -271,10 +442,6 @@ export class NotificacoesService implements OnModuleDestroy {
         `Usuário(s) não encontrado(s): ${usuariosAusentes.join(", ")}`,
       );
     }
-
-    const preferenciasPorUsuario = new Map(
-      preferencias.map((preferencia) => [preferencia.userId, preferencia]),
-    );
 
     const solicitacaoIds = Array.from(
       new Set(
@@ -299,46 +466,52 @@ export class NotificacoesService implements OnModuleDestroy {
       }
     }
 
-    const dtosPermitidos = createNotificacaoDtos.filter((dto) => {
-      const preferenciasUsuario = preferenciasPorUsuario.get(dto.usuarioId);
-      if (!preferenciasUsuario) {
-        return true;
-      }
-      const canReceive = preferenciasUsuario.canReceiveNotification(
-        dto.tipo,
-        "in_app",
-      );
-      if (!canReceive) {
-        this.logger.debug(
-          `Notificação ${dto.tipo} bloqueada pelas preferências do usuário ${dto.usuarioId}`,
-        );
-      }
-      return canReceive;
-    });
+    const dtosUnicos = Array.from(
+      new Map(
+        createNotificacaoDtos.map((dto) => [
+          this.getDeduplicationFingerprint(dto),
+          dto,
+        ]),
+      ).values(),
+    );
 
-    if (!dtosPermitidos.length) {
+    if (!dtosUnicos.length) {
       return [];
     }
 
-    const entidades = dtosPermitidos.map((dto) =>
+    const notificacoesDuplicadas = await Promise.all(
+      dtosUnicos.map((dto) => this.findRecentDuplicate(dto)),
+    );
+
+    const dtosParaCriar = dtosUnicos.filter(
+      (_, index) => !notificacoesDuplicadas[index],
+    );
+
+    const entidades = dtosParaCriar.map((dto) =>
       this.notificacaoRepository.create({
         ...dto,
         prioridade: dto.prioridade || PrioridadeNotificacao.MEDIA,
       }),
     );
 
-    const savedRaw = await this.notificacaoRepository.save(entidades, {
-      chunk: 200,
-    });
+    const savedRaw =
+      entidades.length > 0
+        ? await this.notificacaoRepository.save(entidades, {
+            chunk: 200,
+          })
+        : [];
     const saved = Array.isArray(savedRaw) ? savedRaw : [savedRaw];
 
-    for (const notificacao of saved) {
-      this.emitToUser(notificacao.usuarioId, notificacao);
+    if (saved.length) {
+      await this.dispatchSavedNotifications(saved);
+      await this.bumpReadCachesVersion();
     }
 
-    await this.bumpReadCachesVersion();
+    const existentes = notificacoesDuplicadas.filter(
+      (notificacao): notificacao is Notificacao => notificacao != null,
+    );
 
-    return saved;
+    return [...existentes, ...saved];
   }
 
   private async loadUsersByIds(userIds: number[]): Promise<User[]> {
@@ -435,35 +608,6 @@ export class NotificacoesService implements OnModuleDestroy {
       (preferencia): preferencia is NotificationPreferences =>
         preferencia !== null,
     );
-  }
-
-  /**
-   * Verifica se o usuário pode receber uma notificação de um tipo específico
-   * com base nas suas preferências.
-   */
-  private async checkUserPreferences(
-    userId: number,
-    tipo: TipoNotificacao,
-  ): Promise<boolean> {
-    try {
-      const preferences = await this.preferencesRepository.findOne({
-        where: { userId },
-      });
-
-      // Se não há preferências cadastradas, permitir (default)
-      if (!preferences) {
-        return true;
-      }
-
-      return preferences.canReceiveNotification(tipo, "in_app");
-    } catch (error) {
-      // Em caso de erro ao buscar preferências, permitir a notificação
-      // para não bloquear notificações críticas
-      this.logger.warn(
-        `Erro ao verificar preferências do usuário ${userId}: ${error.message}`,
-      );
-      return true;
-    }
   }
 
   async findByUsuario(
@@ -1084,13 +1228,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefaId: number,
     comentario: string,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioMencionadoId,
-      TipoNotificacao.MENCAO,
-    );
-    if (!canReceive) return null;
-
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
       relations: ["projeto"],
@@ -1127,13 +1264,6 @@ export class NotificacoesService implements OnModuleDestroy {
     remetenteId: number,
     tarefaId: number,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioAtribuidoId,
-      TipoNotificacao.TAREFA_ATRIBUIDA,
-    );
-    if (!canReceive) return null;
-
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
       relations: ["projeto"],
@@ -1173,13 +1303,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefaId: number,
     mudancas: string[],
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioId,
-      TipoNotificacao.TAREFA_ALTERADA,
-    );
-    if (!canReceive) return null;
-
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
     });
@@ -1215,13 +1338,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefaId: number,
     comentario: string,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioId,
-      TipoNotificacao.TAREFA_COMENTADA,
-    );
-    if (!canReceive) return null;
-
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
     });
@@ -1256,13 +1372,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefaId: number,
     diasRestantes: number,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioId,
-      TipoNotificacao.PRAZO_PROXIMO,
-    );
-    if (!canReceive) return null;
-
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
       select: ["id", "titulo", "prazo", "prioridade"],
@@ -1280,13 +1389,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefaId: number,
     diasAtrasados: number,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioId,
-      TipoNotificacao.TAREFA_ATRASADA,
-    );
-    if (!canReceive) return null;
-
     const tarefa = await this.tarefaRepository.findOne({
       where: { id: tarefaId },
       select: ["id", "titulo", "prazo", "prioridade"],
@@ -1308,13 +1410,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefa: Pick<Tarefa, "id" | "titulo" | "prazo" | "prioridade">,
     diasRestantes: number,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioId,
-      TipoNotificacao.PRAZO_PROXIMO,
-    );
-    if (!canReceive) return null;
-
     const notificacao = this.notificacaoRepository.create({
       tipo: TipoNotificacao.PRAZO_PROXIMO,
       titulo: "Prazo se aproximando",
@@ -1341,13 +1436,6 @@ export class NotificacoesService implements OnModuleDestroy {
     tarefa: Pick<Tarefa, "id" | "titulo" | "prazo" | "prioridade">,
     diasAtrasados: number,
   ): Promise<Notificacao | null> {
-    // Verificar preferências antes de criar
-    const canReceive = await this.checkUserPreferences(
-      usuarioId,
-      TipoNotificacao.TAREFA_ATRASADA,
-    );
-    if (!canReceive) return null;
-
     const notificacao = this.notificacaoRepository.create({
       tipo: TipoNotificacao.TAREFA_ATRASADA,
       titulo: "Tarefa atrasada",

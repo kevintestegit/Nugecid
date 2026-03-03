@@ -17,40 +17,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: any) => {
           let token = null;
-          this.logger.debug(`[JwtStrategy] Tentando extrair token JWT`);
 
           if (request && request.cookies) {
             token = request.cookies["access_token"];
-            if (token) {
-              this.logger.debug(
-                `[JwtStrategy] Token encontrado no cookie 'access_token'`,
-              );
-            } else {
-              this.logger.debug(
-                `[JwtStrategy] Nenhum token encontrado no cookie 'access_token'`,
-              );
-            }
-          } else {
-            this.logger.debug(`[JwtStrategy] Request não possui cookies`);
           }
 
           if (!token) {
             token = ExtractJwt.fromAuthHeaderAsBearerToken()(request);
-            if (token) {
-              this.logger.debug(
-                `[JwtStrategy] Token encontrado no header Authorization`,
-              );
-            } else {
-              this.logger.debug(
-                `[JwtStrategy] Nenhum token encontrado no header Authorization`,
-              );
-            }
-          }
-
-          if (!token) {
-            this.logger.warn(
-              `[JwtStrategy] Nenhum token JWT encontrado na requisição`,
-            );
           }
 
           return token;
@@ -65,12 +38,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<User> {
-    this.logger.debug(`Validando payload: ${JSON.stringify(payload)}`);
     const user = await this.authService.validateJwtPayload(payload);
     if (!user) {
-      this.logger.warn(
-        `Validação de JWT falhou para payload: ${JSON.stringify(payload)}`,
-      );
+      this.logger.warn("Validação de JWT falhou para o usuário autenticado");
       throw new UnauthorizedException(
         "Usuário não encontrado ou token inválido",
       );

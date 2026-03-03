@@ -26,6 +26,9 @@ export const novoDesarquivamentoPage = createLazyPage(
 export const detalhesDesarquivamentoPage = createLazyPage(
   () => import("@/pages/DetalhesDesarquivamentoPage"),
 );
+export const termoDesarquivamentoPreviewPage = createLazyPage(
+  () => import("@/pages/TermoDesarquivamentoPreviewPage"),
+);
 export const editDesarquivamentoPage = createLazyPage(
   () => import("@/pages/EditDesarquivamentoPage"),
 );
@@ -38,9 +41,13 @@ export const novoUsuarioPage = createLazyPage(
 export const editarUsuarioPage = createLazyPage(
   () => import("@/pages/usuarios/EditarUsuarioPage"),
 );
+export const detalheUsuarioPage = createLazyPage(
+  () => import("@/pages/usuarios/DetalheUsuarioPage"),
+);
 export const configuracoesPage = createLazyPage(
   () => import("@/pages/ConfiguracoesPage"),
 );
+export const sobrePage = createLazyPage(() => import("@/pages/SobrePage"));
 export const lixeiraPage = createLazyPage(() => import("@/pages/LixeiraPage"));
 export const tarefasPage = createLazyPage(() => import("@/pages/TarefasPage"));
 export const novaTarefaPage = createLazyPage(
@@ -63,6 +70,10 @@ export const kanbanPage = createLazyPage(() => import("@/pages/KanbanPage"));
 export const searchIconTestPage = createLazyPage(
   () => import("@/components/test/SearchIconTest"),
 );
+export const notFoundPage = createLazyPage(
+  () => import("@/pages/NotFoundPage"),
+);
+
 export const custodiaVestigiosPage = createLazyPage(
   () => import("@/pages/CustodiaVestigiosPage"),
 );
@@ -77,12 +88,17 @@ export const relatoriosPage = createLazyPage(() =>
 export const notificacoesPage = createLazyPage(
   () => import("@/pages/NotificacoesPage"),
 );
+export const auditoriaPage = createLazyPage(
+  () => import("@/pages/AuditoriaPage"),
+);
 
 export const preloadByPath: Record<string, () => Promise<unknown>> = {
   "/": dashboardPage.preload,
   "/desarquivamentos": desarquivamentosPage.preload,
   "/desarquivamentos/novo": novoDesarquivamentoPage.preload,
   "/desarquivamentos/:id": detalhesDesarquivamentoPage.preload,
+  "/desarquivamentos/:id/termo/visualizar":
+    termoDesarquivamentoPreviewPage.preload,
   "/desarquivamentos/:id/editar": editDesarquivamentoPage.preload,
   "/desarquivamentos/lixeira": lixeiraPage.preload,
   "/tarefas": tarefasPage.preload,
@@ -98,8 +114,12 @@ export const preloadByPath: Record<string, () => Promise<unknown>> = {
   "/arquivo/:id": prateleiraDetailPage.preload,
   "/usuarios": usuariosPage.preload,
   "/usuarios/novo": novoUsuarioPage.preload,
+  "/usuarios/:id": detalheUsuarioPage.preload,
   "/usuarios/:id/editar": editarUsuarioPage.preload,
   "/configuracoes": configuracoesPage.preload,
+  "/sobre": sobrePage.preload,
   "/notificacoes": notificacoesPage.preload,
+  "/auditoria": auditoriaPage.preload,
   "/test-icons": searchIconTestPage.preload,
+  "*": notFoundPage.preload,
 };

@@ -162,3 +162,27 @@ export const useViewDesarquivamentoAnexo = () => {
     }) => apiService.viewDesarquivamentoAnexo(desarquivamentoId, anexoId),
   });
 };
+
+export const useAnalyzeDesarquivamentoAnexoOcr = () => {
+  return useMutation({
+    mutationFn: async (anexo: DesarquivamentoAnexo) => {
+      if (anexo.desarquivamentoId) {
+        const response = await apiService.getDesarquivamentoAnexoOcrAnalysis(
+          anexo.desarquivamentoId,
+          anexo.id,
+        );
+        return response.data;
+      }
+
+      if (anexo.numeroProcesso) {
+        const response = await apiService.getProcessoAnexoOcrAnalysis(
+          anexo.numeroProcesso,
+          anexo.id,
+        );
+        return response.data;
+      }
+
+      throw new Error("Anexo sem vínculo válido para análise OCR.");
+    },
+  });
+};

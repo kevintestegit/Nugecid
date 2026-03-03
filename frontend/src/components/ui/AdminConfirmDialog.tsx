@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +51,7 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
     }
   }, [isValidating, externalLoading, onClose]);
 
+  const { theme } = useTheme();
   const getVariantStyles = () => {
     switch (variant) {
       case "danger":
@@ -297,7 +300,12 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
     </>
   );
 
-  return createPortal(modalContent, document.body);
+  return createPortal(
+    <div className={theme === "dark" ? "dark" : ""}>
+      {modalContent}
+    </div>,
+    document.body
+  );
 };
 
 export { AdminConfirmDialog };

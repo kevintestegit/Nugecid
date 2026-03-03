@@ -22,10 +22,9 @@ import {
   User,
   Lock,
   Settings,
-  Eye,
-  EyeOff,
   Upload,
   Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api";
@@ -44,7 +43,6 @@ export const UserSettings: React.FC = () => {
     [],
   );
 
-  const [isLoading, setIsLoading] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [userConfig, setUserConfig] = useState(() =>
     derivePreferences(user?.settings),
@@ -74,10 +72,6 @@ export const UserSettings: React.FC = () => {
     user?.nome?.charAt(0)?.toUpperCase() ??
     user?.usuario?.charAt(0)?.toUpperCase() ??
     "?";
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     if (!avatarFile) {
@@ -243,30 +237,6 @@ export const UserSettings: React.FC = () => {
     }
   };
 
-  const handlePasswordChange = async () => {
-    if (newPassword !== confirmPassword) {
-      toast.error("As senhas não coincidem");
-      return;
-    }
-    if (newPassword.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Simular alteração de senha
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      toast.success("Senha alterada com sucesso!");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (error) {
-      toast.error("Erro ao alterar senha");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Perfil */}
@@ -390,52 +360,26 @@ export const UserSettings: React.FC = () => {
             Alterar Senha
           </CardTitle>
           <CardDescription>
-            Altere sua senha para manter sua conta segura
+            A troca de senha pela interface será habilitada quando o backend
+            expuser um endpoint dedicado
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-password">Nova senha</Label>
-            <div className="relative">
-              <Input
-                id="new-password"
-                type={showPassword ? "text" : "password"}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Digite sua nova senha"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-2">
+                <p className="font-medium">
+                  Troca de senha indisponível nesta versão
+                </p>
+                <p className="text-sm/6">
+                  Esta tela não executa alteração real de senha. O fluxo será
+                  habilitado apenas quando houver endpoint dedicado e validação
+                  completa no backend.
+                </p>
+              </div>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirmar nova senha</Label>
-            <Input
-              id="confirm-password"
-              type={showPassword ? "text" : "password"}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirme sua nova senha"
-            />
-          </div>
-
-          <Button
-            onClick={handlePasswordChange}
-            disabled={!newPassword || !confirmPassword || isLoading}
-            className="w-full md:w-auto"
-          >
-            {isLoading ? "Alterando..." : "Alterar Senha"}
-          </Button>
         </CardContent>
       </Card>
 

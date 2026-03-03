@@ -296,7 +296,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">Carregando projeto...</p>
+          <p className="text-muted-foreground">Carregando projeto...</p>
         </div>
       </div>
     );
@@ -306,7 +306,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* New Header Design */}
       <header className="flex-shrink-0 pt-6 px-8 pb-4 bg-white dark:bg-gray-900 z-20 border-b border-gray-100 dark:border-gray-800">
-        <div className="flex items-center text-xs text-gray-500 mb-3">
+        <div className="flex items-center text-xs text-muted-foreground mb-3">
           <span className="hover:text-gray-800 dark:hover:text-gray-200 cursor-pointer">
             Projetos
           </span>
@@ -390,7 +390,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             {onProjectSettings && (
               <button
                 onClick={onProjectSettings}
-                className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-700 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center w-8 h-8 text-gray-500 hover:text-gray-700 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-muted transition-colors"
                 title="Configurações do Projeto"
               >
                 <Settings size={18} />
@@ -403,15 +403,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       {/* Board Area */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-6 bg-gray-50/80 dark:bg-gray-900/40">
         {sortedColunas.length === 0 ? (
-          <div className="h-full rounded-2xl border border-dashed border-gray-200 bg-white/80 p-10 text-center text-gray-600 flex flex-col items-center justify-center gap-4">
-            <div className="w-14 h-14 rounded-full border border-gray-200 bg-white flex items-center justify-center text-gray-400">
+          <div className="h-full rounded-2xl border border-dashed border-border bg-background/80 p-10 text-center text-muted-foreground flex flex-col items-center justify-center gap-4">
+            <div className="w-14 h-14 rounded-full border border-border bg-background flex items-center justify-center text-gray-400">
               <LayoutGrid size={22} />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-base font-semibold text-gray-900">
+              <h3 className="text-base font-semibold text-foreground">
                 Comece organizando o quadro
               </h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Crie colunas para definir o fluxo do projeto e adicione tarefas
                 para acompanhar o trabalho.
               </p>

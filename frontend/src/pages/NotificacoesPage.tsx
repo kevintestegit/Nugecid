@@ -10,23 +10,25 @@ import {
   Clock,
   Filter,
   RefreshCw,
-  ArrowLeft,
-  ChevronDown,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  getNotificationIconVariant,
+  NOTIFICATION_PRIORITY_META,
+  NOTIFICATION_TYPE_LABELS,
+  normalizeNotificationPriority,
+} from "@/lib/notifications/notificationMeta";
 import { cn } from "@/utils/cn";
+import { getNotificationDestination } from "@/utils/notificationNavigation";
 import { useNotificacoesStore } from "@/store/notificacoesStore";
 import {
   notificacoesService,
   Notificacao,
-  NotificacoesResponse,
 } from "@/services/notificacoesService";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Button,
   Badge,
   Select,
@@ -38,43 +40,6 @@ import {
 } from "@/components/ui";
 import Pagination from "@/components/ui/Pagination";
 
-// --- Constants ---
-
-const TIPOS_NOTIFICACAO: Record<string, string> = {
-  solicitacao_pendente: "Solicitação Pendente",
-  novo_processo: "Novo Processo",
-  novo_desarquivamento: "Novo Desarquivamento",
-  mencao: "Menção",
-  tarefa_atribuida: "Tarefa Atribuída",
-  tarefa_alterada: "Tarefa Alterada",
-  tarefa_comentada: "Comentário",
-  prazo_proximo: "Prazo Próximo",
-  tarefa_atrasada: "Tarefa Atrasada",
-  projeto_atualizado: "Projeto Atualizado",
-  novo_registro: "Novo Registro",
-  pasta_criada: "Pasta Criada",
-  evento_auditoria: "Auditoria",
-};
-
-const PRIORIDADES: Record<string, { label: string; color: string }> = {
-  critica: {
-    label: "Crítica",
-    color: "bg-red-500/10 text-red-700 border-red-200",
-  },
-  alta: {
-    label: "Alta",
-    color: "bg-orange-500/10 text-orange-700 border-orange-200",
-  },
-  media: {
-    label: "Média",
-    color: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
-  },
-  baixa: {
-    label: "Baixa",
-    color: "bg-blue-500/10 text-blue-700 border-blue-200",
-  },
-};
-
 const PAGE_SIZE = 20;
 
 // --- Component ---
@@ -82,15 +47,36 @@ const PAGE_SIZE = 20;
 const NotificacoesPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const store = useNotificacoesStore();
+  const historico = useNotificacoesStore((state) => state.historico);
+  const historicoTotal = useNotificacoesStore((state) => state.historicoTotal);
+  const historicoTotalPages = useNotificacoesStore(
+    (state) => state.historicoTotalPages,
+  );
+  const historicoLoading = useNotificacoesStore(
+    (state) => state.historicoLoading,
+  );
+  const historicoRefreshing = useNotificacoesStore(
+    (state) => state.historicoRefreshing,
+  );
+  const historicoError = useNotificacoesStore((state) => state.historicoError);
+  const sseConnected = useNotificacoesStore((state) => state.sseConnected);
+  const totalNaoLidas = useNotificacoesStore((state) => state.totalNaoLidas);
+  const latestRealtimeNotification = useNotificacoesStore(
+    (state) => state.latestRealtimeNotification,
+  );
+  const fetchNotificacoes = useNotificacoesStore(
+    (state) => state.fetchNotificacoes,
+  );
+  const upsertHistorico = useNotificacoesStore((state) => state.upsertHistorico);
+  const marcarComoLida = useNotificacoesStore((state) => state.marcarComoLida);
+  const marcarTodasComoLidas = useNotificacoesStore(
+    (state) => state.marcarTodasComoLidas,
+  );
+  const excluirNotificacao = useNotificacoesStore(
+    (state) => state.excluirNotificacao,
+  );
 
-  // Local state for the paginated history view
-  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [filtroLida, setFiltroLida] = useState<string>("todas");
@@ -118,8 +104,6 @@ const NotificacoesPage: React.FC = () => {
   // --- Data fetching ---
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
       const params: Record<string, unknown> = {
         page,
@@ -130,22 +114,29 @@ const NotificacoesPage: React.FC = () => {
       if (filtroTipo !== "todos") params.tipo = filtroTipo;
       if (filtroPrioridade !== "todas") params.prioridade = filtroPrioridade;
 
-      const response: NotificacoesResponse = await store.fetchNotificacoes(
-        params as Parameters<typeof store.fetchNotificacoes>[0],
+      await fetchNotificacoes(
+        params as Parameters<typeof fetchNotificacoes>[0],
       );
-      setNotificacoes(Array.isArray(response.data) ? response.data : []);
-      setTotal(response.total);
-      setTotalPages(response.totalPages);
     } catch {
-      setError("Erro ao carregar notificações");
-    } finally {
-      setLoading(false);
+      // Erro já normalizado no store
     }
-  }, [page, filtroLida, filtroTipo, filtroPrioridade, store]);
+  }, [fetchNotificacoes, filtroLida, filtroPrioridade, filtroTipo, page]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (!latestRealtimeNotification) {
+      return;
+    }
+
+    if (page !== 1 || filtroLida === "lidas") {
+      return;
+    }
+
+    void fetchData();
+  }, [fetchData, filtroLida, latestRealtimeNotification, page]);
 
   useEffect(() => {
     if (!pendingNotificationId) {
@@ -157,7 +148,7 @@ const NotificacoesPage: React.FC = () => {
 
     const focusNotification = async () => {
       const targetId = pendingNotificationId;
-      let found = notificacoes.some((item) => item.id === targetId);
+      let found = historico.some((item) => item.id === targetId);
 
       if (!found) {
         try {
@@ -165,12 +156,7 @@ const NotificacoesPage: React.FC = () => {
           if (cancelled) {
             return;
           }
-          setNotificacoes((prev) => {
-            if (prev.some((item) => item.id === fetched.id)) {
-              return prev;
-            }
-            return [fetched, ...prev];
-          });
+          upsertHistorico(fetched);
           found = true;
         } catch {
           // Se não for possível buscar por ID, seguimos sem destaque.
@@ -186,7 +172,10 @@ const NotificacoesPage: React.FC = () => {
           const targetElement = document.getElementById(
             `notificacao-item-${targetId}`,
           );
-          targetElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+          targetElement?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
         }, 120);
 
         clearHighlightTimeout = window.setTimeout(() => {
@@ -213,10 +202,11 @@ const NotificacoesPage: React.FC = () => {
       }
     };
   }, [
-    notificacoes,
     pendingNotificationId,
     searchParams,
     setSearchParams,
+    historico,
+    upsertHistorico,
   ]);
 
   // Reset page when filters change
@@ -228,22 +218,16 @@ const NotificacoesPage: React.FC = () => {
   // --- Handlers ---
 
   const handleMarcarComoLida = async (id: number) => {
-    await store.marcarComoLida(id);
-    setNotificacoes((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, lida: true } : n)),
-    );
+    await marcarComoLida(id);
   };
 
   const handleMarcarTodasComoLidas = async () => {
-    await store.marcarTodasComoLidas();
-    setNotificacoes((prev) => prev.map((n) => ({ ...n, lida: true })));
+    await marcarTodasComoLidas();
     setSelectedIds(new Set());
   };
 
   const handleExcluir = async (id: number) => {
-    await store.excluirNotificacao(id);
-    setNotificacoes((prev) => prev.filter((n) => n.id !== id));
-    setTotal((prev) => Math.max(0, prev - 1));
+    await excluirNotificacao(id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -252,21 +236,16 @@ const NotificacoesPage: React.FC = () => {
   };
 
   const handleBulkMarkRead = async () => {
-    for (const id of selectedIds) {
-      await store.marcarComoLida(id);
-    }
-    setNotificacoes((prev) =>
-      prev.map((n) => (selectedIds.has(n.id) ? { ...n, lida: true } : n)),
+    await Promise.all(
+      Array.from(selectedIds).map((id) => marcarComoLida(id)),
     );
     setSelectedIds(new Set());
   };
 
   const handleBulkDelete = async () => {
-    for (const id of selectedIds) {
-      await store.excluirNotificacao(id);
-    }
-    setNotificacoes((prev) => prev.filter((n) => !selectedIds.has(n.id)));
-    setTotal((prev) => Math.max(0, prev - selectedIds.size));
+    await Promise.all(
+      Array.from(selectedIds).map((id) => excluirNotificacao(id)),
+    );
     setSelectedIds(new Set());
   };
 
@@ -283,15 +262,15 @@ const NotificacoesPage: React.FC = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === notificacoes.length) {
+    if (selectedIds.size === historico.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(notificacoes.map((n) => n.id)));
+      setSelectedIds(new Set(historico.map((n) => n.id)));
     }
   };
 
   const handleNotificationClick = (notificacao: Notificacao) => {
-    const destination = getDestination(notificacao);
+    const destination = getNotificationDestination(notificacao);
     if (!destination) return;
     if (!notificacao.lida) {
       handleMarcarComoLida(notificacao.id);
@@ -301,17 +280,9 @@ const NotificacoesPage: React.FC = () => {
 
   // --- Helpers ---
 
-  const getDestination = (n: Notificacao): string | null => {
-    if (n.link) return n.link;
-    if (n.processoId) return `/desarquivamentos/${n.processoId}`;
-    if (n.solicitacaoId) return `/desarquivamentos/${n.solicitacaoId}`;
-    if (n.tarefaId) return `/tarefas/${n.tarefaId}`;
-    return null;
-  };
-
   const getIcon = (tipo: string, prioridade: string) => {
-    const t = tipo?.toLowerCase();
-    const p = prioridade?.toLowerCase();
+    const iconVariant = getNotificationIconVariant(tipo);
+    const p = normalizeNotificationPriority(prioridade);
     const iconClass = cn(
       "h-5 w-5 flex-shrink-0",
       p === "critica" && "text-red-500",
@@ -319,14 +290,10 @@ const NotificacoesPage: React.FC = () => {
       p === "media" && "text-yellow-500",
       p === "baixa" && "text-blue-500",
     );
-    switch (t) {
-      case "solicitacao_pendente":
-      case "prazo_proximo":
-      case "tarefa_atrasada":
+    switch (iconVariant) {
+      case "clock":
         return <Clock className={iconClass} />;
-      case "novo_processo":
-      case "novo_registro":
-      case "novo_desarquivamento":
+      case "info":
         return <Info className={iconClass} />;
       default:
         return <AlertCircle className={iconClass} />;
@@ -334,7 +301,7 @@ const NotificacoesPage: React.FC = () => {
   };
 
   const getPriorityBorder = (prioridade: string) => {
-    switch (prioridade?.toLowerCase()) {
+    switch (normalizeNotificationPriority(prioridade)) {
       case "critica":
         return "border-l-red-500";
       case "alta":
@@ -370,7 +337,7 @@ const NotificacoesPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {store.sseConnected && (
+            {sseConnected && (
               <Badge className="bg-green-500/10 text-green-700 border-green-200">
                 <span className="mr-1 h-1.5 w-1.5 rounded-full bg-green-500 inline-block" />
                 Tempo real
@@ -379,16 +346,19 @@ const NotificacoesPage: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => fetchData()}
-              disabled={loading}
+              onClick={() => void fetchData()}
+              disabled={historicoLoading || historicoRefreshing}
               className="border-border/60 bg-background/70 backdrop-blur"
             >
               <RefreshCw
-                className={cn("mr-2 h-4 w-4", loading && "animate-spin")}
+                className={cn(
+                  "mr-2 h-4 w-4",
+                  (historicoLoading || historicoRefreshing) && "animate-spin",
+                )}
               />
               Atualizar
             </Button>
-            {store.totalNaoLidas > 0 && (
+            {totalNaoLidas > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -437,11 +407,13 @@ const NotificacoesPage: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos</SelectItem>
-                  {Object.entries(TIPOS_NOTIFICACAO).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(NOTIFICATION_TYPE_LABELS).map(
+                    ([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -457,18 +429,27 @@ const NotificacoesPage: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todas</SelectItem>
-                  {Object.entries(PRIORIDADES).map(([value, { label }]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
+                  {Object.entries(NOTIFICATION_PRIORITY_META).map(
+                    ([value, { label }]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="ml-auto text-xs text-muted-foreground">
-              {total} notificação{total !== 1 ? "ões" : ""} encontrada
-              {total !== 1 ? "s" : ""}
+              {historicoRefreshing && historico.length > 0 ? (
+                <span className="mr-3 inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-2 py-1 text-[11px]">
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Atualizando
+                </span>
+              ) : null}
+              {historicoTotal} notificação
+              {historicoTotal !== 1 ? "ões" : ""} encontrada
+              {historicoTotal !== 1 ? "s" : ""}
             </div>
           </div>
         </CardContent>
@@ -513,7 +494,7 @@ const NotificacoesPage: React.FC = () => {
       <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
         <CardContent className="p-0 relative">
-          {loading && notificacoes.length === 0 && (
+          {historicoLoading && historico.length === 0 && (
             <div className="flex items-center justify-center py-16">
               <RefreshCw className="mr-2 h-5 w-5 animate-spin text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
@@ -522,10 +503,10 @@ const NotificacoesPage: React.FC = () => {
             </div>
           )}
 
-          {error && (
+          {historicoError && (
             <div className="flex flex-col items-center justify-center py-16">
               <AlertCircle className="mb-2 h-8 w-8 text-red-500" />
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm text-red-600">{historicoError}</p>
               <Button
                 variant="ghost"
                 size="sm"
@@ -537,7 +518,7 @@ const NotificacoesPage: React.FC = () => {
             </div>
           )}
 
-          {!loading && !error && notificacoes.length === 0 && (
+          {!historicoLoading && !historicoError && historico.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16">
               <Bell className="mb-3 h-12 w-12 text-muted-foreground/40" />
               <p className="text-sm font-medium text-muted-foreground">
@@ -549,14 +530,14 @@ const NotificacoesPage: React.FC = () => {
             </div>
           )}
 
-          {notificacoes.length > 0 && (
+          {historico.length > 0 && (
             <>
               {/* Select all header */}
               <div className="flex items-center gap-3 border-b border-border/60 bg-muted/30 px-4 py-2">
                 <Checkbox
                   checked={
-                    selectedIds.size === notificacoes.length &&
-                    notificacoes.length > 0
+                    selectedIds.size === historico.length &&
+                    historico.length > 0
                   }
                   onCheckedChange={toggleSelectAll}
                   aria-label="Selecionar todas"
@@ -568,8 +549,9 @@ const NotificacoesPage: React.FC = () => {
 
               {/* Items */}
               <div className="divide-y divide-border/60">
-                {notificacoes.map((notificacao) => {
-                  const destination = getDestination(notificacao);
+                {historico.map((notificacao) => {
+                  const destination =
+                    getNotificationDestination(notificacao);
                   const isClickable = Boolean(destination);
                   const timeAgo = formatDistanceToNow(
                     new Date(notificacao.createdAt),
@@ -646,13 +628,17 @@ const NotificacoesPage: React.FC = () => {
                               variant="outline"
                               className={cn(
                                 "text-[10px] px-1.5 py-0",
-                                PRIORIDADES[
-                                  notificacao.prioridade?.toLowerCase()
+                                NOTIFICATION_PRIORITY_META[
+                                  normalizeNotificationPriority(
+                                    notificacao.prioridade,
+                                  )
                                 ]?.color,
                               )}
                             >
-                              {PRIORIDADES[
-                                notificacao.prioridade?.toLowerCase()
+                              {NOTIFICATION_PRIORITY_META[
+                                normalizeNotificationPriority(
+                                  notificacao.prioridade,
+                                )
                               ]?.label || notificacao.prioridade}
                             </Badge>
 
@@ -660,7 +646,7 @@ const NotificacoesPage: React.FC = () => {
                               variant="outline"
                               className="text-[10px] px-1.5 py-0"
                             >
-                              {TIPOS_NOTIFICACAO[
+                              {NOTIFICATION_TYPE_LABELS[
                                 notificacao.tipo?.toLowerCase()
                               ] || notificacao.tipo}
                             </Badge>
@@ -710,11 +696,11 @@ const NotificacoesPage: React.FC = () => {
       </Card>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {historicoTotalPages > 1 && (
         <Pagination
           currentPage={page}
-          totalPages={totalPages}
-          totalItems={total}
+          totalPages={historicoTotalPages}
+          totalItems={historicoTotal}
           itemsPerPage={PAGE_SIZE}
           onPageChange={setPage}
         />

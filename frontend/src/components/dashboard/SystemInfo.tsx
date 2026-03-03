@@ -1,114 +1,120 @@
-import React from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
-import { 
-  Server, 
-  Database, 
-  Users, 
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import {
+  Server,
+  Database,
+  Users,
   Shield,
   Clock,
   HardDrive,
   Wifi,
   CheckCircle,
   AlertTriangle,
-  XCircle
-} from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { cn } from '@/utils/cn'
+  XCircle,
+} from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/utils/cn";
 
 interface SystemStatus {
-  service: string
-  status: 'online' | 'warning' | 'offline'
-  lastCheck: string
-  description: string
+  service: string;
+  status: "online" | "warning" | "offline";
+  lastCheck: string;
+  description: string;
 }
 
 interface SystemInfoData {
-  version: string
-  uptime: string
-  totalUsers: number
-  activeUsers: number
-  databaseSize: string
-  lastBackup: string
-  services: SystemStatus[]
+  version: string;
+  uptime: string;
+  totalUsers: number;
+  activeUsers: number;
+  databaseSize: string;
+  lastBackup: string;
+  services: SystemStatus[];
 }
 
 interface SystemInfoProps {
-  data?: SystemInfoData
-  isLoading?: boolean
+  data?: SystemInfoData;
+  isLoading?: boolean;
 }
 
 const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
-  const { user } = useAuth()
+  const { user } = useAuth();
 
   // Dados mockados para demonstração
   const defaultData: SystemInfoData = {
-    version: '2.0.0',
-    uptime: '15 dias, 8 horas',
+    version: "2.0.0",
+    uptime: "15 dias, 8 horas",
     totalUsers: 45,
     activeUsers: 12,
-    databaseSize: '2.3 GB',
-    lastBackup: '2024-01-15 03:00:00',
+    databaseSize: "2.3 GB",
+    lastBackup: "2024-01-15 03:00:00",
     services: [
       {
-        service: 'API Backend',
-        status: 'online',
-        lastCheck: '2024-01-15 14:30:00',
-        description: 'Serviço principal funcionando'
+        service: "API Backend",
+        status: "online",
+        lastCheck: "2024-01-15 14:30:00",
+        description: "Serviço principal funcionando",
       },
       {
-        service: 'Banco de Dados',
-        status: 'online',
-        lastCheck: '2024-01-15 14:30:00',
-        description: 'PostgreSQL operacional'
+        service: "Banco de Dados",
+        status: "online",
+        lastCheck: "2024-01-15 14:30:00",
+        description: "PostgreSQL operacional",
       },
       {
-        service: 'Sistema de Backup',
-        status: 'warning',
-        lastCheck: '2024-01-15 03:00:00',
-        description: 'Último backup há 11 horas'
+        service: "Sistema de Backup",
+        status: "warning",
+        lastCheck: "2024-01-15 03:00:00",
+        description: "Último backup há 11 horas",
       },
       {
-        service: 'Monitoramento',
-        status: 'online',
-        lastCheck: '2024-01-15 14:29:00',
-        description: 'Sistema de logs ativo'
-      }
-    ]
-  }
+        service: "Monitoramento",
+        status: "online",
+        lastCheck: "2024-01-15 14:29:00",
+        description: "Sistema de logs ativo",
+      },
+    ],
+  };
 
-  const systemData = data || defaultData
-  const isMock = !data
+  const systemData = data || defaultData;
+  const isMock = !data;
 
-  const getStatusIcon = (status: SystemStatus['status']) => {
+  const getStatusIcon = (status: SystemStatus["status"]) => {
     switch (status) {
-      case 'online':
-        return <CheckCircle className="h-4 w-4 text-green-600" />
-      case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />
-      case 'offline':
-        return <XCircle className="h-4 w-4 text-red-600" />
+      case "online":
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case "warning":
+        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+      case "offline":
+        return <XCircle className="h-4 w-4 text-red-600" />;
     }
-  }
+  };
 
-  const getStatusColor = (status: SystemStatus['status']) => {
+  const getStatusColor = (status: SystemStatus["status"]) => {
     switch (status) {
-      case 'online':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'offline':
-        return 'bg-red-100 text-red-800 border-red-200'
+      case "online":
+        return "bg-green-100 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-800/60";
+      case "warning":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-300 dark:border-yellow-800/60";
+      case "offline":
+        return "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800/60";
     }
-  }
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('pt-BR')
-  }
+    return new Date(dateString).toLocaleString("pt-BR");
+  };
 
   // Só mostra para administradores
-  if (user?.role?.name !== 'admin') {
-    return null
+  if (user?.role?.name !== "admin") {
+    return null;
   }
 
   if (isLoading) {
@@ -119,35 +125,36 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
             <Server className="h-5 w-5" />
             Informações do Sistema
           </CardTitle>
-          <CardDescription>
-            Status e estatísticas do sistema
-          </CardDescription>
+          <CardDescription>Status e estatísticas do sistema</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4 animate-pulse">
             <div className="grid grid-cols-2 gap-4">
               {Array.from({ length: 4 }).map((_, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-20"></div>
-                  <div className="h-6 bg-gray-200 rounded w-16"></div>
+                  <div className="h-4 bg-muted/40 rounded w-20"></div>
+                  <div className="h-6 bg-muted/40 rounded w-16"></div>
                 </div>
               ))}
             </div>
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 border rounded"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="h-4 w-4 bg-gray-200 rounded"></div>
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
+                    <div className="h-4 w-4 bg-muted/40 rounded"></div>
+                    <div className="h-4 bg-muted/40 rounded w-24"></div>
                   </div>
-                  <div className="h-6 bg-gray-200 rounded w-16"></div>
+                  <div className="h-6 bg-muted/40 rounded w-16"></div>
                 </div>
               ))}
             </div>
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -172,41 +179,41 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
         {/* Estatísticas Gerais */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               Uptime
             </div>
-            <div className="text-lg font-semibold text-gray-900">
+            <div className="text-lg font-semibold text-foreground">
               {systemData.uptime}
             </div>
           </div>
-          
+
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
               Usuários
             </div>
-            <div className="text-lg font-semibold text-gray-900">
+            <div className="text-lg font-semibold text-foreground">
               {systemData.activeUsers}/{systemData.totalUsers}
             </div>
           </div>
-          
+
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Database className="h-4 w-4" />
               Banco de Dados
             </div>
-            <div className="text-lg font-semibold text-gray-900">
+            <div className="text-lg font-semibold text-foreground">
               {systemData.databaseSize}
             </div>
           </div>
-          
+
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <HardDrive className="h-4 w-4" />
               Último Backup
             </div>
-            <div className="text-sm font-medium text-gray-900">
+            <div className="text-sm font-medium text-foreground">
               {formatDate(systemData.lastBackup)}
             </div>
           </div>
@@ -214,36 +221,39 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
 
         {/* Status dos Serviços */}
         <div>
-          <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
+          <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Status dos Serviços
           </h4>
           <div className="space-y-2">
             {systemData.services.map((service, index) => (
-              <div 
+              <div
                 key={index}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 <div className="flex items-center gap-3">
                   {getStatusIcon(service.status)}
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-foreground">
                       {service.service}
                     </div>
-                    <div className="text-xs text-gray-600">
+                    <div className="text-xs text-muted-foreground">
                       {service.description}
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <Badge 
-                    variant="outline" 
+                  <Badge
+                    variant="outline"
                     className={cn("text-xs", getStatusColor(service.status))}
                   >
-                    {service.status === 'online' ? 'Online' : 
-                     service.status === 'warning' ? 'Atenção' : 'Offline'}
+                    {service.status === "online"
+                      ? "Online"
+                      : service.status === "warning"
+                        ? "Atenção"
+                        : "Offline"}
                   </Badge>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     {formatDate(service.lastCheck)}
                   </div>
                 </div>
@@ -261,7 +271,7 @@ const SystemInfo: React.FC<SystemInfoProps> = ({ data, isLoading = false }) => {
         </div>
       </CardContent>
     </Card>
-  )
-}
+  );
+};
 
-export default SystemInfo
+export default SystemInfo;

@@ -3,18 +3,19 @@ import {
   Get,
   Post,
   Body,
+  BadRequestException,
   Patch,
   Param,
   Delete,
   Query,
   UseGuards,
   Request,
+  Headers,
   ParseIntPipe,
   HttpStatus,
   HttpCode,
   Sse,
   MessageEvent,
-  UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -27,17 +28,21 @@ import {
 } from "@nestjs/swagger";
 import { Observable, interval, map, merge, from } from "rxjs";
 import { finalize } from "rxjs/operators";
-import { JwtService } from "@nestjs/jwt";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
-import { IsPublic } from "../../../common/decorators/is-public.decorator";
+import { AuthenticatedRequest } from "../../../common/types/authenticated-request";
 import {
   NotificacoesService,
   NotificacoesSchedulerService,
   NotificationPreferencesService,
+  PushNotificationsService,
   CreateNotificacaoDto,
   QueryNotificacoesDto,
 } from "../services";
-import { UpdateNotificationPreferencesDto } from "../dto";
+import {
+  RemovePushSubscriptionDto,
+  SavePushSubscriptionDto,
+  UpdateNotificationPreferencesDto,
+} from "../dto";
 import {
   Notificacao,
   TipoNotificacao,
@@ -53,7 +58,7 @@ export class NotificacoesController {
     private readonly notificacoesService: NotificacoesService,
     private readonly notificacoesSchedulerService: NotificacoesSchedulerService,
     private readonly notificationPreferencesService: NotificationPreferencesService,
-    private readonly jwtService: JwtService,
+    private readonly pushNotificationsService: PushNotificationsService,
   ) {}
 
   @Post()
@@ -77,7 +82,7 @@ export class NotificacoesController {
   })
   async create(
     @Body() createNotificacaoDto: CreateNotificacaoDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
     // Por padrão, criar notificação para o usuário logado
     const notificacaoData = {
@@ -144,7 +149,7 @@ export class NotificacoesController {
   })
   async findAll(
     @Query() queryDto: QueryNotificacoesDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{
     data: Notificacao[];
     total: number;
@@ -169,7 +174,7 @@ export class NotificacoesController {
     status: HttpStatus.UNAUTHORIZED,
     description: "Token de acesso inválido",
   })
-  async getEstatisticas(@Request() req: any) {
+  async getEstatisticas(@Request() req: AuthenticatedRequest) {
     return this.notificacoesService.getEstatisticas(req.user.id);
   }
 
@@ -180,7 +185,7 @@ export class NotificacoesController {
     description: "Notificações não lidas retornadas com sucesso",
     type: [Notificacao],
   })
-  async getNaoLidas(@Request() req: any): Promise<{
+  async getNaoLidas(@Request() req: AuthenticatedRequest): Promise<{
     data: Notificacao[];
     total: number;
     page: number;
@@ -195,35 +200,9 @@ export class NotificacoesController {
   }
 
   @Sse("stream")
-  @IsPublic()
   @ApiExcludeEndpoint()
-  streamNotificacoes(
-    @Request() req: any,
-    @Query("token") token?: string,
-  ): Observable<MessageEvent> {
-    // SSE não suporta headers customizados.
-    // Prioridade de autenticação: 1) cookie httpOnly, 2) query string (fallback)
-    let userId: number;
-
-    if (req.user) {
-      userId = req.user.id;
-    } else if (req.cookies?.access_token) {
-      try {
-        const payload = this.jwtService.verify(req.cookies.access_token);
-        userId = payload.sub;
-      } catch (error) {
-        throw new UnauthorizedException("Token do cookie inválido ou expirado");
-      }
-    } else if (token) {
-      try {
-        const payload = this.jwtService.verify(token);
-        userId = payload.sub;
-      } catch (error) {
-        throw new UnauthorizedException("Token inválido ou expirado");
-      }
-    } else {
-      throw new UnauthorizedException("Token não fornecido");
-    }
+  streamNotificacoes(@Request() req: AuthenticatedRequest): Observable<MessageEvent> {
+    const userId = Number(req.user.id);
 
     // 1) Emit all current unread notifications as "init" event
     const init$ = from(
@@ -286,7 +265,7 @@ export class NotificacoesController {
     status: HttpStatus.OK,
     description: "Preferências retornadas com sucesso",
   })
-  async getPreferences(@Request() req: any) {
+  async getPreferences(@Request() req: AuthenticatedRequest) {
     const preferences =
       await this.notificationPreferencesService.getPreferences(req.user.id);
 
@@ -303,7 +282,7 @@ export class NotificacoesController {
     description: "Preferências atualizadas com sucesso",
   })
   async updatePreferences(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() updateDto: UpdateNotificationPreferencesDto,
   ) {
     const preferences =
@@ -326,7 +305,7 @@ export class NotificacoesController {
     status: HttpStatus.OK,
     description: "Preferências resetadas com sucesso",
   })
-  async resetPreferences(@Request() req: any) {
+  async resetPreferences(@Request() req: AuthenticatedRequest) {
     const preferences =
       await this.notificationPreferencesService.resetToDefaults(req.user.id);
 
@@ -334,6 +313,130 @@ export class NotificacoesController {
       success: true,
       data: preferences,
       message: "Preferências resetadas para valores padrão",
+    };
+  }
+
+  @Get("push/config")
+  @ApiOperation({ summary: "Obter configuração pública de Web Push" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Configuração pública retornada com sucesso",
+  })
+  getPushConfig() {
+    return {
+      success: true,
+      data: this.pushNotificationsService.getClientConfig(),
+    };
+  }
+
+  @Post("push/subscriptions")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Registrar ou atualizar subscription Web Push" })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Subscription registrada com sucesso",
+  })
+  async savePushSubscription(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: SavePushSubscriptionDto,
+    @Headers("user-agent") userAgent?: string,
+  ) {
+    const subscription = await this.pushNotificationsService.saveSubscription(
+      req.user.id,
+      dto,
+      userAgent,
+    );
+
+    return {
+      success: true,
+      data: subscription,
+    };
+  }
+
+  @Delete("push/subscriptions")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Remover subscription Web Push do dispositivo atual",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Subscription removida com sucesso",
+  })
+  async removePushSubscription(
+    @Request() req: AuthenticatedRequest,
+    @Body() dto: RemovePushSubscriptionDto,
+  ) {
+    await this.pushNotificationsService.removeSubscription(req.user.id, dto);
+
+    return {
+      success: true,
+      message: "Subscription removida com sucesso",
+    };
+  }
+
+  @Post("teste")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Disparar uma notificação de teste para validar o canal do usuário logado",
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: "Notificação de teste enviada com sucesso",
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: "Preferências atuais impedem o envio do teste",
+  })
+  async sendTestNotification(@Request() req: AuthenticatedRequest) {
+    const preferences =
+      await this.notificationPreferencesService.getPreferences(req.user.id);
+
+    if (
+      !preferences.inAppEnabled &&
+      !preferences.desktopEnabled &&
+      !preferences.pushEnabled
+    ) {
+      throw new BadRequestException(
+        "Ative pelo menos um canal de notificação antes de testar.",
+      );
+    }
+
+    const enabledNotificationType = Object.values(TipoNotificacao).find(
+      (type) => preferences.enabledTypes?.[type],
+    );
+
+    if (!enabledNotificationType) {
+      throw new BadRequestException(
+        "Ative pelo menos um tipo de notificação antes de testar.",
+      );
+    }
+
+    const notification = await this.notificacoesService.create({
+      usuarioId: req.user.id,
+      tipo: enabledNotificationType,
+      prioridade: PrioridadeNotificacao.BAIXA,
+      titulo: "Notificação de teste",
+      descricao:
+        "Se este alerta apareceu, o canal de notificações da área de trabalho está funcionando.",
+      detalhes: {
+        teste: true,
+        origem: "configuracoes",
+        disparadoEm: new Date().toISOString(),
+      },
+      link: "/configuracoes",
+    });
+
+    if (!notification) {
+      throw new BadRequestException(
+        "As preferências atuais bloquearam a notificação de teste.",
+      );
+    }
+
+    return {
+      success: true,
+      data: notification,
+      message: "Notificação de teste enviada com sucesso",
     };
   }
 
@@ -355,7 +458,7 @@ export class NotificacoesController {
   })
   async findOne(
     @Param("id", ParseIntPipe) id: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
     return this.notificacoesService.findOne(id, req.user.id);
   }
@@ -378,7 +481,7 @@ export class NotificacoesController {
   })
   async marcarComoLida(
     @Param("id", ParseIntPipe) id: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
     return this.notificacoesService.marcarComoLida(id, req.user.id);
   }
@@ -397,7 +500,7 @@ export class NotificacoesController {
   })
   async marcarComoNaoLida(
     @Param("id", ParseIntPipe) id: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
     return this.notificacoesService.marcarComoNaoLida(id, req.user.id);
   }
@@ -413,7 +516,7 @@ export class NotificacoesController {
     description: "Token de acesso inválido",
   })
   async marcarTodasComoLidas(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ affected: number }> {
     const affected = await this.notificacoesService.marcarTodasComoLidas(
       req.user.id,
@@ -439,7 +542,7 @@ export class NotificacoesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @Param("id", ParseIntPipe) id: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<void> {
     return this.notificacoesService.delete(id, req.user.id);
   }
@@ -455,7 +558,7 @@ export class NotificacoesController {
   async criarSolicitacaoPendente(
     @Body()
     body: { solicitacaoId: number; diasPendentes: number; usuarioId?: number },
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
     const usuarioId = body.usuarioId || req.user.id;
     return this.notificacoesService.criarNotificacaoSolicitacaoPendente(
@@ -475,7 +578,7 @@ export class NotificacoesController {
   async criarNovoProcesso(
     @Body()
     body: { processoId: number; numeroProcesso: string; usuarioId?: number },
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
     const usuarioId = body.usuarioId || req.user.id;
     return this.notificacoesService.criarNotificacaoNovoProcesso(

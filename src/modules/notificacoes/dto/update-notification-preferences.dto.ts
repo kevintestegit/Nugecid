@@ -121,6 +121,22 @@ export class UpdateNotificationPreferencesDto {
 
   @ApiProperty({
     required: false,
+    description: "Habilitar notificações na área de trabalho",
+  })
+  @IsOptional()
+  @IsBoolean()
+  desktopEnabled?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: "Habilitar notificações push em segundo plano",
+  })
+  @IsOptional()
+  @IsBoolean()
+  pushEnabled?: boolean;
+
+  @ApiProperty({
+    required: false,
     description: "Habilitar som nas notificações",
   })
   @IsOptional()

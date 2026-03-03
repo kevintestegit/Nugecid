@@ -582,7 +582,7 @@ const PrateleiraDetailPage: React.FC = () => {
               <input
                 id="upload-planilhas-input"
                 type="file"
-                accept=".xls,.xlsx,.csv,.ods,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+                accept=".xlsx,.csv,.ods,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 className="hidden"
                 disabled={!canManageArquivos}
                 onChange={handlePlanilhaChange}

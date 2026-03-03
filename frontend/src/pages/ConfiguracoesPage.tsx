@@ -1,30 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui';
-import {
-  Settings,
-  User,
-  Shield,
-  Database,
-  Save,
-  Megaphone,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import React, { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Settings, User, Shield, Database, Megaphone } from "lucide-react";
 
-import { GeneralSettings } from './Configuracoes/GeneralSettings';
-import { SystemSettings } from './Configuracoes/SystemSettings';
-import { SecuritySettings } from './Configuracoes/SecuritySettings';
-import { UserSettings } from './Configuracoes/UserSettings';
-import { AnnouncementsSettings } from './Configuracoes/AnnouncementsSettings';
+import { GeneralSettings } from "./Configuracoes/GeneralSettings";
+import { SystemSettings } from "./Configuracoes/SystemSettings";
+import { SecuritySettings } from "./Configuracoes/SecuritySettings";
+import { UserSettings } from "./Configuracoes/UserSettings";
+import { AnnouncementsSettings } from "./Configuracoes/AnnouncementsSettings";
 
-type TabType = 'geral' | 'sistema' | 'seguranca' | 'usuario' | 'avisos';
+type TabType = "geral" | "sistema" | "seguranca" | "usuario" | "avisos";
 
 const ConfiguracoesPage: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('geral');
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("geral");
   const navRef = useRef<HTMLElement | null>(null);
-  const tabRefs = useRef<Partial<Record<TabType, HTMLButtonElement | null>>>({});
+  const tabRefs = useRef<Partial<Record<TabType, HTMLButtonElement | null>>>(
+    {},
+  );
   const [sliderStyle, setSliderStyle] = useState<{
     left: number;
     top: number;
@@ -39,29 +31,31 @@ const ConfiguracoesPage: React.FC = () => {
     ready: false,
   });
 
-  const isAdmin = user?.role?.name === 'admin';
-  const isCoordenador = user?.role?.name === 'coordenador' || isAdmin;
-
-  const handleSave = async () => {
-    setIsLoading(true);
-    try {
-      // Simular salvamento das configurações
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast.success('Configurações salvas com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao salvar configurações');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const isAdmin = user?.role?.name === "admin";
+  const isCoordenador = user?.role?.name === "coordenador" || isAdmin;
 
   const tabs = [
-    { id: 'geral' as TabType, label: 'Geral', icon: Settings, available: true },
-    { id: 'sistema' as TabType, label: 'Sistema', icon: Database, available: isAdmin },
-    { id: 'avisos' as TabType, label: 'Avisos', icon: Megaphone, available: isAdmin },
-    { id: 'seguranca' as TabType, label: 'Segurança', icon: Shield, available: isCoordenador },
-    { id: 'usuario' as TabType, label: 'Usuário', icon: User, available: true }
-  ].filter(tab => tab.available);
+    { id: "geral" as TabType, label: "Geral", icon: Settings, available: true },
+    {
+      id: "sistema" as TabType,
+      label: "Sistema",
+      icon: Database,
+      available: isAdmin,
+    },
+    {
+      id: "avisos" as TabType,
+      label: "Avisos",
+      icon: Megaphone,
+      available: isAdmin,
+    },
+    {
+      id: "seguranca" as TabType,
+      label: "Segurança",
+      icon: Shield,
+      available: isCoordenador,
+    },
+    { id: "usuario" as TabType, label: "Usuário", icon: User, available: true },
+  ].filter((tab) => tab.available);
 
   useEffect(() => {
     const updateSlider = () => {
@@ -82,8 +76,8 @@ const ConfiguracoesPage: React.FC = () => {
     };
 
     updateSlider();
-    window.addEventListener('resize', updateSlider);
-    return () => window.removeEventListener('resize', updateSlider);
+    window.addEventListener("resize", updateSlider);
+    return () => window.removeEventListener("resize", updateSlider);
   }, [activeTab, tabs.length]);
 
   return (
@@ -96,7 +90,9 @@ const ConfiguracoesPage: React.FC = () => {
         <div className="pointer-events-none absolute -right-14 -top-14 h-36 w-36 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -left-12 -bottom-16 h-40 w-40 rounded-full bg-orange-400/20 blur-3xl" />
 
-        <h1 className="mb-2 text-3xl font-bold text-foreground">Configurações</h1>
+        <h1 className="mb-2 text-3xl font-bold text-foreground">
+          Configurações
+        </h1>
         <p className="text-muted-foreground">
           Gerencie as configurações do sistema e suas preferências pessoais
         </p>
@@ -109,7 +105,7 @@ const ConfiguracoesPage: React.FC = () => {
             <span
               aria-hidden="true"
               className={`pointer-events-none absolute rounded-xl border border-primary/25 bg-primary/10 shadow-sm backdrop-blur transition-all duration-300 ease-out ${
-                sliderStyle.ready ? 'opacity-100' : 'opacity-0'
+                sliderStyle.ready ? "opacity-100" : "opacity-0"
               }`}
               style={{
                 left: sliderStyle.left,
@@ -129,8 +125,8 @@ const ConfiguracoesPage: React.FC = () => {
                   onClick={() => setActiveTab(tab.id)}
                   className={`relative z-10 flex items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
                     activeTab === tab.id
-                      ? 'border-transparent bg-transparent text-primary'
-                      : 'border-transparent text-foreground/80 hover:border-border/60 hover:bg-card/70 hover:text-foreground'
+                      ? "border-transparent bg-transparent text-primary"
+                      : "border-transparent text-foreground/80 hover:border-border/60 hover:bg-card/70 hover:text-foreground"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -144,23 +140,18 @@ const ConfiguracoesPage: React.FC = () => {
 
       {/* Conteúdo das abas */}
       <div className="mb-6">
-        {activeTab === 'geral' && <GeneralSettings />}
-        {activeTab === 'sistema' && isAdmin && <SystemSettings />}
-        {activeTab === 'avisos' && isAdmin && <AnnouncementsSettings />}
-        {activeTab === 'seguranca' && isCoordenador && <SecuritySettings />}
-        {activeTab === 'usuario' && <UserSettings />}
+        {activeTab === "geral" && <GeneralSettings />}
+        {activeTab === "sistema" && isAdmin && <SystemSettings />}
+        {activeTab === "avisos" && isAdmin && <AnnouncementsSettings />}
+        {activeTab === "seguranca" && isCoordenador && <SecuritySettings />}
+        {activeTab === "usuario" && <UserSettings />}
       </div>
 
-      {/* Botão de salvar */}
       <div className="flex justify-end">
-        <Button 
-          onClick={handleSave}
-          disabled={isLoading}
-          className="flex items-center gap-2 bg-primary/90"
-        >
-          <Save className="h-4 w-4" />
-          {isLoading ? 'Salvando...' : 'Salvar Configurações'}
-        </Button>
+        <p className="rounded-xl border border-border/60 bg-card/70 px-4 py-3 text-sm text-muted-foreground shadow-sm">
+          Cada seção salva suas alterações de forma independente quando o
+          backend correspondente estiver disponível.
+        </p>
       </div>
     </div>
   );

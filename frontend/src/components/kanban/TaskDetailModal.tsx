@@ -127,11 +127,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     usuario_id?: number;
   };
 
-  const getCommentAuthor = useCallback((
-    comment: CommentApi,
-  ): NormalizedComment["usuario"] => {
-    return comment.usuario ?? comment.autor ?? comment.user;
-  }, []);
+  const getCommentAuthor = useCallback(
+    (comment: CommentApi): NormalizedComment["usuario"] => {
+      return comment.usuario ?? comment.autor ?? comment.user;
+    },
+    [],
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -288,21 +289,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="!max-w-[95vw] h-[90vh] !flex !flex-col !gap-0 !p-0 !overflow-visible bg-[#Fdfdfd] sm:rounded-xl shadow-2xl border-0">
+      <DialogContent className="!max-w-[95vw] h-[90vh] !flex !flex-col !gap-0 !p-0 !overflow-visible bg-background sm:rounded-xl shadow-2xl border-0">
         {/* Header - Minimalist */}
-        <div className="flex items-start justify-between p-6 pb-4 shrink-0 bg-white border-b border-gray-100">
+        <div className="flex items-start justify-between p-6 pb-4 shrink-0 bg-background border-b border-border">
           <div className="flex-1 min-w-0 pr-8">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-50 text-xs font-medium border border-gray-100">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-50 text-xs font-medium border border-border">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                 {colunaNome || "Sem status"}
               </div>
               <span className="text-gray-300">/</span>
-              <span className="text-gray-400 font-mono text-xs">
+              <span className="text-muted-foreground/70 font-mono text-xs">
                 ID-{task.id}
               </span>
             </div>
-            <DialogTitle className="text-xl font-bold text-gray-900 leading-tight">
+            <DialogTitle className="text-xl font-bold text-foreground leading-tight">
               {task.titulo}
             </DialogTitle>
           </div>
@@ -324,7 +325,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 onClick={() => onOpenTask(task.id)}
                 title="Abrir página da tarefa"
               >
-                <MoreHorizontal className="w-5 h-5 text-gray-400" />
+                <MoreHorizontal className="w-5 h-5 text-muted-foreground/70" />
               </Button>
             )}
             <DialogClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
@@ -337,16 +338,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         {/* Main Body - Two Columns */}
         <div className="flex-1 flex overflow-y-auto">
           {/* Left: Content & Activity (Scrollable) */}
-          <div className="flex-1 custom-scrollbar p-8 pt-6 bg-white">
+          <div className="flex-1 custom-scrollbar p-8 pt-6 bg-background">
             <div className="max-w-3xl space-y-10">
               {/* Description */}
               <div className="group">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <AlignLeft className="w-4 h-4 text-gray-400" /> Descrição
+                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <AlignLeft className="w-4 h-4 text-muted-foreground/70" /> Descrição
                 </h3>
-                <div className="text-base text-gray-700 leading-relaxed whitespace-pre-line pl-0 min-h-[60px]">
+                <div className="text-base text-foreground/90 leading-relaxed whitespace-pre-line pl-0 min-h-[60px]">
                   {task.descricao || (
-                    <span className="text-gray-400 italic">
+                    <span className="text-muted-foreground/70 italic">
                       Nenhuma descrição fornecida.
                     </span>
                   )}
@@ -363,13 +364,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 onOpenTask={(id) => onOpenTask?.(id)}
               />
 
-              <hr className="border-gray-100" />
+              <hr className="border-border" />
 
               {/* Activity & Comments Stream */}
               <div>
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-gray-400" /> Atividade
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-muted-foreground/70" /> Atividade
                   </h3>
                 </div>
 
@@ -381,7 +382,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     </div>
                   </div>
                   <div className="flex-1 relative">
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400 transition-all overflow-hidden relative">
+                    <div className="bg-background rounded-xl border border-border shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400 transition-all overflow-hidden relative">
                       <Textarea
                         ref={textareaRef}
                         className="min-h-[100px] w-full border-0 focus:ring-0 focus-visible:ring-0 resize-y bg-transparent p-4 text-sm"
@@ -394,14 +395,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-400 hover:text-gray-600 rounded-lg"
+                            className="h-8 w-8 text-muted-foreground/70 hover:text-muted-foreground rounded-lg"
                           >
                             <Paperclip className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-400 hover:text-gray-600 rounded-lg"
+                            className="h-8 w-8 text-muted-foreground/70 hover:text-muted-foreground rounded-lg"
                             onClick={() => setCommentText((prev) => prev + "@")}
                           >
                             <AtSign className="w-4 h-4" />
@@ -425,9 +426,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                     {/* Mentions Dropdown */}
                     {mentionQuery !== null && filteredMembers.length > 0 && (
-                      <div className="absolute left-0 bottom-full mb-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
-                        <div className="p-2 border-b border-gray-100 bg-gray-50/50">
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <div className="absolute left-0 bottom-full mb-2 w-64 bg-background rounded-lg shadow-xl border border-border overflow-hidden z-50">
+                        <div className="p-2 border-b border-border bg-gray-50/50">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                             Membros
                           </span>
                         </div>
@@ -439,7 +440,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               onClick={() => insertMention(member)}
                             >
                               <Avatar usuario={member} size="xs" />
-                              <span className="text-sm text-gray-700">
+                              <span className="text-sm text-foreground/90">
                                 {member.nome}
                               </span>
                             </button>
@@ -453,7 +454,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 {/* Timeline */}
                 <div className="space-y-8 relative before:absolute before:left-[19px] before:top-2 before:bottom-0 before:w-px before:bg-gray-100">
                   {loading && (
-                    <div className="flex items-center gap-2 text-sm text-gray-500 pl-12">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground pl-12">
                       <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
                     </div>
                   )}
@@ -470,10 +471,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                         <div className="flex-1 pt-1">
                           <div className="flex items-baseline gap-2 mb-1">
-                            <span className="font-semibold text-sm text-gray-900 hover:underline cursor-pointer">
+                            <span className="font-semibold text-sm text-foreground hover:underline cursor-pointer">
                               {c.usuario?.nome || "Usuário"}
                             </span>
-                            <span className="text-xs text-gray-400">
+                            <span className="text-xs text-muted-foreground/70">
                               {new Date(c.createdAt).toLocaleString("pt-BR", {
                                 day: "2-digit",
                                 month: "short",
@@ -482,7 +483,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               })}
                             </span>
                           </div>
-                          <div className="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50/50 p-3 rounded-lg rounded-tl-none border border-gray-100/50">
+                          <div className="text-sm text-foreground/90 whitespace-pre-wrap bg-gray-50/50 p-3 rounded-lg rounded-tl-none border border-border/50">
                             {c.conteudo}
                           </div>
                         </div>
@@ -494,19 +495,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
 
           {/* Right: Sidebar (Properties) */}
-          <div className="w-[300px] bg-gray-50/30 border-l border-gray-200">
+          <div className="w-[300px] bg-gray-50/30 border-l border-border">
             <div className="p-6 space-y-8">
               {/* Properties List */}
               <div>
                 <div className="space-y-5">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Status
                     </label>
                     <div className="">
                       <Badge
                         variant="secondary"
-                        className="bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors font-normal py-1"
+                        className="bg-background border border-border text-foreground/90 hover:bg-muted transition-colors font-normal py-1"
                       >
                         {colunaNome}
                       </Badge>
@@ -514,7 +515,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <Activity className="w-3.5 h-3.5" /> Prioridade
                     </label>
                     <div>
@@ -523,7 +524,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <UserIcon className="w-3.5 h-3.5" /> Responsáveis
                     </label>
                     {responsaveis.length > 1 ? (
@@ -533,7 +534,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           size="xs"
                           max={4}
                         />
-                        <span className="text-sm text-gray-700 truncate">
+                        <span className="text-sm text-foreground/90 truncate">
                           {responsaveis
                             .map((usuario) => usuario.nome)
                             .join(", ")}
@@ -542,7 +543,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     ) : (
                       <div className="flex items-center gap-2 group cursor-pointer">
                         <Avatar usuario={responsaveis[0]} size="xs" />
-                        <span className="text-sm text-gray-700 truncate group-hover:text-blue-600 transition-colors">
+                        <span className="text-sm text-foreground/90 truncate group-hover:text-blue-600 transition-colors">
                           {responsaveis[0]?.nome || "Não atribuído"}
                         </span>
                       </div>
@@ -550,18 +551,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" /> Prazo
                     </label>
                     <div className="">
                       {task.prazo ? (
-                        <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                        <div className="flex items-center gap-1.5 text-sm text-foreground/90">
                           <span>
                             {new Date(task.prazo).toLocaleDateString()}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400 italic">
+                        <span className="text-sm text-muted-foreground/70 italic">
                           Sem prazo
                         </span>
                       )}
@@ -572,8 +573,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Tags */}
               {task.tags && task.tags.length > 0 && (
-                <div className="pt-6 border-t border-gray-200/50">
-                  <h4 className="text-xs font-medium text-gray-500 mb-3">
+                <div className="pt-6 border-t border-border/50">
+                  <h4 className="text-xs font-medium text-muted-foreground mb-3">
                     Tags
                   </h4>
                   <div className="flex flex-wrap gap-2">
@@ -581,7 +582,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       <Badge
                         key={tag}
                         variant="outline"
-                        className="px-2 py-0.5 text-xs bg-white text-gray-600 border-gray-200"
+                        className="px-2 py-0.5 text-xs bg-background text-muted-foreground border-border"
                       >
                         {tag}
                       </Badge>
@@ -591,8 +592,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               )}
 
               {/* Compact History */}
-              <div className="pt-6 border-t border-gray-200/50">
-                <h4 className="text-xs font-medium text-gray-500 mb-4 flex items-center gap-2">
+              <div className="pt-6 border-t border-border/50">
+                <h4 className="text-xs font-medium text-muted-foreground mb-4 flex items-center gap-2">
                   <History className="w-3.5 h-3.5" /> Histórico
                 </h4>
                 <div className="space-y-4">
@@ -600,15 +601,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <div key={h.id} className="flex gap-3 relative">
                       <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
                       <div>
-                        <p className="text-xs text-gray-600 leading-snug">
+                        <p className="text-xs text-muted-foreground leading-snug">
                           <span className="font-medium text-gray-800">
                             {h.acao}
                           </span>
                           {h.campo && (
-                            <span className="text-gray-500"> {h.campo}</span>
+                            <span className="text-muted-foreground"> {h.campo}</span>
                           )}
                         </p>
-                        <span className="text-[10px] text-gray-400">
+                        <span className="text-[10px] text-muted-foreground/70">
                           {new Date(h.createdAt || Date.now()).toLocaleString(
                             "pt-BR",
                             {
@@ -623,7 +624,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     </div>
                   ))}
                   {history.length === 0 && (
-                    <p className="text-xs text-gray-400 italic">
+                    <p className="text-xs text-muted-foreground/70 italic">
                       Sem histórico recente.
                     </p>
                   )}
@@ -631,7 +632,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </div>
 
               <div className="pt-6 mt-auto">
-                <div className="text-[10px] text-gray-400 flex flex-col gap-1">
+                <div className="text-[10px] text-muted-foreground/70 flex flex-col gap-1">
                   <span>Criado por #{criadorId}</span>
                   <span>
                     Em{" "}

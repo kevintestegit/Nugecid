@@ -136,6 +136,28 @@ export class NugecidPdfService {
     }
   }
 
+  async generatePreviewHtml(
+    desarquivamento: DesarquivamentoTypeOrmEntity,
+  ): Promise<string> {
+    const baseEntity = await this.resolveBaseEntity(desarquivamento);
+    const itensElegiveis = await this.findEligibleProcessItems(baseEntity);
+    const somenteDesarquivados = this.filterDesarquivados(itensElegiveis);
+
+    if (!somenteDesarquivados.length) {
+      throw new BadRequestException(
+        "Nao ha itens com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO para este processo.",
+      );
+    }
+
+    const logos = await loadTermoTemplateLogos(this.logger);
+
+    return buildTermoTemplateHtml({
+      base: baseEntity,
+      itens: somenteDesarquivados,
+      logos,
+    });
+  }
+
   /**
    * Gera PDF nativamente com pdfmake, sem dependências externas (Playwright/html-to-pdfmake)
    */

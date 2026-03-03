@@ -29,6 +29,10 @@ export enum TipoSolicitacao {
 export enum UserRole {
   ADMIN = "admin",
   COORDENADOR = "coordenador",
+  /**
+   * Papel legado em transição.
+   * O frontend deve tratá-lo como compatibilidade temporária, não como papel ativo.
+   */
   NUGECID_OPERATOR = "nugecid_operator",
   USUARIO = "usuario",
 }
@@ -187,6 +191,7 @@ export interface QueryDesarquivamentoDto {
   instituto?: string;
   requerente?: string;
   vencidos?: boolean;
+  atencaoNecessaria?: boolean;
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
   incluirExcluidos?: boolean;
@@ -224,8 +229,6 @@ export interface LoginResponse {
   success: boolean;
   data: {
     user: User;
-    accessToken: string;
-    refreshToken: string;
     expiresIn: string;
   };
   message: string;
@@ -504,6 +507,35 @@ export interface DesarquivamentoAnexo {
   createdAt: string;
   updatedAt?: string;
   usuario?: { id: number; nome: string; usuario: string };
+  ocr?: {
+    status?: string | null;
+    processedAt?: string | null;
+    searchablePdfAvailable?: boolean;
+    textAvailable?: boolean;
+    signedPdfSkipped?: boolean;
+    error?: string | null;
+    analysisUrl?: string | null;
+  };
+}
+
+export interface AnexoOcrAnalysis {
+  anexoId: number;
+  nomeOriginal: string;
+  tipoMime: string;
+  ocrStatus: string | null;
+  processedAt: string | null;
+  error: string | null;
+  searchablePdfAvailable: boolean;
+  textAvailable: boolean;
+  rawText: string | null;
+  possibleNames: string[];
+  signatures: Array<{
+    label: string;
+    signerName: string | null;
+    matchedLine: string;
+    context: string[];
+    confidence: "high" | "medium" | "low";
+  }>;
 }
 
 // Security Types
@@ -580,6 +612,8 @@ export interface NotificationPreferences {
   id: number;
   userId: number;
   inAppEnabled: boolean;
+  desktopEnabled: boolean;
+  pushEnabled: boolean;
   soundEnabled: boolean;
   enabledTypes: Record<string, boolean>;
   createdAt: string;

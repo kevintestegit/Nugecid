@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -8,6 +8,9 @@
 .toast-custom {
   @apply border border-border/50 shadow-lg rounded-lg;
   @apply transition-all duration-300 ease-in-out;
+  background-color: hsl(var(--popover) / 0.96);
+  color: hsl(var(--popover-foreground));
+  backdrop-filter: blur(14px);
 }
 
 .toast-custom[data-type="warning"] {
@@ -21,10 +24,12 @@
 
 .toast-title {
   @apply font-semibold text-foreground;
+  color: hsl(var(--foreground));
 }
 
 .toast-description {
   @apply text-muted-foreground;
+  color: hsl(var(--muted-foreground));
 }
 
 .toast-icon {
@@ -83,7 +88,6 @@
 }
 
 @layer base {
-
   html,
   body {
     height: auto;
@@ -97,14 +101,24 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Manrope', sans-serif;
-    transition: background-color 220ms ease, color 220ms ease;
+    font-family: "Manrope", sans-serif;
+    transition:
+      background-color 220ms ease,
+      color 220ms ease;
   }
 
   .dark body {
     background-image:
-      radial-gradient(1100px 580px at -12% -10%, rgba(56, 189, 248, 0.12), transparent 58%),
-      radial-gradient(980px 520px at 120% -20%, rgba(251, 146, 60, 0.10), transparent 56%);
+      radial-gradient(
+        1100px 580px at -12% -10%,
+        rgba(56, 189, 248, 0.12),
+        transparent 58%
+      ),
+      radial-gradient(
+        980px 520px at 120% -20%,
+        rgba(251, 146, 60, 0.1),
+        transparent 56%
+      );
     background-attachment: fixed;
   }
 }
@@ -125,7 +139,6 @@
 
 /* Acessibilidade */
 @layer utilities {
-
   /* Screen reader only - visível apenas para leitores de tela */
   .sr-only {
     position: absolute;
@@ -164,9 +177,19 @@
   }
 
   .dark .toast-custom {
-    background-color: hsl(var(--card) / 0.92);
+    background-color: hsl(var(--card) / 0.94);
     border-color: hsl(var(--border) / 0.9);
-    backdrop-filter: blur(8px);
+    color: hsl(var(--foreground));
+    backdrop-filter: blur(14px);
+    box-shadow: 0 22px 45px -30px rgba(2, 6, 23, 0.9);
+  }
+
+  .dark .toast-custom .toast-title {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .toast-custom .toast-description {
+    color: hsl(var(--muted-foreground));
   }
 
   .dark ::-webkit-scrollbar {

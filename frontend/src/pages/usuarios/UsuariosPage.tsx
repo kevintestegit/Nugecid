@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Users, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useUsers, useUserPermissions } from "@/hooks/useUsers";
 import { UsersQueryParams } from "@/types";
 import UsuarioFilters from "@/components/usuarios/UsuarioFilters";
@@ -17,6 +18,7 @@ const UsuariosPage: React.FC = () => {
   });
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const navigate = useNavigate();
 
   const { canManageUsers, canViewUsers } = useUserPermissions();
   const {
@@ -85,7 +87,7 @@ const UsuariosPage: React.FC = () => {
         title="Erro ao carregar usuários"
         message="Ocorreu um erro ao carregar a lista de usuários. Tente novamente."
         onRetry={() => refetch()}
-        onGoBack={() => window.history.back()}
+        onGoBack={() => navigate("/", { replace: true })}
       />
     );
   }
@@ -141,7 +143,14 @@ const UsuariosPage: React.FC = () => {
           canManageUsers={canManageUsers}
           onPageChange={handlePageChange}
           onDeleteUser={handleDeleteUser}
-          onRefresh={refetch}
+          onRefresh={() => {
+            setQueryParams({
+              page: 1,
+              limit: 10,
+              active: true,
+            });
+            void refetch();
+          }}
         />
       </div>
 

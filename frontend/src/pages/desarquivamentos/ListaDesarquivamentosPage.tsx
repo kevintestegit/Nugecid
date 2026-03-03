@@ -1,3 +1,3 @@
-import DesarquivamentosPage from '@/pages/DesarquivamentosPage'
+import DesarquivamentosPage from "@/pages/DesarquivamentosPage";
 
-export default DesarquivamentosPage
+export default DesarquivamentosPage;

@@ -3,6 +3,7 @@ import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import * as readline from "readline";
 import { join } from "path";
+import { createHmac, timingSafeEqual } from "crypto";
 import { ConfigService } from "@nestjs/config";
 import {
   NotificacoesService,
@@ -16,8 +17,15 @@ import { EscavadorStatus } from "./types";
 import { StartEscavadorDto } from "./dto/start-escavador.dto";
 import { HookEscavadorDto } from "./dto/hook-escavador.dto";
 
+interface EscavadorWebhookHeaders {
+  authorization?: string;
+  signature?: string;
+  timestamp?: string;
+}
+
 @Injectable()
 export class EscavadorSeirnService implements OnModuleDestroy {
+  private static readonly DEFAULT_WEBHOOK_TOLERANCE_SECONDS = 300;
   private readonly logger = new Logger(EscavadorSeirnService.name);
   private child?: ChildProcessWithoutNullStreams;
   private status: EscavadorStatus = { running: false };
@@ -96,12 +104,8 @@ export class EscavadorSeirnService implements OnModuleDestroy {
     return this.status;
   }
 
-  async webhook(data: HookEscavadorDto, tokenFromHeader?: string) {
-    const expected = process.env.ESCAVADOR_WEBHOOK_TOKEN;
-    const provided = tokenFromHeader?.replace(/^Bearer\s+/i, "") || data.token;
-    if (!expected || expected !== provided) {
-      throw new ForbiddenException("Token inválido para webhook do escavador");
-    }
+  async webhook(data: HookEscavadorDto, headers: EscavadorWebhookHeaders = {}) {
+    this.validateWebhookAuth(data, headers);
 
     const usuarioId =
       data.usuarioId ||
@@ -126,6 +130,105 @@ export class EscavadorSeirnService implements OnModuleDestroy {
     this.status.lastChangeAt = new Date();
 
     return { ok: true };
+  }
+
+  private validateWebhookAuth(
+    data: HookEscavadorDto,
+    headers: EscavadorWebhookHeaders,
+  ) {
+    const secret =
+      this.configService.get<string>("ESCAVADOR_WEBHOOK_TOKEN") ||
+      process.env.ESCAVADOR_WEBHOOK_TOKEN;
+
+    if (!secret) {
+      this.logger.error(
+        "ESCAVADOR_WEBHOOK_TOKEN ausente; webhook do escavador não pode ser autenticado",
+      );
+      throw new ForbiddenException("Webhook do escavador não autorizado");
+    }
+
+    const timestamp = headers.timestamp?.trim();
+    const signature = headers.signature?.trim();
+
+    if (timestamp && signature) {
+      this.assertTimestampWithinTolerance(timestamp);
+      const payload = this.buildWebhookCanonicalPayload(data, timestamp);
+      const expectedSignature = createHmac("sha256", secret)
+        .update(payload)
+        .digest("hex");
+
+      if (
+        this.isSafeEqualHex(signature.toLowerCase(), expectedSignature) ===
+        false
+      ) {
+        throw new ForbiddenException("Assinatura inválida para webhook");
+      }
+
+      return;
+    }
+
+    const allowLegacyToken =
+      (this.configService.get<string>("ESCAVADOR_WEBHOOK_ALLOW_LEGACY_TOKEN") ||
+        process.env.ESCAVADOR_WEBHOOK_ALLOW_LEGACY_TOKEN) === "true";
+    const legacyBearer = (
+      headers.authorization?.replace(/^Bearer\s+/i, "") || ""
+    ).trim();
+
+    if (allowLegacyToken && legacyBearer && legacyBearer === secret) {
+      this.logger.warn(
+        "Webhook do escavador usando autenticação legada por Bearer token; migrar para assinatura HMAC",
+      );
+      return;
+    }
+
+    throw new ForbiddenException("Webhook do escavador não autorizado");
+  }
+
+  private assertTimestampWithinTolerance(timestamp: string) {
+    const timestampSeconds = Number(timestamp);
+    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
+      throw new ForbiddenException("Timestamp inválido para webhook");
+    }
+
+    const toleranceSeconds = Number(
+      this.configService.get<string>(
+        "ESCAVADOR_WEBHOOK_TOLERANCE_SECONDS",
+        String(EscavadorSeirnService.DEFAULT_WEBHOOK_TOLERANCE_SECONDS),
+      ) || EscavadorSeirnService.DEFAULT_WEBHOOK_TOLERANCE_SECONDS,
+    );
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (Math.abs(nowSeconds - timestampSeconds) > toleranceSeconds) {
+      throw new ForbiddenException("Webhook fora da janela de validade");
+    }
+  }
+
+  private buildWebhookCanonicalPayload(
+    data: HookEscavadorDto,
+    timestamp: string,
+  ): string {
+    return [
+      "v1",
+      timestamp,
+      data.numero.trim(),
+      data.titulo.trim(),
+      data.link?.trim() || "",
+      data.usuarioId ? String(data.usuarioId) : "",
+    ].join("\n");
+  }
+
+  private isSafeEqualHex(providedHex: string, expectedHex: string): boolean {
+    if (providedHex.length !== expectedHex.length) {
+      return false;
+    }
+
+    try {
+      return timingSafeEqual(
+        Buffer.from(providedHex, "hex"),
+        Buffer.from(expectedHex, "hex"),
+      );
+    } catch {
+      return false;
+    }
   }
 
   private async hydrateLastFromDbIfNeeded() {

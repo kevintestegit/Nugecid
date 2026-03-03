@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X, AlertCircle, AlertTriangle, Info, Megaphone } from "lucide-react";
 import { apiService } from "@/services/api";
@@ -122,7 +124,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+              <div className="p-3 bg-background/20 rounded-xl backdrop-blur-sm">
                 <Icon className="h-6 w-6" />
               </div>
               <div>
@@ -138,7 +140,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              className="p-2 hover:bg-background/20 rounded-lg transition-colors"
               title="Fechar"
             >
               <X className="h-5 w-5" />
@@ -234,5 +236,10 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
   );
 
   // Renderizar usando Portal para garantir que o modal fique acima de tudo
-  return createPortal(modalContent, document.body);
+  return createPortal(
+    <div className={theme === "dark" ? "dark" : ""}>
+      modalContent
+    </div>,
+    document.body
+  );
 };

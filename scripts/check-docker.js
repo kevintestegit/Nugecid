@@ -1,84 +1,106 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 /**
- * Script de Verificação do Docker (modo enxuto)
- * Exibe apenas informações essenciais.
+ * Verifica dependências Docker necessárias para desenvolvimento local.
+ * O fluxo local depende apenas de db + redis; frontend/backend containerizados
+ * e serviços por profile não são pré-requisitos do `npm run dev`.
  */
 
-const { exec } = require('child_process');
-const util = require('util');
-const execAsync = util.promisify(exec);
+const { exec } = require("child_process");
+const util = require("util");
 
-// Função para log simples
+const execAsync = util.promisify(exec);
+const REQUIRED_SERVICES = ["db", "redis"];
+
 function log(message) {
   console.log(message);
 }
 
 async function findDockerCommand() {
   const possiblePaths = [
-    'docker',
-    '/usr/bin/docker',
-    '/usr/local/bin/docker',
-    '/snap/bin/docker',
-    '/home/linuxbrew/.linuxbrew/bin/docker',
+    "docker",
+    "/usr/bin/docker",
+    "/usr/local/bin/docker",
+    "/snap/bin/docker",
+    "/home/linuxbrew/.linuxbrew/bin/docker",
   ];
-  
-  for (const path of possiblePaths) {
+
+  for (const commandPath of possiblePaths) {
     try {
-      await execAsync(`${path} --version`);
-      return path;
+      await execAsync(`${commandPath} --version`);
+      return commandPath;
     } catch {
       continue;
     }
   }
+
   return null;
+}
+
+function getDockerCmd() {
+  return global.DOCKER_CMD || "docker";
+}
+
+function getComposeCmd() {
+  return `${getDockerCmd()} compose`;
 }
 
 async function checkDockerInstalled() {
   const dockerCmd = await findDockerCommand();
-  if (dockerCmd) {
-    global.DOCKER_CMD = dockerCmd;
-    return true;
+  if (!dockerCmd) {
+    log("Erro: Docker não instalado ou fora do PATH.");
+    return false;
   }
-  log('Erro: Docker não instalado ou fora do PATH.');
-  return false;
+
+  global.DOCKER_CMD = dockerCmd;
+  return true;
 }
 
 async function checkDockerRunning() {
   try {
-    const cmd = global.DOCKER_CMD || 'docker';
-    await execAsync(`${cmd} info`);
+    await execAsync(`${getDockerCmd()} info`);
     return true;
   } catch {
-    log('Erro: Docker não está rodando.');
+    log("Erro: Docker não está rodando.");
     return false;
   }
 }
 
+async function listRunningServices() {
+  const { stdout } = await execAsync(
+    `${getComposeCmd()} ps --services --filter "status=running"`,
+  );
+  return stdout
+    .trim()
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 async function checkContainersRunning() {
   try {
-    const cmd = global.DOCKER_CMD || 'docker';
-    const composeCmd = `${cmd} compose`;
-    const { stdout } = await execAsync(`${composeCmd} ps --services --filter "status=running"`);
-    const runningServices = stdout.trim().split('\n').filter(Boolean);
-    const requiredServices = ['postgres', 'redis', 'pgadmin'];
-    const missingServices = requiredServices.filter(s => !runningServices.includes(s));
+    const runningServices = await listRunningServices();
+    const missingServices = REQUIRED_SERVICES.filter(
+      (service) => !runningServices.includes(service),
+    );
+
     if (missingServices.length === 0) {
       return true;
-    } else {
-      log(`Aviso: Serviços ausentes: ${missingServices.join(', ')}`);
-      return false;
     }
+
+    log(`Aviso: Serviços ausentes: ${missingServices.join(", ")}`);
+    return false;
   } catch {
-    log('Erro ao verificar containers Docker.');
+    log("Erro ao verificar containers Docker.");
     return false;
   }
 }
 
 async function checkPostgresConnection() {
   try {
-    const cmd = global.DOCKER_CMD || 'docker';
-    const composeCmd = `${cmd} compose`;
-    const { stdout } = await execAsync(`${composeCmd} exec -T postgres pg_isready -U postgres -d sgc_itep`);
-    return stdout.includes('accepting connections');
+    const { stdout } = await execAsync(
+      `${getComposeCmd()} exec -T db sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'`,
+    );
+    return stdout.includes("accepting connections");
   } catch {
     return false;
   }
@@ -86,30 +108,38 @@ async function checkPostgresConnection() {
 
 async function checkRedisConnection() {
   try {
-    const cmd = global.DOCKER_CMD || 'docker';
-    const composeCmd = `${cmd} compose`;
-    const { stdout } = await execAsync(`${composeCmd} exec -T redis redis-cli ping`);
-    return stdout.trim() === 'PONG';
+    const { stdout } = await execAsync(
+      `${getComposeCmd()} exec -T redis sh -lc 'if [ -n "$REDIS_PASSWORD" ]; then redis-cli -a "$REDIS_PASSWORD" ping; else redis-cli ping; fi'`,
+    );
+    return stdout.trim().endsWith("PONG");
   } catch {
     return false;
   }
 }
 
-async function checkDockerServices() {
-  log('Iniciando verificação de dependências...');
+async function ensureRequiredServices() {
+  await execAsync(`${getComposeCmd()} up -d ${REQUIRED_SERVICES.join(" ")}`);
+}
 
-  if (!(await checkDockerInstalled())) process.exit(1);
-  if (!(await checkDockerRunning())) process.exit(1);
+async function checkDockerServices() {
+  log("Iniciando verificação de dependências...");
+
+  if (!(await checkDockerInstalled())) {
+    process.exit(1);
+  }
+
+  if (!(await checkDockerRunning())) {
+    process.exit(1);
+  }
 
   const containersOK = await checkContainersRunning();
   if (!containersOK) {
-    log('Subindo serviços Docker necessários...');
+    log("Subindo serviços Docker necessários...");
+
     try {
-      const cmd = global.DOCKER_CMD || 'docker';
-      const composeCmd = `${cmd} compose`;
-      await execAsync(`${composeCmd} up -d`);
-    } catch (e) {
-      log('Falha ao subir serviços Docker.');
+      await ensureRequiredServices();
+    } catch {
+      log("Falha ao subir serviços Docker.");
       process.exit(1);
     }
   }
@@ -118,15 +148,20 @@ async function checkDockerServices() {
   const redisOK = await checkRedisConnection();
 
   if (pgOK && redisOK) {
-    log('Dependências OK.');
-  } else {
-    log(`Aviso: PostgreSQL: ${pgOK ? 'OK' : 'NOK'} | Redis: ${redisOK ? 'OK' : 'NOK'}`);
+    log("Dependências OK.");
+    return;
   }
+
+  log(
+    `Aviso: PostgreSQL: ${pgOK ? "OK" : "NOK"} | Redis: ${
+      redisOK ? "OK" : "NOK"
+    }`,
+  );
 }
 
 if (require.main === module) {
   checkDockerServices().catch(() => {
-    log('Erro inesperado na verificação de dependências.');
+    log("Erro inesperado na verificação de dependências.");
     process.exit(1);
   });
 }
@@ -138,5 +173,7 @@ module.exports = {
   checkContainersRunning,
   checkPostgresConnection,
   checkRedisConnection,
+  ensureRequiredServices,
   findDockerCommand,
+  listRunningServices,
 };

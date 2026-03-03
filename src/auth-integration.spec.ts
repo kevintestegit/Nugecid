@@ -1,8 +1,12 @@
 import { INestApplication } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
 import * as request from "supertest";
 
-import { AuthController } from "./modules/auth/auth.controller";
+import {
+  AuthController,
+  AuthV2Controller,
+} from "./modules/auth/auth.controller";
 import { AuthService } from "./modules/auth/auth.service";
 
 describe("Auth Integration Tests", () => {
@@ -14,8 +18,21 @@ describe("Auth Integration Tests", () => {
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: mockAuthService }],
+      controllers: [AuthController, AuthV2Controller],
+      providers: [
+        { provide: AuthService, useValue: mockAuthService },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string, fallback?: unknown) => {
+              if (key === "auth.session.secure") {
+                return false;
+              }
+              return fallback;
+            }),
+          },
+        },
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
@@ -48,8 +65,18 @@ describe("Auth Integration Tests", () => {
     expect(response.body).toEqual(
       expect.objectContaining({
         success: true,
-        data: expect.objectContaining({ accessToken: "token" }),
+        data: expect.objectContaining({
+          accessToken: "token",
+          expiresIn: "50m",
+        }),
       }),
+    );
+    expect(response.body.data).not.toHaveProperty("refreshToken");
+    expect(response.headers["set-cookie"]).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("access_token=token"),
+        expect.stringContaining("refresh_token=refresh"),
+      ]),
     );
   });
 
@@ -67,7 +94,7 @@ describe("Auth Integration Tests", () => {
     );
   });
 
-  it("POST /auth/api/v2/auth/login deve retornar token v2", async () => {
+  it("POST /v2/auth/login deve retornar token v2", async () => {
     mockAuthService.loginV2.mockResolvedValue({
       user: { userId: 1, usuario: "admin", role: "admin" },
       accessToken: "token-v2",
@@ -75,7 +102,7 @@ describe("Auth Integration Tests", () => {
     });
 
     const response = await request(app.getHttpServer())
-      .post("/auth/api/v2/auth/login")
+      .post("/v2/auth/login")
       .send({ usuario: "admin", senha: "123456" })
       .expect(200);
 

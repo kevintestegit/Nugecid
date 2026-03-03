@@ -1,23 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/Button';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/DropdownMenu';
+} from "@/components/ui/DropdownMenu";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { NovaPastaModal } from '@/components/arquivos/NovaPastaModal';
-import { EditarPastaModal } from '@/components/arquivos/EditarPastaModal';
+} from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { NovaPastaModal } from "@/components/arquivos/NovaPastaModal";
+import { EditarPastaModal } from "@/components/arquivos/EditarPastaModal";
 
 import {
   FolderOpen,
@@ -38,14 +38,14 @@ import {
   Hash,
   Download,
   Loader2,
-} from 'lucide-react';
-import { SearchInput } from '@/components/ui/SearchInput';
-import { cn } from '@/utils/cn';
-import { usePastas, Pasta, CreatePastaInput } from '@/hooks/usePastas';
-import { usePlanilhasControle } from '@/hooks/usePlanilhasControle';
-import { toast } from 'sonner';
-import { SpreadsheetPreview } from '@/components/ui/SpreadsheetPreview';
-import { EnhancedConfirmDialog } from '@/components/ui/EnhancedConfirmDialog';
+} from "lucide-react";
+import { SearchInput } from "@/components/ui/SearchInput";
+import { cn } from "@/utils/cn";
+import { usePastas, Pasta, CreatePastaInput } from "@/hooks/usePastas";
+import { usePlanilhasControle } from "@/hooks/usePlanilhasControle";
+import { toast } from "sonner";
+import { SpreadsheetPreview } from "@/components/ui/SpreadsheetPreview";
+import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
 
 interface Caixa {
   id: string;
@@ -61,10 +61,10 @@ interface Caixa {
 
 const formatFileSize = (bytes?: number): string => {
   if (!bytes || Number.isNaN(bytes)) {
-    return '0 B';
+    return "0 B";
   }
 
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const units = ["B", "KB", "MB", "GB", "TB"];
   const exponent = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
     units.length - 1,
@@ -78,30 +78,33 @@ const formatFileSize = (bytes?: number): string => {
 
 const formatDate = (value?: string): string => {
   if (!value) {
-    return 'Data desconhecida';
+    return "Data desconhecida";
   }
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return 'Data desconhecida';
+    return "Data desconhecida";
   }
 
-  return parsed.toLocaleDateString('pt-BR');
+  return parsed.toLocaleDateString("pt-BR");
 };
 
 const ArquivoPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { checkPermission } = useAuth();
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('todos');
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("todos");
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pastas' | 'planilhas' | 'caixas'>(
-    'pastas',
+  const [activeTab, setActiveTab] = useState<"pastas" | "planilhas" | "caixas">(
+    "pastas",
   );
   const [deletePastaId, setDeletePastaId] = useState<string | null>(null);
-  const [deletePlanilhaItem, setDeletePlanilhaItem] = useState<{ id: string; nome: string } | null>(null);
+  const [deletePlanilhaItem, setDeletePlanilhaItem] = useState<{
+    id: string;
+    nome: string;
+  } | null>(null);
   const [pendingPlanilhaId, setPendingPlanilhaId] = useState<string | null>(
     null,
   );
@@ -109,15 +112,15 @@ const ArquivoPage: React.FC = () => {
     string | null
   >(null);
   const canManageArquivos =
-    checkPermission('create', 'arquivos') ||
-    checkPermission('update', 'arquivos') ||
-    checkPermission('delete', 'arquivos');
+    checkPermission("create", "arquivos") ||
+    checkPermission("update", "arquivos") ||
+    checkPermission("delete", "arquivos");
 
   const ensureManagePermission = () => {
     if (canManageArquivos) {
       return true;
     }
-    toast.error('Você não tem permissão para alterar arquivos ou planilhas.');
+    toast.error("Você não tem permissão para alterar arquivos ou planilhas.");
     return false;
   };
 
@@ -151,24 +154,30 @@ const ArquivoPage: React.FC = () => {
   const [caixas] = useState<Caixa[]>([]);
 
   const totalPastas = safePastas.length;
-  const totalImagens = useMemo(() => safePastas.reduce((acc, pasta) => acc + pasta.imagens, 0), [safePastas]);
-  const totalPlanilhas = useMemo(() => safePastas.reduce((acc, pasta) => acc + pasta.planilhas, 0), [safePastas]);
+  const totalImagens = useMemo(
+    () => safePastas.reduce((acc, pasta) => acc + pasta.imagens, 0),
+    [safePastas],
+  );
+  const totalPlanilhas = useMemo(
+    () => safePastas.reduce((acc, pasta) => acc + pasta.planilhas, 0),
+    [safePastas],
+  );
   const [editingPasta, setEditingPasta] = useState<Pasta | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const planilhasControleIds = useMemo(
-    () => new Set(planilhasControle.map(planilha => planilha.id)),
+    () => new Set(planilhasControle.map((planilha) => planilha.id)),
     [planilhasControle],
   );
 
   useEffect(() => {
-    const tabFromUrl = searchParams.get('tab');
-    const queryFromUrl = searchParams.get('q');
-    const planilhaIdFromUrl = searchParams.get('planilhaId');
+    const tabFromUrl = searchParams.get("tab");
+    const queryFromUrl = searchParams.get("q");
+    const planilhaIdFromUrl = searchParams.get("planilhaId");
 
     if (
-      tabFromUrl === 'pastas' ||
-      tabFromUrl === 'planilhas' ||
-      tabFromUrl === 'caixas'
+      tabFromUrl === "pastas" ||
+      tabFromUrl === "planilhas" ||
+      tabFromUrl === "caixas"
     ) {
       setActiveTab(tabFromUrl);
     }
@@ -185,8 +194,8 @@ const ArquivoPage: React.FC = () => {
   useEffect(() => {
     if (
       !pendingPlanilhaId ||
-      activeTab !== 'planilhas' ||
-      !planilhasControle.some(planilha => planilha.id === pendingPlanilhaId)
+      activeTab !== "planilhas" ||
+      !planilhasControle.some((planilha) => planilha.id === pendingPlanilhaId)
     ) {
       return;
     }
@@ -195,12 +204,14 @@ const ArquivoPage: React.FC = () => {
     setPendingPlanilhaId(null);
 
     const params = new URLSearchParams(searchParams);
-    params.delete('planilhaId');
+    params.delete("planilhaId");
     setSearchParams(params, { replace: true });
 
     const timeout = window.setTimeout(() => {
-      const target = document.getElementById(`planilha-card-${pendingPlanilhaId}`);
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const target = document.getElementById(
+        `planilha-card-${pendingPlanilhaId}`,
+      );
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
       setHighlightedPlanilhaId(null);
     }, 120);
 
@@ -226,13 +237,14 @@ const ArquivoPage: React.FC = () => {
     if (!planilhaGeral.grupos?.length) {
       return [
         {
-          id: 'planilha-geral',
-          titulo: planilhaGeral.linhas[0]?.Planilha || 'Planilha Consolidada',
+          id: "planilha-geral",
+          titulo: planilhaGeral.linhas[0]?.Planilha || "Planilha Consolidada",
           subtitulo: `${planilhaGeral.totalItens} item(s)`,
           planilhaId:
             planilhaGeral.grupos?.[0]?.planilhas?.[0]?.planilhaId ||
             planilhaGeral.linhas[0]?.planilhaId,
-          sheetName: planilhaGeral.grupos?.[0]?.planilhas?.[0]?.sheetName ?? 'Principal',
+          sheetName:
+            planilhaGeral.grupos?.[0]?.planilhas?.[0]?.sheetName ?? "Principal",
           linhas: planilhaGeral.linhas,
           colunas: colunasBase,
           pastaNome: planilhaGeral.linhas[0]?.Pasta || undefined,
@@ -251,11 +263,15 @@ const ArquivoPage: React.FC = () => {
       pastaNome?: string;
     }> = [];
 
-    planilhaGeral.grupos.forEach(grupo => {
-      grupo.planilhas.forEach(planilha => {
-        const linhasFiltradas = planilhaGeral.linhas.filter(linha => {
-          const linhaPasta = linha['Pasta'] ?? linha['Prateleira/NºTOMBO'] ?? linha['Prateleira'] ?? '';
-          const linhaPlanilha = linha['Planilha'] ?? '';
+    planilhaGeral.grupos.forEach((grupo) => {
+      grupo.planilhas.forEach((planilha) => {
+        const linhasFiltradas = planilhaGeral.linhas.filter((linha) => {
+          const linhaPasta =
+            linha["Pasta"] ??
+            linha["Prateleira/NºTOMBO"] ??
+            linha["Prateleira"] ??
+            "";
+          const linhaPlanilha = linha["Planilha"] ?? "";
           const pastaMatches =
             !grupo.pastaNome ||
             linhaPasta === grupo.pastaNome ||
@@ -270,13 +286,15 @@ const ArquivoPage: React.FC = () => {
 
         sections.push({
           id: `${grupo.pastaId}-${planilha.planilhaId}`,
-          titulo: planilha.planilhaNome || grupo.pastaNome || 'Planilha',
-          subtitulo: `Aba: ${planilha.sheetName || 'Principal'} (${planilha.totalItens} ${
-            planilha.totalItens === 1 ? 'item' : 'itens'
+          titulo: planilha.planilhaNome || grupo.pastaNome || "Planilha",
+          subtitulo: `Aba: ${planilha.sheetName || "Principal"} (${planilha.totalItens} ${
+            planilha.totalItens === 1 ? "item" : "itens"
           })`,
           planilhaId: planilha.planilhaId,
           sheetName: planilha.sheetName,
-          linhas: linhasFiltradas.length ? linhasFiltradas : planilhaGeral.linhas,
+          linhas: linhasFiltradas.length
+            ? linhasFiltradas
+            : planilhaGeral.linhas,
           colunas: colunasBase,
           pastaNome: grupo.pastaNome,
         });
@@ -292,19 +310,23 @@ const ArquivoPage: React.FC = () => {
     setShowUploadModal(false);
   };
 
-  const handleUpdatePasta = async (values: { nome: string; descricao: string; tags: string[] }) => {
+  const handleUpdatePasta = async (values: {
+    nome: string;
+    descricao: string;
+    tags: string[];
+  }) => {
     if (!editingPasta || !ensureManagePermission()) return;
     try {
       await updatePasta({
         id: editingPasta.id,
         ...values,
       });
-      toast.success('Pasta atualizada com sucesso!');
+      toast.success("Pasta atualizada com sucesso!");
       setShowEditModal(false);
       setEditingPasta(null);
     } catch (err) {
       console.error(err);
-      toast.error('Não foi possível atualizar a pasta.');
+      toast.error("Não foi possível atualizar a pasta.");
     }
   };
 
@@ -318,10 +340,10 @@ const ArquivoPage: React.FC = () => {
 
     try {
       await deletePasta(deletePastaId);
-      toast.success('Pasta excluída com sucesso!');
+      toast.success("Pasta excluída com sucesso!");
     } catch (err) {
       console.error(err);
-      toast.error('Não foi possível excluir a pasta.');
+      toast.error("Não foi possível excluir a pasta.");
     } finally {
       setDeletePastaId(null);
     }
@@ -340,18 +362,18 @@ const ArquivoPage: React.FC = () => {
       return;
     }
     if (!ensureManagePermission()) {
-      event.target.value = '';
+      event.target.value = "";
       return;
     }
 
     try {
       await uploadPlanilha(file);
-      toast.success('Planilha adicionada com sucesso!');
+      toast.success("Planilha adicionada com sucesso!");
     } catch (err) {
       console.error(err);
-      toast.error('Nao foi possivel enviar a planilha.');
+      toast.error("Nao foi possivel enviar a planilha.");
     } finally {
-      event.target.value = '';
+      event.target.value = "";
     }
   };
 
@@ -365,10 +387,10 @@ const ArquivoPage: React.FC = () => {
 
     try {
       await deletePlanilha(deletePlanilhaItem.id);
-      toast.success('Planilha removida com sucesso!');
+      toast.success("Planilha removida com sucesso!");
     } catch (err) {
       console.error(err);
-      toast.error('Não foi possível remover a planilha.');
+      toast.error("Não foi possível remover a planilha.");
     } finally {
       setDeletePlanilhaItem(null);
     }
@@ -381,9 +403,9 @@ const ArquivoPage: React.FC = () => {
       return safePastas;
     }
 
-    return safePastas.filter(pasta => {
+    return safePastas.filter((pasta) => {
       const nomeMatch = pasta.nome.toLowerCase().includes(normalizedSearchTerm);
-      const tagMatch = pasta.tags.some(tag =>
+      const tagMatch = pasta.tags.some((tag) =>
         tag.toLowerCase().includes(normalizedSearchTerm),
       );
       return nomeMatch || tagMatch;
@@ -395,10 +417,11 @@ const ArquivoPage: React.FC = () => {
       return caixas;
     }
 
-    return caixas.filter(caixa =>
-      caixa.numero.toLowerCase().includes(normalizedSearchTerm) ||
-      caixa.conteudo.toLowerCase().includes(normalizedSearchTerm) ||
-      caixa.localizacao.toLowerCase().includes(normalizedSearchTerm),
+    return caixas.filter(
+      (caixa) =>
+        caixa.numero.toLowerCase().includes(normalizedSearchTerm) ||
+        caixa.conteudo.toLowerCase().includes(normalizedSearchTerm) ||
+        caixa.localizacao.toLowerCase().includes(normalizedSearchTerm),
     );
   }, [caixas, normalizedSearchTerm]);
 
@@ -436,7 +459,7 @@ const ArquivoPage: React.FC = () => {
               title={
                 canManageArquivos
                   ? undefined
-                  : 'Apenas administradores ou coordenadores podem criar pastas'
+                  : "Apenas administradores ou coordenadores podem criar pastas"
               }
               className="flex items-center gap-2 text-sm bg-primary/90"
             >
@@ -445,20 +468,23 @@ const ArquivoPage: React.FC = () => {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 text-sm border-border/60 bg-background/70 backdrop-blur">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 text-sm border-border/60 bg-background/70 backdrop-blur"
+                >
                   <Filter className="h-4 w-4" />
                   Filtros
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSelectedFilter('todos')}>
+                <DropdownMenuItem onClick={() => setSelectedFilter("todos")}>
                   Todas as pastas
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedFilter('recentes')}>
+                <DropdownMenuItem onClick={() => setSelectedFilter("recentes")}>
                   Recentes
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setSelectedFilter('destacadas')}
+                  onClick={() => setSelectedFilter("destacadas")}
                 >
                   Destacadas
                 </DropdownMenuItem>
@@ -507,47 +533,62 @@ const ArquivoPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button
-            variant={activeTab === 'pastas' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('pastas')}
-            className={cn(activeTab === 'pastas' ? 'bg-primary/90' : 'border-border/60 bg-background/70 backdrop-blur', 'text-[11px] font-semibold uppercase tracking-[0.08em]')}
+            variant={activeTab === "pastas" ? "default" : "outline"}
+            onClick={() => setActiveTab("pastas")}
+            className={cn(
+              activeTab === "pastas"
+                ? "bg-primary/90"
+                : "border-border/60 bg-background/70 backdrop-blur",
+              "text-[11px] font-semibold uppercase tracking-[0.08em]",
+            )}
           >
             Pastas
           </Button>
           <Button
-            variant={activeTab === 'planilhas' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('planilhas')}
-            className={cn(activeTab === 'planilhas' ? 'bg-primary/90' : 'border-border/60 bg-background/70 backdrop-blur', 'text-[11px] font-semibold uppercase tracking-[0.08em]')}
+            variant={activeTab === "planilhas" ? "default" : "outline"}
+            onClick={() => setActiveTab("planilhas")}
+            className={cn(
+              activeTab === "planilhas"
+                ? "bg-primary/90"
+                : "border-border/60 bg-background/70 backdrop-blur",
+              "text-[11px] font-semibold uppercase tracking-[0.08em]",
+            )}
           >
             Planilhas
           </Button>
           <Button
-            variant={activeTab === 'caixas' ? 'default' : 'outline'}
-            onClick={() => setActiveTab('caixas')}
-            className={cn(activeTab === 'caixas' ? 'bg-primary/90' : 'border-border/60 bg-background/70 backdrop-blur', 'text-[11px] font-semibold uppercase tracking-[0.08em]')}
+            variant={activeTab === "caixas" ? "default" : "outline"}
+            onClick={() => setActiveTab("caixas")}
+            className={cn(
+              activeTab === "caixas"
+                ? "bg-primary/90"
+                : "border-border/60 bg-background/70 backdrop-blur",
+              "text-[11px] font-semibold uppercase tracking-[0.08em]",
+            )}
           >
             Caixas Documentais
           </Button>
         </div>
         <div className="flex items-center gap-3">
           <SearchInput
-          value={searchTerm}
-          onChange={event => setSearchTerm(event.target.value)}
-          placeholder="Realizar uma busca"
-        />
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Realizar uma busca"
+          />
           <div className="flex rounded-md border border-border overflow-hidden">
             <Button
               type="button"
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              variant={viewMode === "grid" ? "default" : "ghost"}
               size="icon"
-              onClick={() => setViewMode('grid')}
+              onClick={() => setViewMode("grid")}
             >
               <Grid3X3 className="h-4 w-4" />
             </Button>
             <Button
               type="button"
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              variant={viewMode === "list" ? "default" : "ghost"}
               size="icon"
-              onClick={() => setViewMode('list')}
+              onClick={() => setViewMode("list")}
             >
               <List className="h-4 w-4" />
             </Button>
@@ -555,27 +596,26 @@ const ArquivoPage: React.FC = () => {
         </div>
       </div>
 
-
-      {activeTab === 'pastas' && (
+      {activeTab === "pastas" && (
         <>
           {isLoading && <p>Carregando pastas...</p>}
           {error && <p>Erro ao carregar pastas.</p>}
           <div
             className={cn(
-              'grid gap-6',
-              viewMode === 'grid'
-                ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
-                : 'grid-cols-1',
+              "grid gap-6",
+              viewMode === "grid"
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+                : "grid-cols-1",
             )}
           >
-            {filteredPastas.map(pasta => (
+            {filteredPastas.map((pasta) => (
               <Card
                 key={pasta.id}
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate(`/arquivo/${pasta.id}`)}
-                onKeyDown={event => {
-                  if (event.key === 'Enter' || event.key === ' ') {
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     navigate(`/arquivo/${pasta.id}`);
                   }
@@ -596,7 +636,7 @@ const ArquivoPage: React.FC = () => {
                       <DropdownMenu>
                         <DropdownMenuTrigger
                           asChild
-                          onClick={event => event.stopPropagation()}
+                          onClick={(event) => event.stopPropagation()}
                         >
                           <Button variant="ghost" size="icon">
                             <MoreVertical className="h-4 w-4" />
@@ -604,10 +644,10 @@ const ArquivoPage: React.FC = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="end"
-                          onClick={event => event.stopPropagation()}
+                          onClick={(event) => event.stopPropagation()}
                         >
                           <DropdownMenuItem
-                            onClick={event => {
+                            onClick={(event) => {
                               event.stopPropagation();
                               setEditingPasta(pasta);
                               setShowEditModal(true);
@@ -617,7 +657,7 @@ const ArquivoPage: React.FC = () => {
                             <span>Editar</span>
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={event => {
+                            onClick={(event) => {
                               event.stopPropagation();
                               handleDelete(pasta.id);
                             }}
@@ -632,8 +672,8 @@ const ArquivoPage: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    Criada em{' '}
-                    {new Date(pasta.dataCriacao).toLocaleDateString('pt-BR')}
+                    Criada em{" "}
+                    {new Date(pasta.dataCriacao).toLocaleDateString("pt-BR")}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
@@ -641,19 +681,23 @@ const ArquivoPage: React.FC = () => {
                     <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
                       <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-emerald-600 text-xs">
                         <Image className="h-4 w-4" />
-                        {pasta.imagens}{' '}
-                        {pasta.imagens === 1 ? 'imagem' : 'imagens'}
+                        {pasta.imagens}{" "}
+                        {pasta.imagens === 1 ? "imagem" : "imagens"}
                       </span>
                       <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-600 text-xs">
                         <FileSpreadsheet className="h-4 w-4" />
-                        {pasta.planilhas}{' '}
-                        {pasta.planilhas === 1 ? 'planilha' : 'planilhas'}
+                        {pasta.planilhas}{" "}
+                        {pasta.planilhas === 1 ? "planilha" : "planilhas"}
                       </span>
                     </div>
                     {pasta.tags.length ? (
                       <div className="flex flex-wrap gap-1.5">
-                        {pasta.tags.map(tag => (
-                          <Badge key={tag} variant="secondary" className="text-[11px] px-2 py-1 flex items-center gap-1">
+                        {pasta.tags.map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="secondary"
+                            className="text-[11px] px-2 py-1 flex items-center gap-1"
+                          >
                             <Tag className="h-3 w-3" />
                             {tag}
                           </Badge>
@@ -661,7 +705,8 @@ const ArquivoPage: React.FC = () => {
                       </div>
                     ) : null}
                     <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground">
-                      Clique para visualizar os anexos, adicionar novas imagens e consultar os itens desta prateleira.
+                      Clique para visualizar os anexos, adicionar novas imagens
+                      e consultar os itens desta prateleira.
                     </div>
                     <Button
                       variant="outline"
@@ -678,7 +723,7 @@ const ArquivoPage: React.FC = () => {
         </>
       )}
 
-      {activeTab === 'caixas' && (
+      {activeTab === "caixas" && (
         <Card>
           <CardHeader>
             <CardTitle>Registro de Caixas Documentais</CardTitle>
@@ -713,7 +758,7 @@ const ArquivoPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCaixas.map(caixa => (
+                  {filteredCaixas.map((caixa) => (
                     <tr
                       key={caixa.id}
                       className="border-b border-border hover:bg-muted/50"
@@ -734,7 +779,7 @@ const ArquivoPage: React.FC = () => {
                       <td className="py-3 px-4">{caixa.responsavel}</td>
                       <td className="py-3 px-4">
                         {new Date(caixa.dataArquivamento).toLocaleDateString(
-                          'pt-BR',
+                          "pt-BR",
                         )}
                       </td>
                       <td className="py-3 px-4">
@@ -751,7 +796,7 @@ const ArquivoPage: React.FC = () => {
         </Card>
       )}
 
-      {activeTab === 'planilhas' && (
+      {activeTab === "planilhas" && (
         <div className="space-y-6">
           <Card className="border-dashed border-2 hover:border-primary/50 transition-colors">
             <CardContent className="flex flex-col items-center justify-center py-12">
@@ -768,7 +813,7 @@ const ArquivoPage: React.FC = () => {
                 title={
                   canManageArquivos
                     ? undefined
-                    : 'Apenas administradores ou coordenadores podem enviar planilhas'
+                    : "Apenas administradores ou coordenadores podem enviar planilhas"
                 }
                 className="px-6"
               >
@@ -787,7 +832,7 @@ const ArquivoPage: React.FC = () => {
               <input
                 ref={planilhaInputRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.csv"
                 className="hidden"
                 onChange={handleUploadPlanilhaChange}
               />
@@ -800,7 +845,8 @@ const ArquivoPage: React.FC = () => {
                 Planilha Geral Consolidada
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground">
-                Visualize em uma única visão todos os itens catalogados nas planilhas das pastas.
+                Visualize em uma única visão todos os itens catalogados nas
+                planilhas das pastas.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -853,14 +899,14 @@ const ArquivoPage: React.FC = () => {
 
                   {planilhaGeral.grupos.length ? (
                     <div className="flex flex-wrap gap-2">
-                      {planilhaGeral.grupos.map(grupo => (
+                      {planilhaGeral.grupos.map((grupo) => (
                         <Badge
                           key={grupo.pastaId}
                           variant="secondary"
                           className="text-[11px] font-medium"
                         >
-                          {grupo.pastaNome || 'Pasta'} - {grupo.totalItens}{' '}
-                          {grupo.totalItens === 1 ? 'item' : 'itens'}
+                          {grupo.pastaNome || "Pasta"} - {grupo.totalItens}{" "}
+                          {grupo.totalItens === 1 ? "item" : "itens"}
                         </Badge>
                       ))}
                     </div>
@@ -868,7 +914,7 @@ const ArquivoPage: React.FC = () => {
 
                   {planilhaGeralSections.length ? (
                     <div className="space-y-5">
-                      {planilhaGeralSections.map(section => (
+                      {planilhaGeralSections.map((section) => (
                         <div
                           key={section.id}
                           className="rounded-xl border border-border/60 bg-background/80 p-5"
@@ -881,7 +927,9 @@ const ArquivoPage: React.FC = () => {
                               </h4>
                               <p className="text-xs text-muted-foreground">
                                 {section.subtitulo}
-                                {section.pastaNome ? ` • ${section.pastaNome}` : ''}
+                                {section.pastaNome
+                                  ? ` • ${section.pastaNome}`
+                                  : ""}
                               </p>
                             </div>
                             <Button
@@ -891,8 +939,8 @@ const ArquivoPage: React.FC = () => {
                                 if (section.planilhaId) {
                                   window.open(
                                     `/api/planilhas/${section.planilhaId}/download`,
-                                    '_blank',
-                                    'noopener',
+                                    "_blank",
+                                    "noopener",
                                   );
                                 }
                               }}
@@ -950,14 +998,14 @@ const ArquivoPage: React.FC = () => {
             </div>
           ) : planilhasControle.length ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {planilhasControle.map(planilha => (
+              {planilhasControle.map((planilha) => (
                 <Card
                   key={planilha.id}
                   id={`planilha-card-${planilha.id}`}
                   className={cn(
-                    'border border-border/60 bg-muted/10 transition-colors hover:border-primary/60',
+                    "border border-border/60 bg-muted/10 transition-colors hover:border-primary/60",
                     highlightedPlanilhaId === planilha.id &&
-                      'border-primary/60 bg-primary/5 ring-1 ring-primary/30',
+                      "border-primary/60 bg-primary/5 ring-1 ring-primary/30",
                   )}
                 >
                   <CardContent className="p-5 space-y-4">
@@ -966,12 +1014,12 @@ const ArquivoPage: React.FC = () => {
                         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                           <FileSpreadsheet className="h-4 w-4 text-primary" />
                           <span className="break-all">
-                            {planilha.nomeOriginal || 'Planilha'}
+                            {planilha.nomeOriginal || "Planilha"}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {formatDate(planilha.dataUpload)}
-                          {' - '}
+                          {" - "}
                           {formatFileSize(planilha.tamanhoBytes)}
                         </p>
                       </div>
@@ -982,7 +1030,7 @@ const ArquivoPage: React.FC = () => {
                           size="icon"
                           onClick={() => {
                             if (planilha.url) {
-                              window.open(planilha.url, '_blank', 'noopener');
+                              window.open(planilha.url, "_blank", "noopener");
                             }
                           }}
                           disabled={!planilha.url}
@@ -998,7 +1046,7 @@ const ArquivoPage: React.FC = () => {
                             onClick={() =>
                               handleDeletePlanilha(
                                 planilha.id,
-                                planilha.nomeOriginal || 'Planilha',
+                                planilha.nomeOriginal || "Planilha",
                               )
                             }
                             disabled={isDeletingPlanilha}
@@ -1049,9 +1097,9 @@ const ArquivoPage: React.FC = () => {
         confirmationType="checkbox"
         checkboxLabel="Sim, desejo excluir esta pasta permanentemente"
         warningList={[
-          'Esta ação não pode ser desfeita',
-          'Todos os arquivos da pasta serão perdidos',
-          'Imagens e planilhas serão removidas'
+          "Esta ação não pode ser desfeita",
+          "Todos os arquivos da pasta serão perdidos",
+          "Imagens e planilhas serão removidas",
         ]}
       />
 
@@ -1065,8 +1113,8 @@ const ArquivoPage: React.FC = () => {
         confirmationType="checkbox"
         checkboxLabel="Sim, desejo remover esta planilha permanentemente"
         warningList={[
-          'Esta ação não pode ser desfeita',
-          'Os dados da planilha serão perdidos'
+          "Esta ação não pode ser desfeita",
+          "Os dados da planilha serão perdidos",
         ]}
       />
     </div>

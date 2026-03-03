@@ -67,7 +67,13 @@ export class EscavadorSeirnController {
   async hook(
     @Body() dto: HookEscavadorDto,
     @Headers("authorization") authorization?: string,
+    @Headers("x-escavador-signature") signature?: string,
+    @Headers("x-escavador-timestamp") timestamp?: string,
   ) {
-    return this.escavadorService.webhook(dto, authorization);
+    return this.escavadorService.webhook(dto, {
+      authorization,
+      signature,
+      timestamp,
+    });
   }
 }

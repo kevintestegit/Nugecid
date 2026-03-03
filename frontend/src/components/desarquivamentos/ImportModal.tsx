@@ -72,16 +72,16 @@ export const ImportModal = ({
               onChange={handleFileChange}
               disabled={isLoading}
             />
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Selecione um arquivo Excel (.xlsx) ou CSV (.csv) com os dados dos
               desarquivamentos.
             </p>
           </div>
 
           {isLoading && (
-            <div className="flex items-center justify-center p-4 bg-blue-50 rounded-lg">
-              <Loader2 className="mr-2 h-8 w-8 animate-spin text-blue-600" />
-              <p className="text-blue-800">
+            <div className="flex items-center justify-center p-4 bg-blue-500/10 rounded-lg">
+              <Loader2 className="mr-2 h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+              <p className="text-blue-800 dark:text-blue-200">
                 Processando planilha, por favor aguarde...
               </p>
             </div>
@@ -119,7 +119,7 @@ export const ImportModal = ({
                     <strong>Sucessos:</strong> {importResult.successCount}
                   </p>
                   {importResult.errorCount > 0 && (
-                    <p className="text-red-600">
+                    <p className="text-red-600 dark:text-red-400">
                       <strong>Falhas:</strong> {importResult.errorCount}
                     </p>
                   )}
@@ -180,17 +180,17 @@ export const ImportModal = ({
                           </Button>
                         </div>
                       </div>
-                      <div className="max-h-60 overflow-y-auto mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                      <div className="max-h-60 overflow-y-auto mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded">
                         <ul className="space-y-2">
                           {importErrors.map((err, index) => (
                             <li
                               key={index}
-                              className="text-sm border-b border-red-100 pb-2 last:border-0"
+                              className="text-sm border-b border-red-500/10 pb-2 last:border-0"
                             >
-                              <div className="font-semibold text-red-700">
+                              <div className="font-semibold text-red-700 dark:text-red-300">
                                 📍 Linha {err.line || err.row}:
                               </div>
-                              <div className="text-red-600 mt-1">
+                              <div className="text-red-600 dark:text-red-400 mt-1">
                                 {err.error ||
                                   (err.details &&
                                   typeof err.details === "object" &&
@@ -205,7 +205,7 @@ export const ImportModal = ({
                           ))}
                         </ul>
                       </div>
-                      <p className="text-sm text-red-600 mt-2 font-semibold">
+                      <p className="text-sm text-red-600 dark:text-red-400 mt-2 font-semibold">
                         ⚠️ Nenhum registro foi importado. Corrija os erros na
                         planilha e tente novamente.
                       </p>

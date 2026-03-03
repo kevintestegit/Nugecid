@@ -14,7 +14,7 @@ import {
 } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { isValidUserIdFormat, parseNumericId } from "../utils/validation";
-import { getStoredUser } from "@/utils/tokenStorage";
+import { normalizeUserRoleName } from "@/lib/auth/roles";
 
 export const QUERY_KEYS = {
   users: ["users"] as const,
@@ -148,10 +148,9 @@ export function useReactivateUser() {
 // Hook personalizado para verificar permissões de usuário
 export function useUserPermissions() {
   const { user: authUser } = useAuth();
-  const localUser = getStoredUser();
-  const currentUser = authUser ?? localUser;
+  const currentUser = authUser;
 
-  const normalizedRole = normalizeUserRole((currentUser as User | null)?.role);
+  const normalizedRole = normalizeUserRoleName(currentUser?.role);
   const canManageUsers = normalizedRole === UserRole.ADMIN;
   const canViewUsers =
     normalizedRole === UserRole.ADMIN ||
@@ -160,36 +159,6 @@ export function useUserPermissions() {
   return {
     canManageUsers,
     canViewUsers,
-    currentUser: currentUser as User | null,
+    currentUser,
   };
-}
-
-function normalizeUserRole(role: unknown): UserRole | undefined {
-  if (!role) return undefined;
-
-  if (typeof role === "string") {
-    const value = role.toLowerCase();
-    if (value === UserRole.ADMIN) return UserRole.ADMIN;
-    if (value === UserRole.COORDENADOR) return UserRole.COORDENADOR;
-    if (value === UserRole.NUGECID_OPERATOR) return UserRole.NUGECID_OPERATOR;
-    if (value === UserRole.USUARIO) return UserRole.USUARIO;
-    return undefined;
-  }
-
-  if (
-    typeof role === "object" &&
-    role !== null &&
-    "name" in (role as Record<string, unknown>)
-  ) {
-    const name = String(
-      (role as Record<string, unknown>).name || "",
-    ).toLowerCase();
-    if (name === UserRole.ADMIN) return UserRole.ADMIN;
-    if (name === UserRole.COORDENADOR) return UserRole.COORDENADOR;
-    if (name === UserRole.NUGECID_OPERATOR) return UserRole.NUGECID_OPERATOR;
-    if (name === UserRole.USUARIO) return UserRole.USUARIO;
-    return undefined;
-  }
-
-  return undefined;
 }

@@ -11,6 +11,8 @@ dist/
 build/
 .vite/
 .cache/
+playwright-report/
+test-results/
 
 # Editor configs
 .vscode/
@@ -33,7 +35,16 @@ coverage/
 !.env.example
 webscraping-service/.env.example
 
+# Backups (contain PII and password hashes)
+backups/
+*.sql.bak
+
 # Uploads / backups
 uploads/
 backups/
+
+# SSL certificates (never commit private keys)
+docker/postgres/certs/*.key
+docker/postgres/certs/*.crt
+docker/postgres/certs/*.pem
 

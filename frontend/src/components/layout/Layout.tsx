@@ -38,17 +38,52 @@ import {
 const SIDEBAR_ANIMATION_MS = 220;
 const SIDEBAR_EXPAND_DELTA_PX = 192;
 
+const RealtimeRuntimeHooks: React.FC = () => {
+  useNotificacoes();
+  useDomainSyncSSE();
+  useRealtimeSync();
+  return null;
+};
+
+const RealtimeRuntime: React.FC<{ enabled: boolean }> = ({ enabled }) => {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      setReady(false);
+      return;
+    }
+
+    const win = window as Window & {
+      requestIdleCallback?: (
+        callback: IdleRequestCallback,
+        options?: IdleRequestOptions,
+      ) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (win.requestIdleCallback) {
+      const handle = win.requestIdleCallback(() => setReady(true), {
+        timeout: 1500,
+      });
+      return () => win.cancelIdleCallback?.(handle);
+    }
+
+    const timeoutId = window.setTimeout(() => setReady(true), 400);
+    return () => window.clearTimeout(timeoutId);
+  }, [enabled]);
+
+  if (!enabled || !ready) {
+    return null;
+  }
+
+  return <RealtimeRuntimeHooks />;
+};
+
 const Layout: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
-  // Inicializar sistema de notificações (SSE + polling fallback + fetch inicial)
-  useNotificacoes();
-  // Stream SSE de eventos de domínio para sincronização cross-módulo.
-  useDomainSyncSSE();
-  // Sincronização global para manter queries ativas em tempo real.
-  useRealtimeSync();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarLowQuality, setAvatarLowQuality] = useState(false);
   const [isSidebarAnimating, setIsSidebarAnimating] = useState(false);
@@ -263,6 +298,7 @@ const Layout: React.FC = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
+      <RealtimeRuntime enabled={Boolean(user)} />
       {/* Mobile sidebar */}
       <div
         className={cn(

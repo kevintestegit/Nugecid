@@ -1,6 +1,6 @@
-import React from 'react'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert'
-import CustodiaBalistica from '@/components/custodia/balistica'
+import React from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/Alert";
+import CustodiaBalistica from "@/components/custodia/balistica";
 
 const CustodiaVestigiosPage: React.FC = () => {
   return (
@@ -15,14 +15,15 @@ const CustodiaVestigiosPage: React.FC = () => {
         <Alert>
           <AlertTitle>Pré-visualização</AlertTitle>
           <AlertDescription>
-            Esta área é apenas para demonstrar como as etiquetas serão montadas quando forem
-            inseridas no SIGEP. Nenhum dado é enviado ou gravado aqui.
+            Esta área é apenas para demonstrar como as etiquetas serão montadas
+            quando forem inseridas no SIGEP. Nenhum dado é enviado ou gravado
+            aqui.
           </AlertDescription>
         </Alert>
       </div>
       <CustodiaBalistica />
     </div>
-  )
-}
+  );
+};
 
-export default CustodiaVestigiosPage
+export default CustodiaVestigiosPage;

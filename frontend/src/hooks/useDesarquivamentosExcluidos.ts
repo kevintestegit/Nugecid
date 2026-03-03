@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { nugecidService } from "../services/nugecidService";
+import {
+  QueryDesarquivamentoDto,
+  StatusDesarquivamento,
+  TipoDesarquivamento,
+} from "@/types";
+import { apiService } from "@/services/api";
 
 interface DesarquivamentoExcluido {
   id: number;
@@ -54,37 +59,37 @@ export const useDesarquivamentosExcluidos = (
       setLoading(true);
       setError(null);
 
-      // Construir query parameters
-      const queryParams = new URLSearchParams();
+      const query: QueryDesarquivamentoDto = {
+        page: params.page,
+        limit: params.limit,
+        search: params.search,
+        tipoDesarquivamento: params.tipoDesarquivamento as
+          | TipoDesarquivamento
+          | undefined,
+        dataInicio: params.dataExclusaoInicio,
+        dataFim: params.dataExclusaoFim,
+        status: params.status as StatusDesarquivamento | undefined,
+      };
 
-      if (params.page) queryParams.append("page", params.page.toString());
-      if (params.limit) queryParams.append("limit", params.limit.toString());
-      if (params.search) queryParams.append("search", params.search);
-      if (params.tipoDesarquivamento)
-        queryParams.append("tipoDesarquivamento", params.tipoDesarquivamento);
-      if (params.dataExclusaoInicio)
-        queryParams.append("dataExclusaoInicio", params.dataExclusaoInicio);
-      if (params.dataExclusaoFim)
-        queryParams.append("dataExclusaoFim", params.dataExclusaoFim);
-      if (params.status) queryParams.append("status", params.status);
+      const result = await apiService.getDesarquivamentosLixeira(query);
 
-      // Adicionar parâmetro para buscar apenas registros excluídos
-      queryParams.append("deleted", "true");
-
-      const response = await fetch(`/api/nugecid?${queryParams.toString()}`, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      setData({
+        items: result.data.map((item) => ({
+          id: item.id,
+          codigo: item.codigoBarras ?? String(item.numeroSolicitacao ?? ""),
+          nomeSolicitante: item.requerente ?? "",
+          nomeVitima: item.nomeCompleto,
+          tipoDesarquivamento: String(item.tipoDesarquivamento),
+          status: item.status,
+          deletedAt: item.deletedAt ?? "",
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        })),
+        total: result.meta.total,
+        page: result.meta.page,
+        limit: result.meta.limit,
+        totalPages: result.meta.totalPages,
       });
-
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      setData(result);
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro ao carregar dados";
@@ -98,23 +103,7 @@ export const useDesarquivamentosExcluidos = (
   const restoreDesarquivamento = useCallback(
     async (id: number) => {
       try {
-        const response = await fetch(`/api/nugecid/${id}/restore`, {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.message ||
-              `Erro ${response.status}: ${response.statusText}`,
-          );
-        }
-
-        const result = await response.json();
+        await apiService.restoreDesarquivamento(id);
 
         // Atualizar a lista removendo o item restaurado
         if (data) {
@@ -129,7 +118,7 @@ export const useDesarquivamentosExcluidos = (
           );
         }
 
-        return result;
+        return;
       } catch (err: unknown) {
         console.error("Erro ao restaurar desarquivamento:", err);
         throw err;
@@ -141,27 +130,18 @@ export const useDesarquivamentosExcluidos = (
   const restoreMultiple = useCallback(
     async (ids: number[]) => {
       try {
-        // Restaurar cada item individualmente
-        const promises = ids.map((id) =>
-          fetch(`/api/nugecid/${id}/restore`, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }),
+        const results = await Promise.allSettled(
+          ids.map((id) => apiService.restoreDesarquivamento(id)),
         );
 
-        const responses = await Promise.all(promises);
-
-        // Verificar se todas as requisições foram bem-sucedidas
         const errors: string[] = [];
-        for (let i = 0; i < responses.length; i++) {
-          if (!responses[i].ok) {
-            const errorData = await responses[i].json().catch(() => ({}));
-            errors.push(
-              `ID ${ids[i]}: ${errorData.message || responses[i].statusText}`,
-            );
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i];
+          if (result.status === "rejected") {
+            const reason = result.reason;
+            const message =
+              reason instanceof Error ? reason.message : "Erro inesperado";
+            errors.push(`ID ${ids[i]}: ${message}`);
           }
         }
 

@@ -2,17 +2,24 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { MulterModule } from "@nestjs/platform-express";
 import * as multer from "multer";
+import {
+  DEFAULT_DOCUMENT_UPLOAD_MAX_SIZE_BYTES,
+  FileValidator,
+} from "../../common/utils/file-validator";
 
 // Controller
 import { NugecidController } from "./nugecid.controller";
 import {
   AnexosController,
   AnexosProcessoController,
+  AnexosProcessoQueryController,
 } from "./controllers/anexos.controller";
 
 // Modules
 import { AuthModule } from "../auth/auth.module";
 import { NotificacoesModule } from "../notificacoes/notificacoes.module";
+import { SecurityModule } from "../security/security.module";
+import { OcrModule } from "../ocr/ocr.module";
 
 // Use Cases
 import {
@@ -27,6 +34,7 @@ import {
   ImportDesarquivamentoUseCase,
   ImportRegistrosUseCase,
 } from "./application/use-cases";
+import { DesarquivamentoEffectsPublisher } from "./application/services/desarquivamento-effects.publisher";
 
 // Infrastructure
 import { DesarquivamentoRepositoryModule } from "./infrastructure/desarquivamento-repository.module";
@@ -62,26 +70,12 @@ import { NugecidService } from "./nugecid.service";
       Auditoria,
     ]),
     AuthModule,
+    SecurityModule,
+    OcrModule,
     MulterModule.register({
       storage: multer.memoryStorage(),
       fileFilter: (req, file, cb) => {
-        const allowedMimes = [
-          // Imagens
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-          // Documentos
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "text/plain",
-          "text/csv",
-        ];
-
-        if (allowedMimes.includes(file.mimetype)) {
+        if (FileValidator.isAllowedImageOrDocumentMimeType(file.mimetype)) {
           cb(null, true);
         } else {
           cb(
@@ -93,12 +87,17 @@ import { NugecidService } from "./nugecid.service";
         }
       },
       limits: {
-        fileSize: 10 * 1024 * 1024, // 10MB
+        fileSize: DEFAULT_DOCUMENT_UPLOAD_MAX_SIZE_BYTES,
       },
     }),
     NotificacoesModule,
   ],
-  controllers: [NugecidController, AnexosController, AnexosProcessoController],
+  controllers: [
+    NugecidController,
+    AnexosController,
+    AnexosProcessoQueryController,
+    AnexosProcessoController,
+  ],
   providers: [
     // Use Cases
     CreateDesarquivamentoUseCase,
@@ -111,6 +110,7 @@ import { NugecidService } from "./nugecid.service";
     GetDashboardStatsUseCase,
     ImportDesarquivamentoUseCase,
     ImportRegistrosUseCase,
+    DesarquivamentoEffectsPublisher,
 
     // New Services
     NugecidImportService,

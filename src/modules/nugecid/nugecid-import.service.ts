@@ -9,6 +9,7 @@ import { ImportResultDto } from "./dto/import-result.dto";
 import { NugecidService } from "./nugecid.service";
 import { TipoDesarquivamentoEnum } from "./domain/value-objects/tipo-desarquivamento.vo";
 import { StatusDesarquivamentoEnum } from "./domain/enums/status-desarquivamento.enum";
+import { readSpreadsheetMatrix } from "../../common/utils/spreadsheet.util";
 
 @Injectable()
 export class NugecidImportService {
@@ -58,32 +59,15 @@ export class NugecidImportService {
     );
 
     try {
-      const XLSX = this.getXlsx();
-      // Ler arquivo Excel
-      const workbook = XLSX.read(file.buffer, {
-        type: "buffer",
-        cellDates: true,
-        dateNF: "yyyy-mm-dd",
-      });
-
-      const sheetName = workbook.SheetNames[0];
+      const { sheetName, rows: data } = await readSpreadsheetMatrix(
+        file.buffer,
+        file.originalname,
+      );
       if (!sheetName) {
         throw new BadRequestException(
           "O arquivo não contém planilhas válidas.",
         );
       }
-
-      const worksheet = workbook.Sheets[sheetName];
-      if (!worksheet) {
-        throw new BadRequestException("A planilha está vazia.");
-      }
-
-      // Converter para JSON (array de arrays)
-      const data = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: "",
-        raw: false, // Converter tudo para string primeiro
-      }) as any[][];
 
       if (!data || data.length <= 1) {
         throw new BadRequestException(
@@ -142,11 +126,6 @@ export class NugecidImportService {
         `Erro ao processar arquivo: ${error.message}`,
       );
     }
-  }
-
-  private getXlsx(): typeof import("xlsx") {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require("xlsx") as typeof import("xlsx");
   }
 
   /**

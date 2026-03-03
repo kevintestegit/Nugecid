@@ -9,6 +9,7 @@ import {
 
 import { DesarquivamentoTypeOrmEntity } from "./desarquivamento.typeorm-entity";
 import { User } from "../../../users/entities/user.entity";
+import { OcrStatus } from "../../../ocr/ocr.types";
 
 @Entity("desarquivamento_anexos")
 export class DesarquivamentoAnexoTypeOrmEntity {
@@ -64,6 +65,24 @@ export class DesarquivamentoAnexoTypeOrmEntity {
     default: "desarquivamento",
   })
   tipoAnexo: "desarquivamento" | "rearquivamento";
+
+  @Column({ name: "ocr_status", length: 40, nullable: true })
+  ocrStatus?: OcrStatus;
+
+  @Column({ name: "ocr_pdf_caminho", length: 500, nullable: true })
+  ocrPdfPath?: string;
+
+  @Column({ name: "ocr_texto_caminho", length: 500, nullable: true })
+  ocrTextPath?: string;
+
+  @Column({ name: "ocr_texto", type: "text", nullable: true, select: false })
+  ocrTexto?: string;
+
+  @Column({ name: "ocr_processado_em", type: "timestamp", nullable: true })
+  ocrProcessedAt?: Date;
+
+  @Column({ name: "ocr_erro", type: "text", nullable: true })
+  ocrError?: string;
 
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;

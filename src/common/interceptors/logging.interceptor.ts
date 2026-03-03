@@ -118,7 +118,12 @@ export class LoggingInterceptor implements NestInterceptor {
 
   private isHealthCheckEndpoint(sanitizedUrl: string): boolean {
     const [path] = sanitizedUrl.split("?", 1);
-    return path === "/api/health";
+    return (
+      path === "/health" ||
+      path === "/ready" ||
+      path === "/api/health" ||
+      path === "/api/health/database"
+    );
   }
 
   private resolveStatusCode(error: unknown, response: Response): number {

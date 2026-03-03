@@ -1,20 +1,28 @@
-# Dockerfile para o Frontend React + Vite
-FROM node:20-alpine
+# Build stage
+FROM node:24-alpine AS builder
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de dependências
 COPY package*.json ./
-
-# Instala as dependências
 RUN npm ci
 
-# Copia todo o código do frontend
 COPY . .
+RUN npm run build
 
-# Expõe a porta 3001
+# Production stage
+FROM nginx:1.27-alpine
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chown -R nginx:nginx /var/cache/nginx && \
+    chown -R nginx:nginx /var/log/nginx && \
+    touch /var/run/nginx.pid && \
+    chown -R nginx:nginx /var/run/nginx.pid
+
+USER nginx
+
 EXPOSE 3001
 
-# Comando para iniciar o servidor de desenvolvimento
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["nginx", "-g", "daemon off;"]

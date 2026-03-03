@@ -134,6 +134,13 @@ Isso inicia 5 containers:
 | Redis      | `sgc-redis`    | `6379`              |
 | Adminer    | (auto)         | `8081`              |
 
+Perfis opcionais disponíveis:
+
+- `search`: sobe o Meilisearch
+- `storage`: sobe o MinIO
+- `security`: sobe o ClamAV
+- `bi`: sobe o bootstrap do Metabase + Metabase
+
 Portas podem ser alteradas no `.env`:
 
 ```env
@@ -142,7 +149,29 @@ HOST_FRONTEND_PORT=3001
 HOST_DB_PORT=5432
 HOST_REDIS_PORT=6379
 HOST_ADMINER_PORT=8081
+HOST_METABASE_PORT=3002
 ```
+
+### BI com Metabase
+
+O repositório agora possui um profile opcional de BI:
+
+```bash
+docker compose --profile bi up -d metabase-bootstrap metabase
+```
+
+Isso sobe:
+
+- `sgc-metabase-bootstrap`: provisiona o banco interno do Metabase e o usuário analítico read-only
+- `sgc-metabase`: UI do Metabase em `http://localhost:3002`
+
+O Metabase foi preparado para consumir o schema `analytics`, com views estáveis para:
+
+- `analytics.vw_desarquivamentos`
+- `analytics.vw_tarefas`
+- `analytics.vw_notificacoes`
+
+As instruções completas de conexão estão em [docs/metabase.md](./docs/metabase.md).
 
 ### Desenvolvimento Local
 
@@ -168,9 +197,29 @@ O sistema estará disponível em:
 - **Frontend**: http://localhost:3001
 - **API**: http://localhost:3000
 - **API Docs (Swagger)**: http://localhost:3000/api/docs
-- **Health Check**: http://localhost:3000/api/health
+- **Liveness**: http://localhost:3000/health
+- **Readiness**: http://localhost:3000/ready
 
 > **Nota**: O seed de dados iniciais é automático via `SeedingService` (não é necessário rodar `npm run seed` manualmente).
+
+### Web Push
+
+Para notificações com a aba fechada, o ambiente precisa de chaves VAPID e das migrations mais recentes:
+
+```bash
+# gera e grava WEB_PUSH_VAPID_* no .env
+npm run webpush:setup-env
+
+# aplica as migrations de notificações desktop / push
+npm run migration:run
+```
+
+Depois disso:
+
+- acesse a tela de configurações do usuário
+- habilite `Notificações na área de trabalho`
+- conceda permissão do navegador
+- teste em `https` ou `localhost`, porque Service Worker e Push API não funcionam em HTTP comum
 
 ## Scripts Disponíveis
 
@@ -192,12 +241,38 @@ O sistema estará disponível em:
 | `npm run format`             | Prettier no backend                                 |
 | `npm run test`               | Roda testes (Jest)                                  |
 | `npm run test:unit`          | Testes unitários (com `--passWithNoTests`)          |
-| `npm run test:e2e`           | Testes end-to-end                                   |
+| `npm run test:critical`      | Testes críticos do backend (auth, health, search, NUGECID, upload) |
+| `npm run test:e2e`           | Smoke E2E com Playwright                            |
+| `npm run test:e2e:api`       | E2E da API com Jest/Supertest                       |
+| `npm run test:e2e:ui`        | Alias explícito para Playwright                     |
+| `npm run test:e2e:ui:headed` | Playwright com navegador visível                    |
+| `npm run test:e2e:install`   | Instala o Chromium usado pelo Playwright            |
 | `npm run migration:run`      | Executa migrações pendentes                         |
 | `npm run migration:generate` | Gera migração a partir de mudanças nas entities     |
 | `npm run migration:revert`   | Reverte última migração                             |
+| `npm run quality:critical`   | Lint + typecheck + testes críticos (backend + frontend) |
 | `npm run quality:check`      | Lint + typecheck + tests (backend + frontend)       |
 | `npm run quality:ci`         | Quality check + build + bundle size check           |
+
+### E2E com Playwright
+
+O repositório agora possui um smoke E2E real em `e2e/login.spec.ts`, cobrindo:
+
+- login com usuário `admin`
+- carregamento do dashboard após autenticação
+- acesso à rota `/auditoria`
+
+Execução recomendada:
+
+```bash
+# Instale o navegador uma vez
+npm run test:e2e:install
+
+# Rode o smoke E2E
+npm run test:e2e
+```
+
+O Playwright sobe um backend local isolado na porta `3100` e um frontend Vite na porta `3101`, reaproveitando apenas `db` e `redis` do `docker compose`. O usuário admin é semeado automaticamente com a senha padrão `123456`, podendo ser sobrescrita por `E2E_ADMIN_PASSWORD`.
 
 ### Backup
 
@@ -209,15 +284,31 @@ O sistema estará disponível em:
 | `npm run backup:clean`  | Limpar backups antigos     |
 | `npm run backup:size`   | Tamanho total dos backups  |
 
+### Verificação Operacional
+
+| Comando                | Descrição                                                           |
+| ---------------------- | ------------------------------------------------------------------- |
+| `npm run system:check` | Verifica containers, frontend, liveness, readiness e URLs básicas   |
+| `npm run smoke:test`   | Smoke test pós-deploy com frontend, health e, opcionalmente, auth   |
+| `npm run debug:collect`| Coleta logs e snapshots de health para troubleshooting pós-deploy    |
+
+Para validar autenticação real no smoke test:
+
+```bash
+SMOKE_USER=admin SMOKE_PASSWORD='sua_senha' npm run smoke:test
+```
+
 ### Shell Scripts
 
 ```bash
 ./scripts/install.sh       # Instala Docker e Docker Compose (Ubuntu/Zorin)
 ./scripts/run.sh           # Sobe toda a stack via Docker Compose
 ./scripts/stop.sh          # Para todos os containers
+./scripts/check-system.sh  # Verificação rápida de containers e endpoints
+./scripts/smoke-test.sh    # Smoke test pós-deploy
+./scripts/collect-debug-info.sh # Coleta logs e snapshots para diagnóstico
 ./scripts/backup_db.sh     # Backup PostgreSQL via pg_dump
 ./scripts/restore_db.sh    # Restaura backup .dump
-./scripts/check-system.sh  # Verifica saúde do sistema
 ```
 
 ## Autenticação
@@ -225,12 +316,50 @@ O sistema estará disponível em:
 A API usa **JWT via cookie HttpOnly** (`access_token`). O fluxo:
 
 1. `POST /api/auth/login` com `{ usuario, senha }` no body
-2. O backend retorna o token como cookie `Set-Cookie: access_token=<jwt>; HttpOnly; Path=/`
-3. Todas as requisições subsequentes enviam o cookie automaticamente
-4. `POST /api/auth/logout` limpa o cookie
-5. `POST /api/auth/refresh` renova o token
+2. O backend define `access_token` e `refresh_token` como cookies `HttpOnly`
+3. O payload JSON pode incluir `accessToken` para compatibilidade, mas o frontend do projeto opera pelos cookies e não depende do refresh token em JavaScript
+4. Todas as requisições subsequentes enviam os cookies automaticamente
+5. `POST /api/auth/refresh` renova o `access_token` usando o `refresh_token` em cookie
+6. `POST /api/auth/logout` limpa `access_token`, `refresh_token` e a sessão
 
-> **Importante**: O token NÃO é retornado no body JSON. Clientes devem usar `credentials: 'include'` (fetch) ou `withCredentials: true` (axios).
+> **Importante**: clientes web devem usar `credentials: 'include'` (fetch) ou `withCredentials: true` (axios).
+
+## Deploy com Docker Compose
+
+O `docker-compose.yml` agora sobe o frontend como build estático servido por `nginx`, com proxy local para `/api` e `/uploads`. Isso evita rodar `vite dev` em produção e mantém frontend e backend consistentes no mesmo host exposto ao navegador.
+
+Checklist mínimo de produção:
+
+```env
+NODE_ENV=production
+BASE_URL=http://SEU_HOST:8080
+FRONTEND_URL=http://SEU_HOST:3001
+CORS_ORIGIN=http://SEU_HOST:3001
+SESSION_SECURE=auto
+JWT_SECRET=<forte>
+JWT_REFRESH_SECRET=<forte>
+SESSION_SECRET=<forte>
+REDIS_URL=redis://redis:6379/0
+```
+
+Fluxo recomendado:
+
+```bash
+cp .env.example .env
+# editar .env
+docker compose up -d --build
+docker compose ps
+curl http://localhost:8080/ready
+curl http://localhost:3001
+npm run system:check
+npm run smoke:test
+npm run debug:collect   # se precisar diagnosticar falha
+```
+
+Runbook operacional:
+
+- [DEPLOY-RUNBOOK.md](/dados/area_trabalho/SGC-ITEP-NESTJS/docs/operations/DEPLOY-RUNBOOK.md)
+- [BACKLOG-PRODUTO-PRIORIZADO.md](/dados/area_trabalho/SGC-ITEP-NESTJS/docs/planning/BACKLOG-PRODUTO-PRIORIZADO.md)
 
 ## Endpoints Principais
 
@@ -297,7 +426,8 @@ A API usa **JWT via cookie HttpOnly** (`access_token`). O fluxo:
 - `GET /api/security/*` — Endpoints de segurança
 - `GET /api/queues/*` — Monitoramento de filas
 - `GET /api/sync/*` — Sincronização
-- `GET /api/health` — Health check principal
+- `GET /health` — Liveness (processo ativo)
+- `GET /ready` — Readiness (DB + Redis)
 
 A documentação completa e interativa está disponível em **Swagger** (`/api/docs`) quando o backend está rodando.
 
@@ -358,8 +488,26 @@ O sistema gera 3 tipos de PDF:
 
 ### Health Checks
 
-- `GET /api/health` — Status geral da aplicação
-- Verifica: conectividade DB, conectividade Redis, espaço em disco, uso de memória
+- `GET /health` — liveness básico (sempre 200 quando o processo está de pé)
+- `GET /ready` — readiness (retorna 200 apenas com DB e Redis OK; 503 quando indisponível)
+- Endpoints auxiliares autenticados (debug): `GET /api/health/database`, `GET /api/health/database/test`, `GET /api/health/database/info`, `GET /api/health/metrics`
+
+### Requisitos de produção
+
+- Redis é obrigatório em produção para sessões/cache/filas.
+- Fallback em memória é bloqueado em produção (mesmo se `ALLOW_MEMORY_SESSION_STORE=true`).
+- Se Redis/DB estiverem indisponíveis no bootstrap, o processo falha startup.
+- O deploy deve usar `/ready` para readiness probe e `/health` para liveness probe.
+
+### Testando readiness localmente
+
+```bash
+# Liveness
+curl -i http://localhost:3000/health
+
+# Readiness (DB + Redis)
+curl -i http://localhost:3000/ready
+```
 
 ### Backups Automáticos
 
@@ -478,6 +626,7 @@ O backend valida ENV no boot (`src/config/validation.ts`) e falha em produção 
 - Banco: `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`
 - Redis/estado distribuído: `REDIS_URL` **ou** `REDIS_HOST` + `REDIS_PORT`
 - URL e CORS: `FRONTEND_URL`, `CORS_ORIGIN`
+- Em produção: `ALLOW_MEMORY_SESSION_STORE` deve permanecer `false`
 
 ### Opcionais (com defaults)
 

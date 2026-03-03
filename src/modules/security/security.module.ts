@@ -4,6 +4,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { SecurityService } from "./security.service";
 import { SecurityController } from "./security.controller";
 import { IpBlockerGuard } from "./guards/ip-blocker.guard";
+import { AntivirusService } from "./antivirus.service";
 import { BlockedIp } from "./entities/blocked-ip.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
 import { User } from "../users/entities/user.entity";
@@ -15,7 +16,7 @@ import { AuthModule } from "../auth/auth.module";
     forwardRef(() => AuthModule),
   ],
   controllers: [SecurityController],
-  providers: [SecurityService, IpBlockerGuard],
-  exports: [SecurityService, IpBlockerGuard],
+  providers: [SecurityService, IpBlockerGuard, AntivirusService],
+  exports: [SecurityService, IpBlockerGuard, AntivirusService],
 })
 export class SecurityModule {}

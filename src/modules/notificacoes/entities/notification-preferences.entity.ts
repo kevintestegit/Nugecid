@@ -10,6 +10,8 @@ import {
 
 import { User } from "../../users/entities/user.entity";
 
+export type NotificationChannel = "in_app" | "desktop" | "push";
+
 @Entity("notification_preferences")
 export class NotificationPreferences {
   @PrimaryGeneratedColumn()
@@ -25,6 +27,12 @@ export class NotificationPreferences {
   // Canais de notificação
   @Column({ name: "in_app_enabled", type: "boolean", default: true })
   inAppEnabled: boolean;
+
+  @Column({ name: "desktop_enabled", type: "boolean", default: false })
+  desktopEnabled: boolean;
+
+  @Column({ name: "push_enabled", type: "boolean", default: false })
+  pushEnabled: boolean;
 
   @Column({ name: "sound_enabled", type: "boolean", default: true })
   soundEnabled: boolean;
@@ -70,11 +78,19 @@ export class NotificationPreferences {
     this.enabledTypes[type] = false;
   }
 
-  canReceiveNotification(type: string, channel: "in_app"): boolean {
+  canReceiveNotification(type: string, channel: NotificationChannel): boolean {
     const typeEnabled = this.isTypeEnabled(type);
 
     if (channel === "in_app") {
       return this.inAppEnabled && typeEnabled;
+    }
+
+    if (channel === "desktop") {
+      return this.desktopEnabled && typeEnabled;
+    }
+
+    if (channel === "push") {
+      return this.pushEnabled && typeEnabled;
     }
 
     return false;

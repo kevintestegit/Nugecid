@@ -3,7 +3,12 @@ import "./instrument";
 
 import "module-alias/register";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger, LogLevel } from "@nestjs/common";
+import {
+  ValidationPipe,
+  Logger,
+  LogLevel,
+  RequestMethod,
+} from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
@@ -22,6 +27,7 @@ import { LoggingInterceptor } from "./common/interceptors/logging.interceptor";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
 import { DatabaseErrorInterceptor } from "./common/interceptors/database-error.interceptor";
 import { RuntimeMetricsService } from "./modules/observability/runtime-metrics.service";
+import { csrfProtectionMiddleware } from "./common/middleware/csrf.middleware";
 
 async function bootstrap() {
   const logger = new Logger("Bootstrap");
@@ -92,36 +98,42 @@ async function bootstrap() {
   // Habilita trust proxy para rate limiting funcionar corretamente com proxies
   app.set("trust proxy", trustProxyHops);
 
+  const cspDirectives = {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.googleapis.com",
+      ],
+      scriptSrc: [
+        "'self'",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+      ],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: [
+        "'self'",
+        "https://cdn.jsdelivr.net",
+        "https://cdnjs.cloudflare.com",
+        "https://fonts.gstatic.com",
+      ],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+    },
+  };
+
   app.use(
     helmet({
+      // Production: enforce CSP. Other envs: report-only mode so violations
+      // are logged to the console without breaking development workflows.
       contentSecurityPolicy:
         appEnvironment === "production"
-          ? {
-              directives: {
-                defaultSrc: ["'self'"],
-                styleSrc: [
-                  "'self'",
-                  "'unsafe-inline'",
-                  "https://cdn.jsdelivr.net",
-                  "https://cdnjs.cloudflare.com",
-                ],
-                scriptSrc: [
-                  "'self'",
-                  "https://cdn.jsdelivr.net",
-                  "https://cdnjs.cloudflare.com",
-                ],
-                imgSrc: ["'self'", "data:", "https:"],
-                fontSrc: [
-                  "'self'",
-                  "https://cdn.jsdelivr.net",
-                  "https://cdnjs.cloudflare.com",
-                ],
-                connectSrc: ["'self'"],
-                objectSrc: ["'none'"],
-                baseUri: ["'self'"],
-              },
-            }
-          : false,
+          ? cspDirectives
+          : { ...cspDirectives, reportOnly: true },
       crossOriginEmbedderPolicy: false,
     }),
   );
@@ -143,6 +155,11 @@ async function bootstrap() {
       standardHeaders: true,
       legacyHeaders: false,
     });
+  const uploadRateLimiter = createRateLimiter(
+    uploadRateLimitMax,
+    "Muitas tentativas de upload. Aguarde antes de tentar novamente.",
+    uploadRateLimitWindowMs,
+  );
 
   if (rateLimitEnabled) {
     // Rate limit geral para todas as rotas da API (aumentado para uploads)
@@ -156,14 +173,13 @@ async function bootstrap() {
     );
 
     // Rate limit específico para upload de arquivos (mais permissivo)
-    app.use(
-      "/api/pastas/*/arquivos",
-      createRateLimiter(
-        uploadRateLimitMax,
-        "Muitas tentativas de upload. Aguarde antes de tentar novamente.",
-        uploadRateLimitWindowMs,
-      ),
-    );
+    app.use(/^\/api\/pastas\/[^/]+\/arquivos(?:\/.*)?$/, (req, res, next) => {
+      if (req.method !== "POST") {
+        return next();
+      }
+
+      return uploadRateLimiter(req, res, next);
+    });
 
     // Rate limit específico para login (mais restritivo)
     app.use(
@@ -182,6 +198,26 @@ async function bootstrap() {
         registerRateLimitMax,
         "Muitas tentativas de registro. Aguarde 15 minutos.",
         registerRateLimitWindowMs,
+      ),
+    );
+
+    // Rate limit para refresh de tokens (previne abuso de renovação)
+    app.use(
+      "/api/auth/refresh",
+      createRateLimiter(
+        20,
+        "Muitas tentativas de renovação de token. Aguarde antes de tentar novamente.",
+        15 * 60 * 1000,
+      ),
+    );
+
+    // Rate limit para busca global (previne scraping)
+    app.use(
+      "/api/search",
+      createRateLimiter(
+        30,
+        "Muitas buscas. Aguarde um momento antes de tentar novamente.",
+        60 * 1000, // 1 minuto
       ),
     );
   } else {
@@ -209,8 +245,16 @@ async function bootstrap() {
   app.use(cookieParser());
 
   const sessionConfig = configService.get("auth.session");
-  const allowMemorySessionStore =
+  const allowMemorySessionStoreFlag =
     configService.get<string>("ALLOW_MEMORY_SESSION_STORE", "false") === "true";
+  const allowMemorySessionStore =
+    appEnvironment !== "production" && allowMemorySessionStoreFlag;
+
+  if (appEnvironment === "production" && allowMemorySessionStoreFlag) {
+    logger.warn(
+      "ALLOW_MEMORY_SESSION_STORE=true foi ignorado em produção. Redis é obrigatório para sessões.",
+    );
+  }
 
   // Configura Redis como session store quando disponível
   const redisUrl = configService.get<string>("REDIS_URL");
@@ -236,6 +280,13 @@ async function bootstrap() {
         logger.log("Redis session store connected");
       });
 
+      const pingResult = await redisClient.ping();
+      if (pingResult !== "PONG") {
+        throw new Error(
+          `Redis ping retornou valor inesperado durante bootstrap: ${pingResult}`,
+        );
+      }
+
       sessionStore = new RedisStore({
         client: redisClient,
         prefix: "sgc:sess:",
@@ -244,23 +295,20 @@ async function bootstrap() {
 
       logger.log("Session store: Redis");
     } catch (err) {
-      logger.warn(
-        `Failed to connect Redis for sessions, falling back to memory store: ${err.message}`,
-      );
+      const message = `Falha ao conectar Redis para sessões: ${err.message}`;
+      if (allowMemorySessionStore) {
+        logger.warn(`${message}. Usando fallback em memória neste ambiente.`);
+      } else {
+        throw new Error(`${message}. Fallback em memória desabilitado.`);
+      }
     }
-  } else if (appEnvironment !== "production" || allowMemorySessionStore) {
+  } else if (allowMemorySessionStore) {
     logger.warn(
       "Session store: in-memory (configure REDIS_URL for production)",
     );
-  }
-
-  if (
-    !sessionStore &&
-    appEnvironment === "production" &&
-    !allowMemorySessionStore
-  ) {
+  } else {
     throw new Error(
-      "Session store em memória desabilitado em produção. Configure REDIS_URL/REDIS_HOST ou ALLOW_MEMORY_SESSION_STORE=true.",
+      "REDIS_URL/REDIS_HOST não configurados e fallback em memória desabilitado.",
     );
   }
 
@@ -278,6 +326,8 @@ async function bootstrap() {
       },
     }),
   );
+
+  app.use(csrfProtectionMiddleware);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -302,7 +352,11 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.setGlobalPrefix("api", {
-    exclude: ["/"],
+    exclude: [
+      "/",
+      { path: "health", method: RequestMethod.GET },
+      { path: "ready", method: RequestMethod.GET },
+    ],
   });
 
   app.useGlobalInterceptors(

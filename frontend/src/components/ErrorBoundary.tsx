@@ -1,5 +1,6 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCcw, Home } from 'lucide-react';
+import React, { Component, ErrorInfo, ReactNode } from "react";
+import { AlertTriangle, RefreshCcw, Home } from "lucide-react";
+import { dispatchAppNavigate } from "@/lib/navigation/navigationEvents";
 
 interface Props {
   children: ReactNode;
@@ -24,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
     this.setState({
       error,
       errorInfo,
@@ -40,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleGoHome = () => {
-    window.location.href = '/';
+    dispatchAppNavigate({ to: "/", replace: true });
   };
 
   public render() {
@@ -71,7 +72,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
 
               {/* Error Details (development only) */}
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {process.env.NODE_ENV === "development" && this.state.error && (
                 <div className="mb-6 p-4 rounded-xl bg-muted/50 border border-border">
                   <p className="text-sm font-mono text-destructive mb-2">
                     {this.state.error.toString()}

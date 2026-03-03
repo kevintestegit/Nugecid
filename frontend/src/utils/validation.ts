@@ -7,12 +7,14 @@
  * @param id - O valor a ser validado
  * @returns true se for um número válido, false caso contrário
  */
-export const isValidNumericId = (id: string | number | null | undefined): boolean => {
-  if (id === null || id === undefined || id === '') {
+export const isValidNumericId = (
+  id: string | number | null | undefined,
+): boolean => {
+  if (id === null || id === undefined || id === "") {
     return false;
   }
 
-  const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+  const numericId = typeof id === "string" ? parseInt(id, 10) : id;
   return !isNaN(numericId) && numericId > 0 && Number.isInteger(numericId);
 };
 
@@ -22,7 +24,8 @@ export const isValidNumericId = (id: string | number | null | undefined): boolea
  * @returns true se for um UUID válido, false caso contrário
  */
 export const isValidUUID = (id: string): boolean => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(id);
 };
 
@@ -31,12 +34,14 @@ export const isValidUUID = (id: string): boolean => {
  * @param id - O ID a ser convertido
  * @returns O número convertido ou null se inválido
  */
-export const parseNumericId = (id: string | number | null | undefined): number | null => {
+export const parseNumericId = (
+  id: string | number | null | undefined,
+): number | null => {
   if (!isValidNumericId(id)) {
     return null;
   }
 
-  return typeof id === 'string' ? parseInt(id, 10) : id as number;
+  return typeof id === "string" ? parseInt(id, 10) : (id as number);
 };
 
 /**
@@ -44,7 +49,9 @@ export const parseNumericId = (id: string | number | null | undefined): number |
  * @param id - O ID a ser validado
  * @returns true se for válido para usuários, false caso contrário
  */
-export const isValidUserIdFormat = (id: string | number | null | undefined): boolean => {
+export const isValidUserIdFormat = (
+  id: string | number | null | undefined,
+): boolean => {
   return isValidNumericId(id);
 };
 
@@ -53,6 +60,8 @@ export const isValidUserIdFormat = (id: string | number | null | undefined): boo
  * @param id - O ID a ser validado
  * @returns true se for válido para desarquivamentos, false caso contrário
  */
-export const isValidDesarquivamentoIdFormat = (id: string | number | null | undefined): boolean => {
+export const isValidDesarquivamentoIdFormat = (
+  id: string | number | null | undefined,
+): boolean => {
   return isValidNumericId(id);
 };

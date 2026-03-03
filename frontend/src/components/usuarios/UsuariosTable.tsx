@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState } from "react";
 import {
   Edit,
   Trash2,
@@ -9,24 +9,24 @@ import {
   Shield,
   User,
   Crown,
-  Eye
-} from 'lucide-react'
-import { User as UserType, PaginationMeta } from '@/types'
-import { useReactivateUser } from '@/hooks/useUsers'
-import UserDetailModal from './UserDetailModal'
-import EditUserModal from './EditUserModal'
-import { NoResultsFound } from '@/components/ui/EmptyState'
-import { SkeletonTable } from '@/components/ui/Skeleton'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui'
+  Eye,
+} from "lucide-react";
+import { User as UserType, PaginationMeta } from "@/types";
+import { useReactivateUser } from "@/hooks/useUsers";
+import UserDetailModal from "./UserDetailModal";
+import EditUserModal from "./EditUserModal";
+import { NoResultsFound } from "@/components/ui/EmptyState";
+import { SkeletonTable } from "@/components/ui/Skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui";
 
 interface UsuariosTableProps {
-  users: UserType[]
-  meta?: PaginationMeta
-  isLoading: boolean
-  canManageUsers: boolean
-  onPageChange: (page: number) => void
-  onDeleteUser: (userId: number) => void
-  onRefresh?: () => void
+  users: UserType[];
+  meta?: PaginationMeta;
+  isLoading: boolean;
+  canManageUsers: boolean;
+  onPageChange: (page: number) => void;
+  onDeleteUser: (userId: number) => void;
+  onRefresh?: () => void;
 }
 
 const UsuariosTable: React.FC<UsuariosTableProps> = ({
@@ -36,55 +36,55 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
   canManageUsers,
   onPageChange,
   onDeleteUser,
-  onRefresh
+  onRefresh,
 }) => {
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
-  const [editUserId, setEditUserId] = useState<number | null>(null)
-  const reactivateUserMutation = useReactivateUser()
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [editUserId, setEditUserId] = useState<number | null>(null);
+  const reactivateUserMutation = useReactivateUser();
 
   const handleReactivateUser = async (userId: number) => {
     try {
-      await reactivateUserMutation.mutateAsync(userId)
+      await reactivateUserMutation.mutateAsync(userId);
     } catch (error) {
-      console.error('Erro ao reativar usuário:', error)
+      console.error("Erro ao reativar usuário:", error);
     }
-  }
+  };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'admin':
-        return <Crown className="h-4 w-4 text-yellow-600" />
-      case 'coordenador':
-        return <Shield className="h-4 w-4 text-blue-600" />
+      case "admin":
+        return <Crown className="h-4 w-4 text-yellow-600" />;
+      case "coordenador":
+        return <Shield className="h-4 w-4 text-blue-600" />;
       default:
-        return <User className="h-4 w-4 text-gray-600" />
+        return <User className="h-4 w-4 text-gray-600" />;
     }
-  }
+  };
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'admin':
-        return 'Administrador'
-      case 'coordenador':
-        return 'Coordenador'
+      case "admin":
+        return "Administrador";
+      case "coordenador":
+        return "Coordenador";
       default:
-        return 'Usuário'
+        return "Usuário";
     }
-  }
+  };
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'admin':
-        return 'border border-yellow-500/20 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300'
-      case 'coordenador':
-        return 'border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+      case "admin":
+        return "border border-yellow-500/20 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300";
+      case "coordenador":
+        return "border border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300";
       default:
-        return 'border border-border/70 bg-muted/40 text-foreground/85'
+        return "border border-border/70 bg-muted/40 text-foreground/85";
     }
-  }
+  };
 
   if (isLoading) {
-    return <SkeletonTable rows={10} columns={5} />
+    return <SkeletonTable rows={10} columns={5} />;
   }
 
   if (!users.length) {
@@ -92,14 +92,18 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
       <div className="p-8">
         <NoResultsFound
           description="Não há usuários que correspondam aos filtros aplicados."
-          secondaryAction={{
-            label: 'Limpar filtros',
-            onClick: () => window.location.reload()
-          }}
+          secondaryAction={
+            onRefresh
+              ? {
+                  label: "Limpar filtros",
+                  onClick: onRefresh,
+                }
+              : undefined
+          }
           variant="compact"
         />
       </div>
-    )
+    );
   }
 
   return (
@@ -133,7 +137,10 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
           </thead>
           <tbody className="divide-y divide-border/60 bg-card/30">
             {users.map((user) => (
-              <tr key={user.id} className={`transition-colors hover:bg-muted/35 ${user.deletedAt ? 'opacity-60' : ''}`}>
+              <tr
+                key={user.id}
+                className={`transition-colors hover:bg-muted/35 ${user.deletedAt ? "opacity-60" : ""}`}
+              >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
@@ -167,7 +174,9 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     {getRoleIcon(user.role.name)}
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role.name)}`}>
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role.name)}`}
+                    >
                       {getRoleLabel(user.role.name)}
                     </span>
                   </div>
@@ -178,24 +187,27 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                       Deletado
                     </span>
                   ) : (
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      user.ativo 
-                        ? 'border border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300' 
-                        : 'border border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300'
-                    }`}>
-                      {user.ativo ? 'Ativo' : 'Inativo'}
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.ativo
+                          ? "border border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300"
+                          : "border border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
+                      }`}
+                    >
+                      {user.ativo ? "Ativo" : "Inativo"}
                     </span>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                  {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                  {new Date(user.createdAt).toLocaleDateString("pt-BR")}
                 </td>
                 {canManageUsers && (
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
                       {user.deletedAt ? (
                         <span className="text-xs italic text-muted-foreground">
-                          Deletado em {new Date(user.deletedAt).toLocaleDateString('pt-BR')}
+                          Deletado em{" "}
+                          {new Date(user.deletedAt).toLocaleDateString("pt-BR")}
                         </span>
                       ) : user.ativo ? (
                         <>
@@ -267,16 +279,18 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Mostrando{' '}
+                  Mostrando{" "}
                   <span className="font-medium text-foreground">
-                    {((meta.page - 1) * meta.limit) + 1}
-                  </span>{' '}
-                  até{' '}
+                    {(meta.page - 1) * meta.limit + 1}
+                  </span>{" "}
+                  até{" "}
                   <span className="font-medium text-foreground">
                     {Math.min(meta.page * meta.limit, meta.total)}
-                  </span>{' '}
-                  de{' '}
-                  <span className="font-medium text-foreground">{meta.total}</span>{' '}
+                  </span>{" "}
+                  de{" "}
+                  <span className="font-medium text-foreground">
+                    {meta.total}
+                  </span>{" "}
                   resultados
                 </p>
               </div>
@@ -289,27 +303,34 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                   >
                     <ChevronLeft className="h-5 w-5" />
                   </button>
-                  
+
                   {/* Números das páginas */}
-                  {Array.from({ length: Math.min(5, meta.totalPages) }, (_, i) => {
-                    const pageNum = Math.max(1, Math.min(meta.totalPages - 4, meta.page - 2)) + i
-                    if (pageNum > meta.totalPages) return null
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => onPageChange(pageNum)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          pageNum === meta.page
-                            ? 'z-10 border-primary/50 bg-primary/15 text-primary'
-                            : 'border-border/70 bg-background/70 text-muted-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    )
-                  })}
-                  
+                  {Array.from(
+                    { length: Math.min(5, meta.totalPages) },
+                    (_, i) => {
+                      const pageNum =
+                        Math.max(
+                          1,
+                          Math.min(meta.totalPages - 4, meta.page - 2),
+                        ) + i;
+                      if (pageNum > meta.totalPages) return null;
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => onPageChange(pageNum)}
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                            pageNum === meta.page
+                              ? "z-10 border-primary/50 bg-primary/15 text-primary"
+                              : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    },
+                  )}
+
                   <button
                     onClick={() => onPageChange(meta.page + 1)}
                     disabled={!meta.hasNext}
@@ -338,13 +359,13 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
           userId={editUserId}
           onClose={() => setEditUserId(null)}
           onSuccess={() => {
-             setEditUserId(null)
-             onRefresh?.()
-           }}
+            setEditUserId(null);
+            onRefresh?.();
+          }}
         />
       )}
     </div>
-  )
-}
+  );
+};
 
-export default UsuariosTable
+export default UsuariosTable;

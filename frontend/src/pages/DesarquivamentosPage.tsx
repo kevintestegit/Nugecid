@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { createPortal } from "react-dom";
 import {
   useDesarquivamentos,
   useDeleteDesarquivamento,
@@ -7,7 +8,6 @@ import {
 import { useDesarquivamentosImport } from "@/hooks/useDesarquivamentosImport";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import {
   Card,
   CardContent,
@@ -15,15 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/Select";
-import { DateRangeInput, DateRange } from "@/components/ui/DateRangeInput";
+import { DateRange } from "@/components/ui/DateRangeInput";
 
 import {
   Table,
@@ -36,41 +28,25 @@ import {
 // Modal customizado será implementado inline
 import {
   Plus,
-  Eye,
-  Edit,
   Trash2,
   RefreshCw,
   Upload,
   FileText,
-  Calendar,
-  User,
+  Printer,
   AlertCircle,
-  Filter,
-  X,
   Download,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  MoreHorizontal,
 } from "lucide-react";
-import { SearchInput } from "@/components/ui/SearchInput";
 import {
   StatusDesarquivamento,
   TipoSolicitacao,
   TipoDesarquivamento,
-  CreateDesarquivamentoDto,
   Desarquivamento,
 } from "@/types";
-import {
-  formatDate,
-  getStatusLabel,
-  getTipoLabel,
-  getTipoDesarquivamentoLabel,
-} from "@/utils/format";
+import { getTipoDesarquivamentoLabel } from "@/utils/format";
 import { toast } from "sonner";
-import { Pagination } from "@/components/ui/Pagination";
-import { INSTITUTOS, getInstitutoLabel } from "@/constants/institutos";
-import { REQUERENTES, getRequerenteLabel } from "@/constants/requerentes";
 import { TableLoading } from "@/components/ui/Loading";
 import { ImportModal } from "@/components/desarquivamentos/ImportModal";
 import {
@@ -79,12 +55,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui";
+import { DesarquivamentosFiltersCard } from "@/components/desarquivamentos/DesarquivamentosFiltersCard";
+import { DesarquivamentoTableRow } from "@/components/desarquivamentos/DesarquivamentoTableRow";
 import DesarquivamentoDetailModal from "@/components/desarquivamentos/DesarquivamentoDetailModal";
 import { AdminConfirmDialog } from "@/components/ui/AdminConfirmDialog";
 import "@/styles/desarquivamentos.css";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiService } from "@/services/api";
 import axios from "axios";
+import { printHtmlDocument } from "@/components/desarquivamentos/print-utils";
+import brasaorn from "@/components/img/Brasão-RN.png";
+import brasaoitep from "@/components/img/brasao-itep-optimized.png";
 
 type SortOrder = "ASC" | "DESC";
 
@@ -103,6 +84,21 @@ type SortField =
   | "finalidadeDesarquivamento"
   | "solicitacaoProrrogacao";
 
+const escapeHtml = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(
+    /[&<>"']/g,
+    (match) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[match] || match,
+  );
+};
+
 const DesarquivamentosPage: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -114,6 +110,7 @@ const DesarquivamentosPage: React.FC = () => {
     useState<string>("all");
   const [institutoFilter, setInstitutoFilter] = useState<string>("all");
   const [requerenteFilter, setRequerenteFilter] = useState<string>("all");
+  const [atencaoNecessariaFilter, setAtencaoNecessariaFilter] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: null,
     endDate: null,
@@ -133,13 +130,22 @@ const DesarquivamentosPage: React.FC = () => {
     isOpen: false,
     item: null,
   });
+  const [isPrintTermsModalOpen, setIsPrintTermsModalOpen] = useState(false);
+  const [isLoadingPrintTerms, setIsLoadingPrintTerms] = useState(false);
+  const [printCandidates, setPrintCandidates] = useState<Desarquivamento[]>([]);
+  const [selectedPrintIds, setSelectedPrintIds] = useState<number[]>([]);
+  const [printProcessSearch, setPrintProcessSearch] = useState("");
 
   // Read URL query parameters on component mount
   useEffect(() => {
     const statusFromUrl = searchParams.get("status");
-    if (statusFromUrl && statusFromUrl !== "all") {
-      setStatusFilter(statusFromUrl);
-    }
+    const atencaoNecessariaFromUrl =
+      searchParams.get("atencaoNecessaria") === "true";
+
+    setStatusFilter(
+      statusFromUrl && statusFromUrl !== "all" ? statusFromUrl : "all",
+    );
+    setAtencaoNecessariaFilter(atencaoNecessariaFromUrl);
   }, [searchParams]);
 
   useEffect(() => {
@@ -211,6 +217,7 @@ const DesarquivamentosPage: React.FC = () => {
           : undefined,
       instituto: institutoFilter !== "all" ? institutoFilter : undefined,
       requerente: requerenteFilter !== "all" ? requerenteFilter : undefined,
+      atencaoNecessaria: atencaoNecessariaFilter || undefined,
       startDate: toYMD(dateRange.startDate, false),
       endDate: toYMD(dateRange.endDate, true),
     };
@@ -225,10 +232,13 @@ const DesarquivamentosPage: React.FC = () => {
     tipoDesarquivamentoFilter,
     institutoFilter,
     requerenteFilter,
+    atencaoNecessariaFilter,
     dateRange,
   ]);
 
-  const { data, isLoading, error, refetch } = useDesarquivamentos(queryParams);
+  const { data, isLoading, isFetching, error, refetch } =
+    useDesarquivamentos(queryParams);
+  const hasLoadedRows = (data?.data?.length ?? 0) > 0;
   const deleteDesarquivamento = useDeleteDesarquivamento();
   const { isLoading: isImporting } = useDesarquivamentosImport(() => {
     refetch();
@@ -366,6 +376,279 @@ const DesarquivamentosPage: React.FC = () => {
     }
   };
 
+  const fetchAllDesarquivamentosForPrint = async (): Promise<
+    Desarquivamento[]
+  > => {
+    const limit = 100;
+    let page = 1;
+    let totalPages = 1;
+    const allItems: Desarquivamento[] = [];
+
+    do {
+      const response = await apiService.getDesarquivamentos({
+        page,
+        limit,
+        sortBy: "createdAt",
+        sortOrder: "DESC",
+      });
+
+      if (Array.isArray(response?.data)) {
+        allItems.push(...response.data);
+      }
+
+      totalPages = response?.meta?.totalPages ?? 1;
+      page += 1;
+    } while (page <= totalPages);
+
+    return allItems;
+  };
+
+  const handleOpenPrintTermsModal = async () => {
+    try {
+      setIsLoadingPrintTerms(true);
+      const records = await fetchAllDesarquivamentosForPrint();
+
+      if (!records.length) {
+        toast.error("Não há termos disponíveis para impressão.");
+        return;
+      }
+
+      setPrintCandidates(records);
+      setSelectedPrintIds([]);
+      setPrintProcessSearch("");
+      setIsPrintTermsModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao carregar termos para impressão:", error);
+      toast.error("Erro ao carregar termos para impressão");
+    } finally {
+      setIsLoadingPrintTerms(false);
+    }
+  };
+
+  const handlePrintSelectedTerms = () => {
+    const selectedItems = printCandidates.filter((candidate) =>
+      selectedPrintIds.includes(candidate.id),
+    );
+
+    if (!selectedItems.length) {
+      toast.error("Selecione pelo menos um termo para impressão.");
+      return;
+    }
+
+    const baseHref =
+      window.location.origin + (import.meta.env?.BASE_URL ?? "/");
+    const toAbs = (url: string) => new URL(url, baseHref).toString();
+    const logoRN = toAbs(brasaorn);
+    const logoITEP = toAbs(brasaoitep);
+    const userName = escapeHtml(
+      user?.nome || user?.usuario || "Usuário não identificado",
+    );
+    const printedAt = new Date();
+    const dataImpressao = escapeHtml(printedAt.toLocaleDateString("pt-BR"));
+    const horaImpressao = escapeHtml(
+      printedAt.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+    );
+
+    const rowsHtml = selectedItems
+      .map((item, index) => {
+        const tipo =
+          item.tipoDocumento ||
+          getTipoDesarquivamentoLabel(item.tipoDesarquivamento) ||
+          "-";
+
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(item.numeroProcesso || "-")}</td>
+            <td>${escapeHtml(tipo)}</td>
+            <td>${escapeHtml(item.nomeCompleto || "-")}</td>
+            <td>${escapeHtml(item.numeroNicLaudoAuto || "-")}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <base href="${baseHref}">
+  <title>Impressão de Termos</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      color: #000;
+    }
+    .documento-completo {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .documento-completo thead {
+      display: table-header-group;
+    }
+    .documento-completo tfoot {
+      display: table-footer-group;
+    }
+    .documento-completo thead td,
+    .documento-completo tfoot td {
+      border: none;
+      padding: 0;
+    }
+    .hdr { width: 100%; border-collapse: collapse; }
+    .hdr td { vertical-align: top; }
+    .hdr-text{
+      font-family: "Liberation Serif", "Times New Roman", serif;
+      font-size: 10pt;
+    }
+    .logo { width: 96px; text-align: center; }
+    .miolo { text-align: center; padding: 4px 8px; }
+    .logo-dir { width: 96px; text-align: center; }
+    .content {
+      padding: 10mm;
+    }
+    h1 {
+      font-size: 14pt;
+      margin: 0 0 8pt;
+      text-transform: uppercase;
+      text-align: center;
+      font-weight: bold;
+    }
+    p {
+      margin: 0 0 14px;
+      font-size: 12px;
+      color: #111827;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .termos-table th, .termos-table td {
+      border: 1px solid #111827;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .termos-table th {
+      background: #e5e7eb;
+      font-weight: 700;
+    }
+    .autenticacao {
+      margin-top: 16pt;
+      font-size: 10pt;
+      text-align: center;
+      color: #111827;
+    }
+    .rodape {
+      border-top: 0.75pt solid #000;
+      padding-top: 8pt;
+      margin-top: 10pt;
+      text-align: center;
+      line-height: 1.3;
+      font-size: 10pt;
+    }
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      body { margin: 0; }
+      th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .documento-completo thead { display: table-header-group; }
+      .documento-completo tfoot { display: table-footer-group; }
+    }
+  </style>
+</head>
+<body>
+  <table class="documento-completo">
+    <thead>
+      <tr>
+        <td>
+          <table class="hdr">
+            <tr>
+              <td class="logo">
+                <img src="${logoRN}" alt="Brasão RN" height="90" />
+              </td>
+              <td class="miolo">
+                <p class="hdr-text"><strong>GOVERNO DO ESTADO DO RIO GRANDE DO NORTE</strong></p>
+                <p class="hdr-text"><strong>SECRETARIA DE ESTADO DA SEGURANÇA PÚBLICA E DA DEFESA SOCIAL</strong></p>
+                <p class="hdr-text"><strong>POLÍCIA CIENTÍFICA DO RIO GRANDE DO NORTE</strong></p>
+                <p class="hdr-text"><strong>NÚCLEO DE GESTÃO DO CONHECIMENTO, INFORMAÇÃO, DOCUMENTAÇÃO E MEMÓRIA - NUGECID</strong></p>
+                <p class="hdr-text"><strong>SETOR DE ARQUIVO GERAL - SAG</strong></p>
+              </td>
+              <td class="logo-dir">
+                <img src="${logoITEP}" alt="Brasão ITEP" height="90" />
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </thead>
+    <tfoot>
+      <tr>
+        <td>
+          <div class="rodape">
+            <p>Polícia Científica do Rio Grande do Norte - PCIRN</p>
+            <p>Núcleo de Gestão do Conhecimento, Informação Documentação e Memória - NUGECID</p>
+            <p>Rua dos Campos, 293, Felipe Camarão – Natal/RN – CEP: 59.072-103 – Telefone: (84) 3232-6928</p>
+            <p>Email: arquivogeral@pci.rn.gov.br</p>
+          </div>
+        </td>
+      </tr>
+    </tfoot>
+    <tbody>
+      <tr>
+        <td class="content">
+          <h1>Termos de Desarquivamento por Processos</h1>
+          <p>Total selecionado: ${selectedItems.length}</p>
+          <table class="termos-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nº processo eletrônico</th>
+                <th>Tipo</th>
+                <th>Nome</th>
+                <th>Número</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+          <div class="autenticacao">
+            <p><em>Documento impresso por ${userName} às ${horaImpressao} - ${dataImpressao}.</em></p>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    setIsPrintTermsModalOpen(false);
+    printHtmlDocument(html);
+  };
+
+  const filteredPrintCandidates = useMemo(() => {
+    const normalizedSearch = printProcessSearch.trim().toLowerCase();
+    if (!normalizedSearch) return printCandidates;
+
+    const terms = normalizedSearch
+      .split(/[\n,;]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (!terms.length) return printCandidates;
+
+    return printCandidates.filter((candidate) => {
+      const processNumber = String(candidate.numeroProcesso || "").toLowerCase();
+      return terms.some((term) => processNumber.includes(term));
+    });
+  }, [printCandidates, printProcessSearch]);
+
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setCurrentPage(1); // Reset to first page when searching
@@ -382,6 +665,21 @@ const DesarquivamentosPage: React.FC = () => {
     } else {
       newSearchParams.set("status", value);
     }
+
+    if (atencaoNecessariaFilter && value !== StatusDesarquivamento.SOLICITADO) {
+      setAtencaoNecessariaFilter(false);
+      newSearchParams.delete("atencaoNecessaria");
+    }
+
+    setSearchParams(newSearchParams);
+  };
+
+  const clearAtencaoNecessariaFilter = () => {
+    setAtencaoNecessariaFilter(false);
+    setCurrentPage(1);
+
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.delete("atencaoNecessaria");
     setSearchParams(newSearchParams);
   };
 
@@ -399,6 +697,22 @@ const DesarquivamentosPage: React.FC = () => {
     setDateRange(newDateRange);
     setCurrentPage(1);
   };
+
+  const handleOpenDetails = useMemo(
+    () => (id: number) => setDetailId(id || null),
+    [],
+  );
+
+  const handleStartEditStatus = useMemo(
+    () => (id: number) => setEditingStatusId(id),
+    [],
+  );
+
+  const handleUpdateStatus = useMemo(
+    () => (id: number, status: StatusDesarquivamento) =>
+      updateStatus.mutate({ id, status }),
+    [updateStatus],
+  );
 
   const getSortIcon = (field: SortField) => {
     if (sortBy !== field) {
@@ -488,6 +802,16 @@ const DesarquivamentosPage: React.FC = () => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
+            <Button
+              onClick={handleOpenPrintTermsModal}
+              variant="outline"
+              size="sm"
+              disabled={isLoadingPrintTerms}
+              className="border-border/60 bg-background/70 backdrop-blur"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              {isLoadingPrintTerms ? "Carregando..." : "Imprimir Termos"}
+            </Button>
             {canDelete && (
               <Button
                 asChild
@@ -543,183 +867,49 @@ const DesarquivamentosPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card className="relative z-10 overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
-              <Filter className="h-4 w-4 text-primary" />
-            </span>
-            Filtros
-          </CardTitle>
-          <CardDescription>
-            Use os filtros abaixo para encontrar solicitações específicas
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="search"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                Buscar
-              </label>
-              <SearchInput
-                id="search"
-                name="search"
-                placeholder="Buscar por código, requerente..."
-                value={searchTerm}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="status"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                Status
-              </label>
-              <Select value={statusFilter} onValueChange={handleStatusFilter}>
-                <SelectTrigger id="status" name="status">
-                  <SelectValue placeholder="Todos os status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os status</SelectItem>
-                  <SelectItem value={StatusDesarquivamento.FINALIZADO}>
-                    {getStatusLabel(StatusDesarquivamento.FINALIZADO)}
-                  </SelectItem>
-                  <SelectItem value={StatusDesarquivamento.DESARQUIVADO}>
-                    {getStatusLabel(StatusDesarquivamento.DESARQUIVADO)}
-                  </SelectItem>
-                  <SelectItem value={StatusDesarquivamento.NAO_COLETADO}>
-                    {getStatusLabel(StatusDesarquivamento.NAO_COLETADO)}
-                  </SelectItem>
-                  <SelectItem value={StatusDesarquivamento.SOLICITADO}>
-                    {getStatusLabel(StatusDesarquivamento.SOLICITADO)}
-                  </SelectItem>
-                  <SelectItem
-                    value={StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO}
-                  >
-                    {getStatusLabel(
-                      StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO,
-                    )}
-                  </SelectItem>
-                  <SelectItem value={StatusDesarquivamento.RETIRADO_PELO_SETOR}>
-                    {getStatusLabel(StatusDesarquivamento.RETIRADO_PELO_SETOR)}
-                  </SelectItem>
-                  <SelectItem value={StatusDesarquivamento.NAO_LOCALIZADO}>
-                    {getStatusLabel(StatusDesarquivamento.NAO_LOCALIZADO)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="dateRange"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                Período
-              </label>
-              <DateRangeInput
-                value={dateRange}
-                onChange={handleDateRangeChange}
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="tipoDesarquivamento"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                Desarquivamento
-              </label>
-              <Select
-                value={tipoDesarquivamentoFilter}
-                onValueChange={handleTipoDesarquivamentoFilter}
-              >
-                <SelectTrigger
-                  id="tipoDesarquivamento"
-                  name="tipoDesarquivamento"
-                >
-                  <SelectValue placeholder="Todos os tipos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  <SelectItem value={TipoDesarquivamento.FISICO}>
-                    {getTipoDesarquivamentoLabel(TipoDesarquivamento.FISICO)}
-                  </SelectItem>
-                  <SelectItem value={TipoDesarquivamento.DIGITAL}>
-                    {getTipoDesarquivamentoLabel(TipoDesarquivamento.DIGITAL)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="instituto"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                Instituto
-              </label>
-              <Select
-                value={institutoFilter}
-                onValueChange={setInstitutoFilter}
-              >
-                <SelectTrigger id="instituto" name="instituto">
-                  <SelectValue placeholder="Todos os institutos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os institutos</SelectItem>
-                  {INSTITUTOS.map((instituto) => (
-                    <SelectItem key={instituto.value} value={instituto.value}>
-                      {instituto.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="requerente"
-                className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                Requerente
-              </label>
-              <Select
-                value={requerenteFilter}
-                onValueChange={setRequerenteFilter}
-              >
-                <SelectTrigger id="requerente" name="requerente">
-                  <SelectValue placeholder="Todos os requerentes" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <SelectItem value="all">Todos os requerentes</SelectItem>
-                  {REQUERENTES.map((requerente) => (
-                    <SelectItem key={requerente.value} value={requerente.value}>
-                      {requerente.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <DesarquivamentosFiltersCard
+        atencaoNecessariaFilter={atencaoNecessariaFilter}
+        searchTerm={searchTerm}
+        statusFilter={statusFilter}
+        dateRange={dateRange}
+        tipoDesarquivamentoFilter={tipoDesarquivamentoFilter}
+        institutoFilter={institutoFilter}
+        requerenteFilter={requerenteFilter}
+        onClearAtencaoNecessariaFilter={clearAtencaoNecessariaFilter}
+        onSearch={handleSearch}
+        onStatusFilter={handleStatusFilter}
+        onDateRangeChange={handleDateRangeChange}
+        onTipoDesarquivamentoFilter={handleTipoDesarquivamentoFilter}
+        onInstitutoFilter={setInstitutoFilter}
+        onRequerenteFilter={setRequerenteFilter}
+      />
 
       {/* Table */}
       <Card className="relative overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
+        {isFetching && hasLoadedRows ? (
+          <div className="absolute inset-x-0 top-0 h-1 overflow-hidden rounded-t-xl bg-primary/10">
+            <div className="h-full w-1/3 animate-pulse rounded-full bg-primary/60" />
+          </div>
+        ) : null}
         <CardHeader>
-          <CardTitle className="text-base">Solicitações</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            Solicitações
+            {isFetching && hasLoadedRows ? (
+              <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : null}
+          </CardTitle>
           <CardDescription>
             {data?.meta?.total
               ? `${data.meta.total} ${data.meta.total === 1 ? "solicitação encontrada" : "solicitações encontradas"}`
               : "Nenhuma solicitação encontrada"}
+            {atencaoNecessariaFilter &&
+              " em atenção necessária (mais de 5 dias)."}
+            {isFetching && hasLoadedRows ? " Atualizando resultados..." : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading && !hasLoadedRows ? (
             <TableLoading />
           ) : (
             <div className="space-y-4">
@@ -736,12 +926,17 @@ const DesarquivamentosPage: React.FC = () => {
                           "tipoDesarquivamento",
                         )}
                       </TableHead>
-                      <TableHead>{renderSortableHeader("Status", "status")}</TableHead>
+                      <TableHead>
+                        {renderSortableHeader("Status", "status")}
+                      </TableHead>
                       <TableHead>
                         {renderSortableHeader("Nome", "nomeCompleto")}
                       </TableHead>
                       <TableHead>
-                        {renderSortableHeader("NIC/Laudo", "numeroNicLaudoAuto")}
+                        {renderSortableHeader(
+                          "NIC/Laudo",
+                          "numeroNicLaudoAuto",
+                        )}
                       </TableHead>
                       <TableHead>
                         {renderSortableHeader("Processo", "numeroProcesso")}
@@ -759,13 +954,19 @@ const DesarquivamentosPage: React.FC = () => {
                         )}
                       </TableHead>
                       <TableHead>
-                        {renderSortableHeader("Devolução", "dataDevolucaoSetor")}
+                        {renderSortableHeader(
+                          "Devolução",
+                          "dataDevolucaoSetor",
+                        )}
                       </TableHead>
                       <TableHead>
                         {renderSortableHeader("Setor", "setorDemandante")}
                       </TableHead>
                       <TableHead>
-                        {renderSortableHeader("Responsável", "servidorResponsavel")}
+                        {renderSortableHeader(
+                          "Responsável",
+                          "servidorResponsavel",
+                        )}
                       </TableHead>
                       <TableHead>
                         {renderSortableHeader(
@@ -785,227 +986,17 @@ const DesarquivamentosPage: React.FC = () => {
                   <TableBody>
                     {data?.data && data.data.length > 0 ? (
                       data.data.map((item) => (
-                        <TableRow
+                        <DesarquivamentoTableRow
                           key={item.id}
-                          className="hover:bg-muted cursor-pointer"
-                          onClick={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (
-                              target &&
-                              target.closest('[data-actions="true"]')
-                            )
-                              return;
-                            if (item.id) setDetailId(item.id);
-                          }}
-                        >
-                          <TableCell>
-                            <Badge variant="outline">
-                              {item.tipoDesarquivamento
-                                ? getTipoDesarquivamentoLabel(
-                                    item.tipoDesarquivamento as TipoDesarquivamento,
-                                  )
-                                : "-"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                          >
-                            {editingStatusId === item.id ? (
-                              <Select
-                                value={item.status}
-                                onValueChange={(value) =>
-                                  updateStatus.mutate({
-                                    id: item.id!,
-                                    status: value as StatusDesarquivamento,
-                                  })
-                                }
-                              >
-                                <SelectTrigger className="w-[130px] h-7 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem
-                                    value={StatusDesarquivamento.SOLICITADO}
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.SOLICITADO,
-                                    )}
-                                  </SelectItem>
-                                  <SelectItem
-                                    value={StatusDesarquivamento.DESARQUIVADO}
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.DESARQUIVADO,
-                                    )}
-                                  </SelectItem>
-                                  <SelectItem
-                                    value={
-                                      StatusDesarquivamento.RETIRADO_PELO_SETOR
-                                    }
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.RETIRADO_PELO_SETOR,
-                                    )}
-                                  </SelectItem>
-                                  <SelectItem
-                                    value={
-                                      StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO
-                                    }
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.REARQUIVAMENTO_SOLICITADO,
-                                    )}
-                                  </SelectItem>
-                                  <SelectItem
-                                    value={StatusDesarquivamento.NAO_COLETADO}
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.NAO_COLETADO,
-                                    )}
-                                  </SelectItem>
-                                  <SelectItem
-                                    value={StatusDesarquivamento.NAO_LOCALIZADO}
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.NAO_LOCALIZADO,
-                                    )}
-                                  </SelectItem>
-                                  <SelectItem
-                                    value={StatusDesarquivamento.FINALIZADO}
-                                  >
-                                    {getStatusLabel(
-                                      StatusDesarquivamento.FINALIZADO,
-                                    )}
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Badge
-                                onClick={() => setEditingStatusId(item.id!)}
-                                variant={
-                                  item.status ===
-                                  StatusDesarquivamento.FINALIZADO
-                                    ? "default"
-                                    : item.status ===
-                                        StatusDesarquivamento.NAO_LOCALIZADO
-                                      ? "destructive"
-                                      : item.status ===
-                                          StatusDesarquivamento.DESARQUIVADO
-                                        ? "secondary"
-                                        : "outline"
-                                }
-                                className="text-xs px-2 py-0.5 whitespace-nowrap leading-tight cursor-pointer"
-                              >
-                                {getStatusLabel(item.status)}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className="block max-w-[200px] truncate"
-                              title={item.nomeCompleto || ""}
-                            >
-                              {item.nomeCompleto || "-"}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className="block max-w-[160px] truncate font-mono"
-                              title={item.numeroNicLaudoAuto || ""}
-                            >
-                              {item.numeroNicLaudoAuto || "-"}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className="block max-w-[140px] truncate font-mono"
-                              title={item.numeroProcesso || ""}
-                            >
-                              {item.numeroProcesso || "-"}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className="block max-w-[160px] truncate"
-                              title={item.tipoDocumento || ""}
-                            >
-                              {item.tipoDocumento || "-"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {formatDate(item.createdAt || item.dataSolicitacao)}
-                          </TableCell>
-                          <TableCell>
-                            {item.dataDesarquivamentoSAG
-                              ? formatDate(item.dataDesarquivamentoSAG)
-                              : "-"}
-                          </TableCell>
-                          <TableCell>
-                            {item.dataDevolucaoSetor
-                              ? formatDate(item.dataDevolucaoSetor)
-                              : "-"}
-                          </TableCell>
-                          <TableCell>{item.setorDemandante || "-"}</TableCell>
-                          <TableCell>
-                            {item.servidorResponsavel || "-"}
-                          </TableCell>
-                          <TableCell>
-                            {item.finalidadeDesarquivamento || "-"}
-                          </TableCell>
-                          <TableCell>
-                            {item.solicitacaoProrrogacao ? "Sim" : "Não"}
-                          </TableCell>
-                          <TableCell
-                            className="text-right"
-                            data-actions="true"
-                            onClick={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                          >
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem
-                                  onSelect={() => {
-                                    setDetailId(item.id!);
-                                  }}
-                                >
-                                  Ver detalhes
-                                </DropdownMenuItem>
-                                {canEdit && (
-                                  <DropdownMenuItem asChild>
-                                    <Link
-                                      to={`/desarquivamentos/${item.id}/editar`}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Editar
-                                    </Link>
-                                  </DropdownMenuItem>
-                                )}
-                                {canDelete && (
-                                  <DropdownMenuItem
-                                    onSelect={() => {
-                                      setDetailId(null);
-                                      handleDeleteClick(item);
-                                    }}
-                                  >
-                                    Excluir
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                          item={item}
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          editingStatusId={editingStatusId}
+                          onStartEditStatus={handleStartEditStatus}
+                          onUpdateStatus={handleUpdateStatus}
+                          onOpenDetails={handleOpenDetails}
+                          onDelete={handleDeleteClick}
+                        />
                       ))
                     ) : (
                       <TableRow>
@@ -1069,6 +1060,149 @@ const DesarquivamentosPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {isPrintTermsModalOpen
+        ? createPortal(
+            <>
+              <div
+                className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
+                onClick={() => setIsPrintTermsModalOpen(false)}
+              />
+              <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none">
+                <div className="w-full max-w-3xl rounded-lg border border-border bg-background shadow-2xl pointer-events-auto">
+                  <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-foreground">
+                        Selecionar termos para impressão
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Selecione os processos para imprimir no mesmo documento.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 px-5 py-4">
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="print-process-search"
+                        className="text-sm font-medium text-foreground"
+                      >
+                        Buscar por nº de processo
+                      </label>
+                      <input
+                        id="print-process-search"
+                        type="text"
+                        value={printProcessSearch}
+                        onChange={(event) =>
+                          setPrintProcessSearch(event.target.value)
+                        }
+                        placeholder="Digite um ou mais processos (separe por vírgula ou ;)"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedPrintIds(
+                            filteredPrintCandidates.map(
+                              (candidate) => candidate.id,
+                            ),
+                          )
+                        }
+                        className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-muted"
+                      >
+                        Marcar visíveis
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPrintIds([])}
+                        className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground/80 transition-colors hover:bg-muted"
+                      >
+                        Limpar seleção
+                      </button>
+                    </div>
+
+                    <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+                      {filteredPrintCandidates.map((candidate) => {
+                        const selected = selectedPrintIds.includes(candidate.id);
+                        const tipo =
+                          candidate.tipoDocumento ||
+                          getTipoDesarquivamentoLabel(
+                            candidate.tipoDesarquivamento,
+                          );
+
+                        return (
+                          <label
+                            key={candidate.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:bg-muted/60"
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 h-4 w-4 rounded border-border text-primary"
+                              checked={selected}
+                              onChange={(event) => {
+                                const { checked } = event.target;
+                                setSelectedPrintIds((current) => {
+                                  if (checked) {
+                                    if (current.includes(candidate.id)) {
+                                      return current;
+                                    }
+                                    return [...current, candidate.id];
+                                  }
+
+                                  return current.filter(
+                                    (id) => id !== candidate.id,
+                                  );
+                                });
+                              }}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-foreground">
+                                Processo: {candidate.numeroProcesso || "-"}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                Tipo: {tipo || "-"}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                Nome: {candidate.nomeCompleto || "-"} | Número:{" "}
+                                {candidate.numeroNicLaudoAuto || "-"}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                      {filteredPrintCandidates.length === 0 && (
+                        <p className="px-2 py-3 text-sm text-muted-foreground">
+                          Nenhum processo encontrado para o filtro informado.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsPrintTermsModalOpen(false)}
+                      className="rounded-md border border-input bg-background px-4 py-2 text-sm text-foreground/80 transition-colors hover:bg-muted"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePrintSelectedTerms}
+                      className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                    >
+                      Imprimir selecionados
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>,
+            document.body,
+          )
+        : null}
 
       {/* Import Modal */}
       <ImportModal

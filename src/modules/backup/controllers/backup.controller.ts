@@ -6,6 +6,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -83,6 +84,12 @@ export class BackupController {
     description: "Backup não encontrado",
   })
   async restoreBackup(@Param("filename") filename: string) {
+    if (!this.backupService.isHttpRestoreEnabled()) {
+      throw new ForbiddenException(
+        "Restore via HTTP está desabilitado neste ambiente.",
+      );
+    }
+
     return await this.backupService.restoreBackup(filename);
   }
 

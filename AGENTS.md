@@ -3,6 +3,7 @@
 ## 0. Scope (IMPORTANT)
 - This file defines rules for the **Frontend** (React/Vite/TS/Tailwind).
 - If this repository also contains a backend (NestJS), put backend rules in: `backend/AGENTS.md` (or similar path).
+- Don't fight errors! whenever you encounter the same error twice, research the web and find 3-5 possible ways to fix it. Then choose the most efficient solution and implement it."
 
 ## 1. Project Context
 - Stack: React, Vite, TypeScript, TailwindCSS
@@ -62,3 +63,6 @@
 - Lint ok
 - Tests ok (or justified if none)
 - UI: no regressions; basic accessibility (labels, focus, keyboard nav) for changed screens
+
+
+

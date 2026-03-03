@@ -1,53 +1,56 @@
 /// <reference types="vite/client" />
 
-declare module '*.svg' {
-  import React = require('react');
-  export const ReactComponent: React.FunctionComponent<React.SVGProps<SVGSVGElement>>;
+import type * as React from "react";
+
+declare module "*.svg" {
+  export const ReactComponent: React.FunctionComponent<
+    React.SVGProps<SVGSVGElement>
+  >;
   const src: string;
   export default src;
 }
 
-declare module '*.jpg' {
+declare module "*.jpg" {
   const src: string;
   export default src;
 }
 
-declare module '*.jpeg' {
+declare module "*.jpeg" {
   const src: string;
   export default src;
 }
 
-declare module '*.png' {
+declare module "*.png" {
   const src: string;
   export default src;
 }
 
-declare module '*.gif' {
+declare module "*.gif" {
   const src: string;
   export default src;
 }
 
-declare module '*.webp' {
+declare module "*.webp" {
   const src: string;
   export default src;
 }
 
-declare module '*.ico' {
+declare module "*.ico" {
   const src: string;
   export default src;
 }
 
-declare module '*.woff2' {
+declare module "*.woff2" {
   const src: string;
   export default src;
 }
 
-declare module '*.woff' {
+declare module "*.woff" {
   const src: string;
   export default src;
 }
 
-declare module '*.ttf' {
+declare module "*.ttf" {
   const src: string;
   export default src;
 }

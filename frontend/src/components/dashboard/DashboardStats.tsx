@@ -102,7 +102,9 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
       titleColor: "text-red-500",
       bgColor: "bg-red-50 dark:bg-red-950/30",
       tendencia: tendenciaPendentes,
-      link: `/desarquivamentos?status=${StatusDesarquivamento.SOLICITADO}`,
+      link:
+        `/desarquivamentos?status=${StatusDesarquivamento.SOLICITADO}` +
+        "&atencaoNecessaria=true",
     },
   ];
 
@@ -113,12 +115,12 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
           {Array.from({ length: 2 }).map((_, index) => (
             <Card key={index} className="animate-pulse">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="h-4 bg-gray-200 rounded w-32"></div>
-                <div className="h-10 w-10 bg-gray-200 rounded-lg"></div>
+                <div className="h-4 bg-muted/40 rounded w-32"></div>
+                <div className="h-10 w-10 bg-muted/40 rounded-lg"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-9 bg-gray-200 rounded w-20 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-24"></div>
+                <div className="h-9 bg-muted/40 rounded w-20 mb-2"></div>
+                <div className="h-4 bg-muted/40 rounded w-24"></div>
               </CardContent>
             </Card>
           ))}
@@ -283,7 +285,7 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({
                         {count} ({percentage}%)
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200/80 rounded-full h-2.5 dark:bg-gray-800/60">
+                    <div className="w-full bg-muted/40/80 rounded-full h-2.5 dark:bg-gray-800/60">
                       <div
                         className={cn(
                           "h-2.5 rounded-full transition-all",

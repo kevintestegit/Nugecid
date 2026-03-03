@@ -5,6 +5,7 @@ import {
   ManyToOne,
   CreateDateColumn,
   JoinColumn,
+  Index,
 } from "typeorm";
 
 import { User } from "../../users/entities/user.entity";
@@ -21,6 +22,10 @@ export enum AuditAction {
 }
 
 @Entity("auditorias")
+@Index("idx_auditorias_user_id", ["userId"])
+@Index("idx_auditorias_action", ["action"])
+@Index("idx_auditorias_entity", ["entityName", "entityId"])
+@Index("idx_auditorias_timestamp", ["timestamp"])
 export class Auditoria {
   @PrimaryGeneratedColumn()
   id: number;

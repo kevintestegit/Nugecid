@@ -41,50 +41,25 @@ import {
 } from "@/utils/format";
 import { formatDateTime } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { toast } from "sonner";
 import { printRearquivamento } from "./print-templates";
+import {
+  buildDetailRows,
+  escapeHtml,
+  fetchRelatedRecords,
+  printHtmlDocument,
+  type DetailRowData,
+  type RelatedRecord,
+} from "./print-utils";
 import brasaorn from "@/components/img/Brasão-RN.png";
 import brasaoitep from "@/components/img/brasao-itep-optimized.png";
 import { getInstitutoLabel } from "@/constants/institutos";
 import axios from "axios";
-import type {
-  Desarquivamento,
-  StatusDesarquivamento,
-  TipoDesarquivamento,
-} from "@/types";
+import type { Desarquivamento, StatusDesarquivamento } from "@/types";
 interface DesarquivamentoDetailModalProps {
   id: number;
   onClose: () => void;
-}
-
-/** Shape of a related record returned by the /api/nugecid/:id/related endpoint */
-interface RelatedRecord {
-  id: number;
-  status?: string;
-  tipoDocumento?: string;
-  tipoDesarquivamento?: TipoDesarquivamento;
-  nomeCompleto?: string;
-  numeroNicLaudoAuto?: string;
-  quantidadeItens?: number;
-  itens?: Array<{
-    tipo?: string;
-    tipoDocumento?: string;
-    descricaoTipo?: string;
-    nome?: string;
-    registro?: string;
-    titulo?: string;
-    observacao?: string;
-    descricao?: string;
-    detalhe?: string;
-  }>;
-}
-
-interface DetailRowData {
-  index: number;
-  type: string;
-  name: string;
-  code: string;
-  observation: string;
 }
 
 const STATUS_ALIAS_MAP: Record<string, string> = {
@@ -103,6 +78,13 @@ const STATUS_CANDIDATES = [
   "REARQUIVADO",
   "REARQUIVAMENTO",
 ];
+
+const PLACEHOLDER_TEMPLATE = {
+  processoEletronico: "{{processo_eletronico}}",
+  tipoDocumentoPrimeiroItem: "{{tipo_documento_1}}",
+  nomePrimeiroItem: "{{nome_1}}",
+  numeroPrimeiroItem: "{{numero_1}}",
+} as const;
 
 const isValidTimestamp = (value?: string): value is string => {
   if (!value) return false;
@@ -181,6 +163,7 @@ export const DesarquivamentoDetailModal: React.FC<
   const { data: historico = [] } = useDesarquivamentoHistorico(id);
   const [commentText, setCommentText] = useState("");
   const { user } = useAuth();
+  const { theme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
   const previousBodyOverflowRef = useRef<string>("");
   const previousHtmlOverflowRef = useRef<string>("");
@@ -286,16 +269,6 @@ export const DesarquivamentoDetailModal: React.FC<
     }
   };
 
-  const placeholderTemplate = useMemo(
-    () => ({
-      processoEletronico: "{{processo_eletronico}}",
-      tipoDocumentoPrimeiroItem: "{{tipo_documento_1}}",
-      nomePrimeiroItem: "{{nome_1}}",
-      numeroPrimeiroItem: "{{numero_1}}",
-    }),
-    [],
-  );
-
   const movimentacaoDates = useMemo(() => {
     const normalizedCurrentStatus = normalizeStatusValue(item?.status);
 
@@ -376,40 +349,9 @@ export const DesarquivamentoDetailModal: React.FC<
     };
   }, [historico, item]);
 
-  const handlePrintDesarquivamento = async () => {
-    if (!item) {
-      toast.error("Nao foi possivel localizar os dados para gerar o termo.");
-      return;
-    }
-
-    try {
-      // Buscar registros relacionados pelo mesmo número de processo
-      const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
-        credentials: "include",
-      });
-
-      if (!relatedResponse.ok) {
-        throw new Error("Erro ao buscar registros relacionados");
-      }
-
-      const relatedData = await relatedResponse.json();
-      const relatedRecords = relatedData.success ? relatedData.data : [item];
-
-      const eligibleRecords = (relatedRecords || []).filter(
-        (record: RelatedRecord) => {
-          const statusValue = String(record?.status ?? "")
-            .trim()
-            .toUpperCase();
-          return statusValue === "DESARQUIVADO";
-        },
-      );
-
-      if (!eligibleRecords.length) {
-        toast.error(
-          "Somente registros desarquivados podem gerar o termo de impressão.",
-        );
-        return;
-      }
+  const executePrintDesarquivamento = useCallback(
+    (recordsToPrint: RelatedRecord[]) => {
+      if (!item) return;
 
       const baseHref =
         window.location.origin + (import.meta.env?.BASE_URL ?? "/");
@@ -418,28 +360,8 @@ export const DesarquivamentoDetailModal: React.FC<
       const logoRN = toAbs(brasaorn);
       const logoITEP = toAbs(brasaoitep);
 
-      const escapeHtml = (value: unknown): string => {
-        if (value === null || value === undefined) {
-          return "";
-        }
-        return String(value).replace(
-          /[&<>"']/g,
-          (match) =>
-            ({
-              "&": "&amp;",
-              '"': "&quot;",
-              "'": "&#39;",
-              "<": "&lt;",
-              ">": "&gt;",
-            })[match] || match,
-        );
-      };
-
       const userName = escapeHtml(
         user?.nome || user?.usuario || "Usuário não identificado",
-      );
-      const matricula = escapeHtml(
-        user?.matricula || "Matrícula não informada",
       );
       const assinaturaDate = new Date();
       const dataAssinatura = escapeHtml(
@@ -453,74 +375,22 @@ export const DesarquivamentoDetailModal: React.FC<
         }),
       );
 
-      // Gerar linhas para todos os registros elegíveis com numeração sequencial
-      const detailRows: DetailRowData[] = eligibleRecords
-        .map((record: RelatedRecord, globalIndex: number) => {
-          const rawItems = Array.isArray(record?.itens) ? record.itens : [];
-          const identifiers = (record.numeroNicLaudoAuto || "")
-            .split(/[,;]+/)
-            .map((part: string) => part.trim())
-            .filter(Boolean);
-          const fallbackIdentifiers =
-            identifiers.length > 0
-              ? identifiers
-              : [record.numeroNicLaudoAuto || "-"];
+      const detailRows: DetailRowData[] = buildDetailRows(recordsToPrint);
 
-          const inferredQuantity =
-            typeof record.quantidadeItens === "number" &&
-            record.quantidadeItens > 0
-              ? record.quantidadeItens
-              : rawItems.length > 0
-                ? rawItems.length
-                : fallbackIdentifiers.length;
-          const normalizedQuantity =
-            inferredQuantity > 0 ? inferredQuantity : 1;
-
-          const baseType = escapeHtml(
-            record.tipoDocumento ||
-              (record.tipoDesarquivamento
-                ? getTipoDesarquivamentoLabel(record.tipoDesarquivamento)
-                : ""),
-          );
-
-          // Para cada registro, gerar as linhas correspondentes
-          const recordRows = fallbackIdentifiers.map(
-            (code: string, localIndex: number) => {
-              const current = rawItems[localIndex];
-              const typeValue =
-                current && typeof current === "object"
-                  ? (current?.tipo ??
-                    current?.tipoDocumento ??
-                    current?.descricaoTipo)
-                  : undefined;
-              const nameValue =
-                current && typeof current === "object"
-                  ? (current?.nome ?? current?.registro ?? current?.titulo)
-                  : undefined;
-              const observationValue =
-                current && typeof current === "object"
-                  ? (current?.observacao ??
-                    current?.descricao ??
-                    current?.detalhe)
-                  : undefined;
-
-              return {
-                index: globalIndex + 1, // Numeração sequencial global
-                type: escapeHtml(typeValue ?? baseType),
-                name: escapeHtml(nameValue ?? record.nomeCompleto ?? "-"),
-                code: escapeHtml(code ?? "-"),
-                observation: escapeHtml(observationValue ?? ""),
-              };
-            },
-          );
-
-          return recordRows;
-        })
-        .flat();
+      const processNumbers = Array.from(
+        new Set(
+          recordsToPrint
+            .map((record) => String(record.numeroProcesso || "").trim())
+            .filter(Boolean),
+        ),
+      );
 
       const processNumber = escapeHtml(
-        item.numeroProcesso || String(item.id ?? "-"),
+        processNumbers.length > 0
+          ? processNumbers.join(", ")
+          : item.numeroProcesso || String(item.id ?? "-"),
       );
+
       // Data "agora" (no cliente) para o termo impresso
       const hoje = new Date();
       const dataRetirada = escapeHtml(
@@ -528,23 +398,18 @@ export const DesarquivamentoDetailModal: React.FC<
           ? formatDate(hoje)
           : hoje.toLocaleDateString("pt-BR"),
       );
-      const tipoDocumentoPrincipal = escapeHtml(
-        item.tipoDocumento ||
-          getTipoDesarquivamentoLabel(item.tipoDesarquivamento),
-      );
-      const nomeRegistro = escapeHtml(item.nomeCompleto ?? "-");
 
       const rowsHtml = detailRows
         .map((row: DetailRowData) => {
           const isFirstRow = row.index === 1;
           const typeCell = isFirstRow
-            ? placeholderTemplate.tipoDocumentoPrimeiroItem
+            ? PLACEHOLDER_TEMPLATE.tipoDocumentoPrimeiroItem
             : row.type;
           const nameCell = isFirstRow
-            ? placeholderTemplate.nomePrimeiroItem
+            ? PLACEHOLDER_TEMPLATE.nomePrimeiroItem
             : row.name;
           const numberCell = isFirstRow
-            ? placeholderTemplate.numeroPrimeiroItem
+            ? PLACEHOLDER_TEMPLATE.numeroPrimeiroItem
             : row.code;
 
           return `
@@ -747,7 +612,7 @@ export const DesarquivamentoDetailModal: React.FC<
               </tr>
               <tr>
                 <td colspan="4" class="faixa center fs12">
-                  ${placeholderTemplate.processoEletronico || ""}
+                  ${PLACEHOLDER_TEMPLATE.processoEletronico || ""}
                 </td>
               </tr>
 
@@ -825,11 +690,11 @@ export const DesarquivamentoDetailModal: React.FC<
 </html>`;
 
       const placeholderValues: Record<string, string> = {
-        [placeholderTemplate.processoEletronico]: processNumber,
-        [placeholderTemplate.tipoDocumentoPrimeiroItem]:
+        [PLACEHOLDER_TEMPLATE.processoEletronico]: processNumber,
+        [PLACEHOLDER_TEMPLATE.tipoDocumentoPrimeiroItem]:
           detailRows[0]?.type ?? "-",
-        [placeholderTemplate.nomePrimeiroItem]: detailRows[0]?.name ?? "-",
-        [placeholderTemplate.numeroPrimeiroItem]: detailRows[0]?.code ?? "-",
+        [PLACEHOLDER_TEMPLATE.nomePrimeiroItem]: detailRows[0]?.name ?? "-",
+        [PLACEHOLDER_TEMPLATE.numeroPrimeiroItem]: detailRows[0]?.code ?? "-",
       };
 
       const html = Object.entries(placeholderValues).reduce(
@@ -839,121 +704,14 @@ export const DesarquivamentoDetailModal: React.FC<
         templateHtml,
       );
 
-      const printWindow = window.open("", "_blank", "width=900,height=650");
-      if (!printWindow) {
-        toast.error("Nao foi possivel abrir a janela de impressao.");
-        return;
-      }
+      printHtmlDocument(html);
+    },
+    [item, user],
+  );
 
-      printWindow.document.write(html);
-      printWindow.document.close();
-
-      let hasPrinted = false;
-      const tryPrint = () => {
-        if (hasPrinted) return;
-        hasPrinted = true;
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      };
-
-      const imgs = Array.from(printWindow.document.images || []);
-      if (imgs.length === 0) {
-        setTimeout(tryPrint, 300);
-      } else {
-        let loaded = 0;
-        const failSafe = window.setTimeout(tryPrint, 2000);
-        const done = () => {
-          loaded++;
-          if (loaded === imgs.length) {
-            window.clearTimeout(failSafe);
-            tryPrint();
-          }
-        };
-        imgs.forEach((img) => {
-          if (img.complete) {
-            done();
-          } else {
-            img.addEventListener("load", done, { once: true });
-            img.addEventListener("error", done, { once: true });
-          }
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao gerar termo:", error);
-      toast.error("Erro ao gerar termo de impressão");
-    }
-  };
-
-  const handleDownloadDocx = async () => {
-    if (!item) {
-      toast.error(
-        "Não foi possível localizar os dados para gerar o documento.",
-      );
-      return;
-    }
-
-    try {
-      await downloadDocxMutation.mutateAsync(id);
-      toast.success("Documento DOCX baixado com sucesso!");
-    } catch (error) {
-      console.error("Erro ao baixar DOCX:", error);
-      toast.error("Erro ao baixar documento DOCX");
-    }
-  };
-
-  const handlePrintRearquivamento = async () => {
-    if (!item) {
-      toast.error("Não foi possível localizar os dados para gerar o termo.");
-      return;
-    }
-
-    try {
-      // Buscar registros relacionados pelo mesmo número de processo com status REARQUIVAMENTO_SOLICITADO
-      const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
-        credentials: "include",
-      });
-
-      if (!relatedResponse.ok) {
-        throw new Error("Erro ao buscar registros relacionados");
-      }
-
-      const relatedData = await relatedResponse.json();
-      const relatedRecords = relatedData.success ? relatedData.data : [item];
-
-      // Filtrar apenas registros com status REARQUIVAMENTO_SOLICITADO
-      const eligibleRecords = (relatedRecords || []).filter(
-        (record: RelatedRecord) => {
-          const statusValue = String(record?.status ?? "")
-            .trim()
-            .toUpperCase();
-          return statusValue === "REARQUIVAMENTO_SOLICITADO";
-        },
-      );
-
-      if (!eligibleRecords.length) {
-        toast.error(
-          'Somente registros com status "Rearquivamento Solicitado" podem gerar o termo de rearquivamento.',
-        );
-        return;
-      }
-
-      const escapeHtml = (value: unknown): string => {
-        if (value === null || value === undefined) {
-          return "";
-        }
-        return String(value).replace(
-          /[&<>"']/g,
-          (match) =>
-            ({
-              "&": "&amp;",
-              '"': "&quot;",
-              "'": "&#39;",
-              "<": "&lt;",
-              ">": "&gt;",
-            })[match] || match,
-        );
-      };
+  const executePrintRearquivamento = useCallback(
+    (recordsToPrint: RelatedRecord[]) => {
+      if (!item) return;
 
       const userName = escapeHtml(
         user?.nome || user?.usuario || "Usuário não identificado",
@@ -973,13 +731,22 @@ export const DesarquivamentoDetailModal: React.FC<
         }),
       );
 
+      const processNumbers = Array.from(
+        new Set(
+          recordsToPrint
+            .map((record) => String(record.numeroProcesso || "").trim())
+            .filter(Boolean),
+        ),
+      );
       const processNumber = escapeHtml(
-        item.numeroProcesso || String(item.id ?? "-"),
+        processNumbers.length > 0
+          ? processNumbers.join(", ")
+          : item.numeroProcesso || String(item.id ?? "-"),
       );
       const dataHoraRecebimento = escapeHtml(formatDate(new Date()) || "-");
 
       // Montar lista de itens para o template (NIC/Laudo no campo NÚMERO, tipoDocumento - NomeCompleto no campo DESCRIÇÃO)
-      const itens = eligibleRecords.map((record: RelatedRecord) => {
+      const itens = recordsToPrint.map((record: RelatedRecord) => {
         const tipo =
           record.tipoDocumento ||
           (record.tipoDesarquivamento
@@ -1005,11 +772,91 @@ export const DesarquivamentoDetailModal: React.FC<
         horaAssinatura,
         itens,
       });
+    },
+    [item, user],
+  );
+
+  const handlePrintDesarquivamento = useCallback(async () => {
+    if (!item) {
+      toast.error("Nao foi possivel localizar os dados para gerar o termo.");
+      return;
+    }
+
+    try {
+      const relatedRecords = (await fetchRelatedRecords(item.id)) || [item];
+
+      const eligibleRecords = (relatedRecords || []).filter(
+        (record: RelatedRecord) => {
+          const statusValue = String(record?.status ?? "")
+            .trim()
+            .toUpperCase();
+          return statusValue === "DESARQUIVADO";
+        },
+      );
+
+      if (!eligibleRecords.length) {
+        toast.error(
+          "Somente registros desarquivados podem gerar o termo de impressão.",
+        );
+        return;
+      }
+
+      executePrintDesarquivamento(eligibleRecords);
+    } catch (error) {
+      console.error("Erro ao gerar termo:", error);
+      toast.error("Erro ao gerar termo de impressão");
+    }
+  }, [executePrintDesarquivamento, item]);
+
+  const handleDownloadDocx = useCallback(async () => {
+    if (!item) {
+      toast.error(
+        "Não foi possível localizar os dados para gerar o documento.",
+      );
+      return;
+    }
+
+    try {
+      await downloadDocxMutation.mutateAsync(id);
+      toast.success("Documento DOCX baixado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao baixar DOCX:", error);
+      toast.error("Erro ao baixar documento DOCX");
+    }
+  }, [downloadDocxMutation, id, item]);
+
+  const handlePrintRearquivamento = useCallback(async () => {
+    if (!item) {
+      toast.error("Não foi possível localizar os dados para gerar o termo.");
+      return;
+    }
+
+    try {
+      const relatedRecords = (await fetchRelatedRecords(item.id)) || [item];
+
+      // Filtrar apenas registros com status REARQUIVAMENTO_SOLICITADO
+      const eligibleRecords = (relatedRecords || []).filter(
+        (record: RelatedRecord) => {
+          const statusValue = String(record?.status ?? "")
+            .trim()
+            .toUpperCase();
+          return statusValue === "REARQUIVAMENTO_SOLICITADO";
+        },
+      );
+
+      if (!eligibleRecords.length) {
+        toast.error(
+          'Somente registros com status "Rearquivamento Solicitado" podem gerar o termo de rearquivamento.',
+        );
+        return;
+      }
+
+      executePrintRearquivamento(eligibleRecords);
     } catch (error) {
       console.error("Erro ao gerar termo de rearquivamento:", error);
       toast.error("Erro ao gerar termo de rearquivamento");
     }
-  };
+  }, [executePrintRearquivamento, item]);
 
   if (!isMounted) {
     return null;
@@ -1028,25 +875,25 @@ export const DesarquivamentoDetailModal: React.FC<
       }}
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-background rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-              <ClipboardList className="h-5 w-5 text-indigo-600" />
+            <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+              <ClipboardList className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-foreground">
                 Detalhes da Solicitação
               </h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 Informações completas do desarquivamento
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+            className="text-muted-foreground/70 hover:text-muted-foreground p-1 rounded hover:bg-muted transition-colors"
             title="Fechar"
           >
             <X className="h-5 w-5" />
@@ -1063,36 +910,36 @@ export const DesarquivamentoDetailModal: React.FC<
             <>
               {/* Cards de Resumo no Topo */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-600 font-medium mb-1">
+                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                  <div className="text-xs text-muted-foreground font-medium mb-1">
                     Tipo
                   </div>
-                  <div className="text-lg font-semibold text-gray-900">
+                  <div className="text-lg font-semibold text-foreground">
                     {getTipoDesarquivamentoLabel(item.tipoDesarquivamento)}
                   </div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-600 font-medium mb-1">
+                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                  <div className="text-xs text-muted-foreground font-medium mb-1">
                     Status
                   </div>
-                  <div className="text-lg font-semibold text-gray-900">
+                  <div className="text-lg font-semibold text-foreground">
                     {getStatusLabel(item.status)}
                   </div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="text-xs text-gray-600 font-medium mb-1">
+                <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                  <div className="text-xs text-muted-foreground font-medium mb-1">
                     Criação
                   </div>
-                  <div className="text-lg font-semibold text-gray-900">
+                  <div className="text-lg font-semibold text-foreground">
                     {formatDate(item.createdAt || item.dataSolicitacao)}
                   </div>
                 </div>
                 {item.urgente && (
-                  <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-                    <div className="text-xs text-red-600 font-medium mb-1">
+                  <div className="bg-red-50 dark:bg-red-900/30 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                    <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">
                       Prioridade
                     </div>
-                    <div className="text-lg font-semibold text-red-700 flex items-center gap-2">
+                    <div className="text-lg font-semibold text-red-700 dark:text-red-300 flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5" />
                       URGENTE
                     </div>
@@ -1101,10 +948,10 @@ export const DesarquivamentoDetailModal: React.FC<
               </div>
 
               {/* Informações do Documento */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-gray-600" />
-                  <h4 className="text-base font-semibold text-gray-900">
+              <div className="bg-background rounded-lg border border-border overflow-hidden">
+                <div className="bg-muted/50 border-b border-border px-4 py-3 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <h4 className="text-base font-semibold text-foreground">
                     Informações do Documento
                   </h4>
                 </div>
@@ -1134,10 +981,10 @@ export const DesarquivamentoDetailModal: React.FC<
                     />
                   )}
                   <div className="md:col-span-2">
-                    <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                    <div className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
                       Observações
                     </div>
-                    <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
+                    <div className="text-sm text-foreground bg-muted/50 rounded-lg p-4 border border-border whitespace-pre-wrap break-words">
                       {item.dadosAdicionais || "-"}
                     </div>
                   </div>
@@ -1145,10 +992,10 @@ export const DesarquivamentoDetailModal: React.FC<
               </div>
 
               {/* Setor e Responsável */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-                  <User className="h-5 w-5 text-gray-600" />
-                  <h4 className="text-base font-semibold text-gray-900">
+              <div className="bg-background rounded-lg border border-border overflow-hidden">
+                <div className="bg-muted/50 border-b border-border px-4 py-3 flex items-center gap-2">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <h4 className="text-base font-semibold text-foreground">
                     Setor e Responsável
                   </h4>
                 </div>
@@ -1175,20 +1022,20 @@ export const DesarquivamentoDetailModal: React.FC<
               </div>
 
               {/* Justificativa e Prazos */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-gray-600" />
-                  <h4 className="text-base font-semibold text-gray-900">
+              <div className="bg-background rounded-lg border border-border overflow-hidden">
+                <div className="bg-muted/50 border-b border-border px-4 py-3 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  <h4 className="text-base font-semibold text-foreground">
                     Justificativa e Finalidade
                   </h4>
                 </div>
                 <div className="p-5 space-y-4">
                   {item.justificativa && (
                     <div>
-                      <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                      <div className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
                         Justificativa
                       </div>
-                      <div className="text-sm text-gray-900 bg-gray-50 rounded-lg p-4 border border-gray-200 whitespace-pre-wrap break-words">
+                      <div className="text-sm text-foreground bg-muted/50 rounded-lg p-4 border border-border whitespace-pre-wrap break-words">
                         {item.justificativa}
                       </div>
                     </div>
@@ -1199,7 +1046,7 @@ export const DesarquivamentoDetailModal: React.FC<
                     fullWidth
                   />
                   {(item.prazoDesarquivamento || item.prazoVencimento) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-3 border-t border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-3 border-t border-border">
                       {item.prazoDesarquivamento && (
                         <DetailRow
                           label="Prazo de Desarquivamento"
@@ -1221,10 +1068,10 @@ export const DesarquivamentoDetailModal: React.FC<
               </div>
 
               {/* Prazos e Datas */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-gray-600" />
-                  <h4 className="text-base font-semibold text-gray-900">
+              <div className="bg-background rounded-lg border border-border overflow-hidden">
+                <div className="bg-muted/50 border-b border-border px-4 py-3 flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                  <h4 className="text-base font-semibold text-foreground">
                     Prazos e Movimentação
                   </h4>
                 </div>
@@ -1257,10 +1104,10 @@ export const DesarquivamentoDetailModal: React.FC<
               {/* Prorrogação */}
               {(item.solicitacaoProrrogacao ||
                 item.solicitacaoProrrogacaoTexto) && (
-                <div className="bg-amber-50 rounded-lg border border-amber-200 overflow-hidden">
-                  <div className="bg-amber-100 border-b border-amber-200 px-4 py-3 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-700" />
-                    <h4 className="text-base font-semibold text-amber-900">
+                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden">
+                  <div className="bg-amber-100 dark:bg-amber-900/50 border-b border-amber-200 dark:border-amber-800 px-4 py-3 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+                    <h4 className="text-base font-semibold text-amber-900 dark:text-amber-100">
                       Solicitação de Prorrogação
                     </h4>
                   </div>
@@ -1271,10 +1118,10 @@ export const DesarquivamentoDetailModal: React.FC<
                     />
                     {item.solicitacaoProrrogacaoTexto && (
                       <div className="mt-3">
-                        <div className="text-sm font-semibold text-amber-800 mb-2">
+                        <div className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-2">
                           Justificativa:
                         </div>
-                        <div className="text-sm text-gray-800 bg-white rounded-lg p-3 border border-amber-200">
+                        <div className="text-sm text-foreground/90 bg-background rounded-lg p-3 border border-amber-200 dark:border-amber-800">
                           {item.solicitacaoProrrogacaoTexto}
                         </div>
                       </div>
@@ -1284,26 +1131,26 @@ export const DesarquivamentoDetailModal: React.FC<
               )}
 
               {/* Comentários */}
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5 text-gray-600" />
-                  <h4 className="text-base font-semibold text-gray-900">
+              <div className="bg-background rounded-lg border border-border overflow-hidden">
+                <div className="bg-muted/50 border-b border-border px-4 py-3 flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5 text-muted-foreground" />
+                  <h4 className="text-base font-semibold text-foreground">
                     Comentários
                   </h4>
                 </div>
                 <div className="p-5 space-y-4">
                   <form onSubmit={handleSubmitComment} className="space-y-3">
                     <textarea
-                      className="w-full min-h-[100px] rounded-lg border border-gray-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                      className="w-full min-h-[100px] rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
                       placeholder="Adicione um comentário sobre esta solicitação..."
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
                       maxLength={2000}
                     />
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-muted-foreground">
                         Comentando como{" "}
-                        <strong className="text-gray-700">
+                        <strong className="text-foreground/80">
                           {user?.nome || user?.usuario || "Usuário"}
                         </strong>
                       </span>
@@ -1330,12 +1177,12 @@ export const DesarquivamentoDetailModal: React.FC<
                   <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
                     {isLoadingComments ? (
                       <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       </div>
                     ) : comments.length === 0 ? (
-                      <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
-                        <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">
+                      <div className="text-center py-8 bg-muted/50 rounded-lg border border-border">
+                        <MessageCircle className="h-12 w-12 text-gray-400 dark:text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
                           Nenhum comentário registrado até o momento.
                         </p>
                       </div>
@@ -1343,18 +1190,18 @@ export const DesarquivamentoDetailModal: React.FC<
                       comments.map((comment) => (
                         <div
                           key={comment.id}
-                          className="bg-gray-50 border-l-4 border-indigo-500 rounded-lg px-4 py-3 shadow-sm"
+                          className="bg-muted/50 border-l-4 border-indigo-500 rounded-lg px-4 py-3 shadow-sm"
                         >
-                          <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-                            <span className="font-bold text-gray-800 flex items-center gap-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                            <span className="font-bold text-foreground/90 flex items-center gap-2">
                               <User className="h-3 w-3" />
                               {comment.authorName}
                             </span>
-                            <span className="text-gray-500">
+                            <span className="text-muted-foreground">
                               {formatDateTime(comment.createdAt)}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
                             {comment.comment}
                           </p>
                         </div>
@@ -1366,18 +1213,18 @@ export const DesarquivamentoDetailModal: React.FC<
             </>
           ) : (
             <div className="text-center py-10">
-              <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500">Registro não encontrado</p>
+              <AlertTriangle className="h-12 w-12 text-gray-400 dark:text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">Registro não encontrado</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex justify-end gap-3 p-6 border-t border-border bg-muted/50">
           <div className="relative" ref={printDropdownRef}>
             <button
               onClick={() => setShowPrintDropdown(!showPrintDropdown)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-foreground/80 hover:bg-muted focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
             >
               <Printer className="h-4 w-4" />
               Imprimir Termo
@@ -1387,16 +1234,16 @@ export const DesarquivamentoDetailModal: React.FC<
             </button>
 
             {showPrintDropdown && (
-              <div className="absolute bottom-full mb-2 right-0 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="absolute bottom-full mb-2 right-0 w-56 bg-background rounded-lg shadow-lg border border-border py-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <button
                   onClick={() => {
                     setShowPrintDropdown(false);
                     handlePrintDesarquivamento();
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors flex items-center gap-2 rounded-t-lg"
+                  className="w-full text-left px-4 py-2 hover:bg-primary/5 transition-colors flex items-center gap-2 rounded-t-lg"
                 >
-                  <FileText className="h-4 w-4 text-indigo-600" />
-                  <span className="text-sm font-medium text-gray-700">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground/80">
                     Desarquivamento
                   </span>
                 </button>
@@ -1406,10 +1253,10 @@ export const DesarquivamentoDetailModal: React.FC<
                     setShowPrintDropdown(false);
                     handlePrintRearquivamento();
                   }}
-                  className="w-full text-left px-4 py-2 hover:bg-indigo-50 transition-colors flex items-center gap-2 rounded-b-lg"
+                  className="w-full text-left px-4 py-2 hover:bg-primary/5 transition-colors flex items-center gap-2 rounded-b-lg"
                 >
-                  <FileText className="h-4 w-4 text-indigo-600" />
-                  <span className="text-sm font-medium text-gray-700">
+                  <FileText className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground/80">
                     Rearquivamento
                   </span>
                 </button>
@@ -1421,7 +1268,7 @@ export const DesarquivamentoDetailModal: React.FC<
               onClose();
               navigate(`/desarquivamentos/${id}`);
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-input bg-background text-foreground/80 hover:bg-muted focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
           >
             <Eye className="h-4 w-4" />
             Ver Detalhes Completos
@@ -1434,7 +1281,7 @@ export const DesarquivamentoDetailModal: React.FC<
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+            className="px-4 py-2 border border-input rounded-md text-foreground/80 bg-background hover:bg-muted/80 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
           >
             Fechar
           </button>
@@ -1443,7 +1290,10 @@ export const DesarquivamentoDetailModal: React.FC<
     </div>
   );
 
-  return createPortal(modalNode, document.body);
+  return createPortal(
+    <div className={theme === "dark" ? "dark" : ""}>{modalNode}</div>,
+    document.body,
+  );
 };
 
 const copyTextSafely = async (text: string): Promise<boolean> => {
@@ -1518,13 +1368,15 @@ const DetailRow = ({
   };
 
   const baseValueClasses = `text-sm font-medium break-words ${
-    highlight ? "text-orange-600 italic" : "text-gray-900"
+    highlight
+      ? "text-orange-600 dark:text-orange-400 italic"
+      : "text-foreground"
   }`;
 
   if (!copyable) {
     return (
       <div className={fullWidth ? "md:col-span-2" : ""}>
-        <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+        <div className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
           {label}
         </div>
         <div className={baseValueClasses}>{value || "-"}</div>
@@ -1534,7 +1386,7 @@ const DetailRow = ({
 
   return (
     <div className={fullWidth ? "md:col-span-2" : ""}>
-      <div className="text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+      <div className="text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
         {label}
       </div>
       <div className={`${baseValueClasses} flex items-center gap-2`}>
@@ -1544,7 +1396,7 @@ const DetailRow = ({
             <button
               type="button"
               onClick={handleCopy}
-              className="rounded-full p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              className="rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               title="Copiar valor"
               aria-label="Copiar valor"
             >
@@ -1572,8 +1424,8 @@ const Detail = ({
   value?: string | number | boolean | null;
 }) => (
   <div>
-    <div className="text-xs text-gray-500 mb-1">{label}</div>
-    <div className="text-sm text-gray-900 break-words">{value || "-"}</div>
+    <div className="text-xs text-muted-foreground mb-1">{label}</div>
+    <div className="text-sm text-foreground break-words">{value || "-"}</div>
   </div>
 );
 

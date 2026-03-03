@@ -23,6 +23,25 @@ Este roadmap foi **repriorizado** considerando:
 - **Ações FUTURAS (quando possível):** 7
 - **Tempo total estimado:** 55-75 horas (vs 160 original)
 
+### Atualização de Execução - 2026-03-06
+
+Itens já concluídos fora da versão original deste roadmap:
+- `Auth/logout/cookies`: logout limpa `access_token` e `connect.sid`; regra de `secure` foi alinhada com a configuração central.
+- `Auth/refresh`: refresh token passou para cookie `httpOnly` (`refresh_token`), removendo a dependência de estado secreto em memória no frontend e endurecendo o contrato do login JSON.
+- `Ambiente/deploy`: redirect raiz usa `FRONTEND_URL`, `FRONTEND_URL` voltou a ser obrigatório em produção e CSP foi ajustada para as fontes externas realmente usadas.
+- `Frontend auth`: checagem inicial de sessão e refresh deixaram de manter UI autenticada stale.
+- `Frontend operacional`: `getDesarquivamentos` voltou a propagar erro real; Carnaval e Corpus Christi foram corrigidos para `ponto_facultativo`.
+- `Acessibilidade/consistência`: `PrazosCalendar` agora tem interação por clique/foco/teclado; `NugecidLogo` usa IDs SVG únicos; listeners globais ficaram seguros para HMR.
+- `Validação`: backend e frontend foram revalidados com testes, typecheck e build.
+
+Próximo foco recomendado:
+- consolidar a estratégia de autenticação
+- revisar padrão de deploy/configuração por ambiente
+- priorizar observabilidade e backlog operacional
+
+Backlog de produto consolidado:
+- ver `docs/planning/BACKLOG-PRODUTO-PRIORIZADO.md`
+
 ### ⚠️ DECISÕES DO PROJETO
 - **Email/Telefone em User:** NÃO SERÁ IMPLEMENTADO conforme decisão do projeto
 - **Rotação de Credenciais:** Será feita quando o sistema for ativado (não agora)

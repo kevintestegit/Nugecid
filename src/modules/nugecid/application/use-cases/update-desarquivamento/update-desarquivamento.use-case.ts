@@ -2,10 +2,10 @@ import { Injectable, Inject, Logger } from "@nestjs/common";
 import {
   DesarquivamentoDomain,
   DesarquivamentoId,
-  StatusDesarquivamento,
   IDesarquivamentoRepository,
 } from "../../../domain";
 import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
+import { DesarquivamentoEffectsPublisher } from "../../services/desarquivamento-effects.publisher";
 
 export interface UpdateDesarquivamentoRequest {
   id: number;
@@ -85,6 +85,7 @@ export class UpdateDesarquivamentoUseCase {
   constructor(
     @Inject(DESARQUIVAMENTO_REPOSITORY_TOKEN)
     private readonly desarquivamentoRepository: IDesarquivamentoRepository,
+    private readonly desarquivamentoEffectsPublisher: DesarquivamentoEffectsPublisher,
   ) {}
 
   async execute(
@@ -148,6 +149,11 @@ export class UpdateDesarquivamentoUseCase {
       const savedDesarquivamento = await this.desarquivamentoRepository.update(
         updatedDesarquivamento,
       );
+      this.desarquivamentoEffectsPublisher.publishEntityChange({
+        action: "updated",
+        entityId: savedDesarquivamento.id.value,
+        status: savedDesarquivamento.status.value,
+      });
 
       this.logger.log(
         `[NUGECID] Desarquivamento atualizado com sucesso - ID: ${savedDesarquivamento.id.value}, Status: ${savedDesarquivamento.status.value}`,
@@ -223,68 +229,22 @@ export class UpdateDesarquivamentoUseCase {
     desarquivamento: DesarquivamentoDomain,
     request: UpdateDesarquivamentoRequest,
   ): Promise<DesarquivamentoDomain> {
-    // Para a estrutura simplificada, usar métodos do domínio para atualizações
-
-    // Atualizar campos básicos (acesso direto aos campos privados via reflection)
-    if (request.nomeCompleto !== undefined) {
-      (desarquivamento as any)._nomeCompleto = request.nomeCompleto;
-    }
-
-    if (request.numeroNicLaudoAuto !== undefined) {
-      (desarquivamento as any)._numeroNicLaudoAuto = request.numeroNicLaudoAuto;
-    }
-
-    if (request.numeroProcesso !== undefined) {
-      (desarquivamento as any)._numeroProcesso = request.numeroProcesso;
-    }
-
-    if (request.tipoDocumento !== undefined) {
-      (desarquivamento as any)._tipoDocumento = request.tipoDocumento;
-    }
-
-    if (request.setorDemandante !== undefined) {
-      (desarquivamento as any)._setorDemandante = request.setorDemandante;
-    }
-
-    if (request.servidorResponsavel !== undefined) {
-      (desarquivamento as any)._servidorResponsavel =
-        request.servidorResponsavel;
-    }
-
-    if (request.finalidadeDesarquivamento !== undefined) {
-      (desarquivamento as any)._finalidadeDesarquivamento =
-        request.finalidadeDesarquivamento;
-    }
-
-    if (request.solicitacaoProrrogacao !== undefined) {
-      (desarquivamento as any)._solicitacaoProrrogacao =
-        request.solicitacaoProrrogacao;
-    }
-
-    if (request.solicitacaoProrrogacaoTexto !== undefined) {
-      (desarquivamento as any)._solicitacaoProrrogacaoTexto =
-        request.solicitacaoProrrogacaoTexto;
-    }
-
-    if (request.dadosAdicionais !== undefined) {
-      (desarquivamento as any)._dadosAdicionais = request.dadosAdicionais;
-    }
-
-    if (request.urgente !== undefined) {
-      (desarquivamento as any)._urgente = request.urgente;
-    }
-
-    if (request.instituto !== undefined) {
-      (desarquivamento as any)._instituto = request.instituto;
-    }
-
-    if (request.requerente !== undefined) {
-      (desarquivamento as any)._requerente = request.requerente;
-    }
-
-    if (request.numeroOficio !== undefined) {
-      (desarquivamento as any)._numeroOficio = request.numeroOficio;
-    }
+    desarquivamento.updateMutableFields({
+      nomeCompleto: request.nomeCompleto,
+      numeroNicLaudoAuto: request.numeroNicLaudoAuto,
+      numeroProcesso: request.numeroProcesso,
+      tipoDocumento: request.tipoDocumento,
+      setorDemandante: request.setorDemandante,
+      servidorResponsavel: request.servidorResponsavel,
+      finalidadeDesarquivamento: request.finalidadeDesarquivamento,
+      solicitacaoProrrogacao: request.solicitacaoProrrogacao,
+      solicitacaoProrrogacaoTexto: request.solicitacaoProrrogacaoTexto,
+      dadosAdicionais: request.dadosAdicionais,
+      urgente: request.urgente,
+      instituto: request.instituto,
+      requerente: request.requerente,
+      numeroOficio: request.numeroOficio,
+    });
 
     // Atribuir responsável
     if (request.responsavelId !== undefined) {
@@ -330,84 +290,12 @@ export class UpdateDesarquivamentoUseCase {
         upperRoles.includes("NUGECID_OPERATOR") ||
         upperRoles.includes("OPERADOR");
 
-      await this.updateStatus(desarquivamento, request.status, isPrivileged);
+      desarquivamento.transitionToStatus(request.status, {
+        force: isPrivileged,
+      });
     }
 
     return desarquivamento;
-  }
-
-  private async updateStatus(
-    desarquivamento: DesarquivamentoDomain,
-    newStatus: string,
-    isPrivileged: boolean = false,
-  ): Promise<void> {
-    switch (newStatus) {
-      case "SOLICITADO":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createSolicitado(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createSolicitado(),
-            );
-        break;
-      case "DESARQUIVADO":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createDesarquivado(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createDesarquivado(),
-            );
-        break;
-      case "FINALIZADO":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createFinalizado(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createFinalizado(),
-            );
-        break;
-      case "NAO_LOCALIZADO":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createNaoLocalizado(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createNaoLocalizado(),
-            );
-        break;
-      case "NAO_COLETADO":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createNaoColetado(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createNaoColetado(),
-            );
-        break;
-      case "RETIRADO_PELO_SETOR":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createRetiradoPeloSetor(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createRetiradoPeloSetor(),
-            );
-        break;
-      case "REARQUIVAMENTO_SOLICITADO":
-        isPrivileged
-          ? desarquivamento.changeStatusForce(
-              StatusDesarquivamento.createRearquivamentoSolicitado(),
-            )
-          : desarquivamento.changeStatus(
-              StatusDesarquivamento.createRearquivamentoSolicitado(),
-            );
-        break;
-      default:
-        throw new Error(`Status inválido: ${newStatus}`);
-    }
   }
 
   private requiresReconstruction(

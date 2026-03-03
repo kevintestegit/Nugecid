@@ -10,10 +10,12 @@ type HistoricoChanges = Record<
   }
 >;
 
-type HistoricoChangeValue = {
-  from?: unknown;
-  to?: unknown;
-} | unknown;
+type HistoricoChangeValue =
+  | {
+      from?: unknown;
+      to?: unknown;
+    }
+  | unknown;
 
 interface HistoricoDetails {
   details?: string;
@@ -64,7 +66,9 @@ const toRecord = (value: unknown): Record<string, unknown> => {
   return value as Record<string, unknown>;
 };
 
-const normalizeHistoricoChanges = (value: unknown): HistoricoChanges | undefined => {
+const normalizeHistoricoChanges = (
+  value: unknown,
+): HistoricoChanges | undefined => {
   if (!value || typeof value !== "object") return undefined;
 
   const rawChanges = value as Record<string, HistoricoChangeValue>;

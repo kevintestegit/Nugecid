@@ -67,9 +67,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     switch (prioridade.toLowerCase()) {
       case "alta":
       case "critica":
-        return "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50";
+        return "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 dark:bg-red-950/30 dark:text-red-300 border-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900/50";
       case "media":
-        return "bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-900/50";
+        return "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300 dark:bg-yellow-950/30 dark:text-yellow-300 border-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-900/50";
       case "baixa":
         return "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700";
       default:
@@ -164,7 +164,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             {tarefa.prazo && (
               <div
                 className={cn(
-                  "flex items-center gap-1 hover:text-gray-600",
+                  "flex items-center gap-1 hover:text-muted-foreground",
                   new Date(tarefa.prazo) < new Date() ? "text-red-500" : "",
                 )}
               >
@@ -176,14 +176,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             )}
 
             {comentariosCount > 0 && (
-              <div className="flex items-center gap-1 hover:text-gray-600">
+              <div className="flex items-center gap-1 hover:text-muted-foreground">
                 <MessageCircle size={14} />
                 <span>{comentariosCount}</span>
               </div>
             )}
 
             {anexosCount > 0 && (
-              <div className="flex items-center gap-1 hover:text-gray-600">
+              <div className="flex items-center gap-1 hover:text-muted-foreground">
                 <Paperclip size={14} />
                 <span>{anexosCount}</span>
               </div>

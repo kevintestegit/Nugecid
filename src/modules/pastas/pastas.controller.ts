@@ -25,6 +25,15 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RoleType } from "../users/enums/role-type.enum";
+import { PastaArquivoTipo } from "./entities/pasta-arquivo.entity";
+import { inferContentTypeFromFilename } from "../storage/storage.service";
+import { AuthenticatedRequest } from "../../common/types/authenticated-request";
+
+interface PastaUploadedFiles {
+  imagens?: Express.Multer.File[];
+  planilha?: Express.Multer.File[];
+  planilhas?: Express.Multer.File[];
+}
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
@@ -41,7 +50,7 @@ const ALLOWED_SPREADSHEET_MIME_TYPES = new Set([
   "text/plain",
 ]);
 
-const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
+const ALLOWED_SPREADSHEET_EXTENSIONS = new Set([".xlsx", ".csv"]);
 const PASTAS_TMP_UPLOAD_DIR = join(process.cwd(), "uploads", ".tmp", "pastas");
 
 const pastasFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
@@ -60,7 +69,7 @@ const pastasFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
       !ALLOWED_SPREADSHEET_EXTENSIONS.has(extension) ||
       !ALLOWED_SPREADSHEET_MIME_TYPES.has(file.mimetype)
     ) {
-      cb(new Error("Planilha inválida. Envie .xlsx, .xls ou .csv."));
+      cb(new Error("Planilha inválida. Envie .xlsx ou .csv."));
       return;
     }
     cb(null, true);
@@ -104,14 +113,14 @@ export class PastasController {
   )
   create(
     @Body() createPastaDto: CreatePastaDto,
-    @UploadedFiles() files: any,
-    @Request() req: any,
+    @UploadedFiles() files: PastaUploadedFiles,
+    @Request() req: AuthenticatedRequest,
   ) {
     return this.pastasService.create(createPastaDto, files, req.user?.id);
   }
 
   @Get()
-  findAll(@Request() req: any) {
+  findAll(@Request() req: AuthenticatedRequest) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
@@ -122,7 +131,7 @@ export class PastasController {
   buscarItens(
     @Query("q") query: string,
     @Query("limit") limit?: string,
-    @Request() req?: any,
+    @Request() req?: AuthenticatedRequest,
   ) {
     const user = req?.user;
     const role = user?.role?.name;
@@ -141,7 +150,7 @@ export class PastasController {
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string, @Request() req: any) {
+  findOne(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
@@ -153,7 +162,7 @@ export class PastasController {
   update(
     @Param("id") id: string,
     @Body() updatePastaDto: UpdatePastaDto,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const user = req.user;
     const role = user?.role?.name;
@@ -178,8 +187,8 @@ export class PastasController {
   )
   adicionarArquivos(
     @Param("id") id: string,
-    @UploadedFiles() files: any,
-    @Request() req: any,
+    @UploadedFiles() files: PastaUploadedFiles,
+    @Request() req: AuthenticatedRequest,
   ) {
     const user = req.user;
     const role = user?.role?.name;
@@ -192,7 +201,7 @@ export class PastasController {
   }
 
   @Get(":id/arquivos")
-  listarArquivos(@Param("id") id: string, @Request() req: any) {
+  listarArquivos(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
@@ -203,7 +212,7 @@ export class PastasController {
   }
 
   @Get(":id/itens")
-  listarItens(@Param("id") id: string, @Request() req: any) {
+  listarItens(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
@@ -215,7 +224,7 @@ export class PastasController {
     @Param("id") id: string,
     @Param("arquivoId") arquivoId: string,
     @Res() res: Response,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const user = req.user;
     const role = user?.role?.name;
@@ -226,10 +235,45 @@ export class PastasController {
       isAdmin ? undefined : user?.id,
     );
     res.setHeader(
+      "Content-Type",
+      arquivo.contentType || inferContentTypeFromFilename(arquivo.nome),
+    );
+    res.setHeader(
       "Content-Disposition",
       `attachment; filename="${encodeURIComponent(arquivo.nome)}"`,
     );
-    return res.sendFile(arquivo.caminhoAbsoluto);
+    res.setHeader("Content-Length", arquivo.size.toString());
+    return res.send(arquivo.buffer);
+  }
+
+  @Get(":id/arquivos/:arquivoId/view")
+  async visualizarArquivo(
+    @Param("id") id: string,
+    @Param("arquivoId") arquivoId: string,
+    @Res() res: Response,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const user = req.user;
+    const role = user?.role?.name;
+    const isAdmin = role === "admin" || role === "coordenador";
+    const arquivo = await this.pastasService.obterArquivo(
+      id,
+      arquivoId,
+      isAdmin ? undefined : user?.id,
+    );
+
+    if (arquivo.tipo !== PastaArquivoTipo.IMAGEM) {
+      return res.status(400).json({
+        message: "Somente imagens podem ser visualizadas inline.",
+      });
+    }
+
+    res.setHeader(
+      "Content-Type",
+      arquivo.contentType || inferContentTypeFromFilename(arquivo.nome),
+    );
+    res.setHeader("Content-Length", arquivo.size.toString());
+    return res.send(arquivo.buffer);
   }
 
   @Delete(":id/arquivos/:arquivoId")
@@ -237,7 +281,7 @@ export class PastasController {
   removerArquivo(
     @Param("id") id: string,
     @Param("arquivoId") arquivoId: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ) {
     const user = req.user;
     const role = user?.role?.name;
@@ -251,7 +295,7 @@ export class PastasController {
 
   @Delete(":id")
   @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
-  remove(@Param("id") id: string, @Request() req: any) {
+  remove(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";

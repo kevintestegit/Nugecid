@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate } from "react-router-dom";
 import {
   useDesarquivamento,
   useUpdateDesarquivamento,
@@ -19,6 +19,7 @@ import { ArrowLeft, AlertTriangle } from "lucide-react";
 const EditDesarquivamentoPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const isValidId = typeof id === "string" && /^\d+$/.test(id);
   const { data: response, isLoading, error } = useDesarquivamento(id!);
   const updateDesarquivamento = useUpdateDesarquivamento();
 
@@ -69,6 +70,10 @@ const EditDesarquivamentoPage: React.FC = () => {
       requerente: desarquivamento.requerente || "",
     };
   }, [desarquivamento]);
+
+  if (!isValidId) {
+    return <Navigate to="/404" replace />;
+  }
 
   const handleSubmit = async (data: CreateDesarquivamentoDto) => {
     const {

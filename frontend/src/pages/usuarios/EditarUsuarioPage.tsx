@@ -1,10 +1,11 @@
 import React from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Edit, Loader2 } from "lucide-react";
 import { useUser, useUpdateUser, useUserPermissions } from "@/hooks/useUsers";
 import { UpdateUserDto, UserRole } from "@/types";
 import UsuarioForm from "@/components/usuarios/UsuarioForm";
 import { isValidUserIdFormat, parseNumericId } from "@/utils/validation";
+import { normalizeUserRoleName } from "@/lib/auth/roles";
 
 const EditarUsuarioPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,27 +23,7 @@ const EditarUsuarioPage: React.FC = () => {
 
   // Se o ID não for válido, mostrar erro
   if (id && !isValidUserIdFormat(id)) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Edit className="h-16 w-16 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Erro: ID de Usuário Inválido
-          </h2>
-          <p className="text-muted-foreground mb-4">
-            O ID fornecido &ldquo;{id}&rdquo; não é válido para um usuário. IDs
-            de usuários devem ser números inteiros.
-          </p>
-          <Link
-            to="/usuarios"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para Usuários
-          </Link>
-        </div>
-      </div>
-    );
+    return <Navigate to="/404" replace />;
   }
 
   // Redirecionar se não tiver permissão
@@ -111,15 +92,8 @@ const EditarUsuarioPage: React.FC = () => {
   }
 
   const user = userResponse.data;
-  const roleName = user.role?.name?.toLowerCase();
-  const normalizedRole: UserRole =
-    roleName === UserRole.ADMIN
-      ? UserRole.ADMIN
-      : roleName === UserRole.COORDENADOR
-        ? UserRole.COORDENADOR
-        : roleName === UserRole.NUGECID_OPERATOR
-          ? UserRole.NUGECID_OPERATOR
-          : UserRole.USUARIO;
+  const normalizedRole =
+    normalizeUserRoleName(user.role?.name) ?? UserRole.USUARIO;
 
   const handleSubmit = async (data: UpdateUserDto) => {
     if (!userId) return;

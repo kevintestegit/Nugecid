@@ -1,11 +1,11 @@
-import React from 'react'
-import { Search } from 'lucide-react'
-import { cn } from '@/utils/cn'
-import { Input } from './Input'
+import React from "react";
+import { Search } from "lucide-react";
+import { cn } from "@/utils/cn";
+import { Input } from "./Input";
 
 export interface SearchInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
-  containerClassName?: string
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> {
+  containerClassName?: string;
 }
 
 const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
@@ -20,9 +20,9 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           {...props}
         />
       </div>
-    )
-  }
-)
-SearchInput.displayName = "SearchInput"
+    );
+  },
+);
+SearchInput.displayName = "SearchInput";
 
-export { SearchInput }
+export { SearchInput };

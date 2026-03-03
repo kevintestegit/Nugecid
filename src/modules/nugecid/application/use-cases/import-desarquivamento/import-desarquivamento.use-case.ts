@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import * as xlsx from "xlsx";
 import { validate } from "class-validator";
 import { plainToClass } from "class-transformer";
 import { CreateDesarquivamentoDto } from "../../../dto/create-desarquivamento.dto";
 import { TipoDesarquivamentoEnum } from "../../../domain/enums/tipo-desarquivamento.enum";
+import { readSpreadsheetObjects } from "../../../../../common/utils/spreadsheet.util";
 import {
   CreateDesarquivamentoUseCase,
   CreateDesarquivamentoRequest,
@@ -26,10 +26,10 @@ export class ImportDesarquivamentoUseCase {
     fileBuffer: Buffer,
     criadoPorId: number = 1,
   ): Promise<ImportResult> {
-    const workbook = xlsx.read(fileBuffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet);
+    const { rows: data } = await readSpreadsheetObjects(
+      fileBuffer,
+      "importacao.xlsx",
+    );
 
     const result: ImportResult = {
       totalRows: data.length,

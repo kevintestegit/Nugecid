@@ -18,17 +18,22 @@ import {
   CACHE_VERSION_KEYS,
 } from "./common/constants/cache-version.constants";
 import { RuntimeMetricsService } from "./modules/observability/runtime-metrics.service";
+import { SearchService } from "./modules/search/search.service";
+import { SearchResultItem } from "./modules/search/search.types";
+import { isDocumentSearchType } from "./modules/search/search.service";
+import {
+  hasAnyNormalizedRole,
+  normalizeRoleName,
+  TRANSITION_NUGECID_FULL_ACCESS_ROLES,
+} from "./modules/users/enums/role.utils";
 
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
   private static readonly DASHBOARD_CACHE_TTL_SECONDS = 30;
   private static readonly GLOBAL_SEARCH_CACHE_TTL_SECONDS = 20;
-  private static readonly ROLES_WITH_FULL_DESARQUIVAMENTO_ACCESS = new Set([
-    "admin",
-    "nugecid_viewer",
-    "nugecid_operator",
-  ]);
+  private static readonly ROLES_WITH_FULL_DESARQUIVAMENTO_ACCESS =
+    TRANSITION_NUGECID_FULL_ACCESS_ROLES;
   private static readonly ROLES_WITH_USERS_ACCESS = new Set([
     "admin",
     "coordenador",
@@ -60,13 +65,15 @@ export class AppService {
     private readonly cacheManager: Cache,
     @Optional()
     private readonly runtimeMetricsService?: RuntimeMetricsService,
+    @Optional()
+    private readonly searchService?: SearchService,
   ) {}
 
-  async getDashboardData(user: any) {
+  async getDashboardData(user: Pick<User, "id" | "role">) {
     const cacheVersion = await this.getCacheVersion(
       CACHE_VERSION_KEYS.APP_DASHBOARD,
     );
-    const cacheKey = `app:dashboard:v${cacheVersion}:${user?.id ?? "anon"}:${this.normalizeRoleName(
+    const cacheKey = `app:dashboard:v${cacheVersion}:${user?.id ?? "anon"}:${normalizeRoleName(
       user?.role?.name,
     )}`;
     const cached = await this.getFromCache<{
@@ -125,7 +132,9 @@ export class AppService {
         .leftJoinAndSelect("d.criadoPor", "criadoPor")
         .where("d.deletedAt IS NULL")
         .andWhere(
-          user.role?.name === "admin" ? "1=1" : "d.criadoPorId = :userId",
+          normalizeRoleName(user.role?.name) === "admin"
+            ? "1=1"
+            : "d.criadoPorId = :userId",
           { userId: user.id },
         )
         .orderBy("d.createdAt", "DESC")
@@ -189,6 +198,13 @@ export class AppService {
   }
 
   /**
+   * Escape LIKE wildcards (%, _, \\) so they are treated as literal characters.
+   */
+  private escapeLikeWildcards(value: string): string {
+    return value.replace(/[%_\\]/g, "\\$&");
+  }
+
+  /**
    * Gera expressão SQL que normaliza uma coluna para comparação
    * accent-insensitive: translate(lower(coalesce(col, '')), acentos, sem_acentos)
    */
@@ -199,12 +215,8 @@ export class AppService {
     );
   }
 
-  private normalizeRoleName(value?: string): string {
-    return (value || "").trim().toLowerCase();
-  }
-
   private hasAnyRole(userRoles: string[], allowedRoles: Set<string>): boolean {
-    return userRoles.some((role) => allowedRoles.has(role));
+    return hasAnyNormalizedRole(userRoles, allowedRoles);
   }
 
   /**
@@ -247,9 +259,9 @@ export class AppService {
     }
 
     const currentUserId = currentUser.id;
-    const currentUserRoles = [
-      this.normalizeRoleName(currentUser.role?.name),
-    ].filter(Boolean);
+    const currentUserRoles = [normalizeRoleName(currentUser.role?.name)].filter(
+      Boolean,
+    ) as string[];
     const canViewAllDesarquivamentos = this.hasAnyRole(
       currentUserRoles,
       AppService.ROLES_WITH_FULL_DESARQUIVAMENTO_ACCESS,
@@ -268,7 +280,8 @@ export class AppService {
     );
 
     const normalizedTerm = this.normalizeSearchText(query);
-    const searchTerm = `%${normalizedTerm}%`;
+    const escapedTerm = this.escapeLikeWildcards(normalizedTerm);
+    const searchTerm = `%${escapedTerm}%`;
     const encodedQuery = encodeURIComponent(query.trim());
     const globalSearchVersion = await this.getCacheVersion(
       CACHE_VERSION_KEYS.APP_GLOBAL_SEARCH,
@@ -321,28 +334,40 @@ export class AppService {
     // -------------------------------------------------------------------
     const perTypeLimit = Math.min(limit * 2, 50);
 
-    type PartialResult = {
-      id: number | string;
-      type:
-        | "desarquivamento"
-        | "usuario"
-        | "tarefa"
-        | "projeto"
-        | "pasta"
-        | "vestigio"
-        | "notificacao"
-        | "planilha";
-      title: string;
-      subtitle?: string;
-      description?: string;
-      url: string;
-      metadata?: Record<string, unknown>;
-    };
+    type PartialResult = SearchResultItem;
 
     const promises: Promise<PartialResult[]>[] = [];
+    const requestedDocumentTypes = typesNormalized.filter(isDocumentSearchType);
+    let shouldSearchDocumentTypes =
+      this.searchService?.isEnabled() &&
+      (!typesNormalized.length || requestedDocumentTypes.length > 0);
+
+    if (shouldSearchDocumentTypes && this.searchService) {
+      try {
+        const indexedDocuments = await this.searchService.searchDocuments({
+          query,
+          limit: perTypeLimit,
+          requestedTypes: requestedDocumentTypes,
+          currentUserId,
+          currentUserRoles,
+        });
+
+        promises.push(Promise.resolve(indexedDocuments));
+      } catch (error) {
+        shouldSearchDocumentTypes = false;
+        this.logger.warn(
+          `Falha ao consultar o índice Meilisearch; usando fallback SQL: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
 
     // ---- Desarquivamentos ----
-    if (!types || types.includes("desarquivamento")) {
+    if (
+      (!types || types.includes("desarquivamento")) &&
+      !shouldSearchDocumentTypes
+    ) {
       promises.push(
         (() => {
           const queryBuilder = this.desarquivamentoRepository
@@ -554,7 +579,7 @@ export class AppService {
     }
 
     // ---- Pastas (Arquivo) ----
-    if (!types || types.includes("pasta")) {
+    if ((!types || types.includes("pasta")) && !shouldSearchDocumentTypes) {
       promises.push(
         (() => {
           const queryBuilder = this.pastaRepository
@@ -703,7 +728,7 @@ export class AppService {
     }
 
     // ---- Planilhas de Controle ----
-    if (!types || types.includes("planilha")) {
+    if ((!types || types.includes("planilha")) && !shouldSearchDocumentTypes) {
       promises.push(
         this.planilhaControleRepository
           .createQueryBuilder("planilha")

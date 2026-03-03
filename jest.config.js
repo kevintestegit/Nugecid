@@ -15,7 +15,7 @@ module.exports = {
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
-  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/e2e/'],
 
   testTimeout: 10000,
   maxWorkers: 1,

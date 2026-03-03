@@ -106,7 +106,9 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({
         </CardTitle>
         <CardDescription>
           {historicoAcoes.length}{" "}
-          {historicoAcoes.length === 1 ? "ação registrada" : "ações registradas"}
+          {historicoAcoes.length === 1
+            ? "ação registrada"
+            : "ações registradas"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -122,7 +124,9 @@ export const HistoricoTimeline: React.FC<HistoricoTimelineProps> = ({
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge className={cn("text-xs", getActionColor(message.tone))}>
+                      <Badge
+                        className={cn("text-xs", getActionColor(message.tone))}
+                      >
                         {message.categoryLabel}
                       </Badge>
                       <span className="text-xs text-muted-foreground">

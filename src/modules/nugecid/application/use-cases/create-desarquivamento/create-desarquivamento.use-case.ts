@@ -8,6 +8,7 @@ import { TipoDesarquivamentoEnum } from "../../../domain/enums/tipo-desarquivame
 import { CodigoBarras } from "../../../domain/value-objects";
 
 import { DESARQUIVAMENTO_REPOSITORY_TOKEN } from "../../../domain/nugecid.constants";
+import { DesarquivamentoEffectsPublisher } from "../../services/desarquivamento-effects.publisher";
 
 export interface CreateDesarquivamentoRequest {
   tipoDesarquivamento: string;
@@ -73,6 +74,7 @@ export class CreateDesarquivamentoUseCase {
   constructor(
     @Inject(DESARQUIVAMENTO_REPOSITORY_TOKEN)
     private readonly desarquivamentoRepository: IDesarquivamentoRepository,
+    private readonly desarquivamentoEffectsPublisher: DesarquivamentoEffectsPublisher,
   ) {}
 
   async execute(
@@ -162,6 +164,11 @@ export class CreateDesarquivamentoUseCase {
       );
       const savedDesarquivamento =
         await this.desarquivamentoRepository.create(desarquivamento);
+      this.desarquivamentoEffectsPublisher.publishEntityChange({
+        action: "created",
+        entityId: savedDesarquivamento.id.value,
+        status: savedDesarquivamento.status.value,
+      });
 
       this.logger.log(
         `[NUGECID] Desarquivamento criado com sucesso - ID: ${savedDesarquivamento.id.value}, NIC/Laudo: ${savedDesarquivamento.numeroNicLaudoAuto}`,

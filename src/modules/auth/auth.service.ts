@@ -9,6 +9,9 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, In } from "typeorm";
+import * as bcrypt from "bcryptjs";
+import * as crypto from "crypto";
+import type { StringValue } from "ms";
 
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
@@ -21,12 +24,25 @@ export interface JwtPayload {
   sub: number;
   usuario: string;
   role: string;
+  jti?: string;
   iat?: number;
   exp?: number;
 }
 
+export interface RefreshJwtPayload {
+  sub: number;
+  usuario: string;
+  type: "refresh";
+  jti: string;
+  iat?: number;
+  exp?: number;
+}
+
+/** Sanitised user object without sensitive fields. */
+export type SafeUser = Omit<User, "senha">;
+
 export interface LoginResponse {
-  user: Omit<User, "senha">;
+  user: SafeUser;
   accessToken: string;
   refreshToken: string;
   expiresIn: string;
@@ -48,11 +64,15 @@ export class AuthService implements OnModuleInit {
   private static readonly ONLINE_USER_PREFIX = "sgc:online:";
   private static readonly ONLINE_USER_TTL = 5 * 60; // 5 minutes
   private static readonly ACTIVITY_UPDATE_DEBOUNCE_MS = 30_000;
+  /** Prefix for refresh-token blacklist entries in Redis. */
+  private static readonly REFRESH_BLACKLIST_PREFIX = "sgc:rtbl:";
   private readonly lastActivityUpdateAt = new Map<number, number>();
-  private accessTokenExpiresIn: string;
-  private refreshTokenExpiresIn: string;
+  private accessTokenExpiresIn: StringValue;
+  private refreshTokenExpiresIn: StringValue;
   private refreshTokenSecret: string;
   private accessTokenSecret: string;
+  /** Pre-computed bcrypt hash used to equalise timing when user is not found. */
+  private dummyHash: string;
 
   constructor(
     @InjectRepository(User)
@@ -68,13 +88,18 @@ export class AuthService implements OnModuleInit {
 
   onModuleInit(): void {
     // Cache secrets/expirações para evitar lookups repetidos
-    this.accessTokenExpiresIn =
-      this.configService.get<string>("auth.jwt.expiresIn") ||
-      this.configService.get<string>("JWT_EXPIRES_IN", "50m");
+    this.accessTokenExpiresIn = (this.configService.get<string>(
+      "auth.jwt.expiresIn",
+    ) ??
+      this.configService.get<string>("JWT_EXPIRES_IN", "50m")) as StringValue;
 
-    this.refreshTokenExpiresIn =
-      this.configService.get<string>("auth.jwt.refreshExpiresIn") ||
-      this.configService.get<string>("JWT_REFRESH_EXPIRES_IN", "7d");
+    this.refreshTokenExpiresIn = (this.configService.get<string>(
+      "auth.jwt.refreshExpiresIn",
+    ) ??
+      this.configService.get<string>(
+        "JWT_REFRESH_EXPIRES_IN",
+        "7d",
+      )) as StringValue;
 
     this.refreshTokenSecret =
       this.configService.get<string>("auth.jwt.refreshSecret") ||
@@ -89,10 +114,23 @@ export class AuthService implements OnModuleInit {
         "JWT_SECRET is not configured. Set the JWT_SECRET environment variable.",
       );
     }
+
+    // Pre-compute a dummy bcrypt hash so that validateUser timing is constant
+    // regardless of whether the username exists.
+    const rounds = this.configService.get<number>("auth.bcrypt.rounds", 12);
+    this.dummyHash = bcrypt.hashSync("dummy-password-for-timing", rounds);
   }
 
+  // ---------------------------------------------------------------------------
+  // Autenticação
+  // ---------------------------------------------------------------------------
+
   /**
-   * Valida as credenciais do usuário
+   * Valida as credenciais do usuário.
+   *
+   * SECURITY: a dummy bcrypt.compare is executed when the user is not found
+   * so that the response timing is indistinguishable from a wrong-password
+   * scenario, preventing username enumeration attacks.
    */
   async validateUser(usuario: string, password: string): Promise<User | null> {
     this.logger.debug(
@@ -100,7 +138,6 @@ export class AuthService implements OnModuleInit {
     );
     try {
       // Busca por usuario (aceita tanto nome de usuário quanto email)
-      // Se o input contém @, tenta buscar por usuários que tenham email como nome de usuário
       let user = await this.userRepository.findOne({
         where: { usuario: usuario },
         relations: ["role"],
@@ -122,17 +159,12 @@ export class AuthService implements OnModuleInit {
         this.logger.warn(
           `[AuthService] Tentativa de login com usuário inexistente: "${usuario}"`,
         );
+        // Equalise timing: run a bcrypt compare against a dummy hash so that
+        // an attacker cannot distinguish "user not found" from "wrong password"
+        // by measuring response time.
+        await bcrypt.compare(password, this.dummyHash);
         return null;
       }
-      this.logger.debug(
-        `[AuthService] Usuário encontrado: ${user.usuario} (ID: ${user.id})`,
-      );
-
-      // DEBUG: log full user object to inspect 'ativo' value
-      this.logger.debug(
-        `[AuthService] Usuário object: ${JSON.stringify({ id: user.id, usuario: user.usuario, ativo: user.ativo, role: user.role ? user.role.name : null })}`,
-      );
-
       if (!user.ativo) {
         this.logger.warn(
           `[AuthService] Tentativa de login com usuário inativo: "${usuario}"`,
@@ -178,17 +210,21 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Realiza o login do usuário
+   * Core login logic shared by v1 and v2 endpoints.
+   * Returns validated user + generated tokens.
    */
-  async login(
+  private async performLogin(
     loginDto: LoginDto,
     ipAddress: string,
     userAgent: string,
-  ): Promise<LoginResponse> {
+  ): Promise<{
+    user: User;
+    accessToken: string;
+    refreshToken: string;
+  }> {
     const user = await this.validateUser(loginDto.usuario, loginDto.senha);
 
     if (!user) {
-      // Salva auditoria de tentativa de login falhada
       await this.saveLoginAudit(
         null,
         ipAddress,
@@ -210,11 +246,13 @@ export class AuthService implements OnModuleInit {
       secret: this.accessTokenSecret,
     });
 
-    // Gera refresh token com expiração maior
-    const refreshPayload = {
+    // Gera refresh token com jti para permitir revogação individual
+    const jti = crypto.randomUUID();
+    const refreshPayload: RefreshJwtPayload = {
       sub: user.id,
       usuario: user.usuario,
       type: "refresh",
+      jti,
     };
     const refreshToken = this.jwtService.sign(refreshPayload, {
       expiresIn: this.refreshTokenExpiresIn || "7d",
@@ -227,54 +265,46 @@ export class AuthService implements OnModuleInit {
     // Adiciona usuário à lista de online (Redis)
     await this.setUserOnline(user.id);
 
+    return { user, accessToken, refreshToken };
+  }
+
+  /**
+   * Realiza o login do usuário (v1 — retorna user completo + refresh token)
+   */
+  async login(
+    loginDto: LoginDto,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<LoginResponse> {
+    const { user, accessToken, refreshToken } = await this.performLogin(
+      loginDto,
+      ipAddress,
+      userAgent,
+    );
+
     this.logger.log(`Login bem-sucedido para usuário: ${user.usuario}`);
 
     return {
       user: this.sanitizeUser(user),
       accessToken,
       refreshToken,
-      expiresIn: "50m",
+      expiresIn: this.accessTokenExpiresIn || "50m",
     };
   }
 
   /**
-   * Realiza o login do usuário para API v2
+   * Realiza o login do usuário para API v2 (retorna payload mínimo)
    */
   async loginV2(
     loginDto: LoginDto,
     ipAddress: string,
     userAgent: string,
   ): Promise<LoginV2Response> {
-    const user = await this.validateUser(loginDto.usuario, loginDto.senha);
-
-    if (!user) {
-      // Salva auditoria de tentativa de login falhada
-      await this.saveLoginAudit(
-        null,
-        ipAddress,
-        userAgent,
-        false,
-        "Credenciais inválidas",
-      );
-      throw new UnauthorizedException("Credenciais inválidas");
-    }
-
-    const payload: JwtPayload = {
-      sub: user.id,
-      usuario: user.usuario,
-      role: user.role?.name || "user",
-    };
-
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.accessTokenExpiresIn || "50m",
-      secret: this.accessTokenSecret,
-    });
-
-    // Salva auditoria de login bem-sucedido
-    await this.saveLoginAudit(user.id, ipAddress, userAgent, true);
-
-    // Adiciona usuário à lista de online (Redis)
-    await this.setUserOnline(user.id);
+    const { user, accessToken } = await this.performLogin(
+      loginDto,
+      ipAddress,
+      userAgent,
+    );
 
     this.logger.log(`Login API v2 bem-sucedido para usuário: ${user.usuario}`);
 
@@ -285,12 +315,15 @@ export class AuthService implements OnModuleInit {
         role: user.role?.name || "user",
       },
       accessToken,
-      expiresIn: "50m",
+      expiresIn: this.accessTokenExpiresIn || "50m",
     };
   }
 
   /**
-   * Renovar token JWT usando refresh token
+   * Renovar token JWT usando refresh token.
+   *
+   * SECURITY: checks the jti against a Redis blacklist so that revoked
+   * refresh tokens (e.g. after logout) cannot be reused.
    */
   async refreshToken(
     refreshToken: string,
@@ -299,10 +332,20 @@ export class AuthService implements OnModuleInit {
       // Verifica se o refresh token é válido
       const decoded = this.jwtService.verify(refreshToken, {
         secret: this.refreshTokenSecret || this.accessTokenSecret,
-      }) as any;
+      }) as RefreshJwtPayload;
 
       if (decoded.type !== "refresh") {
         throw new UnauthorizedException("Invalid refresh token type");
+      }
+
+      // Check if the token has been revoked (blacklisted)
+      if (decoded.jti) {
+        const isBlacklisted = await this.isRefreshTokenBlacklisted(decoded.jti);
+        if (isBlacklisted) {
+          throw new UnauthorizedException(
+            "Refresh token foi revogado. Faça login novamente.",
+          );
+        }
       }
 
       // Busca o usuário
@@ -360,7 +403,7 @@ export class AuthService implements OnModuleInit {
     return null;
   }
 
-  async register(registerDto: RegisterDto, currentUser: User): Promise<User> {
+  async register(registerDto: RegisterDto, currentUser: User): Promise<SafeUser> {
     if (!currentUser.isAdmin()) {
       throw new UnauthorizedException(
         "Apenas administradores podem criar usuários",
@@ -400,13 +443,22 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Logout do usuário
+   * Logout do usuário.
+   *
+   * SECURITY: blacklists the refresh token jti in Redis so it cannot be
+   * reused after logout.
    */
   async logout(
     userId: number,
     ipAddress: string,
     userAgent: string,
+    refreshToken?: string,
   ): Promise<void> {
+    // Blacklist the refresh token if provided
+    if (refreshToken) {
+      await this.blacklistRefreshToken(refreshToken);
+    }
+
     await this.saveLogoutAudit(userId, ipAddress, userAgent);
     // Remove usuário da lista de online (Redis)
     await this.removeUserOnline(userId);
@@ -444,6 +496,10 @@ export class AuthService implements OnModuleInit {
     return user;
   }
 
+  // ---------------------------------------------------------------------------
+  // Login failure / success handlers
+  // ---------------------------------------------------------------------------
+
   /**
    * Manipula login falhado
    */
@@ -470,6 +526,55 @@ export class AuthService implements OnModuleInit {
     user.ultimoLogin = new Date();
     await this.userRepository.save(user);
   }
+
+  // ---------------------------------------------------------------------------
+  // Refresh token blacklist (Redis)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Blacklist a refresh token by its jti so it cannot be reused.
+   * The entry expires when the token itself would have expired.
+   */
+  private async blacklistRefreshToken(refreshToken: string): Promise<void> {
+    try {
+      const decoded = this.jwtService.decode(refreshToken) as RefreshJwtPayload | null;
+      if (!decoded?.jti) return;
+
+      // Compute remaining TTL so the blacklist entry auto-expires
+      const expiresAt = decoded.exp ? decoded.exp * 1000 : Date.now();
+      const ttlMs = Math.max(expiresAt - Date.now(), 0);
+      const ttlSeconds = Math.ceil(ttlMs / 1000) || 1;
+
+      const key = `${AuthService.REFRESH_BLACKLIST_PREFIX}${decoded.jti}`;
+      await this.redisService.set(key, "revoked", ttlSeconds);
+
+      this.logger.debug(
+        `Refresh token blacklisted: jti=${decoded.jti}, ttl=${ttlSeconds}s`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao blacklist refresh token: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Check whether a refresh token jti has been blacklisted.
+   */
+  private async isRefreshTokenBlacklisted(jti: string): Promise<boolean> {
+    try {
+      const key = `${AuthService.REFRESH_BLACKLIST_PREFIX}${jti}`;
+      const value = await this.redisService.get(key);
+      return value !== null;
+    } catch {
+      // If Redis is unavailable, fail open to avoid locking users out.
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auditoria
+  // ---------------------------------------------------------------------------
 
   /**
    * Salva auditoria de login
@@ -521,6 +626,10 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Online users (Redis)
+  // ---------------------------------------------------------------------------
+
   /**
    * Marca usuário como online no Redis (com TTL de 5 minutos)
    */
@@ -543,7 +652,10 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Obtém lista de usuários online
+   * Obtém lista de usuários online.
+   *
+   * PERFORMANCE: uses Redis MGET to fetch all timestamps in a single round-trip
+   * instead of N individual GET calls.
    */
   async getOnlineUsers(): Promise<
     {
@@ -564,14 +676,35 @@ export class AuthService implements OnModuleInit {
       return [];
     }
 
-    // Extract user IDs from keys
-    const onlineEntries: { userId: number; lastActivity: Date }[] = [];
+    // Extract user IDs and fetch all timestamps in one MGET call
+    const userIdMap = new Map<string, number>();
     for (const key of keys) {
       const idStr = key.replace(AuthService.ONLINE_USER_PREFIX, "");
       const userId = parseInt(idStr, 10);
-      if (isNaN(userId)) continue;
+      if (!isNaN(userId)) {
+        userIdMap.set(key, userId);
+      }
+    }
 
-      const timestamp = await this.redisService.get(key);
+    const validKeys = Array.from(userIdMap.keys());
+    if (validKeys.length === 0) return [];
+
+    // Batch fetch timestamps using MGET
+    let timestamps: (string | null)[];
+    const client = this.redisService.getClient();
+    if (client) {
+      timestamps = await client.mget(...validKeys);
+    } else {
+      // Fallback for memory store — individual gets
+      timestamps = await Promise.all(
+        validKeys.map((k) => this.redisService.get(k)),
+      );
+    }
+
+    const onlineEntries: { userId: number; lastActivity: Date }[] = [];
+    for (let i = 0; i < validKeys.length; i++) {
+      const userId = userIdMap.get(validKeys[i])!;
+      const timestamp = timestamps[i];
       onlineEntries.push({
         userId,
         lastActivity: timestamp ? new Date(timestamp) : new Date(),
@@ -635,12 +768,17 @@ export class AuthService implements OnModuleInit {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
   /**
-   * Remove campos sensíveis do usuário
+   * Remove campos sensíveis do usuário.
+   * Uses destructuring to explicitly exclude `senha` and returns a typed object.
    */
-  private sanitizeUser(user: User): any {
-    const sanitizedUser = { ...user } as Partial<User>;
-    delete sanitizedUser.senha;
-    return sanitizedUser;
+  private sanitizeUser(user: User): SafeUser {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { senha, ...safeUser } = user;
+    return safeUser as SafeUser;
   }
 }

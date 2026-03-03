@@ -33,29 +33,66 @@ export interface DesarquivamentoDomainProps {
   deletedAt?: Date;
 }
 
+export interface DesarquivamentoMutableFields {
+  nomeCompleto?: string;
+  numeroNicLaudoAuto?: string | null;
+  numeroProcesso?: string;
+  tipoDocumento?: string;
+  setorDemandante?: string;
+  servidorResponsavel?: string;
+  finalidadeDesarquivamento?: string;
+  solicitacaoProrrogacao?: boolean;
+  solicitacaoProrrogacaoTexto?: string;
+  dadosAdicionais?: string;
+  urgente?: boolean;
+  instituto?: string;
+  requerente?: string;
+  numeroOficio?: string;
+}
+
 export class DesarquivamentoDomain {
+  private static readonly STATUS_FACTORIES: Record<
+    StatusDesarquivamentoEnum,
+    () => StatusDesarquivamento
+  > = {
+    [StatusDesarquivamentoEnum.SOLICITADO]:
+      StatusDesarquivamento.createSolicitado,
+    [StatusDesarquivamentoEnum.DESARQUIVADO]:
+      StatusDesarquivamento.createDesarquivado,
+    [StatusDesarquivamentoEnum.FINALIZADO]:
+      StatusDesarquivamento.createFinalizado,
+    [StatusDesarquivamentoEnum.NAO_LOCALIZADO]:
+      StatusDesarquivamento.createNaoLocalizado,
+    [StatusDesarquivamentoEnum.NAO_COLETADO]:
+      StatusDesarquivamento.createNaoColetado,
+    [StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR]:
+      StatusDesarquivamento.createRetiradoPeloSetor,
+    [StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO]:
+      StatusDesarquivamento.createRearquivamentoSolicitado,
+  };
+
   private constructor(
     private readonly _id: DesarquivamentoId | undefined,
     private readonly _numeroSolicitacao: number | undefined,
     private _tipoDesarquivamento: string,
     private _status: StatusDesarquivamento,
-    private readonly _nomeCompleto: string,
-    private readonly _numeroNicLaudoAuto: string | null | undefined,
-    private readonly _numeroProcesso: string,
-    private readonly _tipoDocumento: string,
+    private _nomeCompleto: string,
+    private _numeroNicLaudoAuto: string | null | undefined,
+    private _numeroProcesso: string,
+    private _tipoDocumento: string,
     private _dataSolicitacao: Date,
     private _dataDesarquivamentoSAG: Date | undefined,
     private _dataDevolucaoSetor: Date | undefined,
-    private readonly _setorDemandante: string,
-    private readonly _servidorResponsavel: string,
-    private readonly _finalidadeDesarquivamento: string,
-    private readonly _solicitacaoProrrogacao: boolean,
-    private readonly _solicitacaoProrrogacaoTexto: string | undefined,
-    private readonly _dadosAdicionais: string | undefined,
-    private readonly _urgente: boolean | undefined,
-    private readonly _instituto: string | undefined,
-    private readonly _requerente: string | undefined,
-    private readonly _numeroOficio: string | undefined,
+    private _setorDemandante: string,
+    private _servidorResponsavel: string,
+    private _finalidadeDesarquivamento: string,
+    private _solicitacaoProrrogacao: boolean,
+    private _solicitacaoProrrogacaoTexto: string | undefined,
+    private _dadosAdicionais: string | undefined,
+    private _urgente: boolean | undefined,
+    private _instituto: string | undefined,
+    private _requerente: string | undefined,
+    private _numeroOficio: string | undefined,
     private readonly _criadoPorId: number,
     private _responsavelId: number | undefined,
     private readonly _createdAt: Date,
@@ -240,6 +277,67 @@ export class DesarquivamentoDomain {
 
   get deletedAt(): Date | undefined {
     return this._deletedAt;
+  }
+
+  updateMutableFields(fields: DesarquivamentoMutableFields): void {
+    if (fields.nomeCompleto !== undefined) {
+      this._nomeCompleto = fields.nomeCompleto;
+    }
+
+    if (fields.numeroNicLaudoAuto !== undefined) {
+      this._numeroNicLaudoAuto = fields.numeroNicLaudoAuto;
+    }
+
+    if (fields.numeroProcesso !== undefined) {
+      this._numeroProcesso = fields.numeroProcesso;
+    }
+
+    if (fields.tipoDocumento !== undefined) {
+      this._tipoDocumento = fields.tipoDocumento;
+    }
+
+    if (fields.setorDemandante !== undefined) {
+      this._setorDemandante = fields.setorDemandante;
+    }
+
+    if (fields.servidorResponsavel !== undefined) {
+      this._servidorResponsavel = fields.servidorResponsavel;
+    }
+
+    if (fields.finalidadeDesarquivamento !== undefined) {
+      this._finalidadeDesarquivamento = fields.finalidadeDesarquivamento;
+    }
+
+    if (fields.solicitacaoProrrogacao !== undefined) {
+      this._solicitacaoProrrogacao = fields.solicitacaoProrrogacao;
+    }
+
+    if (fields.solicitacaoProrrogacaoTexto !== undefined) {
+      this._solicitacaoProrrogacaoTexto = fields.solicitacaoProrrogacaoTexto;
+    }
+
+    if (fields.dadosAdicionais !== undefined) {
+      this._dadosAdicionais = fields.dadosAdicionais;
+    }
+
+    if (fields.urgente !== undefined) {
+      this._urgente = fields.urgente;
+    }
+
+    if (fields.instituto !== undefined) {
+      this._instituto = fields.instituto;
+    }
+
+    if (fields.requerente !== undefined) {
+      this._requerente = fields.requerente;
+    }
+
+    if (fields.numeroOficio !== undefined) {
+      this._numeroOficio = fields.numeroOficio;
+    }
+
+    this._updatedAt = new Date();
+    this.validate();
   }
 
   // MÃ©todos de negÃ³cio
@@ -433,6 +531,19 @@ export class DesarquivamentoDomain {
     }
   }
 
+  transitionToStatus(statusCode: string, options?: { force?: boolean }): void {
+    const normalizedStatusCode = (statusCode || "").trim().toUpperCase();
+    const targetStatus =
+      DesarquivamentoDomain.createStatusFromCode(normalizedStatusCode);
+
+    if (options?.force) {
+      this.changeStatusForce(targetStatus);
+      return;
+    }
+
+    this.changeStatus(targetStatus);
+  }
+
   // ForÃ§a alteraÃ§Ã£o de status, ignorando regra de transiÃ§Ã£o (uso administrativo)
   changeStatusForce(newStatus: StatusDesarquivamento): void {
     this._status = newStatus;
@@ -574,5 +685,20 @@ export class DesarquivamentoDomain {
       updatedAt: this._updatedAt,
       deletedAt: this._deletedAt,
     };
+  }
+
+  private static createStatusFromCode(
+    statusCode: string,
+  ): StatusDesarquivamento {
+    const factory =
+      DesarquivamentoDomain.STATUS_FACTORIES[
+        statusCode as StatusDesarquivamentoEnum
+      ];
+
+    if (!factory) {
+      throw new Error(`Status inválido: ${statusCode}`);
+    }
+
+    return factory();
   }
 }

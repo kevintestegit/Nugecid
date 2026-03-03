@@ -10,12 +10,15 @@ import React, {
 import { User, LoginDto, UserRole } from "@/types";
 import axios from "axios";
 import { apiService } from "@/services/api";
+import { pushSubscriptionService } from "@/services/pushSubscriptionService";
+import { setMonitoringUser } from "@/lib/monitoring";
 import {
-  getStoredUser,
   setStoredUser,
   removeStoredUser,
   clearAuth,
 } from "@/utils/tokenStorage";
+import { normalizeUserRoleName } from "@/lib/auth/roles";
+import { AUTH_REQUIRED_EVENT } from "@/lib/navigation/navigationEvents";
 
 interface AuthContextType {
   user: User | null;
@@ -37,7 +40,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const refreshTokenRef = useRef<string | null>(null);
 
   const isAuthenticated = !!user;
 
@@ -49,6 +51,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } else {
       removeStoredUser();
     }
+
+    setMonitoringUser(nextUser);
   }, []);
 
   const clearRefreshTimer = useCallback(() => {
@@ -59,18 +63,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshTokens = useCallback(async () => {
     try {
-      const currentRefreshToken = refreshTokenRef.current;
-      if (!currentRefreshToken) {
-        console.warn("Tentativa de refresh sem token disponível");
-        throw new Error("No refresh token available");
-      }
-
-      const response = await apiService.refreshToken(currentRefreshToken);
+      const response = await apiService.refreshToken();
       if (response.success && response.data) {
-        // accessToken is now set via httpOnly cookie by the backend —
-        // no need to store it client-side.
-
-        // Schedule next refresh
         clearRefreshTimer();
         refreshTimerRef.current = setTimeout(
           () => {
@@ -82,23 +76,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error("Failed to refresh token");
       }
     } catch (error: unknown) {
-      // Verificar se é erro de conectividade com o backend
       const errCode = axios.isAxiosError(error) ? error.code : undefined;
       const errMessage = error instanceof Error ? error.message : undefined;
       if (errCode === "ERR_NETWORK" || errMessage?.includes("fetch")) {
-        // Reagendar tentativa de refresh em 30 segundos
         setTimeout(() => {
           void refreshTokens();
         }, 30000);
         return;
       }
 
-      // Para outros erros (token inválido, expirado, etc.), fazer logout
-      refreshTokenRef.current = null;
       clearAuth();
       updateUser(null);
-
-      // Clear refresh timer
       clearRefreshTimer();
     }
   }, [clearRefreshTimer, updateUser]);
@@ -115,25 +103,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = useCallback(async () => {
     try {
-      // Show optimistic UI from cached user while we verify via cookie
-      const localUser = getStoredUser();
-      if (localUser) {
-        updateUser(localUser);
-      }
-
       // Verify auth by calling the API — the httpOnly cookie is sent
       // automatically. If the cookie is valid we get the user back.
       try {
-        const response = await apiService.getCurrentUser();
+        const response = await apiService.getCurrentUser({
+          skipAuthRedirect: true,
+        });
         if (response.success && response.data) {
           updateUser(response.data);
-          // If we still have a refresh token in memory, schedule refresh
-          if (refreshTokenRef.current) {
-            scheduleTokenRefresh();
-          }
+          scheduleTokenRefresh();
         } else {
-          // Backend returned success:false — clear state
-          refreshTokenRef.current = null;
           clearAuth();
           updateUser(null);
         }
@@ -142,20 +121,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const errCode = axios.isAxiosError(error) ? error.code : undefined;
         const errMessage = error instanceof Error ? error.message : undefined;
         if (errCode === "ERR_NETWORK" || errMessage?.includes("fetch")) {
-          // Manter usuário logado com dados do localStorage
+          clearAuth();
+          updateUser(null);
           return;
         }
 
-        // If 401 and we have a refresh token, try refreshing
-        if (
-          axios.isAxiosError(error) &&
-          error.response?.status === 401 &&
-          refreshTokenRef.current
-        ) {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
           await refreshTokens();
+          const refreshedResponse = await apiService.getCurrentUser({
+            skipAuthRedirect: true,
+          });
+          if (refreshedResponse.success && refreshedResponse.data) {
+            updateUser(refreshedResponse.data);
+            scheduleTokenRefresh();
+          } else {
+            clearAuth();
+            updateUser(null);
+          }
         } else {
-          // Outro erro, limpar dados
-          refreshTokenRef.current = null;
           clearAuth();
           updateUser(null);
         }
@@ -176,21 +159,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, [checkAuthStatus, clearRefreshTimer]);
 
+  useEffect(() => {
+    const handleAuthRequired = () => {
+      clearAuth();
+      updateUser(null);
+      clearRefreshTimer();
+    };
+
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    };
+  }, [clearRefreshTimer, updateUser]);
+
   const login = async (credentials: LoginDto) => {
     try {
       const response = await apiService.login(credentials);
 
       if (response.success && response.data) {
-        const { user: userData, refreshToken } = response.data;
-
-        // accessToken is set via httpOnly cookie by the backend.
-        // Store refresh token in memory only (not localStorage).
-        if (refreshToken) {
-          refreshTokenRef.current = refreshToken;
-        }
+        const { user: userData } = response.data;
         updateUser(userData);
-
-        // Schedule token refresh
         scheduleTokenRefresh();
       } else {
         throw new Error(response.message || "Erro ao fazer login");
@@ -203,15 +191,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
+      await pushSubscriptionService.detachCurrentSubscription();
       await apiService.logout();
     } catch (error) {
       console.error("Erro ao fazer logout", error);
     } finally {
-      refreshTokenRef.current = null;
       clearAuth();
       updateUser(null);
-
-      // Clear refresh timer
       clearRefreshTimer();
     }
   };
@@ -221,13 +207,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     }
 
+    const normalizedRole = normalizeUserRoleName(user.role);
+    if (!normalizedRole) {
+      return false;
+    }
+
     // Admin tem acesso total
-    if (user.role?.name === "admin") {
+    if (normalizedRole === UserRole.ADMIN) {
       return true;
     }
 
     // Coordenador tem permissões específicas
-    if (user.role?.name === "coordenador") {
+    if (normalizedRole === UserRole.COORDENADOR) {
       // Pode gerenciar desarquivamentos
       if (resource === "desarquivamentos") {
         return ["create", "read", "update", "delete"].includes(action);
@@ -250,7 +241,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     // Usuário comum tem permissões limitadas
-    if (user.role?.name === "usuario") {
+    if (normalizedRole === UserRole.USUARIO) {
       // Pode apenas visualizar desarquivamentos
       if (resource === "desarquivamentos") {
         return action === "read";

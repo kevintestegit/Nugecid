@@ -1,5 +1,5 @@
-import brasaorn from '@/components/img/Brasão-RN.png';
-import brasaoitep from '@/components/img/brasao-itep-optimized.png';
+import brasaorn from "@/components/img/Brasão-RN.png";
+import brasaoitep from "@/components/img/brasao-itep-optimized.png";
 
 export interface RearquivamentoItem {
   numeroNicLaudoAuto: string;
@@ -16,32 +16,39 @@ export interface RearquivamentoData {
   itens?: RearquivamentoItem[];
 }
 
-export const generateRearquivamentoHTML = (data: RearquivamentoData): string => {
-  const baseHref = window.location.origin + (import.meta.env?.BASE_URL ?? '/');
+export const generateRearquivamentoHTML = (
+  data: RearquivamentoData,
+): string => {
+  const baseHref = window.location.origin + (import.meta.env?.BASE_URL ?? "/");
   const toAbs = (url: string) => new URL(url, baseHref).toString();
-  
+
   const logoRN = toAbs(brasaorn);
   const logoITEP = toAbs(brasaoitep);
 
   const escapeHtml = (value: unknown): string => {
-    if (value === null || value === undefined) return '';
+    if (value === null || value === undefined) return "";
     return String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   };
 
   // Gerar linhas da tabela com os itens (NIC/Laudo no campo NÚMERO)
   const itens = data.itens || [];
-  const rowsHtml = itens.length > 0 
-    ? itens.map((item) => `
+  const rowsHtml =
+    itens.length > 0
+      ? itens
+          .map(
+            (item) => `
     <tr>
-      <td class="fs11" style="height:30pt;">${escapeHtml(item.numeroNicLaudoAuto) || ''}</td>
-      <td class="fs11" style="height:30pt;">${escapeHtml(item.descricao) || ''}</td>
-    </tr>`).join('')
-    : `
+      <td class="fs11" style="height:30pt;">${escapeHtml(item.numeroNicLaudoAuto) || ""}</td>
+      <td class="fs11" style="height:30pt;">${escapeHtml(item.descricao) || ""}</td>
+    </tr>`,
+          )
+          .join("")
+      : `
     <tr>
       <td class="fs11" style="height:30pt;"></td>
       <td class="fs11" style="height:30pt;"></td>
@@ -257,10 +264,10 @@ export const generateRearquivamentoHTML = (data: RearquivamentoData): string => 
 
 export const printRearquivamento = (data: RearquivamentoData): void => {
   const html = generateRearquivamentoHTML(data);
-  
-  const printWindow = window.open('', '_blank', 'width=900,height=650');
+
+  const printWindow = window.open("", "_blank", "width=900,height=650");
   if (!printWindow) {
-    throw new Error('Bloqueador de pop-up impediu a abertura da janela');
+    throw new Error("Bloqueador de pop-up impediu a abertura da janela");
   }
 
   printWindow.document.write(html);
@@ -284,16 +291,16 @@ export const printRearquivamento = (data: RearquivamentoData): void => {
         triggerPrint();
       }
     };
-    
-    images.forEach(img => {
+
+    images.forEach((img) => {
       if (img.complete) {
         onLoad();
       } else {
-        img.addEventListener('load', onLoad, { once: true });
-        img.addEventListener('error', onLoad, { once: true });
+        img.addEventListener("load", onLoad, { once: true });
+        img.addEventListener("error", onLoad, { once: true });
       }
     });
-    
+
     // Fallback timeout
     setTimeout(triggerPrint, 2000);
   }

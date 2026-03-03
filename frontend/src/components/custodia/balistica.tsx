@@ -24,7 +24,7 @@ import { Copy, Printer, Database, CheckCircle } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { api } from "@/services/api";
 
-const QR_CODE_TARGET_URL = "http://10.9.233.136:3001/custodia";
+const QR_CODE_TARGET_URL = import.meta.env.VITE_QR_CODE_TARGET_URL || "";
 
 const QR_CODE_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEX///8AAABVwtN+AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAA/ElEQVRYhd2Y0Q6FMAhD4cv9c7jSdpqZ+G4vLotynpqxjhnxGkcj8F6R52Civk2QazwkNYn0JaMTSlvk1Fr2ZOYahX9CZlCnO1ElziB51qgXkVNgZ0nn7iFe5Ir5yi1jSQ7qXGaeTbllTOB7M7MIl52bEi4a5jlmCyh10hoSmASML5ZHhJzCkqhrkDtIKjuhDxOC0O7p27RNScTlCMqNJ7ASLQm9beaUYdMQXAlbA3Q8Okt5CnmSFSzHvHeXKTkoLaSQHY/82pJIJ9avpHTrr91IsxtdYq9aNCen1tQPhNru26ZEhah1Mybyie5O/d2xJiy86LsUcaVzJa/xAxr8HJc3ZfzyAAAAAElFTkSuQmCC";
@@ -1064,7 +1064,7 @@ const CustodiaBalistica: React.FC = () => {
                     <img
                       src={QR_CODE_DATA_URL}
                       alt="QR code para custodia"
-                      className="h-32 w-32 rounded-md border border-border/60 bg-white p-2 shadow-sm"
+                      className="h-32 w-32 rounded-md border border-border/60 bg-background p-2 shadow-sm"
                     />
                   </div>
                 ) : (

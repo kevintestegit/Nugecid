@@ -25,6 +25,7 @@ import { Roles } from "../../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { RoleType } from "../users/enums/role-type.enum";
+import { AntivirusService } from "../security/antivirus.service";
 
 import { RegistrosService } from "./registros.service";
 
@@ -32,7 +33,10 @@ import { RegistrosService } from "./registros.service";
 @Controller("registros")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RegistrosController {
-  constructor(private readonly registrosService: RegistrosService) {}
+  constructor(
+    private readonly registrosService: RegistrosService,
+    private readonly antivirusService: AntivirusService,
+  ) {}
 
   @Post("import")
   @Roles(RoleType.ADMIN)
@@ -73,12 +77,18 @@ export class RegistrosController {
     @Request() req: any,
   ) {
     try {
+      await this.antivirusService.scanUploadedFile(file, {
+        source: "registros.import",
+      });
       const result = await this.registrosService.importFromXlsx(
         file,
         req.user?.id,
       );
       return result;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new HttpException(
         `Falha ao processar o arquivo: ${error.message}`,
         HttpStatus.BAD_REQUEST,

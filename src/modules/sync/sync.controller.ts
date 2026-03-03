@@ -1,34 +1,42 @@
 import {
   Controller,
-  Query,
+  Post,
   Request,
   Sse,
   MessageEvent,
-  UnauthorizedException,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Optional,
 } from "@nestjs/common";
-import { JwtService } from "@nestjs/jwt";
 import { Observable, from, interval, map, merge } from "rxjs";
 import { finalize } from "rxjs/operators";
-import { ApiExcludeEndpoint, ApiTags } from "@nestjs/swagger";
-import { IsPublic } from "../../common/decorators/is-public.decorator";
+import {
+  ApiExcludeEndpoint,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
 import { SyncRealtimeService } from "./sync-realtime.service";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { SearchService } from "../search/search.service";
 
 @ApiTags("sync")
 @Controller("sync")
 export class SyncController {
   constructor(
     private readonly syncRealtimeService: SyncRealtimeService,
-    private readonly jwtService: JwtService,
+    @Optional()
+    private readonly searchService?: SearchService,
   ) {}
 
   @Sse("stream")
-  @IsPublic()
+  @UseGuards(JwtAuthGuard)
   @ApiExcludeEndpoint()
-  stream(
-    @Request() req: any,
-    @Query("token") token?: string,
-  ): Observable<MessageEvent> {
-    const userId = this.resolveUserId(req, token);
+  stream(@Request() req: any): Observable<MessageEvent> {
+    const userId = Number(req.user.id);
 
     const init$ = from([
       {
@@ -67,47 +75,25 @@ export class SyncController {
     );
   }
 
-  private resolveUserId(req: any, token?: string): number {
-    if (req?.user?.id) {
-      const parsedId = Number(req.user.id);
-      if (!Number.isNaN(parsedId) && parsedId > 0) {
-        return parsedId;
-      }
-    }
+  @Post("search/reindex")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
+  @ApiOperation({
+    summary: "Solicita reindexação completa do Meilisearch em background",
+  })
+  @ApiResponse({
+    status: 202,
+    description: "Reindexação aceita para execução assíncrona",
+  })
+  requestSearchReindex() {
+    const accepted = this.searchService?.requestFullReindex() ?? false;
 
-    const cookieToken = req?.cookies?.access_token;
-    if (cookieToken) {
-      try {
-        const payload = this.jwtService.verify(cookieToken);
-        if (!payload?.sub) {
-          throw new UnauthorizedException("Token do cookie inválido");
-        }
-        const parsedId = Number(payload.sub);
-        if (!Number.isNaN(parsedId) && parsedId > 0) {
-          return parsedId;
-        }
-        throw new UnauthorizedException("Token do cookie inválido");
-      } catch {
-        throw new UnauthorizedException("Token do cookie inválido ou expirado");
-      }
-    }
-
-    if (token) {
-      try {
-        const payload = this.jwtService.verify(token);
-        if (!payload?.sub) {
-          throw new UnauthorizedException("Token inválido");
-        }
-        const parsedId = Number(payload.sub);
-        if (!Number.isNaN(parsedId) && parsedId > 0) {
-          return parsedId;
-        }
-        throw new UnauthorizedException("Token inválido");
-      } catch {
-        throw new UnauthorizedException("Token inválido ou expirado");
-      }
-    }
-
-    throw new UnauthorizedException("Token não fornecido");
+    return {
+      status: accepted ? "accepted" : "disabled",
+      target: "search",
+      mode: "full-reindex",
+      queuedAt: new Date().toISOString(),
+    };
   }
 }

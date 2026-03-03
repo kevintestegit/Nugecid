@@ -11,16 +11,24 @@ services:
       dockerfile: Dockerfile
     container_name: sgc-backend
     env_file: .env
+    networks:
+      - backend
+      - frontend
     environment:
       NODE_ENV: production
-      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=768 --heapsnapshot-signal=SIGUSR2}
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=768 --heapsnapshot-signal=SIGUSR2 --no-deprecation}
       UV_THREADPOOL_SIZE: ${UV_THREADPOOL_SIZE:-8}
       PORT: ${APP_PORT:-3000}
+      BASE_URL: ${BASE_URL:-http://localhost:${HOST_BACKEND_PORT:-8080}}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:${HOST_FRONTEND_PORT:-3001}}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:${HOST_FRONTEND_PORT:-3001}}
+      SESSION_SECURE: ${SESSION_SECURE_OVERRIDE:-auto}
       DATABASE_HOST: db
       DATABASE_PORT: 5432
-      DATABASE_USERNAME: ${POSTGRES_USER:-sgc}
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-sgc_password}
-      DATABASE_NAME: ${POSTGRES_DB:-sgc}
+      DATABASE_USERNAME: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      DATABASE_NAME: ${POSTGRES_DB}
+      DATABASE_SSL: ${DATABASE_SSL:-true}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
@@ -28,6 +36,31 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       ALLOW_MEMORY_SESSION_STORE: ${ALLOW_MEMORY_SESSION_STORE:-false}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_S3_ENDPOINT: ${STORAGE_S3_ENDPOINT:-http://minio:9000}
+      STORAGE_S3_REGION: ${STORAGE_S3_REGION:-us-east-1}
+      STORAGE_S3_BUCKET: ${STORAGE_S3_BUCKET:-sgc-documentos}
+      STORAGE_S3_ACCESS_KEY: ${STORAGE_S3_ACCESS_KEY:-}
+      STORAGE_S3_SECRET_KEY: ${STORAGE_S3_SECRET_KEY:-}
+      STORAGE_S3_FORCE_PATH_STYLE: ${STORAGE_S3_FORCE_PATH_STYLE:-true}
+      STORAGE_S3_AUTO_CREATE_BUCKET: ${STORAGE_S3_AUTO_CREATE_BUCKET:-true}
+      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-false}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_TIMEOUT_MS: ${CLAMAV_TIMEOUT_MS:-10000}
+      CLAMAV_FAIL_OPEN: ${CLAMAV_FAIL_OPEN:-false}
+      OCR_ENABLED: ${OCR_ENABLED:-false}
+      OCR_COMMAND: ${OCR_COMMAND:-ocrmypdf}
+      OCR_LANGUAGE: ${OCR_LANGUAGE:-por}
+      OCR_TIMEOUT_MS: ${OCR_TIMEOUT_MS:-180000}
+      OCR_TESSERACT_TIMEOUT: ${OCR_TESSERACT_TIMEOUT:-180}
+      OCR_FAIL_OPEN: ${OCR_FAIL_OPEN:-false}
+      SEARCH_ENABLED: ${SEARCH_ENABLED:-false}
+      SEARCH_MEILI_HOST: ${SEARCH_MEILI_HOST:-http://meilisearch:7700}
+      SEARCH_MEILI_API_KEY: ${SEARCH_MEILI_API_KEY:-}
+      SEARCH_MEILI_INDEX: ${SEARCH_MEILI_INDEX:-global_documents}
+      SEARCH_FAIL_OPEN: ${SEARCH_FAIL_OPEN:-false}
+      SEARCH_BOOTSTRAP_ON_START: ${SEARCH_BOOTSTRAP_ON_START:-false}
     ports:
       - "${HOST_BACKEND_PORT:-8080}:${APP_PORT:-3000}"
     depends_on:
@@ -49,7 +82,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "const port = process.env.PORT || 3000; require('http').get('http://127.0.0.1:' + port + '/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));",
+          "const port = process.env.PORT || 3000; require('http').get('http://127.0.0.1:' + port + '/ready', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));",
         ]
       interval: 30s
       timeout: 10s
@@ -62,19 +95,29 @@ services:
       dockerfile: Dockerfile
     container_name: sgc-frontend
     env_file: .env
+    networks:
+      - frontend
     environment:
       NODE_ENV: production
-      VITE_API_URL: http://localhost:${HOST_BACKEND_PORT:-8080}
     ports:
       - "${HOST_FRONTEND_PORT:-3001}:3001"
     depends_on:
       - backend
     restart: unless-stopped
     logging: *logging-default
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
   db:
-    image: postgres:16
+    image: postgres:16.4-alpine3.20
     env_file: .env
+    networks:
+      - backend
+      - bi
     environment:
       PGDATA: /var/lib/postgresql/data/pgdata
     healthcheck:
@@ -82,28 +125,37 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    ports:
-      - "${HOST_DB_PORT:-5432}:5432"
+    # Do NOT expose DB port in production. Use adminer or direct container access.
+    # For dev only: uncomment the line below
+    # ports:
+    #   - "${HOST_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backups:/backups
+      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./docker/postgres/certs:/var/lib/postgresql:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     restart: unless-stopped
     logging: *logging-default
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine3.20
     container_name: sgc-redis
+    networks:
+      - backend
     command: >
       sh -c '
-        if [ -n "$$REDIS_PASSWORD" ]; then
-          redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
-        else
-          redis-server --appendonly yes
-        fi
+      if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+      else
+        redis-server --appendonly yes
+      fi
       '
     env_file: .env
-    ports:
-      - "${HOST_REDIS_PORT:-6379}:6379"
+    # Do NOT expose Redis port in production.
+    # For dev only: uncomment the line below
+    # ports:
+    #   - "${HOST_REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
     restart: unless-stopped
@@ -114,8 +166,117 @@ services:
       timeout: 5s
       retries: 5
 
+  clamav:
+    image: clamav/clamav:1.4.1
+    container_name: sgc-clamav
+    profiles: ["security"]
+    restart: unless-stopped
+    volumes:
+      - clamav_db:/var/lib/clamav
+    logging: *logging-default
+
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    container_name: sgc-minio
+    profiles: ["storage"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${HOST_MINIO_API_PORT:-9000}:9000"
+      - "${HOST_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    logging: *logging-default
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12.0
+    container_name: sgc-meilisearch
+    profiles: ["search"]
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+      MEILI_NO_ANALYTICS: "true"
+    ports:
+      - "${HOST_MEILI_PORT:-7700}:7700"
+    volumes:
+      - meili_data:/meili_data
+    restart: unless-stopped
+    logging: *logging-default
+
+  metabase-bootstrap:
+    image: postgres:16.4-alpine3.20
+    container_name: sgc-metabase-bootstrap
+    profiles: ["bi"]
+    env_file: .env
+    networks:
+      - bi
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      METABASE_APP_DB: ${METABASE_APP_DB:-metabase_app}
+      METABASE_APP_USER: ${METABASE_APP_USER:-metabase_app}
+      METABASE_APP_PASSWORD: ${METABASE_APP_PASSWORD:-}
+      METABASE_ANALYTICS_DB: ${METABASE_ANALYTICS_DB:-${POSTGRES_DB:-sgc}}
+      METABASE_ANALYTICS_SCHEMA: ${METABASE_ANALYTICS_SCHEMA:-analytics}
+      METABASE_ANALYTICS_USER: ${METABASE_ANALYTICS_USER:-metabase_analytics}
+      METABASE_ANALYTICS_PASSWORD: ${METABASE_ANALYTICS_PASSWORD:-}
+      METABASE_BOOTSTRAP_DB_HOST: db
+      METABASE_BOOTSTRAP_DB_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./docker/metabase/provision-metabase.sh:/bootstrap/provision-metabase.sh:ro
+    entrypoint: ["/bin/bash", "/bootstrap/provision-metabase.sh"]
+    restart: "no"
+    logging: *logging-default
+
+  metabase:
+    image: ${METABASE_IMAGE:-metabase/metabase:v0.59.1.x}
+    container_name: sgc-metabase
+    profiles: ["bi"]
+    networks:
+      - bi
+      - frontend
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: ${METABASE_APP_DB:-metabase_app}
+      MB_DB_HOST: db
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${METABASE_APP_USER:-metabase_app}
+      MB_DB_PASS: ${METABASE_APP_PASSWORD:-}
+      MB_SITE_URL: ${METABASE_SITE_URL:-http://localhost:${HOST_METABASE_PORT:-3002}}
+      JAVA_TIMEZONE: ${TZ:-America/Fortaleza}
+    ports:
+      - "${HOST_METABASE_PORT:-3002}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      metabase-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      - /dev/urandom:/dev/random:ro
+    restart: unless-stopped
+    logging: *logging-default
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:3000/api/health >/dev/null || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
   adminer:
-    image: adminer:latest
+    image: adminer:1.17.1
+    profiles: ["dev"]
+    networks:
+      - backend
     ports:
       - "${HOST_ADMINER_PORT:-8081}:8080"
     depends_on:
@@ -128,3 +289,16 @@ volumes:
   pgdata:
   redisdata:
   app_uploads:
+  clamav_db:
+  minio_data:
+  meili_data:
+
+networks:
+  backend:
+    driver: bridge
+    internal: true
+  frontend:
+    driver: bridge
+  bi:
+    driver: bridge
+    internal: true

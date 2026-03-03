@@ -34,9 +34,9 @@ Este documento contém todas as melhorias recomendadas para o sistema SGC-ITEP-N
 
 #### Problema
 Credenciais expostas no arquivo `.env` que podem estar no controle de versão:
-- `POSTGRES_PASSWORD=@Sanfona1`
-- `JWT_SECRET=your-super-secret-jwt-key-change-this-in-production`
-- `SESSION_SECRET=your-super-secret-session-key-change-this-in-production`
+- `POSTGRES_PASSWORD=<REDACTED>` (senha real removida — ver .env)
+- `JWT_SECRET=<REDACTED>` (valor placeholder detectado e corrigido)
+- `SESSION_SECRET=<REDACTED>` (valor placeholder detectado e corrigido)
 
 #### Solução
 
