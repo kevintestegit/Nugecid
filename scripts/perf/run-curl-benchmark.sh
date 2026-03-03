@@ -10,7 +10,7 @@ TIMEOUT_SECONDS="${PERF_TIMEOUT_SECONDS:-15}"
 LOGIN_FORWARDED_FOR="${PERF_LOGIN_FORWARDED_FOR:-10.250.0.10}"
 
 SCENARIOS=(
-  "health|/api/health"
+  "health|/health"
   "nugecid-list|/api/nugecid?page=1&limit=20&sortBy=dataSolicitacao&sortOrder=DESC"
   "pastas-list|/api/pastas"
   "notificacoes-list|/api/notificacoes?page=1&limit=20"

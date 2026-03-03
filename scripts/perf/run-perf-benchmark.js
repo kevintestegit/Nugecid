@@ -216,7 +216,7 @@ async function main() {
   const scenarios = [
     {
       name: "health",
-      pathname: "/api/health",
+      pathname: "/health",
     },
     {
       name: "nugecid-list",

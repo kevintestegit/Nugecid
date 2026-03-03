@@ -1,4 +1,9 @@
-import { Controller, Get, Logger } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import {
   DatabaseHealthService,
@@ -6,44 +11,75 @@ import {
 } from "./database-health.service";
 import { IsPublic } from "../../common/decorators/is-public.decorator";
 import { RuntimeMetricsService } from "../observability/runtime-metrics.service";
+import { RedisService } from "../redis/redis.service";
 
 @ApiTags("health")
-@Controller("health")
+@Controller()
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
   constructor(
     private readonly databaseHealthService: DatabaseHealthService,
     private readonly runtimeMetricsService: RuntimeMetricsService,
+    private readonly redisService: RedisService,
   ) {}
 
-  @Get()
+  @Get("health")
   @IsPublic()
-  @ApiOperation({ summary: "Verificação geral de saúde do sistema" })
-  @ApiResponse({ status: 200, description: "Status de saúde do sistema" })
+  @ApiOperation({ summary: "Liveness: processo HTTP está ativo" })
+  @ApiResponse({ status: 200, description: "Aplicação viva (liveness)" })
   async getHealth() {
-    this.logger.log(`🔍 [HEALTH] Verificação de saúde solicitada`);
-
-    const dbHealth = await this.databaseHealthService.checkHealth();
-
-    const health = {
-      status: dbHealth.status === "healthy" ? "ok" : "error",
+    return {
+      status: "ok",
+      type: "liveness",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      database: dbHealth,
-      memory: process.memoryUsage(),
-      runtime: this.runtimeMetricsService.getSummary(),
       version: process.version,
+    };
+  }
+
+  @Get("ready")
+  @IsPublic()
+  @ApiOperation({
+    summary: "Readiness: valida dependências críticas (DB e Redis)",
+  })
+  @ApiResponse({ status: 200, description: "Aplicação pronta para tráfego" })
+  @ApiResponse({
+    status: 503,
+    description: "Aplicação não pronta (DB e/ou Redis indisponível)",
+  })
+  async getReadiness() {
+    this.logger.log("🔍 [READY] Verificação de readiness solicitada");
+
+    const dbHealth = await this.databaseHealthService.checkHealth();
+    const redisOk = await this.redisService.ping();
+    const ready = dbHealth.status === "healthy" && redisOk;
+
+    const readiness = {
+      status: ready ? "ready" : "not_ready",
+      type: "readiness",
+      timestamp: new Date().toISOString(),
+      database: dbHealth,
+      redis: {
+        connected: redisOk,
+      },
     };
 
     this.logger.log(
-      `📊 [HEALTH] Status: ${health.status}, DB: ${dbHealth.status}`,
+      `📊 [READY] Status: ${readiness.status}, DB: ${dbHealth.status}, Redis: ${redisOk ? "up" : "down"}`,
     );
 
-    return health;
+    if (!ready) {
+      this.logger.error(
+        `❌ [READY] Dependências indisponíveis: DB=${dbHealth.status}, Redis=${redisOk ? "up" : "down"}`,
+      );
+      throw new ServiceUnavailableException(readiness);
+    }
+
+    return readiness;
   }
 
-  @Get("database")
+  @Get("health/database")
   @IsPublic()
   @ApiOperation({
     summary: "Verificação detalhada da conexão com banco de dados",
@@ -64,7 +100,7 @@ export class HealthController {
     return health;
   }
 
-  @Get("database/test")
+  @Get("health/database/test")
   @IsPublic()
   @ApiOperation({ summary: "Executa testes de queries no banco de dados" })
   @ApiResponse({ status: 200, description: "Resultados dos testes de queries" })
@@ -93,7 +129,7 @@ export class HealthController {
     }
   }
 
-  @Get("database/info")
+  @Get("health/database/info")
   @IsPublic()
   @ApiOperation({ summary: "Informações detalhadas do banco de dados" })
   @ApiResponse({
@@ -127,7 +163,7 @@ export class HealthController {
     }
   }
 
-  @Get("ping")
+  @Get("health/ping")
   @IsPublic()
   @ApiOperation({ summary: "Ping básico do sistema" })
   @ApiResponse({ status: 200, description: "Pong - sistema ativo" })
@@ -139,7 +175,7 @@ export class HealthController {
     };
   }
 
-  @Get("metrics")
+  @Get("health/metrics")
   @IsPublic()
   @ApiOperation({
     summary: "Métricas de runtime (event loop, GC, HTTP e cache)",

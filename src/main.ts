@@ -3,7 +3,7 @@ import "./instrument";
 
 import "module-alias/register";
 import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger, LogLevel } from "@nestjs/common";
+import { ValidationPipe, Logger, LogLevel, RequestMethod } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
@@ -209,8 +209,16 @@ async function bootstrap() {
   app.use(cookieParser());
 
   const sessionConfig = configService.get("auth.session");
-  const allowMemorySessionStore =
+  const allowMemorySessionStoreFlag =
     configService.get<string>("ALLOW_MEMORY_SESSION_STORE", "false") === "true";
+  const allowMemorySessionStore =
+    appEnvironment !== "production" && allowMemorySessionStoreFlag;
+
+  if (appEnvironment === "production" && allowMemorySessionStoreFlag) {
+    logger.warn(
+      "ALLOW_MEMORY_SESSION_STORE=true foi ignorado em produção. Redis é obrigatório para sessões.",
+    );
+  }
 
   // Configura Redis como session store quando disponível
   const redisUrl = configService.get<string>("REDIS_URL");
@@ -236,6 +244,13 @@ async function bootstrap() {
         logger.log("Redis session store connected");
       });
 
+      const pingResult = await redisClient.ping();
+      if (pingResult !== "PONG") {
+        throw new Error(
+          `Redis ping retornou valor inesperado durante bootstrap: ${pingResult}`,
+        );
+      }
+
       sessionStore = new RedisStore({
         client: redisClient,
         prefix: "sgc:sess:",
@@ -244,23 +259,20 @@ async function bootstrap() {
 
       logger.log("Session store: Redis");
     } catch (err) {
-      logger.warn(
-        `Failed to connect Redis for sessions, falling back to memory store: ${err.message}`,
-      );
+      const message = `Falha ao conectar Redis para sessões: ${err.message}`;
+      if (allowMemorySessionStore) {
+        logger.warn(`${message}. Usando fallback em memória neste ambiente.`);
+      } else {
+        throw new Error(`${message}. Fallback em memória desabilitado.`);
+      }
     }
-  } else if (appEnvironment !== "production" || allowMemorySessionStore) {
+  } else if (allowMemorySessionStore) {
     logger.warn(
       "Session store: in-memory (configure REDIS_URL for production)",
     );
-  }
-
-  if (
-    !sessionStore &&
-    appEnvironment === "production" &&
-    !allowMemorySessionStore
-  ) {
+  } else {
     throw new Error(
-      "Session store em memória desabilitado em produção. Configure REDIS_URL/REDIS_HOST ou ALLOW_MEMORY_SESSION_STORE=true.",
+      "REDIS_URL/REDIS_HOST não configurados e fallback em memória desabilitado.",
     );
   }
 
@@ -302,7 +314,11 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.setGlobalPrefix("api", {
-    exclude: ["/"],
+    exclude: [
+      "/",
+      { path: "health", method: RequestMethod.GET },
+      { path: "ready", method: RequestMethod.GET },
+    ],
   });
 
   app.useGlobalInterceptors(

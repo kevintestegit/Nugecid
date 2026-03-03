@@ -65,16 +65,6 @@ export class AppController {
     };
   }
 
-  @Get("health")
-  @ApiOperation({ summary: "Health check da aplicação" })
-  @ApiResponse({
-    status: 200,
-    description: "Aplicação funcionando corretamente",
-  })
-  getHealth() {
-    return this.appService.getHealth();
-  }
-
   @Get("test-search")
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Teste simples de busca" })
