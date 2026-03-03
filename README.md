@@ -332,7 +332,7 @@ O sistema gera 3 tipos de PDF:
 - **Rate Limiting em 4 níveis** — Global, login, registro, upload (configurável via `.env`)
 - **CORS** — Origens controladas
 - **Bloqueio por IP** — Módulo `security` com IP blocking
-- **Account Lockout** — Bloqueio após N tentativas falhas (`LOCKOUT_ATTEMPTS`, `LOCKOUT_DURATION`)
+- **Account Lockout** — Bloqueio após N tentativas falhas (`MAX_LOGIN_ATTEMPTS`, `LOCKOUT_DURATION`)
 - **Sessões Redis** — `express-session` com `connect-redis`
 - **Criptografia de senhas** — bcrypt com rounds configuráveis
 - **Cookie HttpOnly** — Token JWT nunca exposto ao JavaScript do client
@@ -468,25 +468,38 @@ EXPOSE 3000
 CMD ["node", "dist/src/main.js"]
 ```
 
-## Variáveis de Ambiente
+## Configuração por ambiente
 
-Todas as variáveis estão documentadas em `.env.example`. As principais:
+O backend valida ENV no boot (`src/config/validation.ts`) e falha em produção quando faltam variáveis críticas.
 
-| Variável             | Descrição                        | Padrão                 |
-| -------------------- | -------------------------------- | ---------------------- |
-| `APP_PORT`           | Porta interna do backend         | `3000`                 |
-| `HOST_BACKEND_PORT`  | Porta exposta do backend (host)  | `8080`                 |
-| `HOST_FRONTEND_PORT` | Porta exposta do frontend (host) | `3001`                 |
-| `POSTGRES_USER`      | Usuário PostgreSQL               | `sgc`                  |
-| `POSTGRES_PASSWORD`  | Senha PostgreSQL                 | (obrigatório)          |
-| `POSTGRES_DB`        | Nome do banco                    | `sgc`                  |
-| `JWT_SECRET`         | Segredo para assinar JWT         | (obrigatório)          |
-| `SESSION_SECRET`     | Segredo para sessões             | (obrigatório)          |
-| `REDIS_HOST`         | Host do Redis                    | `localhost`            |
-| `SENTRY_DSN`         | DSN do Sentry (opcional)         | (vazio = desabilitado) |
-| `SENTRY_ENVIRONMENT` | Ambiente Sentry                  | `production`           |
-| `BACKUP_ENABLED`     | Ativar backups automáticos       | `true`                 |
-| `CORS_ORIGIN`        | Origens permitidas               | `localhost:3000,3001`  |
+### Produção (obrigatórias)
+
+- Auth: `JWT_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET`
+- Banco: `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`
+- Redis/estado distribuído: `REDIS_URL` **ou** `REDIS_HOST` + `REDIS_PORT`
+- URL e CORS: `FRONTEND_URL`, `CORS_ORIGIN`
+
+### Opcionais (com defaults)
+
+- Rate-limit: `RATE_LIMIT_*`, `TRUST_PROXY_HOPS`
+- Sentry: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`
+- Email: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`
+- Portas Compose: `HOST_BACKEND_PORT`, `HOST_FRONTEND_PORT`, `HOST_DB_PORT`, `HOST_REDIS_PORT`, `HOST_ADMINER_PORT`
+
+### Legado suportado (com warning de depreciação)
+
+- `MAIL_*` -> `EMAIL_*`
+- `HOST_HTTP_PORT` -> `HOST_BACKEND_PORT`
+
+### Lista de variáveis críticas por módulo
+
+- `auth`: `JWT_SECRET`, `JWT_REFRESH_SECRET`, `SESSION_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, `MAX_LOGIN_ATTEMPTS`, `LOCKOUT_DURATION`
+- `db`: `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_SSL`, `DATABASE_TYPE`, `DATABASE_USE_NEON`
+- `redis`: `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB`, `ALLOW_MEMORY_SESSION_STORE`
+- `email`: `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASSWORD`, `EMAIL_FROM`
+- `rate-limit`: `RATE_LIMIT_ENABLED`, `RATE_LIMIT_GLOBAL_MAX`, `RATE_LIMIT_GLOBAL_WINDOW_MS`, `RATE_LIMIT_LOGIN_MAX`, `RATE_LIMIT_LOGIN_WINDOW_MS`, `RATE_LIMIT_REGISTER_MAX`, `RATE_LIMIT_REGISTER_WINDOW_MS`, `RATE_LIMIT_UPLOAD_MAX`, `RATE_LIMIT_UPLOAD_WINDOW_MS`, `TRUST_PROXY_HOPS`
+- `sentry`: `SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_RELEASE`
+- `frontend urls`: `FRONTEND_URL`, `BASE_URL`, `CORS_ORIGIN`, `HOST_BACKEND_PORT`, `HOST_FRONTEND_PORT`
 
 ## Migração de Uploads entre Máquinas
 
