@@ -46,7 +46,6 @@ import { printRearquivamento } from "./print-templates";
 import brasaorn from "@/components/img/Brasão-RN.png";
 import brasaoitep from "@/components/img/brasao-itep-optimized.png";
 import { getInstitutoLabel } from "@/constants/institutos";
-import { getAuthHeader } from "@/utils/tokenStorage";
 import axios from "axios";
 import type {
   Desarquivamento,
@@ -145,7 +144,9 @@ const extractStatusFromDetailsText = (detailsText: unknown): string | null => {
   return null;
 };
 
-const extractStatusFromHistoricoItem = (historyItem: HistoricoItem): string | null => {
+const extractStatusFromHistoricoItem = (
+  historyItem: HistoricoItem,
+): string | null => {
   const statusChange = historyItem.details?.changes?.status;
 
   if (statusChange && typeof statusChange === "object") {
@@ -384,9 +385,7 @@ export const DesarquivamentoDetailModal: React.FC<
     try {
       // Buscar registros relacionados pelo mesmo número de processo
       const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
-        headers: {
-          ...getAuthHeader(),
-        },
+        credentials: "include",
       });
 
       if (!relatedResponse.ok) {
@@ -912,9 +911,7 @@ export const DesarquivamentoDetailModal: React.FC<
     try {
       // Buscar registros relacionados pelo mesmo número de processo com status REARQUIVAMENTO_SOLICITADO
       const relatedResponse = await fetch(`/api/nugecid/${item.id}/related`, {
-        headers: {
-          ...getAuthHeader(),
-        },
+        credentials: "include",
       });
 
       if (!relatedResponse.ok) {

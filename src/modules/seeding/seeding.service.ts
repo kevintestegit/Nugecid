@@ -257,7 +257,14 @@ export class SeedingService implements OnModuleInit {
     const adminUser = await this.userRepository.findOne({
       where: { usuario: "admin" },
     });
-    const hashedPassword = await bcrypt.hash("admin123", 12);
+    const adminSeedPassword = process.env.ADMIN_SEED_PASSWORD;
+    if (!adminSeedPassword) {
+      this.logger.error(
+        "ADMIN_SEED_PASSWORD env var is not set. Skipping admin user seed.",
+      );
+      return;
+    }
+    const hashedPassword = await bcrypt.hash(adminSeedPassword, 12);
 
     if (adminUser) {
       this.logger.log("Usuário admin encontrado. Atualizando a senha...");

@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { getAuthHeader } from "@/utils/tokenStorage";
 
 interface ImageThumbnailProps {
   desarquivamentoId: number | null;
@@ -38,9 +37,7 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
         // Se tem previewUrl, usar ela (vem do backend com a URL correta)
         if (previewUrl) {
           const response = await fetch(previewUrl, {
-            headers: {
-              ...getAuthHeader(),
-            },
+            credentials: "include",
             signal: controller.signal,
           });
           if (!response.ok) throw new Error("Erro ao carregar imagem");
@@ -50,9 +47,7 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
           const response = await fetch(
             `/api/nugecid/${desarquivamentoId}/anexos/${anexoId}/view`,
             {
-              headers: {
-                ...getAuthHeader(),
-              },
+              credentials: "include",
               signal: controller.signal,
             },
           );
@@ -64,9 +59,7 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
           const response = await fetch(
             `/api/nugecid/processo/${encodedProcesso}/anexos/${anexoId}/view`,
             {
-              headers: {
-                ...getAuthHeader(),
-              },
+              credentials: "include",
               signal: controller.signal,
             },
           );
