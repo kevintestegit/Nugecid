@@ -21,6 +21,7 @@ import {
 } from "./config/database.config";
 import authConfig from "./config/auth.config";
 import appConfig from "./config/app.config";
+import { validateEnvironment } from "./config/validation";
 
 // Modules
 import { AuthModule } from "./modules/auth/auth.module";
@@ -61,6 +62,7 @@ import { PlanilhaControle } from "./modules/planilhas/entities/planilha-controle
 
 dotenvConfig({ path: ".env", override: false });
 dotenvConfig({ path: ".env.local", override: true });
+validateEnvironment();
 const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
 
 @Module({
