@@ -16,6 +16,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1).optional(),
   REDIS_HOST: z.string().min(1).optional(),
   REDIS_PORT: z.string().regex(/^\d+$/).optional(),
+  ALLOW_MEMORY_SESSION_STORE: z.enum(["true", "false"]).optional(),
   JWT_SECRET: z.string().min(1).optional(),
   JWT_REFRESH_SECRET: z.string().min(1).optional(),
   SESSION_SECRET: z.string().min(1).optional(),
@@ -120,6 +121,18 @@ export function validateEnvironment(): void {
     );
   }
 
+  if (!normalized.REDIS_URL && !normalized.REDIS_HOST) {
+    throw new Error(
+      "[ENV] Redis obrigatório em produção: defina REDIS_URL ou REDIS_HOST.",
+    );
+  }
+
+  if (normalized.ALLOW_MEMORY_SESSION_STORE === "true") {
+    throw new Error(
+      "[ENV] ALLOW_MEMORY_SESSION_STORE=true não é permitido em produção.",
+    );
+  }
+
   const weakSecrets = ["JWT_SECRET", "JWT_REFRESH_SECRET", "SESSION_SECRET"]
     .filter((key) => isPlaceholderSecret(normalized[key]))
     .join(", ");
@@ -129,4 +142,3 @@ export function validateEnvironment(): void {
     );
   }
 }
-

@@ -12,7 +12,14 @@ echo ""
 
 echo "🔗 Testando Conectividade:"
 echo -n "  Backend (8080): "
-if curl -s http://localhost:8080/api/health > /dev/null 2>&1; then
+if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+    echo "✅ OK"
+else
+    echo "❌ FALHOU"
+fi
+
+echo -n "  Readiness (8080): "
+if curl -s http://localhost:8080/ready > /dev/null 2>&1; then
     echo "✅ OK"
 else
     echo "❌ FALHOU"

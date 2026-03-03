@@ -168,7 +168,8 @@ O sistema estará disponível em:
 - **Frontend**: http://localhost:3001
 - **API**: http://localhost:3000
 - **API Docs (Swagger)**: http://localhost:3000/api/docs
-- **Health Check**: http://localhost:3000/api/health
+- **Liveness**: http://localhost:3000/health
+- **Readiness**: http://localhost:3000/ready
 
 > **Nota**: O seed de dados iniciais é automático via `SeedingService` (não é necessário rodar `npm run seed` manualmente).
 
@@ -297,7 +298,8 @@ A API usa **JWT via cookie HttpOnly** (`access_token`). O fluxo:
 - `GET /api/security/*` — Endpoints de segurança
 - `GET /api/queues/*` — Monitoramento de filas
 - `GET /api/sync/*` — Sincronização
-- `GET /api/health` — Health check principal
+- `GET /health` — Liveness (processo ativo)
+- `GET /ready` — Readiness (DB + Redis)
 
 A documentação completa e interativa está disponível em **Swagger** (`/api/docs`) quando o backend está rodando.
 
@@ -358,8 +360,26 @@ O sistema gera 3 tipos de PDF:
 
 ### Health Checks
 
-- `GET /api/health` — Status geral da aplicação
-- Verifica: conectividade DB, conectividade Redis, espaço em disco, uso de memória
+- `GET /health` — liveness básico (sempre 200 quando o processo está de pé)
+- `GET /ready` — readiness (retorna 200 apenas com DB e Redis OK; 503 quando indisponível)
+- Endpoints auxiliares (debug): `GET /api/health/database`, `GET /api/health/database/info`, `GET /api/health/metrics`
+
+### Requisitos de produção
+
+- Redis é obrigatório em produção para sessões/cache/filas.
+- Fallback em memória é bloqueado em produção (mesmo se `ALLOW_MEMORY_SESSION_STORE=true`).
+- Se Redis/DB estiverem indisponíveis no bootstrap, o processo falha startup.
+- O deploy deve usar `/ready` para readiness probe e `/health` para liveness probe.
+
+### Testando readiness localmente
+
+```bash
+# Liveness
+curl -i http://localhost:3000/health
+
+# Readiness (DB + Redis)
+curl -i http://localhost:3000/ready
+```
 
 ### Backups Automáticos
 
@@ -478,6 +498,7 @@ O backend valida ENV no boot (`src/config/validation.ts`) e falha em produção 
 - Banco: `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_NAME`
 - Redis/estado distribuído: `REDIS_URL` **ou** `REDIS_HOST` + `REDIS_PORT`
 - URL e CORS: `FRONTEND_URL`, `CORS_ORIGIN`
+- Em produção: `ALLOW_MEMORY_SESSION_STORE` deve permanecer `false`
 
 ### Opcionais (com defaults)
 
