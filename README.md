@@ -26,27 +26,13 @@ O projeto combina backend NestJS, frontend React/Vite e uma stack Docker com Pos
 
 ## Imagens do Sistema
 
-Para exibir prints do programa aqui no GitHub:
+### Dashboard
 
-1. Salve as imagens em `docs/screenshots/`.
-2. Use nomes simples, sem espaços, por exemplo `dashboard.png`, `desarquivamentos.png` e `kanban.png`.
-3. Adicione no README usando Markdown:
+![Dashboard do Nugecid](docs/screenshots/dashboard.png)
 
-```md
-![Dashboard](docs/screenshots/dashboard.png)
-![Desarquivamentos](docs/screenshots/desarquivamentos.png)
-![Kanban](docs/screenshots/kanban.png)
-```
+### Desarquivamentos
 
-Sugestão de organização:
-
-| Tela | Arquivo sugerido |
-| --- | --- |
-| Dashboard inicial | `docs/screenshots/dashboard.png` |
-| Lista de desarquivamentos | `docs/screenshots/desarquivamentos.png` |
-| Detalhe do desarquivamento | `docs/screenshots/detalhe-desarquivamento.png` |
-| Kanban de tarefas | `docs/screenshots/kanban.png` |
-| Relatórios / estatísticas | `docs/screenshots/relatorios.png` |
+![Tela de desarquivamentos](docs/screenshots/Desarquivamentos.png)
 
 ## Como Executar
 
