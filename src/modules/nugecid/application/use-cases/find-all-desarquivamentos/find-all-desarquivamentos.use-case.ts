@@ -13,6 +13,7 @@ export interface FindAllDesarquivamentosRequest {
   sortBy?: string;
   sortOrder?: "ASC" | "DESC";
   filters?: {
+    search?: string;
     status?: string | string[];
     statusList?: string[];
     tipoDesarquivamento?: string | string[];
@@ -24,8 +25,9 @@ export interface FindAllDesarquivamentosRequest {
     responsavelId?: number;
     urgente?: boolean;
     instituto?: string;
-    dataInicio?: Date;
-    dataFim?: Date;
+    requerente?: string;
+    dataInicio?: Date | string;
+    dataFim?: Date | string;
     incluirExcluidos?: boolean;
   };
   userId?: number;
@@ -174,6 +176,7 @@ export class FindAllDesarquivamentosUseCase {
       "criadoPorId",
       "responsavelId",
       "createdAt",
+      "deletedAt",
       "updatedAt",
     ];
 
@@ -185,7 +188,9 @@ export class FindAllDesarquivamentosUseCase {
 
     // Validar filtros de data
     if (request.filters?.dataInicio && request.filters?.dataFim) {
-      if (request.filters.dataInicio > request.filters.dataFim) {
+      const startDate = this.normalizeDateFilter(request.filters.dataInicio);
+      const endDate = this.normalizeDateFilter(request.filters.dataFim);
+      if (startDate && endDate && startDate > endDate) {
         throw new Error("Data de início deve ser anterior à data de fim");
       }
     }
@@ -265,6 +270,20 @@ export class FindAllDesarquivamentosUseCase {
       ...filters,
       criadoPorId: userId,
     };
+  }
+
+  private normalizeDateFilter(value: Date | string | undefined): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Data inválida para filtro de período");
+    }
+    return parsed;
   }
 
   private mapToResponse(

@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
@@ -8,6 +14,7 @@ import {
 import { useDesarquivamentosImport } from "@/hooks/useDesarquivamentosImport";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import {
   Card,
   CardContent,
@@ -38,6 +45,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  MoreVertical,
+  X,
 } from "lucide-react";
 import {
   StatusDesarquivamento,
@@ -45,7 +54,11 @@ import {
   TipoDesarquivamento,
   Desarquivamento,
 } from "@/types";
-import { getTipoDesarquivamentoLabel } from "@/utils/format";
+import {
+  formatDate,
+  getStatusLabel,
+  getTipoDesarquivamentoLabel,
+} from "@/utils/format";
 import { toast } from "sonner";
 import { TableLoading } from "@/components/ui/Loading";
 import { ImportModal } from "@/components/desarquivamentos/ImportModal";
@@ -135,6 +148,10 @@ const DesarquivamentosPage: React.FC = () => {
   const [printCandidates, setPrintCandidates] = useState<Desarquivamento[]>([]);
   const [selectedPrintIds, setSelectedPrintIds] = useState<number[]>([]);
   const [printProcessSearch, setPrintProcessSearch] = useState("");
+  const printTermsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const printSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const printDialogRef = useRef<HTMLDivElement | null>(null);
+  const printReturnFocusRef = useRef<HTMLElement | null>(null);
 
   // Read URL query parameters on component mount
   useEffect(() => {
@@ -403,8 +420,89 @@ const DesarquivamentosPage: React.FC = () => {
     return allItems;
   };
 
+  const closePrintTermsModal = useCallback(() => {
+    setIsPrintTermsModalOpen(false);
+
+    window.setTimeout(() => {
+      const returnTarget =
+        printReturnFocusRef.current ?? printTermsButtonRef.current;
+      returnTarget?.focus();
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    if (!isPrintTermsModalOpen) {
+      return;
+    }
+
+    const focusTimeout = window.setTimeout(() => {
+      printSearchInputRef.current?.focus();
+    }, 0);
+
+    const getFocusableElements = () => {
+      const dialog = printDialogRef.current;
+      if (!dialog) {
+        return [];
+      }
+
+      return Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          [
+            "a[href]",
+            "button:not([disabled])",
+            "input:not([disabled])",
+            "select:not([disabled])",
+            "textarea:not([disabled])",
+            '[tabindex]:not([tabindex="-1"])',
+          ].join(","),
+        ),
+      ).filter((element) => !element.hasAttribute("aria-hidden"));
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closePrintTermsModal();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusableElements = getFocusableElements();
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        printDialogRef.current?.focus();
+        return;
+      }
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.clearTimeout(focusTimeout);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closePrintTermsModal, isPrintTermsModalOpen]);
+
   const handleOpenPrintTermsModal = async () => {
     try {
+      printReturnFocusRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : printTermsButtonRef.current;
       setIsLoadingPrintTerms(true);
       const records = await fetchAllDesarquivamentosForPrint();
 
@@ -628,7 +726,7 @@ const DesarquivamentosPage: React.FC = () => {
 </body>
 </html>`;
 
-    setIsPrintTermsModalOpen(false);
+    closePrintTermsModal();
     printHtmlDocument(html);
   };
 
@@ -644,7 +742,9 @@ const DesarquivamentosPage: React.FC = () => {
     if (!terms.length) return printCandidates;
 
     return printCandidates.filter((candidate) => {
-      const processNumber = String(candidate.numeroProcesso || "").toLowerCase();
+      const processNumber = String(
+        candidate.numeroProcesso || "",
+      ).toLowerCase();
       return terms.some((term) => processNumber.includes(term));
     });
   }, [printCandidates, printProcessSearch]);
@@ -803,6 +903,7 @@ const DesarquivamentosPage: React.FC = () => {
               Atualizar
             </Button>
             <Button
+              ref={printTermsButtonRef}
               onClick={handleOpenPrintTermsModal}
               variant="outline"
               size="sm"
@@ -913,10 +1014,168 @@ const DesarquivamentosPage: React.FC = () => {
             <TableLoading />
           ) : (
             <div className="space-y-4">
-              <div>
+              {data?.data && data.data.length > 0 ? (
+                <div
+                  role="list"
+                  aria-label="Solicitações em formato de cartões"
+                  className="grid gap-3 lg:hidden"
+                >
+                  {data.data.map((item) => (
+                    <article
+                      key={item.id}
+                      role="listitem"
+                      className="rounded-xl border border-border/60 bg-background/80 p-4 shadow-[0_14px_34px_-32px_rgba(15,23,42,0.8)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant={
+                                item.status === StatusDesarquivamento.FINALIZADO
+                                  ? "default"
+                                  : item.status ===
+                                      StatusDesarquivamento.NAO_LOCALIZADO
+                                    ? "destructive"
+                                    : item.status ===
+                                        StatusDesarquivamento.DESARQUIVADO
+                                      ? "secondary"
+                                      : "outline"
+                              }
+                              className="text-xs"
+                            >
+                              {getStatusLabel(item.status)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {item.tipoDesarquivamento
+                                ? getTipoDesarquivamentoLabel(
+                                    item.tipoDesarquivamento,
+                                  )
+                                : "-"}
+                            </Badge>
+                          </div>
+                          <h3 className="truncate text-sm font-semibold text-foreground">
+                            {item.nomeCompleto || "-"}
+                          </h3>
+                        </div>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Ações da solicitação"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            {item.id ? (
+                              <DropdownMenuItem
+                                onSelect={() => handleOpenDetails(item.id)}
+                              >
+                                Ver detalhes
+                              </DropdownMenuItem>
+                            ) : null}
+                            {canEdit && item.id ? (
+                              <DropdownMenuItem asChild>
+                                <Link
+                                  to={`/desarquivamentos/${item.id}/editar`}
+                                >
+                                  Editar
+                                </Link>
+                              </DropdownMenuItem>
+                            ) : null}
+                            {canDelete && item.id ? (
+                              <DropdownMenuItem
+                                onSelect={() => handleDeleteClick(item)}
+                              >
+                                Excluir
+                              </DropdownMenuItem>
+                            ) : null}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+                        <div>
+                          <dt className="font-medium text-muted-foreground">
+                            Processo
+                          </dt>
+                          <dd className="break-words font-mono text-foreground">
+                            {item.numeroProcesso || "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-muted-foreground">
+                            NIC/Laudo
+                          </dt>
+                          <dd className="break-words font-mono text-foreground">
+                            {item.numeroNicLaudoAuto || "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-muted-foreground">
+                            Documento
+                          </dt>
+                          <dd className="text-foreground">
+                            {item.tipoDocumento || "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-muted-foreground">
+                            Criação
+                          </dt>
+                          <dd className="text-foreground">
+                            {formatDate(item.createdAt || item.dataSolicitacao)}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <div className="mt-4 flex flex-wrap justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => item.id && handleOpenDetails(item.id)}
+                          aria-label={`Ver detalhes da solicitação ${item.numeroProcesso || item.id}`}
+                        >
+                          Ver detalhes
+                        </Button>
+                        {canEdit && item.id ? (
+                          <Button asChild size="sm" variant="outline">
+                            <Link to={`/desarquivamentos/${item.id}/editar`}>
+                              Editar
+                            </Link>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="lg:hidden">
+                  <div className="rounded-xl border border-dashed border-border/60 bg-background/70 px-4 py-8 text-center text-muted-foreground">
+                    <FileText className="mx-auto mb-3 h-10 w-10 opacity-50" />
+                    <p className="text-sm font-medium text-foreground">
+                      Nenhuma solicitação encontrada
+                    </p>
+                    <p className="mt-1 text-xs">
+                      {searchTerm ||
+                      statusFilter !== "all" ||
+                      tipoFilter !== "all" ||
+                      tipoDesarquivamentoFilter !== "all"
+                        ? "Tente ajustar os filtros de busca"
+                        : "Comece criando uma nova solicitação"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="hidden lg:block">
                 <Table
                   className="compact-desarquivamentos"
-                  containerClassName="overflow-y-auto overflow-x-hidden"
+                  containerClassName="overflow-x-auto overflow-y-auto"
                 >
                   <TableHeader>
                     <TableRow>
@@ -1065,20 +1324,44 @@ const DesarquivamentosPage: React.FC = () => {
         ? createPortal(
             <>
               <div
+                aria-hidden="true"
                 className="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm"
-                onClick={() => setIsPrintTermsModalOpen(false)}
+                onClick={closePrintTermsModal}
               />
               <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 pointer-events-none">
-                <div className="w-full max-w-3xl rounded-lg border border-border bg-background shadow-2xl pointer-events-auto">
+                <div
+                  ref={printDialogRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="print-terms-title"
+                  aria-describedby="print-terms-description"
+                  tabIndex={-1}
+                  className="w-full max-w-3xl rounded-lg border border-border bg-background shadow-2xl pointer-events-auto"
+                >
                   <div className="flex items-center justify-between border-b border-border px-5 py-4">
                     <div>
-                      <h3 className="text-base font-semibold text-foreground">
+                      <h3
+                        id="print-terms-title"
+                        className="text-base font-semibold text-foreground"
+                      >
                         Selecionar termos para impressão
                       </h3>
-                      <p className="text-sm text-muted-foreground">
+                      <p
+                        id="print-terms-description"
+                        className="text-sm text-muted-foreground"
+                      >
                         Selecione os processos para imprimir no mesmo documento.
                       </p>
                     </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={closePrintTermsModal}
+                      aria-label="Fechar modal de impressão"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
 
                   <div className="space-y-3 px-5 py-4">
@@ -1090,6 +1373,7 @@ const DesarquivamentosPage: React.FC = () => {
                         Buscar por nº de processo
                       </label>
                       <input
+                        ref={printSearchInputRef}
                         id="print-process-search"
                         type="text"
                         value={printProcessSearch}
@@ -1126,7 +1410,9 @@ const DesarquivamentosPage: React.FC = () => {
 
                     <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border border-border p-2">
                       {filteredPrintCandidates.map((candidate) => {
-                        const selected = selectedPrintIds.includes(candidate.id);
+                        const selected = selectedPrintIds.includes(
+                          candidate.id,
+                        );
                         const tipo =
                           candidate.tipoDocumento ||
                           getTipoDesarquivamentoLabel(
@@ -1184,7 +1470,7 @@ const DesarquivamentosPage: React.FC = () => {
                   <div className="flex justify-end gap-2 border-t border-border px-5 py-4">
                     <button
                       type="button"
-                      onClick={() => setIsPrintTermsModalOpen(false)}
+                      onClick={closePrintTermsModal}
                       className="rounded-md border border-input bg-background px-4 py-2 text-sm text-foreground/80 transition-colors hover:bg-muted"
                     >
                       Cancelar

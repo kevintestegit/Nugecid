@@ -31,6 +31,7 @@ export const EditarPastaModal: React.FC<EditarPastaModalProps> = ({
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [tagsInput, setTagsInput] = useState("");
+  const { theme } = useTheme();
 
   useEffect(() => {
     if (pasta) {
@@ -43,7 +44,6 @@ export const EditarPastaModal: React.FC<EditarPastaModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleEsc = (event: KeyboardEvent) => {
-  const { theme } = useTheme();
       if (event.key === "Escape" && !isSubmitting) {
         onClose();
       }

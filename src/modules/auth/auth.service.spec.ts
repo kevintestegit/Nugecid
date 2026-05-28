@@ -99,6 +99,7 @@ describe("AuthService", () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
+    service.onModuleInit();
     jest.spyOn(service["logger"], "error").mockImplementation(() => {});
     jest.spyOn(service["logger"], "warn").mockImplementation(() => {});
     jwtService = module.get<JwtService>(JwtService);

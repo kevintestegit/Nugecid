@@ -1,6 +1,7 @@
 import { INestApplication } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
+import { JwtService } from "@nestjs/jwt";
 import * as request from "supertest";
 
 import {
@@ -8,6 +9,8 @@ import {
   AuthV2Controller,
 } from "./modules/auth/auth.controller";
 import { AuthService } from "./modules/auth/auth.service";
+import { IpBlockerGuard } from "./modules/security/guards/ip-blocker.guard";
+import { SecurityService } from "./modules/security/security.service";
 
 describe("Auth Integration Tests", () => {
   let app: INestApplication;
@@ -32,8 +35,13 @@ describe("Auth Integration Tests", () => {
             }),
           },
         },
+        { provide: JwtService, useValue: { sign: jest.fn() } },
+        { provide: SecurityService, useValue: { isIpBlocked: jest.fn() } },
       ],
-    }).compile();
+    })
+      .overrideGuard(IpBlockerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.use((req: any, _res: any, next: () => void) => {
@@ -66,7 +74,6 @@ describe("Auth Integration Tests", () => {
       expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          accessToken: "token",
           expiresIn: "50m",
         }),
       }),

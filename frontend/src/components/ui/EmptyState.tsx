@@ -84,11 +84,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {children}
 
       {(action || secondaryAction) && (
-        <div className="flex items-center gap-3 mt-6">
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
           {action && (
             <button
+              type="button"
               onClick={action.onClick}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {action.label}
             </button>
@@ -96,8 +97,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
           {secondaryAction && (
             <button
+              type="button"
               onClick={secondaryAction.onClick}
-              className="px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors font-medium"
+              className="px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {secondaryAction.label}
             </button>
@@ -110,9 +112,9 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
 // Variantes pré-configuradas para casos comuns
 
-export const NoResultsFound: React.FC<
-  Omit<EmptyStateProps, "icon" | "title">
-> = (props) => (
+export const NoResultsFound: React.FC<Omit<EmptyStateProps, "icon">> = (
+  props,
+) => (
   <EmptyState
     icon={Search}
     title="Nenhum resultado encontrado"
@@ -121,9 +123,9 @@ export const NoResultsFound: React.FC<
   />
 );
 
-export const NoDataAvailable: React.FC<
-  Omit<EmptyStateProps, "icon" | "title">
-> = (props) => (
+export const NoDataAvailable: React.FC<Omit<EmptyStateProps, "icon">> = (
+  props,
+) => (
   <EmptyState
     icon={Database}
     title="Nenhum dado disponível"
@@ -132,7 +134,7 @@ export const NoDataAvailable: React.FC<
   />
 );
 
-export const NoFilesFound: React.FC<Omit<EmptyStateProps, "icon" | "title">> = (
+export const NoFilesFound: React.FC<Omit<EmptyStateProps, "icon">> = (
   props,
 ) => (
   <EmptyState
@@ -143,9 +145,7 @@ export const NoFilesFound: React.FC<Omit<EmptyStateProps, "icon" | "title">> = (
   />
 );
 
-export const EmptyFolder: React.FC<Omit<EmptyStateProps, "icon" | "title">> = (
-  props,
-) => (
+export const EmptyFolder: React.FC<Omit<EmptyStateProps, "icon">> = (props) => (
   <EmptyState
     icon={FolderOpen}
     title="Pasta vazia"
@@ -154,9 +154,9 @@ export const EmptyFolder: React.FC<Omit<EmptyStateProps, "icon" | "title">> = (
   />
 );
 
-export const ErrorState: React.FC<
-  Omit<EmptyStateProps, "icon" | "title" | "variant">
-> = (props) => (
+export const ErrorState: React.FC<Omit<EmptyStateProps, "icon" | "variant">> = (
+  props,
+) => (
   <EmptyState
     icon={AlertCircle}
     title="Erro ao carregar dados"

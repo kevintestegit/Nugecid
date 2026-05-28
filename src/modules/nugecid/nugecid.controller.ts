@@ -83,6 +83,11 @@ const STATUS_ALIAS_MAP: Record<string, StatusDesarquivamentoEnum> = {
   REARQUIVAMENTO: StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO,
 };
 
+const PRINTABLE_STATUS_LIST = [
+  StatusDesarquivamentoEnum.DESARQUIVADO,
+  StatusDesarquivamentoEnum.REARQUIVAMENTO_SOLICITADO,
+];
+
 const UPDATE_AUDIT_FIELDS: ReadonlyArray<AuditTrackedField> = [
   { field: "status", type: "status" },
   { field: "dataSolicitacao", type: "date" },
@@ -550,46 +555,13 @@ export class NugecidController {
     @Query() queryDto: QueryDesarquivamentoDto,
     @CurrentUser() currentUser: User,
   ) {
-    // Debug: Log dos parâmetros de data recebidos
-    this.logger.log(
-      `[findAll] Query params recebidos: startDate=${(queryDto as any).startDate}, endDate=${(queryDto as any).endDate}, dataInicio=${(queryDto as any).dataInicio}, dataFim=${(queryDto as any).dataFim}`,
-    );
-
-    // Mapear Query DTO -> filtros esperados pelo use case/repositório
-    const filters = {
-      search: queryDto.search,
-      // Suporte a múltiplos status
-      statusList: Array.isArray(queryDto.status) ? queryDto.status : undefined,
-      status: Array.isArray(queryDto.status)
-        ? undefined
-        : (queryDto as any).status,
-      tipoDesarquivamento: Array.isArray(queryDto.tipoDesarquivamento)
-        ? queryDto.tipoDesarquivamento[0]
-        : (queryDto as any).tipoDesarquivamento,
-      criadoPorId: (queryDto as any).usuarioId,
-      responsavelId: (queryDto as any).responsavelId,
-      urgente: (queryDto as any).urgente,
-      instituto: queryDto.instituto,
-      requerente: queryDto.requerente,
-      dataInicio:
-        (queryDto as any).startDate ||
-        (queryDto as any).dataInicio ||
-        undefined,
-      dataFim:
-        (queryDto as any).endDate || (queryDto as any).dataFim || undefined,
-      incluirExcluidos: (queryDto as any).incluirExcluidos || false,
-    };
-
-    // Debug: Log dos filtros montados
-    this.logger.log(
-      `[findAll] Filtros montados: dataInicio=${filters.dataInicio}, dataFim=${filters.dataFim}`,
-    );
+    const filters = this.buildListFilters(queryDto);
 
     const result = await this.findAllDesarquivamentosUseCase.execute({
       page: queryDto.page,
       limit: queryDto.limit,
-      sortBy: (queryDto as any).sortBy,
-      sortOrder: (queryDto as any).sortOrder,
+      sortBy: queryDto.sortBy,
+      sortOrder: queryDto.sortOrder,
       filters,
       userId: currentUser.id,
       userRoles: [currentUser.role?.name || "USER"],
@@ -607,6 +579,52 @@ export class NugecidController {
     };
   }
 
+  @Get("impressao/candidatos")
+  @Roles(RoleType.ADMIN, RoleType.USUARIO)
+  @ApiOperation({
+    summary: "Listar candidatos elegíveis para impressão do termo de entrega",
+  })
+  @ApiQuery({ type: QueryDesarquivamentoDto })
+  @ApiBearerAuth()
+  async listPrintCandidates(
+    @Query() queryDto: QueryDesarquivamentoDto,
+    @CurrentUser() currentUser: User,
+  ) {
+    const filters = this.buildListFilters(queryDto, {
+      incluirExcluidos: false,
+      statusList: PRINTABLE_STATUS_LIST,
+    });
+
+    const result = await this.findAllDesarquivamentosUseCase.execute({
+      page: queryDto.page,
+      limit: queryDto.limit,
+      sortBy: queryDto.sortBy,
+      sortOrder: queryDto.sortOrder,
+      filters,
+      userId: currentUser.id,
+      userRoles: [currentUser.role?.name || "USER"],
+    });
+
+    return {
+      success: true,
+      data: result.data.map((item) => ({
+        id: item.id,
+        numeroProcesso: item.numeroProcesso,
+        numeroNicLaudoAuto: item.numeroNicLaudoAuto,
+        nomeCompleto: item.nomeCompleto,
+        tipoDocumento: item.tipoDocumento,
+        status: item.status,
+        dataDesarquivamentoSAG: item.dataDesarquivamentoSAG,
+      })),
+      meta: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    };
+  }
+
   @Get("lixeira")
   @Roles(RoleType.ADMIN, RoleType.USUARIO)
   @ApiOperation({ summary: "Listar desarquivamentos excluídos (lixeira)" })
@@ -615,73 +633,29 @@ export class NugecidController {
   async findDeleted(
     @Query() queryDto: QueryDesarquivamentoDto,
     @CurrentUser() currentUser: User,
-    @Req() req: any,
   ) {
-    const timestamp = new Date().toISOString();
-
-    // Log detalhado dos parâmetros recebidos para debug
-    this.logger.log(
-      `[${timestamp}] 🗑️ Buscando itens da lixeira - Usuário: ${currentUser.usuario}`,
-    );
-    this.logger.log(
-      `[${timestamp}] 📋 Query params recebidos:`,
-      JSON.stringify(req.query, null, 2),
-    );
-    this.logger.log(
-      `[${timestamp}] 📋 DTO validado:`,
-      JSON.stringify(queryDto, null, 2),
-    );
-
-    const filters = {
-      search: queryDto.search,
-      statusList: Array.isArray(queryDto.status) ? queryDto.status : undefined,
-      status: Array.isArray(queryDto.status)
-        ? undefined
-        : (queryDto as any).status,
-      tipoDesarquivamento: Array.isArray(queryDto.tipoDesarquivamento)
-        ? queryDto.tipoDesarquivamento[0]
-        : (queryDto as any).tipoDesarquivamento,
-      criadoPorId: (queryDto as any).usuarioId,
-      responsavelId: (queryDto as any).responsavelId,
-      urgente: (queryDto as any).urgente,
-      dataInicio: (queryDto as any).startDate
-        ? new Date((queryDto as any).startDate as any)
-        : (queryDto as any).dataInicio
-          ? new Date((queryDto as any).dataInicio as any)
-          : undefined,
-      dataFim: (queryDto as any).endDate
-        ? new Date((queryDto as any).endDate as any)
-        : (queryDto as any).dataFim
-          ? new Date((queryDto as any).dataFim as any)
-          : undefined,
+    const filters = this.buildListFilters(queryDto, {
       incluirExcluidos: true,
-    };
+    });
 
     const result = await this.findAllDesarquivamentosUseCase.execute({
       page: queryDto.page,
       limit: queryDto.limit,
-      sortBy: (queryDto as any).sortBy,
-      sortOrder: (queryDto as any).sortOrder,
+      sortBy: queryDto.sortBy,
+      sortOrder: queryDto.sortOrder,
       filters,
       userId: currentUser.id,
       userRoles: [currentUser.role?.name || "USER"],
     });
 
-    // Filtra apenas os itens que foram excluídos (têm deletedAt)
-    const deletedItems = result.data.filter((item) => item.deletedAt);
-
-    this.logger.log(
-      `[${timestamp}] 📊 Encontrados ${deletedItems.length} itens na lixeira`,
-    );
-
     return {
       success: true,
-      data: deletedItems,
+      data: result.data,
       meta: {
         page: result.page,
         limit: result.limit,
-        total: deletedItems.length,
-        totalPages: Math.ceil(deletedItems.length / result.limit),
+        total: result.total,
+        totalPages: result.totalPages,
       },
     };
   }
@@ -1079,6 +1053,44 @@ export class NugecidController {
     }
 
     return enriched;
+  }
+
+  private buildListFilters(
+    queryDto: QueryDesarquivamentoDto,
+    options: {
+      incluirExcluidos?: boolean;
+      statusList?: string[];
+    } = {},
+  ) {
+    const statusList = options.statusList
+      ? options.statusList
+      : Array.isArray(queryDto.status)
+        ? queryDto.status
+        : undefined;
+
+    const status = options.statusList
+      ? undefined
+      : Array.isArray(queryDto.status)
+        ? undefined
+        : queryDto.status;
+
+    return {
+      search: queryDto.search,
+      statusList,
+      status,
+      tipoDesarquivamento: Array.isArray(queryDto.tipoDesarquivamento)
+        ? queryDto.tipoDesarquivamento[0]
+        : undefined,
+      criadoPorId: queryDto.usuarioId,
+      responsavelId: queryDto.responsavelId,
+      urgente: queryDto.urgente,
+      instituto: queryDto.instituto,
+      requerente: queryDto.requerente,
+      dataInicio: queryDto.startDate || queryDto.dataInicio || undefined,
+      dataFim: queryDto.endDate || queryDto.dataFim || undefined,
+      incluirExcluidos:
+        options.incluirExcluidos ?? queryDto.incluirExcluidos ?? false,
+    };
   }
 
   private normalizeAuditFieldValue(

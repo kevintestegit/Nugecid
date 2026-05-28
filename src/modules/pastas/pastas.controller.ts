@@ -201,7 +201,10 @@ export class PastasController {
   }
 
   @Get(":id/arquivos")
-  listarArquivos(@Param("id") id: string, @Request() req: AuthenticatedRequest) {
+  listarArquivos(
+    @Param("id") id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";

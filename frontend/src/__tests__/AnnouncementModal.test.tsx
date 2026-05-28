@@ -11,6 +11,10 @@ vi.mock("@/services/api", () => ({
   },
 }));
 
+vi.mock("@/contexts/ThemeContext", () => ({
+  useTheme: () => ({ theme: "light" }),
+}));
+
 const apiService = (await import("@/services/api")).apiService as unknown as {
   getActiveAnnouncements: ReturnType<typeof vi.fn>;
 };

@@ -41,6 +41,7 @@ const FILTERABLE_ATTRIBUTES = [
 const SORTABLE_ATTRIBUTES = ["sortTimestamp"];
 const MAX_PLANILHA_TEXT_LENGTH = 150_000;
 const MAX_ATTACHMENT_TEXT_LENGTH = 250_000;
+const REINDEX_BATCH_SIZE = 100;
 const LEGACY_PLANILHA_ROOT = path.resolve(
   process.cwd(),
   "uploads",
@@ -322,40 +323,192 @@ export class SearchService implements OnModuleInit {
     }
 
     await this.ensureIndexReady();
+    const index = this.client.index<SearchDocument>(this.indexUid);
+    const summary = {
+      indexed: 0,
+      failedBatches: 0,
+      failedDocuments: 0,
+    };
 
-    const [desarquivamentos, pastas, planilhas] = await Promise.all([
-      this.desarquivamentoRepository.find({
-        select: { id: true },
+    const processBatch = async (
+      label: string,
+      batchNumber: number,
+      totalBatches: number,
+      documents: Array<SearchDocument | null>,
+      processedCount: number,
+      totalCount: number,
+    ): Promise<void> => {
+      const payload = documents.filter(
+        (document): document is SearchDocument => document !== null,
+      );
+
+      if (!payload.length) {
+        this.logger.log(
+          `Reindexação ${label}: lote ${batchNumber}/${totalBatches} sem documentos válidos (${processedCount}/${totalCount}).`,
+        );
+        return;
+      }
+
+      try {
+        await index.addDocuments(payload, { primaryKey: "id" });
+        summary.indexed += payload.length;
+        this.logger.log(
+          `Reindexação ${label}: lote ${batchNumber}/${totalBatches} enviado (${processedCount}/${totalCount}).`,
+        );
+      } catch (error) {
+        summary.failedBatches += 1;
+        this.logger.error(
+          `Falha ao reindexar ${label} no lote ${batchNumber}/${totalBatches}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    };
+
+    const processEntities = async <T extends { id: number | string }>(
+      label: string,
+      totalCount: number,
+      fetchBatch: (offset: number, limit: number) => Promise<T[]>,
+      buildDocument: (id: T["id"]) => Promise<SearchDocument | null>,
+    ): Promise<void> => {
+      if (!totalCount) {
+        return;
+      }
+
+      const totalBatches = Math.ceil(totalCount / REINDEX_BATCH_SIZE);
+      let processedCount = 0;
+
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex += 1) {
+        let items: T[];
+        try {
+          items = await fetchBatch(
+            batchIndex * REINDEX_BATCH_SIZE,
+            REINDEX_BATCH_SIZE,
+          );
+        } catch (error) {
+          summary.failedBatches += 1;
+          this.logger.error(
+            `Falha ao carregar lote ${batchIndex + 1}/${totalBatches} de ${label}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          continue;
+        }
+
+        if (!items.length) {
+          break;
+        }
+
+        processedCount += items.length;
+        const settledDocuments = await Promise.allSettled(
+          items.map((item) => buildDocument(item.id)),
+        );
+
+        const documents = settledDocuments.map((result, index) => {
+          if (result.status === "fulfilled") {
+            return result.value;
+          }
+
+          summary.failedDocuments += 1;
+          this.logger.warn(
+            `Falha ao montar documento de ${label} para id ${String(
+              items[index]?.id,
+            )}: ${
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason)
+            }`,
+          );
+          return null;
+        });
+
+        await processBatch(
+          label,
+          batchIndex + 1,
+          totalBatches,
+          documents,
+          processedCount,
+          totalCount,
+        );
+      }
+    };
+
+    let desarquivamentoTotal = 0;
+    try {
+      desarquivamentoTotal = await this.desarquivamentoRepository.count({
         where: { deletedAt: IsNull() },
-      }),
-      this.pastaRepository.find({ select: { id: true } }),
-      this.getPlanilhaIdsForBootstrap(),
-    ]);
+      });
+    } catch (error) {
+      this.logger.error(
+        `Falha ao contar desarquivamentos para reindexação: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
-    const documents = (
-      await Promise.all([
-        ...desarquivamentos.map((item) =>
-          this.buildDesarquivamentoDocument(item.id),
-        ),
-        ...pastas.map((item) => this.buildPastaDocument(item.id)),
-        ...planilhas.map((item) => this.buildPlanilhaDocument(item.id)),
-      ])
-    ).filter((document): document is SearchDocument => document !== null);
+    let pastaTotal = 0;
+    try {
+      pastaTotal = await this.pastaRepository.count();
+    } catch (error) {
+      this.logger.error(
+        `Falha ao contar pastas para reindexação: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
 
-    if (!documents.length) {
+    const planilhaTotal = await this.countPlanilhasForBootstrap();
+
+    await processEntities(
+      "desarquivamentos",
+      desarquivamentoTotal,
+      (offset, limit) =>
+        this.desarquivamentoRepository.find({
+          select: { id: true },
+          where: { deletedAt: IsNull() },
+          order: { id: "ASC" },
+          skip: offset,
+          take: limit,
+        }),
+      (id) => this.buildDesarquivamentoDocument(id),
+    );
+
+    await processEntities(
+      "pastas",
+      pastaTotal,
+      (offset, limit) =>
+        this.pastaRepository.find({
+          select: { id: true },
+          order: { id: "ASC" },
+          skip: offset,
+          take: limit,
+        }),
+      (id) => this.buildPastaDocument(id),
+    );
+
+    await processEntities(
+      "planilhas",
+      planilhaTotal,
+      (offset, limit) => this.getPlanilhaIdsForBootstrap({ offset, limit }),
+      (id) => this.buildPlanilhaDocument(id),
+    );
+
+    if (!summary.indexed) {
       this.logger.log(
         "Bootstrap do índice concluído sem documentos para indexar.",
       );
       return;
     }
 
-    await this.client
-      .index<SearchDocument>(this.indexUid)
-      .addDocuments(documents, { primaryKey: "id" });
-
     this.logger.log(
-      `Bootstrap do índice concluído com ${documents.length} documentos documentais.`,
+      `Bootstrap do índice concluído com ${summary.indexed} documentos documentais.`,
     );
+
+    if (summary.failedBatches || summary.failedDocuments) {
+      this.logger.warn(
+        `Reindexação concluída com ${summary.failedBatches} lote(s) falho(s) e ${summary.failedDocuments} documento(s) ignorado(s).`,
+      );
+    }
   }
 
   private async ensureIndexReady(): Promise<void> {
@@ -640,11 +793,16 @@ export class SearchService implements OnModuleInit {
     );
   }
 
-  private async getPlanilhaIdsForBootstrap(): Promise<
-    Array<Pick<PlanilhaControle, "id">>
-  > {
+  private async getPlanilhaIdsForBootstrap(params?: {
+    offset?: number;
+    limit?: number;
+  }): Promise<Array<Pick<PlanilhaControle, "id">>> {
     try {
-      return await this.planilhaRepository.find({ select: { id: true } });
+      return await this.planilhaRepository.find({
+        select: { id: true },
+        skip: params?.offset,
+        take: params?.limit,
+      });
     } catch (error) {
       this.logger.warn(
         `Falha ao consultar planilhas para bootstrap do índice: ${
@@ -652,6 +810,19 @@ export class SearchService implements OnModuleInit {
         }`,
       );
       return [];
+    }
+  }
+
+  private async countPlanilhasForBootstrap(): Promise<number> {
+    try {
+      return await this.planilhaRepository.count();
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao contar planilhas para bootstrap do índice: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return 0;
     }
   }
 

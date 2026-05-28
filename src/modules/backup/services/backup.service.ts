@@ -5,7 +5,6 @@ import { execFile, spawn } from "child_process";
 import { promises as fs } from "fs";
 import { constants, existsSync, statSync, createReadStream } from "fs";
 import * as path from "path";
-import { pipeline } from "stream/promises";
 import { createWriteStream } from "fs";
 
 export interface BackupResult {
@@ -60,13 +59,18 @@ export class BackupService {
     env?: Record<string, string | undefined>,
   ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      const child = execFile(command, args, { env: { ...process.env, ...env } }, (error, stdout, stderr) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve({ stdout: stdout ?? "", stderr: stderr ?? "" });
-        }
-      });
+      const child = execFile(
+        command,
+        args,
+        { env: { ...process.env, ...env } },
+        (error, stdout, stderr) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve({ stdout: stdout ?? "", stderr: stderr ?? "" });
+          }
+        },
+      );
       child.on("error", reject);
     });
   }
@@ -262,13 +266,19 @@ export class BackupService {
 
       if (dbConfig.isDocker) {
         const dockerArgs = [
-          "exec", "-i", containerName,
+          "exec",
+          "-i",
+          containerName,
           "pg_dump",
-          "-U", dbConfig.username,
-          "-d", dbConfig.database,
+          "-U",
+          dbConfig.username,
+          "-d",
+          dbConfig.database,
           ...tableArgs,
-          "--no-owner", "--no-privileges",
-          "--clean", "--if-exists",
+          "--no-owner",
+          "--no-privileges",
+          "--clean",
+          "--if-exists",
         ];
         this.logger.log(
           `Executando: docker exec -i ${containerName} pg_dump ...`,
@@ -276,16 +286,27 @@ export class BackupService {
         await this.spawnWithOutput("docker", dockerArgs, sqlFilepath);
       } else {
         const pgArgs = [
-          "-h", dbConfig.host,
-          "-p", String(dbConfig.port),
-          "-U", dbConfig.username,
-          "-d", dbConfig.database,
+          "-h",
+          dbConfig.host,
+          "-p",
+          String(dbConfig.port),
+          "-U",
+          dbConfig.username,
+          "-d",
+          dbConfig.database,
           ...tableArgs,
-          "--no-owner", "--no-privileges",
-          "--clean", "--if-exists",
+          "--no-owner",
+          "--no-privileges",
+          "--clean",
+          "--if-exists",
         ];
         this.logger.log("Executando: pg_dump ...");
-        await this.executeWithPgPassword("pg_dump", pgArgs, dbConfig.password, sqlFilepath);
+        await this.executeWithPgPassword(
+          "pg_dump",
+          pgArgs,
+          dbConfig.password,
+          sqlFilepath,
+        );
       }
 
       // Aguardar um pouco para garantir que o arquivo foi escrito
@@ -320,10 +341,10 @@ export class BackupService {
           const tempUploadsPath = path.join(tempDir, "uploads");
           await fs.cp(uploadsPath, tempUploadsPath, { recursive: true });
 
-        // Criar tar.gz do diretório temporário
-        const tarArgs = ["-czf", tarFilepath, "-C", tempDir, "."];
-        this.logger.log(`Executando tar: tar ${tarArgs.join(" ")}`);
-        await this.execFileAsync("tar", tarArgs);
+          // Criar tar.gz do diretório temporário
+          const tarArgs = ["-czf", tarFilepath, "-C", tempDir, "."];
+          this.logger.log(`Executando tar: tar ${tarArgs.join(" ")}`);
+          await this.execFileAsync("tar", tarArgs);
 
           // Limpar diretório temporário e arquivo SQL original
           await fs.rm(tempDir, { recursive: true, force: true });
@@ -416,26 +437,43 @@ export class BackupService {
 
       if (dbConfig.isDocker) {
         const dockerArgs = [
-          "exec", "-i", containerName,
+          "exec",
+          "-i",
+          containerName,
           "pg_dump",
-          "-U", dbConfig.username,
-          "-d", dbConfig.database,
+          "-U",
+          dbConfig.username,
+          "-d",
+          dbConfig.database,
           ...tableArgs,
-          "--no-owner", "--no-privileges",
-          "--clean", "--if-exists",
+          "--no-owner",
+          "--no-privileges",
+          "--clean",
+          "--if-exists",
         ];
         await this.spawnWithOutput("docker", dockerArgs, filepath);
       } else {
         const pgArgs = [
-          "-h", dbConfig.host,
-          "-p", String(dbConfig.port),
-          "-U", dbConfig.username,
-          "-d", dbConfig.database,
+          "-h",
+          dbConfig.host,
+          "-p",
+          String(dbConfig.port),
+          "-U",
+          dbConfig.username,
+          "-d",
+          dbConfig.database,
           ...tableArgs,
-          "--no-owner", "--no-privileges",
-          "--clean", "--if-exists",
+          "--no-owner",
+          "--no-privileges",
+          "--clean",
+          "--if-exists",
         ];
-        await this.executeWithPgPassword("pg_dump", pgArgs, dbConfig.password, filepath);
+        await this.executeWithPgPassword(
+          "pg_dump",
+          pgArgs,
+          dbConfig.password,
+          filepath,
+        );
       }
 
       if (!existsSync(filepath)) {
@@ -675,10 +713,10 @@ export class BackupService {
         extractDir = path.join(this.backupDir, `temp_restore_${Date.now()}`);
         await fs.mkdir(extractDir, { recursive: true });
 
-      await this.validateTarArchiveEntries(filepath);
+        await this.validateTarArchiveEntries(filepath);
 
-      // Extrair tar.gz
-      await this.execFileAsync("tar", ["-xzf", filepath, "-C", extractDir]);
+        // Extrair tar.gz
+        await this.execFileAsync("tar", ["-xzf", filepath, "-C", extractDir]);
 
         // Procurar o arquivo SQL dentro do extraído
         const extractedFiles = await fs.readdir(extractDir);
@@ -704,18 +742,30 @@ export class BackupService {
 
         if (dbConfig.isDocker) {
           const psqlArgs = [
-            "exec", "-i", containerName,
-            "psql", "-U", dbConfig.username, "-d", dbConfig.database,
+            "exec",
+            "-i",
+            containerName,
+            "psql",
+            "-U",
+            dbConfig.username,
+            "-d",
+            dbConfig.database,
           ];
           await this.spawnWithInput("docker", psqlArgs, tempSqlFile);
         } else {
           const psqlArgs = [
-            "-h", dbConfig.host,
-            "-p", String(dbConfig.port),
-            "-U", dbConfig.username,
-            "-d", dbConfig.database,
+            "-h",
+            dbConfig.host,
+            "-p",
+            String(dbConfig.port),
+            "-U",
+            dbConfig.username,
+            "-d",
+            dbConfig.database,
           ];
-          await this.spawnWithInput("psql", psqlArgs, tempSqlFile, { PGPASSWORD: dbConfig.password });
+          await this.spawnWithInput("psql", psqlArgs, tempSqlFile, {
+            PGPASSWORD: dbConfig.password,
+          });
         }
 
         // 3. Restaurar arquivos uploads/ se existirem
@@ -739,18 +789,30 @@ export class BackupService {
 
         if (dbConfig.isDocker) {
           const psqlArgs = [
-            "exec", "-i", containerName,
-            "psql", "-U", dbConfig.username, "-d", dbConfig.database,
+            "exec",
+            "-i",
+            containerName,
+            "psql",
+            "-U",
+            dbConfig.username,
+            "-d",
+            dbConfig.database,
           ];
           await this.spawnWithInput("docker", psqlArgs, filepath);
         } else {
           const psqlArgs = [
-            "-h", dbConfig.host,
-            "-p", String(dbConfig.port),
-            "-U", dbConfig.username,
-            "-d", dbConfig.database,
+            "-h",
+            dbConfig.host,
+            "-p",
+            String(dbConfig.port),
+            "-U",
+            dbConfig.username,
+            "-d",
+            dbConfig.database,
           ];
-          await this.spawnWithInput("psql", psqlArgs, filepath, { PGPASSWORD: dbConfig.password });
+          await this.spawnWithInput("psql", psqlArgs, filepath, {
+            PGPASSWORD: dbConfig.password,
+          });
         }
       }
 
@@ -821,7 +883,8 @@ export class BackupService {
       .map((entry) => entry.trim())
       .filter(Boolean);
     const { stdout: verboseOutput } = await this.execFileAsync("tar", [
-      "-tvzf", archivePath,
+      "-tvzf",
+      archivePath,
     ]);
     const verboseLines = verboseOutput
       .split(/\r?\n/)
@@ -990,10 +1053,7 @@ export class BackupService {
   /**
    * Constrói comando de backup
    */
-  private buildBackupArgs(
-    config: any,
-    desarquivamentoOnly: boolean,
-  ): string[] {
+  private buildBackupArgs(config: any, desarquivamentoOnly: boolean): string[] {
     const args: string[] = [];
 
     if (desarquivamentoOnly) {
@@ -1116,24 +1176,39 @@ export class BackupService {
       "🗑️ Truncando tabelas existentes antes do restore (evitando duplicatas)...",
     );
 
-    const tempSqlFile = path.join(this.backupDir, `temp_truncate_${Date.now()}.sql`);
+    const tempSqlFile = path.join(
+      this.backupDir,
+      `temp_truncate_${Date.now()}.sql`,
+    );
     await fs.writeFile(tempSqlFile, truncateSQL, "utf-8");
 
     try {
       if (config.isDocker) {
         const dockerArgs = [
-          "exec", "-i", containerName,
-          "psql", "-U", config.username, "-d", config.database,
+          "exec",
+          "-i",
+          containerName,
+          "psql",
+          "-U",
+          config.username,
+          "-d",
+          config.database,
         ];
         await this.spawnWithInput("docker", dockerArgs, tempSqlFile);
       } else {
         const psqlArgs = [
-          "-h", config.host,
-          "-p", String(config.port),
-          "-U", config.username,
-          "-d", config.database,
+          "-h",
+          config.host,
+          "-p",
+          String(config.port),
+          "-U",
+          config.username,
+          "-d",
+          config.database,
         ];
-        await this.spawnWithInput("psql", psqlArgs, tempSqlFile, { PGPASSWORD: config.password });
+        await this.spawnWithInput("psql", psqlArgs, tempSqlFile, {
+          PGPASSWORD: config.password,
+        });
       }
 
       this.logger.log("✅ Tabelas truncadas com sucesso");

@@ -63,7 +63,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString({ message: "Role deve ser uma string" })
   @IsIn(["admin", "coordenador", "editor", "usuario"], {
-    message: "Role inválida. Valores permitidos: admin, coordenador, editor, usuario",
+    message:
+      "Role inválida. Valores permitidos: admin, coordenador, editor, usuario",
   })
   role?: string;
 

@@ -403,7 +403,10 @@ export class AuthService implements OnModuleInit {
     return null;
   }
 
-  async register(registerDto: RegisterDto, currentUser: User): Promise<SafeUser> {
+  async register(
+    registerDto: RegisterDto,
+    currentUser: User,
+  ): Promise<SafeUser> {
     if (!currentUser.isAdmin()) {
       throw new UnauthorizedException(
         "Apenas administradores podem criar usuários",
@@ -537,7 +540,9 @@ export class AuthService implements OnModuleInit {
    */
   private async blacklistRefreshToken(refreshToken: string): Promise<void> {
     try {
-      const decoded = this.jwtService.decode(refreshToken) as RefreshJwtPayload | null;
+      const decoded = this.jwtService.decode(
+        refreshToken,
+      ) as RefreshJwtPayload | null;
       if (!decoded?.jti) return;
 
       // Compute remaining TTL so the blacklist entry auto-expires

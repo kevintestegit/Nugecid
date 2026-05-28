@@ -46,6 +46,13 @@ import { usePlanilhasControle } from "@/hooks/usePlanilhasControle";
 import { toast } from "sonner";
 import { SpreadsheetPreview } from "@/components/ui/SpreadsheetPreview";
 import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
+import {
+  EmptyState,
+  ErrorState,
+  NoDataAvailable,
+  NoResultsFound,
+} from "@/components/ui/EmptyState";
+import { TableLoading } from "@/components/ui/Loading";
 
 interface Caixa {
   id: string;
@@ -598,128 +605,151 @@ const ArquivoPage: React.FC = () => {
 
       {activeTab === "pastas" && (
         <>
-          {isLoading && <p>Carregando pastas...</p>}
-          {error && <p>Erro ao carregar pastas.</p>}
-          <div
-            className={cn(
-              "grid gap-6",
-              viewMode === "grid"
-                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
-                : "grid-cols-1",
-            )}
-          >
-            {filteredPastas.map((pasta) => (
-              <Card
-                key={pasta.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/arquivo/${pasta.id}`)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    navigate(`/arquivo/${pasta.id}`);
-                  }
-                }}
-                className="cursor-pointer border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] transition-all hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
-              >
-                <CardHeader className="space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <CardTitle className="text-base font-semibold text-foreground">
-                        {pasta.nome}
-                      </CardTitle>
-                      <CardDescription className="mt-1 text-[11px] text-muted-foreground">
-                        {pasta.descricao}
-                      </CardDescription>
-                    </div>
-                    {canManageArquivos && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          asChild
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setEditingPasta(pasta);
-                              setShowEditModal(true);
-                            }}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            <span>Editar</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDelete(pasta.id);
-                            }}
-                            className="text-red-500"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            <span>Excluir</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    Criada em{" "}
-                    {new Date(pasta.dataCriacao).toLocaleDateString("pt-BR")}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
-                      <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-emerald-600 text-xs">
-                        <Image className="h-4 w-4" />
-                        {pasta.imagens}{" "}
-                        {pasta.imagens === 1 ? "imagem" : "imagens"}
-                      </span>
-                      <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-600 text-xs">
-                        <FileSpreadsheet className="h-4 w-4" />
-                        {pasta.planilhas}{" "}
-                        {pasta.planilhas === 1 ? "planilha" : "planilhas"}
-                      </span>
-                    </div>
-                    {pasta.tags.length ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        {pasta.tags.map((tag) => (
-                          <Badge
-                            key={tag}
-                            variant="secondary"
-                            className="text-[11px] px-2 py-1 flex items-center gap-1"
-                          >
-                            <Tag className="h-3 w-3" />
-                            {tag}
-                          </Badge>
-                        ))}
+          {isLoading ? (
+            <TableLoading />
+          ) : error ? (
+            <ErrorState description="Não foi possível carregar as pastas do arquivo." />
+          ) : filteredPastas.length ? (
+            <div
+              className={cn(
+                "grid gap-6",
+                viewMode === "grid"
+                  ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+                  : "grid-cols-1",
+              )}
+            >
+              {filteredPastas.map((pasta) => (
+                <Card
+                  key={pasta.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/arquivo/${pasta.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigate(`/arquivo/${pasta.id}`);
+                    }
+                  }}
+                  className="cursor-pointer border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)] transition-all hover:border-primary/40 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-sm"
+                >
+                  <CardHeader className="space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-base font-semibold text-foreground">
+                          {pasta.nome}
+                        </CardTitle>
+                        <CardDescription className="mt-1 text-[11px] text-muted-foreground">
+                          {pasta.descricao}
+                        </CardDescription>
                       </div>
-                    ) : null}
-                    <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground">
-                      Clique para visualizar os anexos, adicionar novas imagens
-                      e consultar os itens desta prateleira.
+                      {canManageArquivos && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            asChild
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingPasta(pasta);
+                                setShowEditModal(true);
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              <span>Editar</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDelete(pasta.id);
+                              }}
+                              className="text-red-500"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              <span>Excluir</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
-                    <Button
-                      variant="outline"
-                      className="w-full text-sm py-2"
-                      onClick={() => navigate(`/arquivo/${pasta.id}`)}
-                    >
-                      Ver prateleira
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      Criada em{" "}
+                      {new Date(pasta.dataCriacao).toLocaleDateString("pt-BR")}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+                        <span className="flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-emerald-600 text-xs">
+                          <Image className="h-4 w-4" />
+                          {pasta.imagens}{" "}
+                          {pasta.imagens === 1 ? "imagem" : "imagens"}
+                        </span>
+                        <span className="flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-amber-600 text-xs">
+                          <FileSpreadsheet className="h-4 w-4" />
+                          {pasta.planilhas}{" "}
+                          {pasta.planilhas === 1 ? "planilha" : "planilhas"}
+                        </span>
+                      </div>
+                      {pasta.tags.length ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {pasta.tags.map((tag) => (
+                            <Badge
+                              key={tag}
+                              variant="secondary"
+                              className="text-[11px] px-2 py-1 flex items-center gap-1"
+                            >
+                              <Tag className="h-3 w-3" />
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground">
+                        Clique para visualizar os anexos, adicionar novas
+                        imagens e consultar os itens desta prateleira.
+                      </div>
+                      <Button
+                        variant="outline"
+                        className="w-full text-sm py-2"
+                        onClick={() => navigate(`/arquivo/${pasta.id}`)}
+                      >
+                        Ver prateleira
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : normalizedSearchTerm ? (
+            <NoResultsFound
+              title="Nenhuma pasta encontrada"
+              description="Tente ajustar a busca ou os filtros do arquivo."
+            />
+          ) : (
+            <EmptyState
+              icon={FolderOpen}
+              title="Nenhuma pasta encontrada"
+              description="Crie uma pasta para organizar imagens e planilhas."
+              action={
+                canManageArquivos
+                  ? {
+                      label: "Nova Pasta",
+                      onClick: () => setShowUploadModal(true),
+                    }
+                  : undefined
+              }
+            />
+          )}
         </>
       )}
 
@@ -792,6 +822,21 @@ const ArquivoPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {!filteredCaixas.length ? (
+              normalizedSearchTerm ? (
+                <NoResultsFound
+                  title="Nenhuma caixa documental encontrada"
+                  description="Tente ajustar a busca para localizar caixas cadastradas."
+                  variant="compact"
+                />
+              ) : (
+                <NoDataAvailable
+                  title="Nenhuma caixa documental cadastrada"
+                  description="Ainda não há caixas documentais para exibir."
+                  variant="compact"
+                />
+              )
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -851,23 +896,17 @@ const ArquivoPage: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-5">
               {planilhaGeralError ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-xs text-destructive">
-                  <span>Não foi possível carregar a planilha geral.</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => refetchPlanilhaGeral()}
-                  >
-                    Tentar novamente
-                  </Button>
-                </div>
+                <ErrorState
+                  description="Não foi possível carregar a planilha geral."
+                  action={{
+                    label: "Tentar novamente",
+                    onClick: () => refetchPlanilhaGeral(),
+                  }}
+                />
               ) : null}
 
               {isLoadingPlanilhaGeral ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Consolidando dados das planilhas...
-                </div>
+                <TableLoading />
               ) : planilhaGeralSections.length ? (
                 <>
                   <div className="grid gap-3 sm:grid-cols-3">
@@ -962,9 +1001,11 @@ const ArquivoPage: React.FC = () => {
                                 showRowNumbers
                               />
                             ) : (
-                              <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 py-10 text-center text-sm text-muted-foreground">
-                                Nenhum item foi encontrado para esta planilha.
-                              </div>
+                              <NoDataAvailable
+                                title="Nenhum item encontrado"
+                                description="Nenhum item foi encontrado para esta planilha."
+                                variant="compact"
+                              />
                             )}
                           </div>
                         </div>
@@ -978,24 +1019,23 @@ const ArquivoPage: React.FC = () => {
                       showRowNumbers
                     />
                   ) : (
-                    <div className="rounded-lg border border-dashed border-border/60 bg-background/70 py-10 text-center text-sm text-muted-foreground">
-                      Nenhum dado consolidado disponível no momento.
-                    </div>
+                    <NoDataAvailable
+                      title="Nenhum dado consolidado"
+                      description="Nenhum dado consolidado disponível no momento."
+                    />
                   )}
                 </>
               ) : (
-                <div className="rounded-lg border border-dashed border-border/60 bg-background/70 py-10 text-center text-sm text-muted-foreground">
-                  Nenhuma planilha foi encontrada nas pastas cadastradas.
-                </div>
+                <NoDataAvailable
+                  title="Nenhuma planilha encontrada"
+                  description="Nenhuma planilha foi encontrada nas pastas cadastradas."
+                />
               )}
             </CardContent>
           </Card>
 
           {isLoadingPlanilhas ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando planilhas...
-            </div>
+            <TableLoading />
           ) : planilhasControle.length ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {planilhasControle.map((planilha) => (
@@ -1062,9 +1102,20 @@ const ArquivoPage: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-border/60 bg-background/70 py-10 text-center text-sm text-muted-foreground">
-              Nenhuma planilha geral manual cadastrada ate o momento.
-            </div>
+            <EmptyState
+              icon={FileSpreadsheet}
+              title="Nenhuma planilha cadastrada"
+              description="Nenhuma planilha geral manual cadastrada até o momento."
+              variant="card"
+              action={
+                canManageArquivos
+                  ? {
+                      label: "Adicionar Planilha",
+                      onClick: handleSelectPlanilha,
+                    }
+                  : undefined
+              }
+            />
           )}
         </div>
       )}

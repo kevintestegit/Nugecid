@@ -201,7 +201,9 @@ export class NotificacoesController {
 
   @Sse("stream")
   @ApiExcludeEndpoint()
-  streamNotificacoes(@Request() req: AuthenticatedRequest): Observable<MessageEvent> {
+  streamNotificacoes(
+    @Request() req: AuthenticatedRequest,
+  ): Observable<MessageEvent> {
     const userId = Number(req.user.id);
 
     // 1) Emit all current unread notifications as "init" event

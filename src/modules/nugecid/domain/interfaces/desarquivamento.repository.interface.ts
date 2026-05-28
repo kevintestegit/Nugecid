@@ -23,8 +23,8 @@ export interface FindAllOptions {
     urgente?: boolean;
     instituto?: string;
     requerente?: string;
-    dataInicio?: Date;
-    dataFim?: Date;
+    dataInicio?: Date | string;
+    dataFim?: Date | string;
     incluirExcluidos?: boolean;
   };
 }

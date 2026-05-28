@@ -11,6 +11,7 @@ import { User } from "../users/entities/user.entity";
 import { NotificacoesService } from "../notificacoes/services/notificacoes.service";
 import { TipoDesarquivamentoEnum } from "./domain/enums/tipo-desarquivamento.enum";
 import { StatusDesarquivamentoEnum } from "./domain/enums/status-desarquivamento.enum";
+import { DesarquivamentoEffectsPublisher } from "./application/services/desarquivamento-effects.publisher";
 
 describe("NugecidService", () => {
   let service: NugecidService;
@@ -94,6 +95,10 @@ describe("NugecidService", () => {
         {
           provide: NotificacoesService,
           useValue: mockNotificacoesService,
+        },
+        {
+          provide: DesarquivamentoEffectsPublisher,
+          useValue: { publishEntityChange: jest.fn() },
         },
       ],
     }).compile();

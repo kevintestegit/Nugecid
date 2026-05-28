@@ -30,9 +30,10 @@ export const DashboardCustomizer: React.FC<DashboardCustomizerProps> = ({
   onReset,
   onClose,
 }) => {
+  const { theme } = useTheme();
+
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
-  const { theme } = useTheme();
       if (event.key === "Escape") {
         onClose();
       }

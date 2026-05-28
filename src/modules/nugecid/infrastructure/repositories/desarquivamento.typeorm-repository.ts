@@ -41,6 +41,7 @@ export class DesarquivamentoTypeOrmRepository
     criadoPorId: "d.criadoPorId",
     responsavelId: "d.responsavelId",
     createdAt: "d.createdAt",
+    deletedAt: "d.deletedAt",
     updatedAt: "d.updatedAt",
   };
   private static readonly ACCENTED_CHARACTERS =
@@ -552,11 +553,6 @@ export class DesarquivamentoTypeOrmRepository
       incluirExcluidos,
     } = filters;
 
-    // Debug log para filtros de data
-    this.logger.log(
-      `[applyFilters] dataInicio=${dataInicio}, dataFim=${dataFim}, tipo dataInicio=${typeof dataInicio}, tipo dataFim=${typeof dataFim}`,
-    );
-
     // Filtro por status (suporta múltiplos)
     if (Array.isArray(statusList) && statusList.length > 0) {
       qb.andWhere("d.status IN (:...statusList)", { statusList });
@@ -604,10 +600,6 @@ export class DesarquivamentoTypeOrmRepository
       const startDateStr = dataInicio ? formatDate(dataInicio) : undefined;
       const endDateStr = dataFim ? formatDate(dataFim) : undefined;
 
-      this.logger.log(
-        `[applyFilters] Aplicando filtro de datas: startDateStr=${startDateStr}, endDateStr=${endDateStr}`,
-      );
-
       // O frontend já adiciona 1 dia ao endDate, então usamos < endDate diretamente
       // para filtrar por data de criação (createdAt), que é o campo exibido na listagem.
       if (startDateStr && endDateStr) {
@@ -617,9 +609,6 @@ export class DesarquivamentoTypeOrmRepository
             dataInicio: `${startDateStr} 00:00:00`,
             dataFim: `${endDateStr} 00:00:00`,
           },
-        );
-        this.logger.log(
-          `[applyFilters] Query: createdAt >= '${startDateStr} 00:00:00' AND < '${endDateStr} 00:00:00'`,
         );
       } else if (startDateStr) {
         qb.andWhere("d.createdAt >= CAST(:dataInicio AS TIMESTAMP)", {

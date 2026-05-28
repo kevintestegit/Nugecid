@@ -25,9 +25,9 @@ export const NovaPastaModal: React.FC<NovaPastaModalProps> = ({
   const [imagens, setImagens] = useState<File[]>([]);
   const [planilhas, setPlanilhas] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { theme } = useTheme();
 
   const handleImagemChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  const { theme } = useTheme();
     const files = Array.from(event.target.files ?? []);
     setImagens(files);
   };

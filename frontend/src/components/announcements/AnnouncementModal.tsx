@@ -46,6 +46,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     loadAnnouncements();

@@ -262,6 +262,7 @@ export class QueryDesarquivamentoDto {
     enum: [
       "dataSolicitacao",
       "createdAt",
+      "deletedAt",
       "nomeCompleto",
       "numeroNicLaudoAuto",
       "numeroProcesso",
@@ -283,6 +284,7 @@ export class QueryDesarquivamentoDto {
     [
       "dataSolicitacao",
       "createdAt",
+      "deletedAt",
       "nomeCompleto",
       "numeroNicLaudoAuto",
       "numeroProcesso",

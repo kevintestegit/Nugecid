@@ -1,4 +1,10 @@
-import { Logger, Module, OnModuleInit, OnModuleDestroy, forwardRef } from "@nestjs/common";
+import {
+  Logger,
+  Module,
+  OnModuleInit,
+  OnModuleDestroy,
+  forwardRef,
+} from "@nestjs/common";
 
 import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
