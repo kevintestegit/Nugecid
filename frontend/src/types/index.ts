@@ -133,6 +133,16 @@ export interface Desarquivamento {
   comentarios?: DesarquivamentoComment[];
 }
 
+export interface DesarquivamentoPrintCandidate {
+  id: number;
+  numeroProcesso: string;
+  numeroNicLaudoAuto: string;
+  nomeCompleto: string;
+  tipoDocumento?: string;
+  status: StatusDesarquivamento;
+  dataDesarquivamentoSAG?: string;
+}
+
 export interface DesarquivamentoComment {
   id: number;
   comment: string;

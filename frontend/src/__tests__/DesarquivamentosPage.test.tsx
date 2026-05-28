@@ -14,11 +14,13 @@ import {
   StatusDesarquivamento,
   TipoDesarquivamento,
   type Desarquivamento,
+  type DesarquivamentoPrintCandidate,
 } from "@/types";
 
 const refetchMock = vi.fn();
 const useDesarquivamentosMock = vi.fn();
 const getDesarquivamentosMock = vi.fn();
+const getPrintCandidatesMock = vi.fn();
 const printHtmlDocumentMock = vi.fn();
 
 const makeDesarquivamento = (
@@ -40,6 +42,19 @@ const makeDesarquivamento = (
   criadoPorId: 1,
   createdAt: "2026-05-20T10:00:00.000Z",
   updatedAt: "2026-05-20T10:00:00.000Z",
+  ...overrides,
+});
+
+const makePrintCandidate = (
+  overrides: Partial<DesarquivamentoPrintCandidate> = {},
+): DesarquivamentoPrintCandidate => ({
+  id: 1,
+  numeroProcesso: "0800001-10.2026.8.20.0001",
+  numeroNicLaudoAuto: "NIC-001",
+  nomeCompleto: "Maria da Silva",
+  tipoDocumento: "Laudo",
+  status: StatusDesarquivamento.DESARQUIVADO,
+  dataDesarquivamentoSAG: "2026-05-20T10:00:00.000Z",
   ...overrides,
 });
 
@@ -81,6 +96,8 @@ vi.mock("@/services/api", () => ({
     exportDesarquivamentos: vi.fn(),
     getDesarquivamentos: (...args: unknown[]) =>
       getDesarquivamentosMock(...args),
+    getPrintCandidates: (...args: unknown[]) =>
+      getPrintCandidatesMock(...args),
   },
 }));
 
@@ -119,6 +136,7 @@ describe("DesarquivamentosPage", () => {
       refetch: refetchMock,
     });
     getDesarquivamentosMock.mockReset();
+    getPrintCandidatesMock.mockReset();
     printHtmlDocumentMock.mockReset();
   });
 
@@ -219,8 +237,8 @@ describe("DesarquivamentosPage", () => {
 
   it("abre o modal de impressão com foco inicial e fecha por escape retornando foco", async () => {
     const user = userEvent.setup();
-    getDesarquivamentosMock.mockResolvedValue({
-      data: [makeDesarquivamento()],
+    getPrintCandidatesMock.mockResolvedValue({
+      data: [makePrintCandidate()],
       meta: {
         totalPages: 1,
       },
@@ -256,6 +274,8 @@ describe("DesarquivamentosPage", () => {
     const searchInput = screen.getByLabelText(/buscar por nº de processo/i);
 
     expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(getPrintCandidatesMock).toHaveBeenCalledTimes(1);
+    expect(getDesarquivamentosMock).not.toHaveBeenCalled();
     await waitFor(() => expect(searchInput).toHaveFocus());
 
     await user.keyboard("{Escape}");
@@ -268,8 +288,8 @@ describe("DesarquivamentosPage", () => {
 
   it("permite navegação por Tab dentro do modal de impressão", async () => {
     const user = userEvent.setup();
-    getDesarquivamentosMock.mockResolvedValue({
-      data: [makeDesarquivamento()],
+    getPrintCandidatesMock.mockResolvedValue({
+      data: [makePrintCandidate()],
       meta: {
         totalPages: 1,
       },
@@ -323,12 +343,12 @@ describe("DesarquivamentosPage", () => {
 
   it("permite impressão com item selecionado no modal", async () => {
     const user = userEvent.setup();
-    const candidate = makeDesarquivamento({
+    const candidate = makePrintCandidate({
       id: 42,
       numeroProcesso: "0800001-10.2026.8.20.0001",
     });
 
-    getDesarquivamentosMock.mockResolvedValue({
+    getPrintCandidatesMock.mockResolvedValue({
       data: [candidate],
       meta: {
         totalPages: 1,

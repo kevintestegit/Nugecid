@@ -53,6 +53,7 @@ import {
   TipoSolicitacao,
   TipoDesarquivamento,
   Desarquivamento,
+  DesarquivamentoPrintCandidate,
 } from "@/types";
 import {
   formatDate,
@@ -145,7 +146,9 @@ const DesarquivamentosPage: React.FC = () => {
   });
   const [isPrintTermsModalOpen, setIsPrintTermsModalOpen] = useState(false);
   const [isLoadingPrintTerms, setIsLoadingPrintTerms] = useState(false);
-  const [printCandidates, setPrintCandidates] = useState<Desarquivamento[]>([]);
+  const [printCandidates, setPrintCandidates] = useState<
+    DesarquivamentoPrintCandidate[]
+  >([]);
   const [selectedPrintIds, setSelectedPrintIds] = useState<number[]>([]);
   const [printProcessSearch, setPrintProcessSearch] = useState("");
   const printTermsButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -394,15 +397,15 @@ const DesarquivamentosPage: React.FC = () => {
   };
 
   const fetchAllDesarquivamentosForPrint = async (): Promise<
-    Desarquivamento[]
+    DesarquivamentoPrintCandidate[]
   > => {
     const limit = 100;
     let page = 1;
     let totalPages = 1;
-    const allItems: Desarquivamento[] = [];
+    const allItems: DesarquivamentoPrintCandidate[] = [];
 
     do {
-      const response = await apiService.getDesarquivamentos({
+      const response = await apiService.getPrintCandidates({
         page,
         limit,
         sortBy: "createdAt",
@@ -553,10 +556,7 @@ const DesarquivamentosPage: React.FC = () => {
 
     const rowsHtml = selectedItems
       .map((item, index) => {
-        const tipo =
-          item.tipoDocumento ||
-          getTipoDesarquivamentoLabel(item.tipoDesarquivamento) ||
-          "-";
+        const tipo = item.tipoDocumento || "-";
 
         return `
           <tr>
@@ -1413,11 +1413,7 @@ const DesarquivamentosPage: React.FC = () => {
                         const selected = selectedPrintIds.includes(
                           candidate.id,
                         );
-                        const tipo =
-                          candidate.tipoDocumento ||
-                          getTipoDesarquivamentoLabel(
-                            candidate.tipoDesarquivamento,
-                          );
+                        const tipo = candidate.tipoDocumento || "-";
 
                         return (
                           <label

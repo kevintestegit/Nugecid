@@ -4,6 +4,7 @@ import {
   ApiResponse,
   PaginatedResponse,
   Desarquivamento,
+  DesarquivamentoPrintCandidate,
   CreateDesarquivamentoDto,
   UpdateDesarquivamentoDto,
   QueryDesarquivamentoDto,
@@ -302,6 +303,26 @@ export class ApiService {
     } catch (error: unknown) {
       const errorInfo = extractAxiosErrorInfo(error);
       apiLogError("getDesarquivamentos error", {
+        status: errorInfo.status,
+        data: errorInfo.data,
+        message: errorInfo.message,
+        params,
+      });
+      throw error;
+    }
+  }
+
+  async getPrintCandidates(
+    params?: Pick<QueryDesarquivamentoDto, "page" | "limit" | "sortBy" | "sortOrder">,
+  ): Promise<PaginatedResponse<DesarquivamentoPrintCandidate>> {
+    try {
+      const response: AxiosResponse<
+        PaginatedResponse<DesarquivamentoPrintCandidate>
+      > = await this.api.get("/nugecid/impressao/candidatos", { params });
+      return response.data;
+    } catch (error: unknown) {
+      const errorInfo = extractAxiosErrorInfo(error);
+      apiLogError("getPrintCandidates error", {
         status: errorInfo.status,
         data: errorInfo.data,
         message: errorInfo.message,
