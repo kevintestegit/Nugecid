@@ -11,12 +11,18 @@ import {
   Switch,
   Badge,
   Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui";
 import {
   Bell,
   Monitor,
   Moon,
   Send,
+  Sparkles,
   Sun,
   Volume2,
   Loader2,
@@ -31,6 +37,12 @@ import { NotificationPreferences } from "@/types";
 import { toast } from "sonner";
 import { PREFERENCES_UPDATED_EVENT } from "@/hooks/useDesktopNotifications";
 import { NOTIFICATION_TYPE_DESCRIPTIONS } from "@/lib/notifications/notificationMeta";
+import {
+  DEFAULT_NUGECID_LOGO_PREFERENCE,
+  readNugecidLogoPreference,
+  writeNugecidLogoPreference,
+  type NugecidLogoPreference,
+} from "@/lib/logoPreferences";
 
 export const GeneralSettings: React.FC = () => {
   const { isDark } = useTheme();
@@ -38,6 +50,9 @@ export const GeneralSettings: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [preferences, setPreferences] =
     useState<NotificationPreferences | null>(null);
+  const [logoPreference, setLogoPreference] = useState<NugecidLogoPreference>(
+    DEFAULT_NUGECID_LOGO_PREFERENCE,
+  );
   const [hasChanges, setHasChanges] = useState(false);
   const [testingBrowserNotification, setTestingBrowserNotification] =
     useState(false);
@@ -49,6 +64,7 @@ export const GeneralSettings: React.FC = () => {
 
   useEffect(() => {
     setBrowserPermission(desktopNotificationsService.getPermission());
+    setLogoPreference(readNugecidLogoPreference());
     loadPreferences();
   }, []);
 
@@ -122,6 +138,11 @@ export const GeneralSettings: React.FC = () => {
       },
     });
     setHasChanges(true);
+  };
+
+  const handleLogoPreferenceChange = (value: NugecidLogoPreference) => {
+    setLogoPreference(value);
+    writeNugecidLogoPreference(value);
   };
 
   const handleDesktopNotificationsToggle = async (checked: boolean) => {
@@ -294,9 +315,7 @@ export const GeneralSettings: React.FC = () => {
     }
 
     if (!preferences.pushEnabled) {
-      toast.error(
-        "Ative o Web Push antes de testar o envio pelo servidor.",
-      );
+      toast.error("Ative o Web Push antes de testar o envio pelo servidor.");
       return;
     }
 
@@ -469,6 +488,51 @@ export const GeneralSettings: React.FC = () => {
             </div>
             <ThemeToggle size="md" />
           </div>
+
+          <div className="rounded-xl border border-border/70 bg-background/70 p-4">
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium">
+                  Tema visual da logo NUGECID
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Salvo neste navegador e aplicado na sidebar em tempo real.
+                </p>
+              </div>
+              <Badge variant="secondary" className="shrink-0">
+                <Sparkles className="mr-1 h-3.5 w-3.5" />
+                Logo
+              </Badge>
+            </div>
+
+            <Select
+              value={logoPreference}
+              onValueChange={(value) => {
+                handleLogoPreferenceChange(value as NugecidLogoPreference);
+              }}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o tema da logo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Automático</SelectItem>
+                <SelectItem value="saoJoao">São João</SelectItem>
+                <SelectItem value="worldCup2026">Copa 2026</SelectItem>
+                <SelectItem value="mothersDay">Dia das Mães</SelectItem>
+                <SelectItem value="easter">Páscoa</SelectItem>
+                <SelectItem value="standard">Padrão azul</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/70 px-2.5 py-1">
+                Junho alterna São João e Copa
+              </span>
+              <span className="rounded-full border border-border/70 px-2.5 py-1">
+                Sidebar colapsado oculta a animação
+              </span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -560,12 +624,10 @@ export const GeneralSettings: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Send className="h-4 w-4 text-muted-foreground" />
                 <div>
-                  <Label className="text-sm font-medium">
-                    Web Push
-                  </Label>
+                  <Label className="text-sm font-medium">Web Push</Label>
                   <p className="text-sm text-muted-foreground">
-                    Entregar notificações reais do servidor, inclusive com a
-                    aba fechada
+                    Entregar notificações reais do servidor, inclusive com a aba
+                    fechada
                   </p>
                 </div>
               </div>
@@ -603,8 +665,8 @@ export const GeneralSettings: React.FC = () => {
                     Testador de notificações
                   </h5>
                   <p className="text-sm text-muted-foreground">
-                    Valide primeiro o alerta local do navegador e depois o
-                    envio real pelo servidor.
+                    Valide primeiro o alerta local do navegador e depois o envio
+                    real pelo servidor.
                   </p>
                   <p className="text-xs text-muted-foreground">
                     O teste do servidor usa o canal Web Push salvo e é o que

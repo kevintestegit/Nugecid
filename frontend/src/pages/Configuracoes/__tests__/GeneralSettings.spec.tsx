@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GeneralSettings } from "../GeneralSettings";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getNotificationPreferences: vi.fn(),
@@ -63,8 +63,28 @@ const basePreferences = {
 };
 
 describe("GeneralSettings", () => {
+  beforeAll(() => {
+    Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", {
+      configurable: true,
+      value: vi.fn(() => false),
+    });
+    Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(HTMLElement.prototype, "releasePointerCapture", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mocks.getNotificationPreferences.mockResolvedValue({
       success: true,
       data: basePreferences,
@@ -102,6 +122,21 @@ describe("GeneralSettings", () => {
       screen.getByText("Notificações na área de trabalho"),
     ).toBeInTheDocument();
     expect(screen.getByText("Som")).toBeInTheDocument();
+  });
+
+  it("loads the logo preference selector from localStorage", async () => {
+    window.localStorage.setItem("nugecid-logo-preference", "worldCup2026");
+
+    render(
+      <ThemeProvider>
+        <GeneralSettings />
+      </ThemeProvider>,
+    );
+
+    expect(
+      await screen.findByText("Tema visual da logo NUGECID"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("combobox")).toHaveTextContent("Copa 2026");
   });
 
   it("should save desktop notification preference", async () => {

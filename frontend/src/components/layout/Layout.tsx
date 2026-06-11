@@ -313,7 +313,11 @@ const Layout: React.FC = () => {
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-background/80 backdrop-blur-xl backdrop-saturate-150 border-r border-border/50 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.4)] animate-slide-in-left">
           <div className="flex h-16 items-center justify-between px-4">
             <Link to="/" className="flex items-center">
-              <NugecidLogo showText={true} className="h-10 w-auto" />
+              <NugecidLogo
+                showText={true}
+                showAnimation={true}
+                className="h-10 w-auto"
+              />
             </Link>
             <Button
               variant="ghost"
@@ -404,35 +408,6 @@ const Layout: React.FC = () => {
               );
             })}
           </nav>
-
-          {/* Beta Warning Banner - Mobile */}
-          <div className="mx-4 mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-            <div className="flex items-start gap-2">
-              <div className="flex-shrink-0 mt-0.5">
-                <svg
-                  className="h-4 w-4 text-amber-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                  Versão Beta
-                </p>
-                <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1 leading-relaxed">
-                  Algumas funcionalidades podem não funcionar corretamente.
-                </p>
-              </div>
-            </div>
-          </div>
 
           <div className="border-t border-border/80 p-4 space-y-3">
             <div className="flex items-center gap-3">
@@ -549,6 +524,7 @@ const Layout: React.FC = () => {
               >
                 <NugecidLogo
                   showText={!sidebarCollapsed}
+                  showAnimation={!sidebarCollapsed}
                   className={cn(
                     sidebarCollapsed ? "h-12 w-12" : "h-12 w-[157px]",
                   )}
@@ -660,40 +636,6 @@ const Layout: React.FC = () => {
                 );
               })}
             </nav>
-
-            {/* Beta Warning Banner */}
-            <div
-              className={cn(
-                "mx-4 mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 transition-all duration-300",
-                sidebarCollapsed ? "hidden" : "block",
-              )}
-            >
-              <div className="flex items-start gap-2">
-                <div className="flex-shrink-0 mt-0.5">
-                  <svg
-                    className="h-4 w-4 text-amber-500"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                    Versão Beta
-                  </p>
-                  <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-1 leading-relaxed">
-                    Algumas funcionalidades podem não funcionar corretamente.
-                  </p>
-                </div>
-              </div>
-            </div>
 
             <div
               className={cn(

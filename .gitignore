@@ -2,6 +2,7 @@
 .trae
 .vercel
 .claude
+.superpowers/
 
 # Node
 node_modules/

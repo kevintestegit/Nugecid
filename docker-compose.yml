@@ -133,7 +133,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./backups:/backups
       - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ./docker/postgres/certs:/var/lib/postgresql:ro
+      - ./docker/postgres/certs:/var/lib/postgresql/certs:ro
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     restart: unless-stopped
     logging: *logging-default
