@@ -128,7 +128,7 @@
     "exceljs": "^4.4.0",
     "express-rate-limit": "^7.1.5",
     "express-session": "^1.17.3",
-    "fast-xml-parser": "^5.7.2",
+    "fast-xml-parser": "^5.9.3",
     "file-type": "^21.1.0",
     "follow-redirects": "^1.16.0",
     "helmet": "^7.1.0",
