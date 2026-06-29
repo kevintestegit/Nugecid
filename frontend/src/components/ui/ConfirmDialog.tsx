@@ -161,7 +161,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return createPortal(
     <div className={theme === "dark" ? "dark" : ""}>
-      modalContent
+      {modalContent}
     </div>,
     document.body
   );

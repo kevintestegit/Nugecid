@@ -48,6 +48,25 @@ const HEADER_ALIASES = {
 
 @Injectable()
 export class SeiCapturaMapperService {
+  mapWebhook(payload: {
+    numero: string;
+    titulo: string;
+    link?: string;
+  }): SeiRegistroCapturado {
+    return {
+      numeroProcessoSei: this.normalizeNullable(payload.numero),
+      numeroPci: this.extractNumeroPci(payload.titulo),
+      dataEntradaSei: new Date(),
+      unidadeOrigem: null,
+      unidadeAtual: null,
+      interessado: null,
+      assunto: this.normalizeNullable(payload.titulo),
+      tipoProcesso: null,
+      textoResumo: null,
+      linkSei: this.normalizeNullable(payload.link),
+    };
+  }
+
   mapRow(row: RawSpreadsheetRow): SeiRegistroCapturado {
     const normalizedRow = this.normalizeRowKeys(row);
     const textoResumo = this.pick(normalizedRow, HEADER_ALIASES.textoResumo);

@@ -20,6 +20,7 @@ import { AuthModule } from "../auth/auth.module";
 import { NotificacoesModule } from "../notificacoes/notificacoes.module";
 import { SecurityModule } from "../security/security.module";
 import { OcrModule } from "../ocr/ocr.module";
+import { AuditoriaModule } from "../audit/auditoria.module";
 
 // Use Cases
 import {
@@ -91,6 +92,7 @@ import { NugecidService } from "./nugecid.service";
       },
     }),
     NotificacoesModule,
+    AuditoriaModule,
   ],
   controllers: [
     NugecidController,

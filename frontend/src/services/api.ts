@@ -127,6 +127,9 @@ export class ApiService {
       headers: {
         Accept: "application/json",
       },
+      paramsSerializer: {
+        indexes: null,
+      },
     });
 
     this.setupInterceptors();
@@ -637,6 +640,17 @@ export class ApiService {
   async deleteMyAvatar(): Promise<ApiResponse<{ avatarUrl?: string | null }>> {
     const response: AxiosResponse<ApiResponse<{ avatarUrl?: string | null }>> =
       await this.api.delete("/users/me/avatar");
+    return response.data;
+  }
+
+  async changeMyPassword(payload: {
+    senhaAtual: string;
+    novaSenha: string;
+  }): Promise<ApiResponse<null>> {
+    const response: AxiosResponse<ApiResponse<null>> = await this.api.patch(
+      "/users/me/password",
+      payload,
+    );
     return response.data;
   }
 

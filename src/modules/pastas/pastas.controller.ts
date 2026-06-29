@@ -28,6 +28,7 @@ import { RoleType } from "../users/enums/role-type.enum";
 import { PastaArquivoTipo } from "./entities/pasta-arquivo.entity";
 import { inferContentTypeFromFilename } from "../storage/storage.service";
 import { AuthenticatedRequest } from "../../common/types/authenticated-request";
+import { parsePagination } from "../../common/utils/pagination.util";
 
 interface PastaUploadedFiles {
   imagens?: Express.Multer.File[];
@@ -120,11 +121,19 @@ export class PastasController {
   }
 
   @Get()
-  findAll(@Request() req: AuthenticatedRequest) {
+  findAll(
+    @Request() req: AuthenticatedRequest,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
     const user = req.user;
     const role = user?.role?.name;
     const isAdmin = role === "admin" || role === "coordenador";
-    return this.pastasService.findAll(isAdmin ? undefined : user?.id);
+    const pagination = parsePagination(page, limit);
+    return this.pastasService.findAll(
+      isAdmin ? undefined : user?.id,
+      pagination,
+    );
   }
 
   @Get("itens")

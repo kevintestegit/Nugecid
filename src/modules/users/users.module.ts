@@ -16,6 +16,7 @@ import { Role } from "./entities/role.entity";
 import { UserPreference } from "./entities/user-preference.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
 import { SecurityModule } from "../security/security.module";
+import { AuditoriaModule } from "../audit/auditoria.module";
 
 // Services
 import { UserPreferencesService } from "./services/user-preferences.service";
@@ -30,6 +31,7 @@ import {
   RestoreUserUseCase,
   GetUserStatisticsUseCase,
   GetRolesUseCase,
+  ChangePasswordUseCase,
 } from "./application/use-cases";
 
 // Repository Implementations
@@ -43,6 +45,7 @@ import {
     TypeOrmModule.forFeature([User, Role, UserPreference, Auditoria]),
     AuthModule,
     SecurityModule,
+    AuditoriaModule,
   ],
   controllers: [UsersController],
   providers: [
@@ -69,6 +72,7 @@ import {
     RestoreUserUseCase,
     GetUserStatisticsUseCase,
     GetRolesUseCase,
+    ChangePasswordUseCase,
   ],
   exports: [
     // UsersService, // Removido - não existe essa classe

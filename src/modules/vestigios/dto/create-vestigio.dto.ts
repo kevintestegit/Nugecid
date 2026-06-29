@@ -80,6 +80,54 @@ export class CreateVestigioDto {
   @IsNotEmpty()
   etiquetaCompleta: string;
 
+  @ApiPropertyOptional({
+    description: "Classe usada para montar a ficha de catalogação",
+    example: "0",
+  })
+  @IsString()
+  @IsOptional()
+  classeCatalogacao?: string;
+
+  @ApiPropertyOptional({
+    description: "Subclasse usada para montar a ficha de catalogação",
+    example: "Papiloscopia",
+  })
+  @IsString()
+  @IsOptional()
+  subclasseCatalogacao?: string;
+
+  @ApiPropertyOptional({
+    description: "Tipo específico da catalogação",
+    example: "Iris",
+  })
+  @IsString()
+  @IsOptional()
+  tipoCatalogacao?: string;
+
+  @ApiPropertyOptional({
+    description: "Versão do schema de catalogação aplicado",
+    example: "ccvc-2026-06",
+  })
+  @IsString()
+  @IsOptional()
+  schemaVersao?: string;
+
+  @ApiPropertyOptional({
+    description: "Metadados gerais preenchidos na catalogação",
+    example: { codigoVestigio: "VG-4102-0125" },
+  })
+  @IsObject()
+  @IsOptional()
+  metadadosGerais?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description: "Metadados específicos da categoria do vestígio",
+    example: { tipoVestigio: "Iris" },
+  })
+  @IsObject()
+  @IsOptional()
+  metadadosEspecificos?: Record<string, unknown>;
+
   @ApiPropertyOptional({ description: "Status do vestígio", example: "ativo" })
   @IsString()
   @IsOptional()

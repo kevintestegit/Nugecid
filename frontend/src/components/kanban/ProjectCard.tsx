@@ -45,7 +45,7 @@ export interface ProjectCardProps {
   onOpenBoard?: () => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({
+const ProjectCardComponent: React.FC<ProjectCardProps> = ({
   projeto,
   onClick,
   onEdit,
@@ -238,3 +238,5 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     </div>
   );
 };
+
+export const ProjectCard = React.memo(ProjectCardComponent);

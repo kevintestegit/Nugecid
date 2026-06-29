@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { HttpStatus } from "@nestjs/common";
+import { HttpStatus, NotAcceptableException } from "@nestjs/common";
 import { Response } from "express";
 
 import { NugecidController } from "./nugecid.controller";
@@ -27,6 +27,7 @@ import { NugecidAuditService } from "./nugecid-audit.service";
 import { TipoDesarquivamentoEnum } from "./domain/enums/tipo-desarquivamento.enum";
 import { AntivirusService } from "../security/antivirus.service";
 import { ConfigService } from "@nestjs/config";
+import { RoleType } from "../users/enums/role-type.enum";
 
 describe("NugecidController", () => {
   let controller: NugecidController;
@@ -165,6 +166,7 @@ describe("NugecidController", () => {
     const result = await controller.findAll(
       { page: 1, limit: 10 } as any,
       currentUser,
+      "application/json",
     );
 
     expect(mockFindAllUseCase.execute).toHaveBeenCalledWith(
@@ -181,6 +183,26 @@ describe("NugecidController", () => {
       data: useCaseResult.data,
       meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
     });
+  });
+
+  it("findAll deve bloquear navegação HTML direta no endpoint JSON", async () => {
+    await expect(
+      controller.findAll(
+        { page: 1, limit: 10 } as any,
+        currentUser,
+        "text/html,application/xhtml+xml",
+      ),
+    ).rejects.toBeInstanceOf(NotAcceptableException);
+    expect(mockFindAllUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it("lixeira e restauração devem exigir role admin no backend", () => {
+    expect(Reflect.getMetadata("roles", controller.findDeleted)).toEqual([
+      RoleType.ADMIN,
+    ]);
+    expect(Reflect.getMetadata("roles", controller.restore)).toEqual([
+      RoleType.ADMIN,
+    ]);
   });
 
   it("findOne deve registrar auditoria e retornar sucesso", async () => {

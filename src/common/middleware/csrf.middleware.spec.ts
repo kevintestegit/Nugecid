@@ -90,6 +90,46 @@ describe("csrfProtectionMiddleware", () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
+  it("rejeita POST sem token CSRF quando há cookie de autenticação", () => {
+    const req = {
+      method: "POST",
+      url: "/api/vestigios",
+      cookies: {
+        access_token: "jwt-token",
+        [CSRF_COOKIE_NAME]: "csrf-cookie",
+      },
+      headers: {},
+      secure: false,
+    } as unknown as Request;
+    const res = createResponse();
+
+    csrfProtectionMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("permite GET sem token CSRF mesmo com cookie de autenticação", () => {
+    const req = {
+      method: "GET",
+      url: "/api/vestigios",
+      cookies: {
+        access_token: "jwt-token",
+      },
+      headers: {},
+      secure: false,
+    } as unknown as Request;
+    const res = createResponse();
+
+    csrfProtectionMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
   it("não exige CSRF em requisição sem contexto autenticado", () => {
     const req = {
       method: "POST",

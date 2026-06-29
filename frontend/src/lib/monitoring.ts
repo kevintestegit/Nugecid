@@ -1,6 +1,6 @@
-import * as Sentry from "@sentry/react";
-
 import { User } from "@/types";
+
+type SentryModule = typeof import("@sentry/react");
 
 const globalMonitoringState = globalThis as typeof globalThis & {
   __sgcMonitoringInitialized?: boolean;
@@ -8,6 +8,15 @@ const globalMonitoringState = globalThis as typeof globalThis & {
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim();
 const monitoringEnabled = Boolean(sentryDsn);
+
+let sentryPromise: Promise<SentryModule> | null = null;
+
+const getSentry = (): Promise<SentryModule> => {
+  if (!sentryPromise) {
+    sentryPromise = import("@sentry/react");
+  }
+  return sentryPromise;
+};
 
 const parseSampleRate = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
@@ -23,34 +32,35 @@ export const initMonitoring = (): void => {
   if (!monitoringEnabled || globalMonitoringState.__sgcMonitoringInitialized) {
     return;
   }
-
-  Sentry.init({
-    dsn: sentryDsn,
-    enabled: monitoringEnabled,
-    environment:
-      import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
-    release: import.meta.env.VITE_SENTRY_RELEASE || undefined,
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration(),
-    ],
-    tracesSampleRate: parseSampleRate(
-      import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE,
-      0.1,
-    ),
-    replaysSessionSampleRate: parseSampleRate(
-      import.meta.env.VITE_SENTRY_REPLAY_SESSION_SAMPLE_RATE,
-      0,
-    ),
-    replaysOnErrorSampleRate: parseSampleRate(
-      import.meta.env.VITE_SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE,
-      1,
-    ),
-    normalizeDepth: 5,
-    sendDefaultPii: false,
-  });
-
   globalMonitoringState.__sgcMonitoringInitialized = true;
+
+  void getSentry().then((Sentry) => {
+    Sentry.init({
+      dsn: sentryDsn,
+      enabled: monitoringEnabled,
+      environment:
+        import.meta.env.VITE_SENTRY_ENVIRONMENT || import.meta.env.MODE,
+      release: import.meta.env.VITE_SENTRY_RELEASE || undefined,
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration(),
+      ],
+      tracesSampleRate: parseSampleRate(
+        import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE,
+        0.1,
+      ),
+      replaysSessionSampleRate: parseSampleRate(
+        import.meta.env.VITE_SENTRY_REPLAY_SESSION_SAMPLE_RATE,
+        0,
+      ),
+      replaysOnErrorSampleRate: parseSampleRate(
+        import.meta.env.VITE_SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE,
+        1,
+      ),
+      normalizeDepth: 5,
+      sendDefaultPii: false,
+    });
+  });
 };
 
 export const captureMonitoringException = (
@@ -63,10 +73,11 @@ export const captureMonitoringException = (
   if (!monitoringEnabled) {
     return;
   }
-
-  Sentry.captureException(error, {
-    tags: context?.tags,
-    extra: context?.extra,
+  void getSentry().then((Sentry) => {
+    Sentry.captureException(error, {
+      tags: context?.tags,
+      extra: context?.extra,
+    });
   });
 };
 
@@ -74,15 +85,15 @@ export const setMonitoringUser = (user: User | null): void => {
   if (!monitoringEnabled) {
     return;
   }
-
-  if (!user) {
-    Sentry.setUser(null);
-    return;
-  }
-
-  Sentry.setUser({
-    id: String(user.id),
-    username: user.usuario,
+  void getSentry().then((Sentry) => {
+    if (!user) {
+      Sentry.setUser(null);
+      return;
+    }
+    Sentry.setUser({
+      id: String(user.id),
+      username: user.usuario,
+    });
+    Sentry.setTag("role", user.role?.name ?? "unknown");
   });
-  Sentry.setTag("role", user.role?.name ?? "unknown");
 };

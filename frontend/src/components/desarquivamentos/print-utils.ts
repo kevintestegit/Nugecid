@@ -1,4 +1,5 @@
 import { getTipoDesarquivamentoLabel } from "@/utils/format";
+import { apiService } from "@/services/api";
 import type { TipoDesarquivamento } from "@/types";
 
 /** Shape of a related record returned by the /api/nugecid/:id/related endpoint */
@@ -52,16 +53,8 @@ export const escapeHtml = (value: unknown): string => {
 export const fetchRelatedRecords = async (
   id: number,
 ): Promise<RelatedRecord[]> => {
-  const relatedResponse = await fetch(`/api/nugecid/${id}/related`, {
-    credentials: "include",
-  });
-
-  if (!relatedResponse.ok) {
-    throw new Error("Erro ao buscar registros relacionados");
-  }
-
-  const relatedData = await relatedResponse.json();
-  return relatedData.success ? relatedData.data : [];
+  const response = await apiService.get<{ success: boolean; data: RelatedRecord[] }>(`/nugecid/${id}/related`);
+  return response.data.success ? response.data.data : [];
 };
 
 export const buildDetailRows = (

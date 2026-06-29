@@ -59,6 +59,7 @@ describe("TermoDesarquivamentoPreviewPage", () => {
       "srcdoc",
       "<html><body><h1>Termo</h1></body></html>",
     );
+    expect(iframe).toHaveAttribute("sandbox", "allow-same-origin");
 
     const printButton = screen.getByRole("button", { name: /imprimir/i });
     expect(printButton).toBeDisabled();

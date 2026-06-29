@@ -15,11 +15,13 @@ import {
   HttpCode,
   Res,
   Req,
+  Headers,
   Logger,
   BadRequestException,
   Header,
   NotFoundException,
   ForbiddenException,
+  NotAcceptableException,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import {
@@ -156,6 +158,19 @@ export class NugecidController {
         "http://localhost:3001",
       ),
     ).toString();
+  }
+
+  private assertJsonCollectionRequest(acceptHeader?: string): void {
+    const acceptsHtml = acceptHeader?.toLowerCase().includes("text/html");
+    const acceptsJson = acceptHeader
+      ?.toLowerCase()
+      .includes("application/json");
+
+    if (acceptsHtml && !acceptsJson) {
+      throw new NotAcceptableException(
+        "Endpoint disponível apenas para clientes JSON",
+      );
+    }
   }
 
   @Post()
@@ -546,6 +561,20 @@ export class NugecidController {
     );
   }
 
+  @Get("resumo-diario")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR, RoleType.USUARIO)
+  @ApiOperation({
+    summary:
+      "Resumo diário de desarquivamentos pendentes (SOLICITADO e RETIRADO_PELO_SETOR)",
+  })
+  @ApiBearerAuth()
+  async getResumoDiario(@CurrentUser() currentUser: User) {
+    const result = await this.nugecidService.getResumoDiario(currentUser.id, [
+      currentUser.role?.name || "USER",
+    ]);
+    return { success: true, ...result };
+  }
+
   @Get()
   @Roles(RoleType.ADMIN, RoleType.USUARIO)
   @ApiOperation({ summary: "Listar desarquivamentos com filtros e paginação" })
@@ -554,7 +583,10 @@ export class NugecidController {
   async findAll(
     @Query() queryDto: QueryDesarquivamentoDto,
     @CurrentUser() currentUser: User,
+    @Headers("accept") acceptHeader?: string,
   ) {
+    this.assertJsonCollectionRequest(acceptHeader);
+
     const filters = this.buildListFilters(queryDto);
 
     const result = await this.findAllDesarquivamentosUseCase.execute({
@@ -626,7 +658,7 @@ export class NugecidController {
   }
 
   @Get("lixeira")
-  @Roles(RoleType.ADMIN, RoleType.USUARIO)
+  @Roles(RoleType.ADMIN)
   @ApiOperation({ summary: "Listar desarquivamentos excluídos (lixeira)" })
   @ApiQuery({ type: QueryDesarquivamentoDto })
   @ApiBearerAuth()
@@ -661,7 +693,7 @@ export class NugecidController {
   }
 
   @Patch("lixeira/:id/restaurar")
-  @Roles(RoleType.ADMIN, RoleType.USUARIO)
+  @Roles(RoleType.ADMIN)
   @ApiOperation({ summary: "Restaurar desarquivamento da lixeira" })
   @ApiBearerAuth()
   async restore(@Param("id") id: string, @CurrentUser() currentUser: User) {

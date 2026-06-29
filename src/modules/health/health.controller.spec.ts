@@ -10,6 +10,7 @@ import { RedisService } from "../redis/redis.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { SearchService } from "../search/search.service";
+import { PrometheusService } from "../observability/prometheus.service";
 
 describe("HealthController", () => {
   let app: INestApplication;
@@ -45,6 +46,14 @@ describe("HealthController", () => {
       failOpen: true,
       bootstrapOnStart: false,
     }),
+  };
+
+  const mockPrometheusService = {
+    getMetrics: jest
+      .fn()
+      .mockResolvedValue(
+        "# HELP sgc_process_uptime_seconds Process uptime\nsgc_process_uptime_seconds 12\n",
+      ),
   };
 
   class MockJwtAuthGuard {
@@ -92,6 +101,10 @@ describe("HealthController", () => {
           provide: SearchService,
           useValue: mockSearchService,
         },
+        {
+          provide: PrometheusService,
+          useValue: mockPrometheusService,
+        },
         RolesGuard,
         Reflector,
       ],
@@ -120,6 +133,15 @@ describe("HealthController", () => {
 
   it("mantém readiness público", async () => {
     await request(app.getHttpServer()).get("/ready").expect(200);
+  });
+
+  it("expõe /metrics público em formato Prometheus (text/plain)", async () => {
+    const response = await request(app.getHttpServer())
+      .get("/metrics")
+      .expect(200);
+    expect(response.type).toBe("text/plain");
+    expect(response.text).toContain("sgc_process_uptime_seconds");
+    expect(mockPrometheusService.getMetrics).toHaveBeenCalled();
   });
 
   it("bloqueia métricas sem autenticação", async () => {

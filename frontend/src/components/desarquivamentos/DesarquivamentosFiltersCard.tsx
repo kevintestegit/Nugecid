@@ -31,6 +31,7 @@ interface DesarquivamentosFiltersCardProps {
   institutoFilter: string;
   requerenteFilter: string;
   onClearAtencaoNecessariaFilter: () => void;
+  onClearAllFilters: () => void;
   onSearch: (value: string) => void;
   onStatusFilter: (value: string) => void;
   onDateRangeChange: (value: DateRange) => void;
@@ -50,6 +51,7 @@ const DesarquivamentosFiltersCardComponent: React.FC<
   institutoFilter,
   requerenteFilter,
   onClearAtencaoNecessariaFilter,
+  onClearAllFilters,
   onSearch,
   onStatusFilter,
   onDateRangeChange,
@@ -61,15 +63,29 @@ const DesarquivamentosFiltersCardComponent: React.FC<
     <Card className="relative z-10 overflow-hidden border border-border/60 bg-card/85 shadow-[0_20px_50px_-38px_rgba(15,23,42,0.75)]">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-primary/8 to-transparent" />
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
-            <Filter className="h-4 w-4 text-primary" />
-          </span>
-          Filtros
-        </CardTitle>
-        <CardDescription>
-          Use os filtros abaixo para encontrar solicitações específicas
-        </CardDescription>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <span className="rounded-lg bg-primary/10 p-1.5 ring-1 ring-white/70 shadow-sm backdrop-blur">
+                <Filter className="h-4 w-4 text-primary" />
+              </span>
+              Filtros
+            </CardTitle>
+            <CardDescription>
+              Use os filtros abaixo para encontrar solicitações específicas
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClearAllFilters}
+            className="shrink-0"
+          >
+            <X className="mr-1 h-3.5 w-3.5" />
+            Limpar filtros
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {atencaoNecessariaFilter ? (

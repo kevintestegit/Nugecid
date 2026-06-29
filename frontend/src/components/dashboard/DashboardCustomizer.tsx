@@ -187,7 +187,7 @@ export const DashboardCustomizer: React.FC<DashboardCustomizerProps> = ({
 
   return createPortal(
     <div className={theme === "dark" ? "dark" : ""}>
-      modalContent
+      {modalContent}
     </div>,
     document.body
   );

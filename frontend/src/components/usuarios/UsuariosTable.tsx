@@ -108,8 +108,122 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
 
   return (
     <div className="overflow-hidden">
-      {/* Tabela */}
-      <div className="overflow-x-auto">
+      {/* Mobile cards - hidden on lg+ */}
+      <ul
+        role="list"
+        className="divide-y divide-border/60 lg:hidden"
+        aria-label="Lista de usuários"
+      >
+        {users.map((user) => (
+          <li
+            key={user.id}
+            className={`p-4 transition-colors hover:bg-muted/30 ${user.deletedAt ? "opacity-60" : ""}`}
+          >
+            <div className="flex items-start gap-3">
+              <Avatar className="h-10 w-10 flex-shrink-0">
+                {user.avatarUrl || user.avatar ? (
+                  <AvatarImage
+                    src={user.avatarUrl ?? user.avatar ?? undefined}
+                    alt={user.nome}
+                    className="object-cover"
+                  />
+                ) : (
+                  <AvatarFallback className="bg-muted text-muted-foreground">
+                    <User className="h-5 w-5" />
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {user.nome}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    {getRoleIcon(user.role.name)}
+                    <span
+                      className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role.name)}`}
+                    >
+                      {getRoleLabel(user.role.name)}
+                    </span>
+                  </div>
+                </div>
+                <p className="truncate text-sm text-muted-foreground">
+                  {user.usuario}
+                </p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  {user.deletedAt ? (
+                    <span className="inline-flex rounded-full border border-border/70 bg-muted/40 px-2 py-0.5 text-xs font-semibold text-foreground/85">
+                      Deletado
+                    </span>
+                  ) : (
+                    <span
+                      className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                        user.ativo
+                          ? "border border-green-500/20 bg-green-500/10 text-green-700 dark:text-green-300"
+                          : "border border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-300"
+                      }`}
+                    >
+                      {user.ativo ? "Ativo" : "Inativo"}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(user.createdAt).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+                {canManageUsers && !user.deletedAt && (
+                  <div className="mt-3 flex items-center justify-end gap-1 border-t border-border/40 pt-3">
+                    {user.ativo ? (
+                      <>
+                        <button
+                          onClick={() => setSelectedUserId(user.id)}
+                          className="rounded p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          title="Visualizar detalhes"
+                          aria-label={`Visualizar detalhes de ${user.nome}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditUserId(user.id)}
+                          className="rounded p-2 text-blue-600 transition-colors hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                          title="Editar usuário"
+                          aria-label={`Editar ${user.nome}`}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteUser(user.id)}
+                          className="rounded p-2 text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
+                          title="Desativar usuário"
+                          aria-label={`Desativar ${user.nome}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleReactivateUser(user.id)}
+                        disabled={reactivateUserMutation.isPending}
+                        className="rounded p-2 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-600 disabled:opacity-50 dark:text-green-300 dark:hover:text-green-200"
+                        title="Reativar usuário"
+                        aria-label={`Reativar ${user.nome}`}
+                      >
+                        {reactivateUserMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* Tabela - desktop */}
+      <div className="hidden overflow-x-auto lg:block">
         <table className="min-w-full divide-y divide-border/60">
           <thead className="bg-muted/35">
             <tr>
@@ -215,6 +329,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                             onClick={() => setSelectedUserId(user.id)}
                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             title="Visualizar detalhes"
+                            aria-label={`Visualizar detalhes de ${user.nome}`}
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -222,6 +337,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                             onClick={() => setEditUserId(user.id)}
                             className="rounded p-1 text-blue-600 transition-colors hover:bg-blue-500/10 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
                             title="Editar usuário"
+                            aria-label={`Editar ${user.nome}`}
                           >
                             <Edit className="h-4 w-4" />
                           </button>
@@ -229,6 +345,7 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                             onClick={() => onDeleteUser(user.id)}
                             className="rounded p-1 text-red-600 transition-colors hover:bg-red-500/10 hover:text-red-700 dark:text-red-300 dark:hover:text-red-200"
                             title="Desativar usuário"
+                            aria-label={`Desativar ${user.nome}`}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -237,8 +354,9 @@ const UsuariosTable: React.FC<UsuariosTableProps> = ({
                         <button
                           onClick={() => handleReactivateUser(user.id)}
                           disabled={reactivateUserMutation.isPending}
-                          className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-700 disabled:opacity-50 dark:text-green-300 dark:hover:text-green-200"
+                          className="rounded p-1 text-green-600 transition-colors hover:bg-green-500/10 hover:text-green-600 disabled:opacity-50 dark:text-green-300 dark:hover:text-green-200"
                           title="Reativar usuário"
+                          aria-label={`Reativar ${user.nome}`}
                         >
                           {reactivateUserMutation.isPending ? (
                             <Loader2 className="h-4 w-4 animate-spin" />

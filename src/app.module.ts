@@ -1,4 +1,5 @@
-import { Module, NestModule, MiddlewareConsumer } from "@nestjs/common";
+import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { CacheModule } from "@nestjs/cache-manager";
@@ -7,12 +8,8 @@ import { EventEmitterModule } from "@nestjs/event-emitter";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { MulterModule } from "@nestjs/platform-express";
 import { SentryModule } from "@sentry/nestjs/setup";
-import { join } from "path";
 import { config as dotenvConfig } from "dotenv";
 import * as redisStore from "cache-manager-redis-store";
-
-// Middleware
-import { StaticAuthMiddleware } from "./common/middleware/static-auth.middleware";
 
 // Configuration
 import {
@@ -21,6 +18,7 @@ import {
 } from "./config/database.config";
 import authConfig from "./config/auth.config";
 import appConfig from "./config/app.config";
+import { createStaticFileServeOptions } from "./config/static-files.config";
 import { validateEnvironment } from "./config/validation";
 
 // Modules
@@ -37,7 +35,6 @@ import { PastasModule } from "./modules/pastas/pastas.module";
 import { PlanilhasModule } from "./modules/planilhas/planilhas.module";
 import { BackupModule } from "./modules/backup/backup.module";
 import { SecurityModule } from "./modules/security/security.module";
-// import { WebscrapingModule } from "./modules/webscraping/webscraping.module";  // TEMPORARIAMENTE DESABILITADO
 import { AnnouncementsModule } from "./modules/announcements/announcements.module";
 import { VestigiosModule } from "./modules/vestigios/vestigios.module";
 import { EscavadorSeirnModule } from "./modules/escavador-seirn/escavador-seirn.module";
@@ -49,10 +46,15 @@ import { StorageModule } from "./modules/storage/storage.module";
 import { SeedingModule } from "./modules/seeding/seeding.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SeiModule } from "./modules/sei/sei.module";
+import { MailModule } from "./modules/mail/mail.module";
 
 // Controllers and Services
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+
+// Global guards (defense-in-depth: every route requires auth unless @IsPublic())
+import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
+import { RolesGuard } from "./modules/auth/guards/roles.guard";
 
 // Entities
 import { User } from "./modules/users/entities/user.entity";
@@ -145,16 +147,7 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
     // Static Files
     ServeStaticModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => [
-        {
-          rootPath: join(__dirname, "..", "public"),
-          serveRoot: "/public",
-        },
-        {
-          rootPath: configService.get<string>("UPLOAD_PATH", "./uploads"),
-          serveRoot: "/uploads",
-        },
-      ],
+      useFactory: createStaticFileServeOptions,
       inject: [ConfigService],
     }),
 
@@ -179,6 +172,7 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
     SeedingModule,
     SyncModule,
     RedisModule,
+    MailModule,
     AuthModule,
     UsersModule,
     NugecidModule,
@@ -193,17 +187,24 @@ const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
     SeiModule,
     BackupModule,
     SecurityModule,
-    // WebscrapingModule,  // TEMPORARIAMENTE DESABILITADO
     AnnouncementsModule,
     VestigiosModule,
     EscavadorSeirnModule,
     ...(queueFeatureEnabled ? [QueuesModule] : []),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Defense-in-depth: JwtAuthGuard applied globally; controllers opt out via @IsPublic().
+    // RolesGuard applied globally; methods opt out via @IsPublic() or qualify via @Roles(...).
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(StaticAuthMiddleware).forRoutes("/uploads");
-  }
-}
+export class AppModule {}

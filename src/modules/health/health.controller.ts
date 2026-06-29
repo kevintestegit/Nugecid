@@ -3,6 +3,7 @@ import {
   Get,
   Logger,
   Optional,
+  Res,
   ServiceUnavailableException,
   UseGuards,
 } from "@nestjs/common";
@@ -18,6 +19,8 @@ import { RedisService } from "../redis/redis.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { SearchService } from "../search/search.service";
+import { Response } from "express";
+import { PrometheusService } from "../observability/prometheus.service";
 
 @ApiTags("health")
 @Controller()
@@ -28,6 +31,7 @@ export class HealthController {
     private readonly databaseHealthService: DatabaseHealthService,
     private readonly runtimeMetricsService: RuntimeMetricsService,
     private readonly redisService: RedisService,
+    private readonly prometheusService: PrometheusService,
     @Optional()
     private readonly searchService?: SearchService,
   ) {}
@@ -42,7 +46,7 @@ export class HealthController {
       type: "liveness",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      version: process.version,
+      version: "2.0",
     };
   }
 
@@ -63,11 +67,18 @@ export class HealthController {
     const redisOk = await this.redisService.ping();
     const ready = dbHealth.status === "healthy" && redisOk;
 
+    const sanitizedDbHealth = {
+      status: dbHealth.status,
+      connection: dbHealth.connection,
+      responseTime: dbHealth.responseTime,
+      lastCheck: dbHealth.lastCheck,
+    };
+
     const readiness = {
       status: ready ? "ready" : "not_ready",
       type: "readiness",
       timestamp: new Date().toISOString(),
-      database: dbHealth,
+      database: sanitizedDbHealth,
       redis: {
         connected: redisOk,
       },
@@ -196,6 +207,21 @@ export class HealthController {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     };
+  }
+
+  @Get("metrics")
+  @IsPublic()
+  @ApiOperation({
+    summary: "Métricas em formato Prometheus para scrape (/metrics)",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Métricas Prometheus em text/plain",
+  })
+  async getPrometheusMetrics(@Res() res: Response) {
+    const metrics = await this.prometheusService.getMetrics();
+    res.type("text/plain; version=0.0.4; charset=utf-8");
+    res.send(metrics);
   }
 
   @Get("health/metrics")

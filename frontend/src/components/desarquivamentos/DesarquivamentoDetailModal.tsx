@@ -778,7 +778,7 @@ export const DesarquivamentoDetailModal: React.FC<
 
   const handlePrintDesarquivamento = useCallback(async () => {
     if (!item) {
-      toast.error("Nao foi possivel localizar os dados para gerar o termo.");
+      toast.error("Não foi possível localizar os dados para gerar o termo.");
       return;
     }
 

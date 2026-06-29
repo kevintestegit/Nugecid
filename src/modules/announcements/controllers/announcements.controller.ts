@@ -37,6 +37,7 @@ import { AnnouncementsService } from "../services";
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from "../dto";
 import { FileValidator } from "../../../common/utils/file-validator";
 import { AntivirusService } from "../../security/antivirus.service";
+import { parsePagination } from "../../../common/utils/pagination.util";
 
 @ApiTags("announcements")
 @Controller("announcements")
@@ -85,11 +86,24 @@ export class AnnouncementsController {
     status: HttpStatus.OK,
     description: "Lista de avisos retornada com sucesso",
   })
-  async findAll(@Query("includeInactive") includeInactive?: string) {
-    const announcements = await this.announcementsService.findAll(
-      includeInactive === "true",
-    );
+  async findAll(
+    @Query("includeInactive") includeInactive?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const includeInactiveBool = includeInactive === "true";
+    const pagination = parsePagination(page, limit);
 
+    if (pagination) {
+      const result = await this.announcementsService.findAll(
+        includeInactiveBool,
+        pagination,
+      );
+      return { success: true, ...result };
+    }
+
+    const announcements =
+      await this.announcementsService.findAll(includeInactiveBool);
     return {
       success: true,
       data: announcements,

@@ -356,6 +356,7 @@ async function bootstrap() {
       "/",
       { path: "health", method: RequestMethod.GET },
       { path: "ready", method: RequestMethod.GET },
+      { path: "metrics", method: RequestMethod.GET },
     ],
   });
 
@@ -422,17 +423,7 @@ async function bootstrap() {
 
   app.set("etag", false);
 
-  process.on("SIGTERM", async () => {
-    logger.log("Encerrando (SIGTERM)...");
-    await app.close();
-    process.exit(0);
-  });
-
-  process.on("SIGINT", async () => {
-    logger.log("Encerrando (SIGINT)...");
-    await app.close();
-    process.exit(0);
-  });
+  app.enableShutdownHooks();
 
   await app.listen(port, "0.0.0.0");
 

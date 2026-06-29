@@ -65,13 +65,9 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
     }
 
     this.logger.log(`Inicializando configuração do banco (${environment}).`);
-    const masked = dbPassword
-      ? dbPassword.replace(/.(?=.{2})/g, "*")
-      : "undefined";
     this.logger.log(
       `DB config resolvido: host=${dbHost}, port=${dbPort}, db=${dbName}, user=${dbUser}, password_set=${!!dbPassword}`,
     );
-    this.logger.debug(`DB password (masked): ${masked}`);
 
     const baseConfig = {
       synchronize: false,
@@ -93,13 +89,13 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       database: dbName,
       ssl: buildSslConfigFromEnv(),
       extra: {
-        connectionLimit: 10,
+        connectionLimit: parseInt(env("DATABASE_POOL_MAX", "10")!, 10),
         acquireTimeout: 60000,
         timeout: 60000,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 10000,
-        max: 10,
-        min: 2,
+        max: parseInt(env("DATABASE_POOL_MAX", "10")!, 10),
+        min: parseInt(env("DATABASE_POOL_MIN", "2")!, 10),
       },
     } as TypeOrmModuleOptions;
 

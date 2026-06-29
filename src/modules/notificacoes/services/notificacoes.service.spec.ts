@@ -262,14 +262,32 @@ describe("NotificacoesService", () => {
     });
 
     it("should return the existing notification when a duplicate is detected", async () => {
+      const nonRecurrenteDto = {
+        tipo: TipoNotificacao.MENCAO,
+        titulo: "Test",
+        descricao: "Test desc",
+        usuarioId: 1,
+      };
       mockUserRepository.findOne.mockResolvedValue(mockUser);
       mockPreferencesRepository.find.mockResolvedValue([]);
       mockNotificacaoRepository.findOne.mockResolvedValue(mockNotificacao);
 
-      const result = await service.create(createDto);
+      const result = await service.create(nonRecurrenteDto);
 
       expect(result).toEqual(mockNotificacao);
       expect(mockNotificacaoRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("should upsert existing notification for tipo recorrente", async () => {
+      mockUserRepository.findOne.mockResolvedValue(mockUser);
+      mockPreferencesRepository.find.mockResolvedValue([]);
+      mockNotificacaoRepository.findOne.mockResolvedValue(mockNotificacao);
+      mockNotificacaoRepository.save.mockResolvedValue(mockNotificacao);
+
+      const result = await service.create(createDto);
+
+      expect(result).toEqual(mockNotificacao);
+      expect(mockNotificacaoRepository.save).toHaveBeenCalled();
     });
   });
 
@@ -330,7 +348,7 @@ describe("NotificacoesService", () => {
   });
 
   describe("limparNotificacoesAntigas", () => {
-    it("should soft-delete old read notifications", async () => {
+    it("should soft-delete old read, expired, and stale unread notifications", async () => {
       const mockQb = {
         softDelete: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -341,8 +359,8 @@ describe("NotificacoesService", () => {
 
       const result = await service.limparNotificacoesAntigas(30);
 
-      expect(result).toBe(10);
-      expect(mockQb.softDelete).toHaveBeenCalled();
+      expect(result).toBe(30);
+      expect(mockQb.softDelete).toHaveBeenCalledTimes(3);
       expect(mockQb.where).toHaveBeenCalledWith("lida = :lida", {
         lida: true,
       });

@@ -41,6 +41,7 @@ import {
   searchIconTestPage,
   custodiaVestigiosPage,
   bancoVestigiosPage,
+  catalogacaoVestigiosPage,
   relatoriosPage,
   notificacoesPage,
   auditoriaPage,
@@ -151,7 +152,11 @@ const App: React.FC = () => {
           {/* Lixeira */}
           <Route
             path="desarquivamentos/lixeira"
-            element={renderLazyRoute(lixeiraPage.Component)}
+            element={
+              <ProtectedRoute requiredRole={UserRole.ADMIN}>
+                {renderLazyRoute(lixeiraPage.Component)}
+              </ProtectedRoute>
+            }
           />
           <Route
             path="lixeira"
@@ -194,6 +199,10 @@ const App: React.FC = () => {
           <Route
             path="custodia/banco-vestigios"
             element={renderLazyRoute(bancoVestigiosPage.Component)}
+          />
+          <Route
+            path="custodia/catalogacao"
+            element={renderLazyRoute(catalogacaoVestigiosPage.Component)}
           />
 
           {/* Relatórios */}
@@ -267,11 +276,13 @@ const App: React.FC = () => {
             }
           />
 
-          {/* Teste de ícones - temporário */}
-          <Route
-            path="test-icons"
-            element={renderLazyRoute(searchIconTestPage.Component)}
-          />
+          {/* Teste de ícones - apenas em dev */}
+          {import.meta.env.DEV && (
+            <Route
+              path="test-icons"
+              element={renderLazyRoute(searchIconTestPage.Component)}
+            />
+          )}
         </Route>
 
         {/* Página 404 para rotas não encontradas */}

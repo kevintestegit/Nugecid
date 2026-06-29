@@ -3,6 +3,9 @@ import { ForbiddenException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { EscavadorSeirnService } from "./escavador-seirn.service";
+import { HookEscavadorDto } from "./dto/hook-escavador.dto";
+import { NotificacoesService } from "../notificacoes/services/notificacoes.service";
+import { SeiCapturaService } from "../sei/sei-captura.service";
 import { TipoNotificacao } from "../notificacoes/entities";
 
 describe("EscavadorSeirnService", () => {
@@ -19,7 +22,11 @@ describe("EscavadorSeirnService", () => {
   const mockNotificacoesService = {
     create: jest.fn().mockResolvedValue({}),
     findLatestByTipo: jest.fn().mockResolvedValue(null),
-  };
+  } as unknown as NotificacoesService;
+
+  const mockSeiCapturaService = {
+    criarFromWebhook: jest.fn().mockResolvedValue({ id: "captura-id" }),
+  } as unknown as SeiCapturaService;
 
   let service: EscavadorSeirnService;
 
@@ -27,7 +34,8 @@ describe("EscavadorSeirnService", () => {
     jest.clearAllMocks();
     service = new EscavadorSeirnService(
       mockConfigService,
-      mockNotificacoesService as any,
+      mockNotificacoesService,
+      mockSeiCapturaService,
     );
     jest.spyOn(service["logger"], "warn").mockImplementation(() => {});
     jest.spyOn(service["logger"], "error").mockImplementation(() => {});
@@ -72,23 +80,34 @@ describe("EscavadorSeirnService", () => {
     const timestamp = "1700000000";
     const signature = signPayload(payload, timestamp);
 
-    const result = await service.webhook(payload as any, {
-      timestamp,
-      signature,
-    });
+    const result = await service.webhook(
+      payload as unknown as HookEscavadorDto,
+      {
+        timestamp,
+        signature,
+      },
+    );
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, capturaId: "captura-id" });
     expect(mockNotificacoesService.create).toHaveBeenCalledWith(
       expect.objectContaining({
         usuarioId: 11,
         tipo: TipoNotificacao.NOVO_PROCESSO,
       }),
     );
+    expect(mockSeiCapturaService.criarFromWebhook).toHaveBeenCalledWith(
+      {
+        numero: payload.numero,
+        titulo: payload.titulo,
+        link: payload.link,
+      },
+      11,
+    );
   });
 
   it("rejeita webhook com assinatura inválida", async () => {
     await expect(
-      service.webhook(makePayload() as any, {
+      service.webhook(makePayload() as unknown as HookEscavadorDto, {
         timestamp: "1700000000",
         signature: "b".repeat(64),
       }),
@@ -103,7 +122,7 @@ describe("EscavadorSeirnService", () => {
     const signature = signPayload(payload, timestamp);
 
     await expect(
-      service.webhook(payload as any, {
+      service.webhook(payload as unknown as HookEscavadorDto, {
         timestamp,
         signature,
       }),
@@ -114,7 +133,7 @@ describe("EscavadorSeirnService", () => {
 
   it("bloqueia bearer legado por padrão", async () => {
     await expect(
-      service.webhook(makePayload() as any, {
+      service.webhook(makePayload() as unknown as HookEscavadorDto, {
         authorization: "Bearer segredo-webhook",
       }),
     ).rejects.toThrow(
@@ -122,14 +141,15 @@ describe("EscavadorSeirnService", () => {
     );
   });
 
-  it("aceita bearer legado apenas quando liberado por env", async () => {
+  it("rejeita bearer legado mesmo quando ESCAVADOR_WEBHOOK_ALLOW_LEGACY_TOKEN=true", async () => {
     process.env.ESCAVADOR_WEBHOOK_ALLOW_LEGACY_TOKEN = "true";
 
-    const result = await service.webhook(makePayload() as any, {
-      authorization: "Bearer segredo-webhook",
-    });
-
-    expect(result).toEqual({ ok: true });
-    expect(mockNotificacoesService.create).toHaveBeenCalled();
+    await expect(
+      service.webhook(makePayload() as unknown as HookEscavadorDto, {
+        authorization: "Bearer segredo-webhook",
+      }),
+    ).rejects.toThrow(
+      new ForbiddenException("Webhook do escavador não autorizado"),
+    );
   });
 });

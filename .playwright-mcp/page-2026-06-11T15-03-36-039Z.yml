@@ -1,0 +1,29 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img "Painel institucional" [ref=e6]
+      - generic [ref=e10]:
+        - paragraph [ref=e11]: Sistema de Gerenciamento Eletrônico de Documentos - GED
+        - paragraph [ref=e12]: Polícia Científica do Rio Grande do Norte - Setor de Gestão da Informação
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - heading "NUGECID" [level=1] [ref=e19]
+        - heading "Acesse sua conta" [level=2] [ref=e20]
+        - paragraph [ref=e21]: Entre com suas credenciais para continuar
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - generic [ref=e24]: Usuário
+          - textbox "Usuário" [ref=e25]:
+            - /placeholder: Seu usuário
+        - generic [ref=e26]:
+          - generic [ref=e27]: Senha
+          - generic [ref=e28]:
+            - textbox "Senha" [ref=e29]:
+              - /placeholder: ••••••••
+            - button "Mostrar senha" [ref=e30] [cursor=pointer]:
+              - img [ref=e31]
+        - button "Entrar" [ref=e34] [cursor=pointer]:
+          - img
+          - text: Entrar
+      - paragraph [ref=e36]: Em caso de acesso bloqueado, To nem ai
+  - region "Notifications alt+T"

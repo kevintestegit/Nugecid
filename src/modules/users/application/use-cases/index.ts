@@ -6,3 +6,4 @@ export { GetUsersUseCase } from "./get-users.use-case";
 export { RestoreUserUseCase } from "./restore-user.use-case";
 export { GetUserStatisticsUseCase } from "./get-user-statistics.use-case";
 export { GetRolesUseCase } from "./get-roles.use-case";
+export { ChangePasswordUseCase } from "./change-password.use-case";

@@ -133,6 +133,18 @@ describe("BackupService", () => {
     expect(service.isHttpRestoreEnabled()).toBe(false);
   });
 
+  it("rejeita filename com path traversal", () => {
+    expect(() =>
+      (service as any).validateBackupFilename("../etc/passwd"),
+    ).toThrow("Nome do backup inválido");
+  });
+
+  it("rejeita filename sem extensão permitida", () => {
+    expect(() => (service as any).validateBackupFilename("backup.sh")).toThrow(
+      "Formato de nome de backup não permitido",
+    );
+  });
+
   it("não expõe caminho absoluto ao listar backups", async () => {
     const backupFile = path.join(
       tempRoot,

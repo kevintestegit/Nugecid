@@ -80,6 +80,9 @@ export const custodiaVestigiosPage = createLazyPage(
 export const bancoVestigiosPage = createLazyPage(
   () => import("@/pages/BancoVestigiosPage"),
 );
+export const catalogacaoVestigiosPage = createLazyPage(
+  () => import("@/pages/CatalogacaoVestigiosPage"),
+);
 export const relatoriosPage = createLazyPage(() =>
   import("@/pages/RelatoriosPage").then((module) => ({
     default: module.RelatoriosPage,
@@ -109,6 +112,7 @@ export const preloadByPath: Record<string, () => Promise<unknown>> = {
   "/kanban/:id": kanbanPage.preload,
   "/custodia": custodiaVestigiosPage.preload,
   "/custodia/banco-vestigios": bancoVestigiosPage.preload,
+  "/custodia/catalogacao": catalogacaoVestigiosPage.preload,
   "/relatorios": relatoriosPage.preload,
   "/arquivo": arquivoPage.preload,
   "/arquivo/:id": prateleiraDetailPage.preload,

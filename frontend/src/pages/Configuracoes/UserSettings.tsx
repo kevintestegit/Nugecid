@@ -24,11 +24,11 @@ import {
   Settings,
   Upload,
   Trash2,
-  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api";
 import { UserSettings as UserSettingsType } from "@/types";
+import { FormField } from "@/components/ui/FormField";
 
 export const UserSettings: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -72,6 +72,48 @@ export const UserSettings: React.FC = () => {
     user?.nome?.charAt(0)?.toUpperCase() ??
     user?.usuario?.charAt(0)?.toUpperCase() ??
     "?";
+
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+
+  const senhaError =
+    novaSenha && novaSenha.length < 6
+      ? "A senha deve ter pelo menos 6 caracteres"
+      : confirmarSenha && novaSenha !== confirmarSenha
+        ? "As senhas não conferem"
+        : senhaAtual && novaSenha && senhaAtual === novaSenha
+          ? "A nova senha deve ser diferente da senha atual"
+          : null;
+
+  const canSubmitPassword =
+    senhaAtual.length > 0 &&
+    novaSenha.length >= 6 &&
+    confirmarSenha.length > 0 &&
+    novaSenha === confirmarSenha &&
+    senhaAtual !== novaSenha &&
+    !isSubmittingPassword;
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingPassword(true);
+    try {
+      await apiService.changeMyPassword({ senhaAtual, novaSenha });
+      toast.success("Senha alterada com sucesso!");
+      setSenhaAtual("");
+      setNovaSenha("");
+      setConfirmarSenha("");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Não foi possível alterar a senha.";
+      toast.error(message);
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  };
 
   useEffect(() => {
     if (!avatarFile) {
@@ -360,26 +402,75 @@ export const UserSettings: React.FC = () => {
             Alterar Senha
           </CardTitle>
           <CardDescription>
-            A troca de senha pela interface será habilitada quando o backend
-            expuser um endpoint dedicado
+            Altere sua senha de acesso ao sistema
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div className="space-y-2">
-                <p className="font-medium">
-                  Troca de senha indisponível nesta versão
-                </p>
-                <p className="text-sm/6">
-                  Esta tela não executa alteração real de senha. O fluxo será
-                  habilitado apenas quando houver endpoint dedicado e validação
-                  completa no backend.
-                </p>
-              </div>
+          <form onSubmit={handleChangePassword} noValidate className="space-y-4">
+            <FormField
+              id="senha-atual"
+              label="Senha atual"
+              required
+            >
+              <Input
+                id="senha-atual"
+                type="password"
+                value={senhaAtual}
+                onChange={(e) => setSenhaAtual(e.target.value)}
+                placeholder="Sua senha atual"
+                disabled={isSubmittingPassword}
+              />
+            </FormField>
+            <FormField
+              id="nova-senha"
+              label="Nova senha"
+              required
+              error={
+                novaSenha && novaSenha.length < 6
+                  ? "Mínimo de 6 caracteres"
+                  : undefined
+              }
+            >
+              <Input
+                id="nova-senha"
+                type="password"
+                value={novaSenha}
+                onChange={(e) => setNovaSenha(e.target.value)}
+                placeholder="Mínimo de 6 caracteres"
+                disabled={isSubmittingPassword}
+              />
+            </FormField>
+            <FormField
+              id="confirmar-senha"
+              label="Confirmar nova senha"
+              required
+              error={
+                confirmarSenha && novaSenha !== confirmarSenha
+                  ? "As senhas não conferem"
+                  : undefined
+              }
+            >
+              <Input
+                id="confirmar-senha"
+                type="password"
+                value={confirmarSenha}
+                onChange={(e) => setConfirmarSenha(e.target.value)}
+                placeholder="Repita a nova senha"
+                disabled={isSubmittingPassword}
+              />
+            </FormField>
+            <div className="flex justify-end pt-2">
+              <Button
+                type="submit"
+                disabled={!canSubmitPassword}
+                className="w-full md:w-auto"
+              >
+                {isSubmittingPassword
+                  ? "Alterando..."
+                  : "Alterar senha"}
+              </Button>
             </div>
-          </div>
+          </form>
         </CardContent>
       </Card>
 

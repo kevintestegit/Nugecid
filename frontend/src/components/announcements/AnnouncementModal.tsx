@@ -239,7 +239,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
   // Renderizar usando Portal para garantir que o modal fique acima de tudo
   return createPortal(
     <div className={theme === "dark" ? "dark" : ""}>
-      modalContent
+      {modalContent}
     </div>,
     document.body
   );

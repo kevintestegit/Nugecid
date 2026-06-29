@@ -43,6 +43,14 @@ export class AppService {
     "coordenador",
   ]);
   private static readonly ROLES_WITH_ALL_PROJECTS_ACCESS = new Set(["admin"]);
+  private static readonly ROLES_WITH_ALL_VESTIGIOS_ACCESS = new Set([
+    "admin",
+    "coordenador",
+  ]);
+  private static readonly ROLES_WITH_ALL_PLANILHAS_ACCESS = new Set([
+    "admin",
+    "coordenador",
+  ]);
 
   constructor(
     @InjectRepository(User)
@@ -277,6 +285,14 @@ export class AppService {
     const canViewAllProjects = this.hasAnyRole(
       currentUserRoles,
       AppService.ROLES_WITH_ALL_PROJECTS_ACCESS,
+    );
+    const canViewAllVestigios = this.hasAnyRole(
+      currentUserRoles,
+      AppService.ROLES_WITH_ALL_VESTIGIOS_ACCESS,
+    );
+    const canViewAllPlanilhas = this.hasAnyRole(
+      currentUserRoles,
+      AppService.ROLES_WITH_ALL_PLANILHAS_ACCESS,
     );
 
     const normalizedTerm = this.normalizeSearchText(query);
@@ -633,7 +649,7 @@ export class AppService {
     }
 
     // ---- Vestígios ----
-    if (!types || types.includes("vestigio")) {
+    if ((!types || types.includes("vestigio")) && canViewAllVestigios) {
       promises.push(
         this.vestigioRepository
           .createQueryBuilder("vestigio")
@@ -728,7 +744,11 @@ export class AppService {
     }
 
     // ---- Planilhas de Controle ----
-    if ((!types || types.includes("planilha")) && !shouldSearchDocumentTypes) {
+    if (
+      (!types || types.includes("planilha")) &&
+      !shouldSearchDocumentTypes &&
+      canViewAllPlanilhas
+    ) {
       promises.push(
         this.planilhaControleRepository
           .createQueryBuilder("planilha")

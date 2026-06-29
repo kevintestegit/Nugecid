@@ -1,4 +1,5 @@
 export type NugecidLogoTheme =
+  | "brasil"
   | "easter"
   | "mothersDay"
   | "saoJoao"
@@ -11,7 +12,7 @@ export const NUGECID_LOGO_PREFERENCE_KEY = "nugecid-logo-preference";
 export const NUGECID_LOGO_PREFERENCE_CHANGE_EVENT =
   "nugecid-logo-preference-change";
 
-export const DEFAULT_NUGECID_LOGO_PREFERENCE: NugecidLogoPreference = "auto";
+export const DEFAULT_NUGECID_LOGO_PREFERENCE: NugecidLogoPreference = "brasil";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -34,6 +35,7 @@ export const isNugecidLogoPreference = (
 ): value is NugecidLogoPreference => {
   return (
     value === "auto" ||
+    value === "brasil" ||
     value === "easter" ||
     value === "mothersDay" ||
     value === "saoJoao" ||

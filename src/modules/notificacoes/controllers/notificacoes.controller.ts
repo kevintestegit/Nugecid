@@ -29,6 +29,9 @@ import {
 import { Observable, interval, map, merge, from } from "rxjs";
 import { finalize } from "rxjs/operators";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../../auth/guards/roles.guard";
+import { Roles } from "../../../common/decorators/roles.decorator";
+import { RoleType } from "../../users/enums/role-type.enum";
 import { AuthenticatedRequest } from "../../../common/types/authenticated-request";
 import {
   NotificacoesService,
@@ -51,7 +54,7 @@ import {
 
 @ApiTags("notificacoes")
 @Controller("notificacoes")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class NotificacoesController {
   constructor(
@@ -87,7 +90,7 @@ export class NotificacoesController {
     // Por padrão, criar notificação para o usuário logado
     const notificacaoData = {
       ...createNotificacaoDto,
-      usuarioId: createNotificacaoDto.usuarioId || req.user.id,
+      usuarioId: req.user.id,
     };
     return this.notificacoesService.create(notificacaoData);
   }
@@ -562,9 +565,8 @@ export class NotificacoesController {
     body: { solicitacaoId: number; diasPendentes: number; usuarioId?: number },
     @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
-    const usuarioId = body.usuarioId || req.user.id;
     return this.notificacoesService.criarNotificacaoSolicitacaoPendente(
-      usuarioId,
+      req.user.id,
       body.solicitacaoId,
       body.diasPendentes,
     );
@@ -582,15 +584,15 @@ export class NotificacoesController {
     body: { processoId: number; numeroProcesso: string; usuarioId?: number },
     @Request() req: AuthenticatedRequest,
   ): Promise<Notificacao> {
-    const usuarioId = body.usuarioId || req.user.id;
     return this.notificacoesService.criarNotificacaoNovoProcesso(
-      usuarioId,
+      req.user.id,
       body.processoId,
       body.numeroProcesso,
     );
   }
 
   @Post("verificar-pendentes")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   @ApiOperation({
     summary: "Verificar e criar notificações para solicitações pendentes",
   })
@@ -607,6 +609,7 @@ export class NotificacoesController {
   // ========== NOVOS ENDPOINTS PARA TAREFAS ==========
 
   @Post("verificar-prazos")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   @ApiOperation({
     summary: "Verificar e notificar tarefas com prazo próximo",
   })
@@ -623,6 +626,7 @@ export class NotificacoesController {
   }
 
   @Post("verificar-atrasadas")
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   @ApiOperation({
     summary: "Verificar e notificar tarefas atrasadas",
   })

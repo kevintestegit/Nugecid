@@ -61,6 +61,32 @@ export class NotificacoesService implements OnModuleDestroy {
   private readonly logger = new Logger(NotificacoesService.name);
   private static readonly LIST_CACHE_TTL_SECONDS = 10;
 
+  private static readonly TIPOS_RECORRENTES: Set<TipoNotificacao> = new Set([
+    TipoNotificacao.SOLICITACAO_PENDENTE,
+    TipoNotificacao.PRAZO_PROXIMO,
+    TipoNotificacao.TAREFA_ATRASADA,
+  ]);
+
+  private static readonly TTL_DIAS_POR_TIPO: Partial<
+    Record<TipoNotificacao, number>
+  > = {
+    [TipoNotificacao.SOLICITACAO_PENDENTE]: 7,
+    [TipoNotificacao.PRAZO_PROXIMO]: 3,
+    [TipoNotificacao.TAREFA_ATRASADA]: 7,
+    [TipoNotificacao.NOVO_PROCESSO]: 30,
+    [TipoNotificacao.NOVO_DESARQUIVAMENTO]: 30,
+    [TipoNotificacao.MENCAO]: 30,
+    [TipoNotificacao.TAREFA_ATRIBUIDA]: 30,
+    [TipoNotificacao.TAREFA_ALTERADA]: 14,
+    [TipoNotificacao.TAREFA_COMENTADA]: 14,
+    [TipoNotificacao.NOVO_REGISTRO]: 30,
+    [TipoNotificacao.PASTA_CRIADA]: 30,
+    [TipoNotificacao.EVENTO_AUDITORIA]: 30,
+  };
+
+  private static readonly TTL_PADRAO_DIAS = 90;
+  private static readonly RETENCAO_NAO_LIDAS_DIAS = 90;
+
   /**
    * Per-user RxJS Subjects for real-time SSE push.
    * Key = userId, Value = Subject that emits Notificacao whenever one is created for that user.
@@ -131,10 +157,43 @@ export class NotificacoesService implements OnModuleDestroy {
     }
   }
 
+  private getExpiresAtByTipo(tipo: TipoNotificacao): Date {
+    const dias =
+      NotificacoesService.TTL_DIAS_POR_TIPO[tipo] ??
+      NotificacoesService.TTL_PADRAO_DIAS;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + dias);
+    return expiresAt;
+  }
+
+  private isTipoRecorrente(tipo: TipoNotificacao): boolean {
+    return NotificacoesService.TIPOS_RECORRENTES.has(tipo);
+  }
+
   private async saveAndEmit(notificacao: Notificacao): Promise<Notificacao> {
-    const notificacaoDuplicada = await this.findRecentDuplicate(notificacao);
-    if (notificacaoDuplicada) {
-      return notificacaoDuplicada;
+    if (!notificacao.expiresAt) {
+      notificacao.expiresAt = this.getExpiresAtByTipo(notificacao.tipo);
+    }
+
+    if (this.isTipoRecorrente(notificacao.tipo)) {
+      const existente = await this.findExistingByEntidade(notificacao);
+      if (existente) {
+        existente.titulo = notificacao.titulo;
+        existente.descricao = notificacao.descricao;
+        existente.detalhes = notificacao.detalhes;
+        existente.prioridade = notificacao.prioridade;
+        existente.lida = false;
+        existente.expiresAt = notificacao.expiresAt;
+        const updated = await this.notificacaoRepository.save(existente);
+        await this.dispatchSavedNotifications([updated]);
+        await this.bumpReadCachesVersion();
+        return updated;
+      }
+    } else {
+      const notificacaoDuplicada = await this.findRecentDuplicate(notificacao);
+      if (notificacaoDuplicada) {
+        return notificacaoDuplicada;
+      }
     }
 
     const saved = await this.notificacaoRepository.save(notificacao);
@@ -294,6 +353,49 @@ export class NotificacoesService implements OnModuleDestroy {
     }
 
     return notificacaoExistente;
+  }
+
+  private async findExistingByEntidade(
+    notificacao: Pick<
+      CreateNotificacaoDto,
+      | "tipo"
+      | "usuarioId"
+      | "solicitacaoId"
+      | "processoId"
+      | "tarefaId"
+      | "projetoId"
+    >,
+  ): Promise<Notificacao | null> {
+    const where: Record<string, unknown> = {
+      tipo: notificacao.tipo,
+      usuarioId: notificacao.usuarioId,
+      deletedAt: IsNull(),
+    };
+
+    if (typeof notificacao.tarefaId === "number") {
+      where.tarefaId = notificacao.tarefaId;
+    } else if (typeof notificacao.solicitacaoId === "number") {
+      where.solicitacaoId = notificacao.solicitacaoId;
+    } else if (typeof notificacao.processoId === "number") {
+      where.processoId = notificacao.processoId;
+    } else if (typeof notificacao.projetoId === "number") {
+      where.projetoId = notificacao.projetoId;
+    } else {
+      return null;
+    }
+
+    const existente = await this.notificacaoRepository.findOne({
+      where,
+      order: { createdAt: "DESC", id: "DESC" },
+    });
+
+    if (existente) {
+      this.logger.debug(
+        `Notificação recorrente atualizada (upsert) para usuário ${notificacao.usuarioId} (${notificacao.tipo})`,
+      );
+    }
+
+    return existente;
   }
 
   private async getPreferencesByUserIds(
@@ -479,18 +581,40 @@ export class NotificacoesService implements OnModuleDestroy {
       return [];
     }
 
-    const notificacoesDuplicadas = await Promise.all(
-      dtosUnicos.map((dto) => this.findRecentDuplicate(dto)),
-    );
+    const resultados: Notificacao[] = [];
+    const dtosParaCriar: CreateNotificacaoDto[] = [];
 
-    const dtosParaCriar = dtosUnicos.filter(
-      (_, index) => !notificacoesDuplicadas[index],
-    );
+    for (const dto of dtosUnicos) {
+      if (this.isTipoRecorrente(dto.tipo)) {
+        const existente = await this.findExistingByEntidade(dto);
+        if (existente) {
+          existente.titulo = dto.titulo;
+          existente.descricao = dto.descricao;
+          existente.detalhes = dto.detalhes ?? existente.detalhes;
+          existente.prioridade = dto.prioridade || existente.prioridade;
+          existente.lida = false;
+          existente.expiresAt = this.getExpiresAtByTipo(dto.tipo);
+          const updated = await this.notificacaoRepository.save(existente);
+          await this.dispatchSavedNotifications([updated]);
+          await this.bumpReadCachesVersion();
+          resultados.push(updated);
+          continue;
+        }
+      } else {
+        const duplicada = await this.findRecentDuplicate(dto);
+        if (duplicada) {
+          resultados.push(duplicada);
+          continue;
+        }
+      }
+      dtosParaCriar.push(dto);
+    }
 
     const entidades = dtosParaCriar.map((dto) =>
       this.notificacaoRepository.create({
         ...dto,
         prioridade: dto.prioridade || PrioridadeNotificacao.MEDIA,
+        expiresAt: this.getExpiresAtByTipo(dto.tipo),
       }),
     );
 
@@ -507,11 +631,7 @@ export class NotificacoesService implements OnModuleDestroy {
       await this.bumpReadCachesVersion();
     }
 
-    const existentes = notificacoesDuplicadas.filter(
-      (notificacao): notificacao is Notificacao => notificacao != null,
-    );
-
-    return [...existentes, ...saved];
+    return [...resultados, ...saved];
   }
 
   private async loadUsersByIds(userIds: number[]): Promise<User[]> {
@@ -966,14 +1086,12 @@ export class NotificacoesService implements OnModuleDestroy {
     });
   }
 
-  // Método para verificar solicitações pendentes (para ser executado periodicamente)
   async verificarSolicitacoesPendentes(): Promise<Notificacao[]> {
     const cincoDiasAtras = new Date();
     cincoDiasAtras.setDate(cincoDiasAtras.getDate() - 5);
 
     const notificacoesCriadas: Notificacao[] = [];
 
-    // Buscar desarquivamentos e gestores em paralelo
     const [desarquivamentosPendentes, gestores] = await Promise.all([
       this.desarquivamentoRepository.find({
         where: {
@@ -989,41 +1107,6 @@ export class NotificacoesService implements OnModuleDestroy {
 
     const gestoresIds = gestores.map((g) => g.id);
 
-    // Coletar todos os IDs de desarquivamentos e usuários para buscar notificações existentes de uma vez
-    const desarquivamentoIds = desarquivamentosPendentes.map((d) => d.id);
-
-    // Buscar notificações criadas nas últimas 24h para evitar duplicatas
-    // NÃO filtrar por lida=false — se já notificou hoje, não notifica de novo
-    // mesmo que o usuário tenha marcado como lida
-    const umDiaAtras = new Date();
-    umDiaAtras.setDate(umDiaAtras.getDate() - 1);
-
-    const notificacoesExistentes =
-      desarquivamentoIds.length > 0
-        ? await this.notificacaoRepository
-            .createQueryBuilder("n")
-            .select(["n.processoId", "n.usuarioId"])
-            .where("n.tipo = :tipo", {
-              tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
-            })
-            .andWhere("n.processoId IN (:...ids)", { ids: desarquivamentoIds })
-            .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
-            .getRawMany()
-        : [];
-
-    // Criar um Set para lookup rápido
-    const notificacoesExistentesSet = new Set(
-      notificacoesExistentes.map((n) => `${n.n_processoId}-${n.n_usuarioId}`),
-    );
-
-    // Processar desarquivamentos
-    const notificacoesParaCriar: Array<{
-      usuarioId: number;
-      desarquivamento: DesarquivamentoTypeOrmEntity;
-      diasPendentes: number;
-    }> = [];
-
-    // Buscar tarefas que não foram movimentadas há mais de 5 dias
     const solicitacoesPendentes = await this.tarefaRepository
       .createQueryBuilder("tarefa")
       .leftJoin("tarefa.coluna", "coluna")
@@ -1033,7 +1116,6 @@ export class NotificacoesService implements OnModuleDestroy {
       })
       .getMany();
 
-    // Coletar todos os IDs de usuários que precisam ser validados
     const usuariosIdsParaValidar = new Set<number>(gestoresIds);
     for (const desarquivamento of desarquivamentosPendentes) {
       if (desarquivamento.criadoPorId) {
@@ -1043,8 +1125,6 @@ export class NotificacoesService implements OnModuleDestroy {
         usuariosIdsParaValidar.add(desarquivamento.responsavelId);
       }
     }
-
-    // Adicionar IDs de usuários das tarefas
     for (const solicitacao of solicitacoesPendentes) {
       if (solicitacao.responsavelId) {
         usuariosIdsParaValidar.add(solicitacao.responsavelId);
@@ -1054,7 +1134,6 @@ export class NotificacoesService implements OnModuleDestroy {
       }
     }
 
-    // Buscar todos os usuários válidos de uma vez
     const usuariosValidos =
       usuariosIdsParaValidar.size > 0
         ? await this.userRepository.find({
@@ -1064,6 +1143,12 @@ export class NotificacoesService implements OnModuleDestroy {
         : [];
 
     const usuariosValidosSet = new Set(usuariosValidos.map((u) => u.id));
+
+    const notificacoesParaCriar: Array<{
+      usuarioId: number;
+      desarquivamento: DesarquivamentoTypeOrmEntity;
+      diasPendentes: number;
+    }> = [];
 
     for (const desarquivamento of desarquivamentosPendentes) {
       const diasPendentes = Math.floor(
@@ -1087,15 +1172,11 @@ export class NotificacoesService implements OnModuleDestroy {
 
       for (const usuarioId of destinatarios) {
         if (!usuarioId || !usuariosValidosSet.has(usuarioId)) continue;
-
-        const chave = `${desarquivamento.id}-${usuarioId}`;
-        if (!notificacoesExistentesSet.has(chave)) {
-          notificacoesParaCriar.push({
-            usuarioId,
-            desarquivamento,
-            diasPendentes,
-          });
-        }
+        notificacoesParaCriar.push({
+          usuarioId,
+          desarquivamento,
+          diasPendentes,
+        });
       }
     }
 
@@ -1115,27 +1196,7 @@ export class NotificacoesService implements OnModuleDestroy {
       ),
     );
 
-    // Buscar notificações existentes para tarefas de uma vez (últimas 24h)
-    const tarefaIds = solicitacoesPendentes.map((s) => s.id);
-    const notificacoesTarefasExistentes =
-      tarefaIds.length > 0
-        ? await this.notificacaoRepository
-            .createQueryBuilder("n")
-            .select("n.solicitacaoId")
-            .where("n.tipo = :tipo", {
-              tipo: TipoNotificacao.SOLICITACAO_PENDENTE,
-            })
-            .andWhere("n.solicitacaoId IN (:...ids)", { ids: tarefaIds })
-            .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
-            .getRawMany()
-        : [];
-
-    const tarefasComNotificacao = new Set(
-      notificacoesTarefasExistentes.map((n) => n.n_solicitacaoId),
-    );
-
     const pendenciasParaNotificar = solicitacoesPendentes
-      .filter((solicitacao) => !tarefasComNotificacao.has(solicitacao.id))
       .map((solicitacao) => {
         const diasPendentes = Math.floor(
           (Date.now() - solicitacao.updatedAt.getTime()) /
@@ -1480,28 +1541,9 @@ export class NotificacoesService implements OnModuleDestroy {
       return [];
     }
 
-    // Buscar notificações existentes nas últimas 24h (independente de lida)
-    const umDiaAtras = new Date();
-    umDiaAtras.setDate(umDiaAtras.getDate() - 1);
-
-    const tarefaIds = tarefas.map((t) => t.id);
-    const notificacoesExistentes = await this.notificacaoRepository
-      .createQueryBuilder("n")
-      .select("n.tarefaId")
-      .where("n.tipo = :tipo", { tipo: TipoNotificacao.PRAZO_PROXIMO })
-      .andWhere("n.tarefaId IN (:...ids)", { ids: tarefaIds })
-      .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
-      .getRawMany();
-
-    const tarefasComNotificacao = new Set(
-      notificacoesExistentes.map((n) => n.n_tarefaId),
-    );
-
     const notificacoesPromises: Promise<Notificacao | null>[] = [];
 
     for (const tarefa of tarefas) {
-      if (tarefasComNotificacao.has(tarefa.id)) continue;
-
       const diasRestantes = Math.ceil(
         (new Date(tarefa.prazo).getTime() - hoje.getTime()) /
           (1000 * 60 * 60 * 24),
@@ -1542,28 +1584,9 @@ export class NotificacoesService implements OnModuleDestroy {
       return [];
     }
 
-    // Buscar notificações existentes de uma vez (últimas 24h)
-    const umDiaAtras = new Date();
-    umDiaAtras.setDate(umDiaAtras.getDate() - 1);
-
-    const tarefaIds = tarefas.map((t) => t.id);
-    const notificacoesExistentes = await this.notificacaoRepository
-      .createQueryBuilder("n")
-      .select("n.tarefaId")
-      .where("n.tipo = :tipo", { tipo: TipoNotificacao.TAREFA_ATRASADA })
-      .andWhere("n.tarefaId IN (:...ids)", { ids: tarefaIds })
-      .andWhere("n.createdAt > :umDiaAtras", { umDiaAtras })
-      .getRawMany();
-
-    const tarefasComNotificacao = new Set(
-      notificacoesExistentes.map((n) => n.n_tarefaId),
-    );
-
     const notificacoesPromises: Promise<Notificacao | null>[] = [];
 
     for (const tarefa of tarefas) {
-      if (tarefasComNotificacao.has(tarefa.id)) continue;
-
       const diasAtrasados = Math.floor(
         (hoje.getTime() - new Date(tarefa.prazo).getTime()) /
           (1000 * 60 * 60 * 24),
@@ -1744,28 +1767,53 @@ export class NotificacoesService implements OnModuleDestroy {
     }
   }
 
-  /**
-   * Remove notificações lidas com mais de X dias (soft-delete).
-   * Notificações não lidas são preservadas independente da idade.
-   * @param diasRetencao Número de dias para reter notificações lidas (padrão: 30)
-   * @returns Número de notificações removidas
-   */
   async limparNotificacoesAntigas(diasRetencao = 30): Promise<number> {
-    const dataLimite = new Date();
-    dataLimite.setDate(dataLimite.getDate() - diasRetencao);
+    const dataLimiteLidas = new Date();
+    dataLimiteLidas.setDate(dataLimiteLidas.getDate() - diasRetencao);
 
-    const result = await this.notificacaoRepository
+    const dataLimiteNaoLidas = new Date();
+    dataLimiteNaoLidas.setDate(
+      dataLimiteNaoLidas.getDate() -
+        NotificacoesService.RETENCAO_NAO_LIDAS_DIAS,
+    );
+
+    const agora = new Date();
+
+    const resultLidas = await this.notificacaoRepository
       .createQueryBuilder()
       .softDelete()
       .where("lida = :lida", { lida: true })
       .andWhere("deletedAt IS NULL")
-      .andWhere("createdAt < :dataLimite", { dataLimite })
+      .andWhere("createdAt < :dataLimite", { dataLimite: dataLimiteLidas })
       .execute();
 
-    if ((result.affected || 0) > 0) {
+    const resultExpiradas = await this.notificacaoRepository
+      .createQueryBuilder()
+      .softDelete()
+      .where("deletedAt IS NULL")
+      .andWhere("expiresAt IS NOT NULL")
+      .andWhere("expiresAt < :agora", { agora })
+      .execute();
+
+    const resultNaoLidasAntigas = await this.notificacaoRepository
+      .createQueryBuilder()
+      .softDelete()
+      .where("lida = :lida", { lida: false })
+      .andWhere("deletedAt IS NULL")
+      .andWhere("createdAt < :dataLimite", {
+        dataLimite: dataLimiteNaoLidas,
+      })
+      .execute();
+
+    const totalRemovidas =
+      (resultLidas.affected || 0) +
+      (resultExpiradas.affected || 0) +
+      (resultNaoLidasAntigas.affected || 0);
+
+    if (totalRemovidas > 0) {
       await this.bumpReadCachesVersion();
     }
 
-    return result.affected || 0;
+    return totalRemovidas;
   }
 }

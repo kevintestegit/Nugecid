@@ -7,6 +7,10 @@ import {
 } from "./logoPreferences";
 
 describe("logoPreferences", () => {
+  it("usa o tema Brasil quando o usuario ainda nao escolheu uma preferencia", () => {
+    expect(readNugecidLogoPreference()).toBe("brasil");
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();

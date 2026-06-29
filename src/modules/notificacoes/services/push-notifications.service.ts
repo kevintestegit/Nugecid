@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -10,6 +10,14 @@ import {
   Notificacao,
 } from "../entities";
 import { RemovePushSubscriptionDto, SavePushSubscriptionDto } from "../dto";
+
+const ALLOWED_WEB_PUSH_ENDPOINT_HOSTS = new Set([
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+]);
+
+const ALLOWED_WEB_PUSH_ENDPOINT_SUFFIXES = [".notify.windows.com"];
 
 @Injectable()
 export class PushNotificationsService {
@@ -71,6 +79,8 @@ export class PushNotificationsService {
       return null;
     }
 
+    this.assertAllowedWebPushEndpoint(dto.endpoint);
+
     const existing = await this.pushSubscriptionRepository.findOne({
       where: { endpoint: dto.endpoint },
     });
@@ -95,6 +105,35 @@ export class PushNotificationsService {
     subscription.userAgent = userAgent ?? null;
 
     return this.pushSubscriptionRepository.save(subscription);
+  }
+
+  private assertAllowedWebPushEndpoint(endpoint: string): void {
+    if (!this.isAllowedWebPushEndpoint(endpoint)) {
+      throw new BadRequestException("Endpoint Web Push não permitido");
+    }
+  }
+
+  private isAllowedWebPushEndpoint(endpoint: string): boolean {
+    let url: URL;
+
+    try {
+      url = new URL(endpoint);
+    } catch {
+      return false;
+    }
+
+    if (url.protocol !== "https:" || url.username || url.password) {
+      return false;
+    }
+
+    const hostname = url.hostname.toLowerCase();
+
+    return (
+      ALLOWED_WEB_PUSH_ENDPOINT_HOSTS.has(hostname) ||
+      ALLOWED_WEB_PUSH_ENDPOINT_SUFFIXES.some((suffix) =>
+        hostname.endsWith(suffix),
+      )
+    );
   }
 
   async removeSubscription(
@@ -131,10 +170,27 @@ export class PushNotificationsService {
       return;
     }
 
+    const validSubscriptions: NotificationPushSubscription[] = [];
+    for (const subscription of subscriptions) {
+      const endpoint = subscription.toWebPushSubscription().endpoint;
+      if (!this.isAllowedWebPushEndpoint(endpoint)) {
+        await this.pushSubscriptionRepository.delete({
+          endpoint: subscription.endpoint,
+        });
+        continue;
+      }
+
+      validSubscriptions.push(subscription);
+    }
+
+    if (!validSubscriptions.length) {
+      return;
+    }
+
     const payload = JSON.stringify(this.buildPayload(notificacao));
 
     const results = await Promise.allSettled(
-      subscriptions.map((subscription) =>
+      validSubscriptions.map((subscription) =>
         webPush.sendNotification(
           subscription.toWebPushSubscription(),
           payload,
@@ -151,7 +207,7 @@ export class PushNotificationsService {
           return;
         }
 
-        const subscription = subscriptions[index];
+        const subscription = validSubscriptions[index];
         const statusCode = this.extractStatusCode(result.reason);
         if (statusCode === 404 || statusCode === 410) {
           await this.pushSubscriptionRepository.delete({

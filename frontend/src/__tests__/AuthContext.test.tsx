@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
@@ -71,6 +72,27 @@ const AuthProbe = () => {
   );
 };
 
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+const renderAuth = (queryClient = createTestQueryClient()) => {
+  render(
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>
+    </QueryClientProvider>,
+  );
+
+  return queryClient;
+};
+
 describe("AuthContext", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -97,11 +119,7 @@ describe("AuthContext", () => {
       },
     });
 
-    render(
-      <AuthProvider>
-        <AuthProbe />
-      </AuthProvider>,
-    );
+    renderAuth();
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("auth:admin");
@@ -132,11 +150,7 @@ describe("AuthContext", () => {
       undefined,
     );
 
-    render(
-      <AuthProvider>
-        <AuthProbe />
-      </AuthProvider>,
-    );
+    renderAuth();
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("anon");
@@ -164,6 +178,37 @@ describe("AuthContext", () => {
     expect(apiServiceMock.logout).toHaveBeenCalledTimes(1);
   });
 
+  it("limpa cache do React Query ao fazer logout", async () => {
+    apiServiceMock.getCurrentUser.mockResolvedValue({
+      success: true,
+      data: testUser,
+    });
+    apiServiceMock.logout.mockResolvedValue(undefined);
+    pushSubscriptionServiceMock.detachCurrentSubscription.mockResolvedValue(
+      undefined,
+    );
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(["private", "desarquivamentos"], {
+      total: 1,
+    });
+
+    renderAuth(queryClient);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("auth:admin");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "logout" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("anon");
+    });
+
+    expect(
+      queryClient.getQueryData(["private", "desarquivamentos"]),
+    ).toBeUndefined();
+  });
+
   it("não autentica apenas com usuário em cache quando a sessão não pode ser validada", async () => {
     localStorage.setItem("user", JSON.stringify(testUser));
     apiServiceMock.getCurrentUser.mockRejectedValue({
@@ -172,11 +217,7 @@ describe("AuthContext", () => {
       message: "Network Error",
     });
 
-    render(
-      <AuthProvider>
-        <AuthProbe />
-      </AuthProvider>,
-    );
+    renderAuth();
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("anon");
@@ -199,11 +240,7 @@ describe("AuthContext", () => {
       data: legacyUser,
     });
 
-    render(
-      <AuthProvider>
-        <AuthProbe />
-      </AuthProvider>,
-    );
+    renderAuth();
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-state")).toHaveTextContent("auth:admin");

@@ -30,6 +30,12 @@ export class Auditoria {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ name: "previous_hash", length: 64, nullable: true })
+  previousHash: string | null;
+
+  @Column({ name: "hash", length: 64, nullable: true })
+  hash: string | null;
+
   @Column({ name: "user_id", nullable: true })
   userId: number | null;
 
@@ -100,7 +106,6 @@ export class Auditoria {
       error,
       details: {
         loginAttempt: true,
-        timestamp: new Date(),
       },
     };
   }
@@ -119,7 +124,6 @@ export class Auditoria {
       success: true,
       details: {
         logoutAction: true,
-        timestamp: new Date(),
       },
     };
   }
@@ -143,6 +147,27 @@ export class Auditoria {
       userAgent,
       success: true,
     };
+  }
+
+  /**
+   * Builds a deterministic payload string for hash chain verification.
+   * Do NOT include the generated id or mutable fields that would break append-only semantics.
+   */
+  buildHashPayload(): string {
+    const payload = {
+      previousHash: this.previousHash,
+      userId: this.userId,
+      action: this.action,
+      entityName: this.entityName,
+      entityId: this.entityId,
+      details: this.details,
+      ipAddress: this.ipAddress,
+      userAgent: this.userAgent,
+      success: this.success,
+      error: this.error,
+      timestamp: this.timestamp,
+    };
+    return JSON.stringify(payload, Object.keys(payload).sort());
   }
 
   getActionLabel(): string {

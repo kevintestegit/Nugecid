@@ -38,6 +38,14 @@ describe("NotificacoesController SSE", () => {
       }),
     ),
     removeUserStream: jest.fn(),
+    criarNotificacaoSolicitacaoPendente: jest.fn().mockResolvedValue({
+      id: 100,
+      titulo: "Solicitação pendente",
+    }),
+    criarNotificacaoNovoProcesso: jest.fn().mockResolvedValue({
+      id: 101,
+      titulo: "Novo processo",
+    }),
   };
 
   const mockSchedulerService = {};
@@ -154,5 +162,57 @@ describe("NotificacoesController SSE", () => {
         link: "/configuracoes",
       }),
     );
+  });
+
+  it("ignora usuarioId do body ao criar notificação via endpoint público autenticado", async () => {
+    await request(app.getHttpServer())
+      .post("/notificacoes")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        tipo: "novo_registro",
+        titulo: "Tentativa de spoofing",
+        descricao: "Não deve criar para terceiro",
+        usuarioId: 999,
+      })
+      .expect(201);
+
+    expect(mockNotificacoesService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: 5,
+        titulo: "Tentativa de spoofing",
+      }),
+    );
+  });
+
+  it("ignora usuarioId do body ao criar notificação de solicitação pendente", async () => {
+    await request(app.getHttpServer())
+      .post("/notificacoes/solicitacao-pendente")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        solicitacaoId: 10,
+        diasPendentes: 3,
+        usuarioId: 999,
+      })
+      .expect(201);
+
+    expect(
+      mockNotificacoesService.criarNotificacaoSolicitacaoPendente,
+    ).toHaveBeenCalledWith(5, 10, 3);
+  });
+
+  it("ignora usuarioId do body ao criar notificação de novo processo", async () => {
+    await request(app.getHttpServer())
+      .post("/notificacoes/novo-processo")
+      .set("Authorization", "Bearer valid-token")
+      .send({
+        processoId: 20,
+        numeroProcesso: "PROC-20",
+        usuarioId: 999,
+      })
+      .expect(201);
+
+    expect(
+      mockNotificacoesService.criarNotificacaoNovoProcesso,
+    ).toHaveBeenCalledWith(5, 20, "PROC-20");
   });
 });

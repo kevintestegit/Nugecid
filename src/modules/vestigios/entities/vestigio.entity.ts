@@ -65,7 +65,50 @@ export class Vestigio {
   @Column({ name: "etiqueta_completa", type: "text" })
   etiquetaCompleta: string;
 
-  @Column({ name: "status", type: "varchar", length: 50, default: "ativo" })
+  @Column({
+    name: "classe_catalogacao",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
+  classeCatalogacao: string;
+
+  @Column({
+    name: "subclasse_catalogacao",
+    type: "varchar",
+    length: 100,
+    nullable: true,
+  })
+  subclasseCatalogacao: string;
+
+  @Column({
+    name: "tipo_catalogacao",
+    type: "varchar",
+    length: 150,
+    nullable: true,
+  })
+  tipoCatalogacao: string;
+
+  @Column({
+    name: "schema_versao",
+    type: "varchar",
+    length: 30,
+    nullable: true,
+  })
+  schemaVersao: string;
+
+  @Column({ name: "metadados_gerais", type: "jsonb", nullable: true })
+  metadadosGerais: Record<string, unknown>;
+
+  @Column({ name: "metadados_especificos", type: "jsonb", nullable: true })
+  metadadosEspecificos: Record<string, unknown>;
+
+  @Column({
+    name: "status",
+    type: "varchar",
+    length: 50,
+    default: "'catalogacao_pendente'",
+  })
   status: string;
 
   @Column({ name: "observacoes", type: "text", nullable: true })

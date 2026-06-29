@@ -14,6 +14,7 @@ import { useNotificacoes } from "@/hooks/useNotificacoes";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
 import { useDomainSyncSSE } from "@/hooks/useDomainSyncSSE";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { DailySummaryModal } from "@/components/ui/DailySummaryModal";
 import { NugecidLogo } from "@/components/ui/NugecidLogo";
 import { preloadByPath } from "@/routes/lazyPages";
 import {
@@ -33,6 +34,7 @@ import {
   ChevronLeft,
   ChevronDown,
   Database,
+  ClipboardList,
 } from "lucide-react";
 
 const SIDEBAR_ANIMATION_MS = 220;
@@ -240,11 +242,17 @@ const Layout: React.FC = () => {
             current: location.pathname === "/custodia",
           },
           {
-            name: "Banco de Vestígios",
-            href: "/custodia/banco-vestigios",
-            icon: Database,
-            current: location.pathname === "/custodia/banco-vestigios",
+            name: "Catalogação",
+            href: "/custodia/catalogacao",
+            icon: ClipboardList,
+            current: location.pathname === "/custodia/catalogacao",
           },
+          // {
+          //   name: "Banco de Vestígios",
+          //   href: "/custodia/banco-vestigios",
+          //   icon: Database,
+          //   current: location.pathname === "/custodia/banco-vestigios",
+          // },
         ],
       },
       {
@@ -298,7 +306,14 @@ const Layout: React.FC = () => {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      >
+        Pular para o conteúdo principal
+      </a>
       <RealtimeRuntime enabled={Boolean(user)} />
+      <DailySummaryModal />
       {/* Mobile sidebar */}
       <div
         className={cn(
@@ -462,31 +477,6 @@ const Layout: React.FC = () => {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:block lg:w-16 lg:overflow-visible lg:z-30">
-        {/* Toggle Button - Minimalist Design */}
-        <button
-          onClick={handleDesktopSidebarToggle}
-          className={cn(
-            "absolute top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-border/60 bg-card/95 text-muted-foreground shadow-sm backdrop-blur-sm -right-3 hover:scale-110 hover:bg-card hover:text-foreground hover:shadow-md hover:border-border focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95 transition-transform duration-200 ease-out",
-            sidebarCollapsed ? "translate-x-0" : "translate-x-48",
-          )}
-          style={{
-            transitionProperty: "transform, box-shadow",
-          }}
-          title={sidebarCollapsed ? "Expandir sidebar" : "Recolher sidebar"}
-        >
-          <div className="relative flex items-center justify-center">
-            <div
-              className="relative z-10"
-              style={{
-                transform: sidebarCollapsed ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s ease-out",
-              }}
-            >
-              <ChevronLeft className="h-3 w-3" />
-            </div>
-          </div>
-        </button>
-
         <div
           className="absolute inset-y-0 left-0 w-64"
           style={{
@@ -498,6 +488,7 @@ const Layout: React.FC = () => {
             contain: "layout paint style",
             backfaceVisibility: "hidden",
           }}
+          id="desktop-sidebar"
         >
           <div
             className={cn(
@@ -506,33 +497,69 @@ const Layout: React.FC = () => {
                 ? "backdrop-blur-none shadow-none"
                 : "backdrop-blur-xl backdrop-saturate-150 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_24px_-12px_rgba(0,0,0,0.4)]",
             )}
+            id="desktop-sidebar-panel"
           >
             <div
               className={cn(
-                "flex h-16 flex-shrink-0 items-center",
+                "flex flex-shrink-0 items-center",
                 sidebarCollapsed
-                  ? "ml-auto w-16 justify-center px-0"
-                  : "w-full px-4",
+                  ? "ml-auto h-24 w-16 flex-col justify-center gap-2 px-0"
+                  : "relative h-16 w-full justify-center px-4",
               )}
             >
-              <Link
-                to="/"
-                className={cn(
-                  "flex w-full items-center",
-                  sidebarCollapsed ? "justify-center" : "justify-center",
-                )}
-              >
-                <NugecidLogo
-                  showText={!sidebarCollapsed}
-                  showAnimation={!sidebarCollapsed}
-                  className={cn(
-                    sidebarCollapsed ? "h-12 w-12" : "h-12 w-[157px]",
-                  )}
-                />
-              </Link>
+              {sidebarCollapsed ? (
+                <>
+                  <button
+                    type="button"
+                    aria-controls="desktop-sidebar"
+                    aria-expanded="false"
+                    aria-label="Abrir barra lateral"
+                    onClick={handleDesktopSidebarToggle}
+                    className="group flex h-9 w-9 cursor-e-resize items-center justify-center rounded-lg text-foreground/80 outline-none transition-colors hover:bg-card/70 hover:text-foreground focus-visible:bg-card/70 focus-visible:ring-2 focus-visible:ring-primary/50"
+                  >
+                    <ChevronLeft className="hidden h-5 w-5 rotate-180 group-hover:block group-focus-visible:block" />
+                  </button>
+                  <Link
+                    to="/"
+                    className="flex h-10 w-10 items-center justify-center"
+                    aria-label="NUGECID"
+                  >
+                    <NugecidLogo
+                      showText={false}
+                      showAnimation={false}
+                      className="h-10 w-10"
+                    />
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/"
+                    className="flex w-full min-w-0 items-center justify-center"
+                    data-testid="desktop-sidebar-logo-link"
+                  >
+                    <NugecidLogo
+                      showText={true}
+                      showAnimation={true}
+                      className="h-12 w-[200px] justify-center"
+                    />
+                  </Link>
+                  <button
+                    type="button"
+                    aria-controls="desktop-sidebar"
+                    aria-expanded="true"
+                    aria-label="Recolher barra lateral"
+                    onClick={handleDesktopSidebarToggle}
+                    className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 cursor-w-resize items-center justify-center rounded-lg text-foreground/75 outline-none transition-colors hover:bg-card/70 hover:text-foreground focus-visible:bg-card/70 focus-visible:ring-2 focus-visible:ring-primary/50"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                </>
+              )}
             </div>
 
             <nav
+              aria-label="Navegação principal desktop"
               className={cn(
                 "flex flex-1 flex-col gap-1 overflow-y-auto pb-6 pt-4",
                 sidebarCollapsed ? "ml-auto w-16 px-0" : "px-4",
@@ -550,7 +577,7 @@ const Layout: React.FC = () => {
                       <button
                         onClick={() => setCustodiaExpanded(!isExpanded)}
                         className={cn(
-                          "group flex w-full items-center rounded-xl border border-transparent px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-[background-color,border-color,color]",
+                          "group flex w-full items-center rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium leading-snug tracking-normal transition-[background-color,border-color,color]",
                           sidebarCollapsed
                             ? "justify-center"
                             : "justify-between",
@@ -590,7 +617,7 @@ const Layout: React.FC = () => {
                                 key={subItem.name}
                                 to={subItem.href}
                                 className={cn(
-                                  "group flex items-center rounded-lg border border-transparent px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors",
+                                  "group flex items-center rounded-lg border border-transparent px-3 py-2 text-xs font-medium tracking-normal transition-colors",
                                   subItem.current
                                     ? "border-primary/25 bg-primary/10 text-primary shadow-sm backdrop-blur"
                                     : "text-foreground/80 hover:border-border/60 hover:bg-card/70 hover:text-foreground",
@@ -615,7 +642,7 @@ const Layout: React.FC = () => {
                     key={item.name}
                     to={item.href}
                     className={cn(
-                      "group flex items-center rounded-xl border border-transparent px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-[background-color,border-color,color]",
+                      "group flex items-center rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium tracking-normal transition-[background-color,border-color,color]",
                       sidebarCollapsed ? "justify-center" : "",
                       item.current
                         ? "border-primary/25 bg-primary/10 text-primary shadow-sm backdrop-blur"
@@ -685,7 +712,7 @@ const Layout: React.FC = () => {
                 <Link
                   to="/configuracoes"
                   className={cn(
-                    "mt-3 flex items-center gap-2 rounded-xl border border-transparent px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground/85 transition-[background-color,border-color,color] hover:border-border/60 hover:bg-card/70 hover:text-foreground hover:backdrop-blur",
+                    "mt-3 flex items-center gap-2 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium tracking-normal text-foreground/85 transition-[background-color,border-color,color] hover:border-border/60 hover:bg-card/70 hover:text-foreground hover:backdrop-blur",
                     sidebarCollapsed
                       ? "mx-auto mt-2 h-10 w-10 justify-center rounded-full border-transparent bg-primary/10 p-0 text-primary shadow-sm backdrop-blur hover:bg-primary/15"
                       : "justify-start",
@@ -704,7 +731,7 @@ const Layout: React.FC = () => {
                 size="sm"
                 onClick={handleLogout}
                 className={cn(
-                  "mt-3 flex w-full items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/85 transition-[background-color,border-color,color] hover:border-border/60 hover:bg-card/70 hover:text-destructive hover:backdrop-blur",
+                  "mt-3 flex w-full items-center gap-2 rounded-xl border border-transparent px-3 py-2 text-sm font-medium tracking-normal text-foreground/85 transition-[background-color,border-color,color] hover:border-border/60 hover:bg-card/70 hover:text-destructive hover:backdrop-blur",
                   sidebarCollapsed ? "justify-center" : "justify-start",
                 )}
                 title={sidebarCollapsed ? "Sair" : undefined}
@@ -755,7 +782,11 @@ const Layout: React.FC = () => {
         </div>
 
         {/* Page content - Enhanced spacing */}
-        <main className="py-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="py-8 focus:outline-none"
+        >
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <Outlet />
           </div>

@@ -14,6 +14,7 @@ const applyProductionBaseEnv = () => {
   process.env.DATABASE_NAME = "sgc";
   process.env.FRONTEND_URL = "https://frontend.example.com";
   process.env.CORS_ORIGIN = "https://frontend.example.com";
+  process.env.CLAMAV_ENABLED = "true";
 };
 
 describe("validateEnvironment", () => {
@@ -95,7 +96,7 @@ describe("validateEnvironment", () => {
     process.env.SEARCH_FAIL_OPEN = "true";
 
     expect(() => validateEnvironment()).toThrow(
-      "OCR_FAIL_OPEN e SEARCH_FAIL_OPEN devem ser false em produção",
+      "OCR_FAIL_OPEN, SEARCH_FAIL_OPEN e CLAMAV_FAIL_OPEN devem ser false em produção",
     );
   });
 

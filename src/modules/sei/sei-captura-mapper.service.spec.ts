@@ -22,6 +22,22 @@ describe("SeiCapturaMapperService", () => {
     expect(registro.unidadeAtual).toBe("PCI-NUGECID");
   });
 
+  it("mapeia payload de webhook do escavador como captura incompleta", () => {
+    const registro = service.mapWebhook({
+      numero: "0391002.002025/2026-46",
+      titulo: "Pedido de desarquivamento PCI 123/2026",
+      link: "https://sei.rn.gov.br/processo/0391002.002025/2026-46",
+    });
+
+    expect(registro.numeroProcessoSei).toBe("0391002.002025/2026-46");
+    expect(registro.numeroPci).toBe("PCI 123/2026");
+    expect(registro.assunto).toBe("Pedido de desarquivamento PCI 123/2026");
+    expect(registro.linkSei).toBe(
+      "https://sei.rn.gov.br/processo/0391002.002025/2026-46",
+    );
+    expect(service.validate(registro).status).toBe(SeiCapturaStatus.INCOMPLETO);
+  });
+
   it("marca captura incompleta quando faltam campos minimos", () => {
     const registro = service.mapRow({
       Interessado: "Solicitante sem processo",

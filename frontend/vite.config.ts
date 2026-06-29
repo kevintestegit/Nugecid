@@ -11,6 +11,9 @@ export default defineConfig(() => {
     process.env.VITE_API_PROXY_TARGET || "http://127.0.0.1:3000";
   const sentryRelease =
     process.env.VITE_SENTRY_RELEASE || process.env.SENTRY_RELEASE;
+  const assetVersion = (
+    process.env.VITE_ASSET_VERSION || Date.now().toString(36)
+  ).replace(/[^a-zA-Z0-9_-]/g, "");
   const sentryPluginEnabled = Boolean(
     process.env.SENTRY_AUTH_TOKEN &&
       process.env.SENTRY_ORG &&
@@ -105,14 +108,14 @@ export default defineConfig(() => {
             const assetName = assetInfo.name ?? "";
 
             if (/\.css$/i.test(assetName)) {
-              return "css/[name]-[hash][extname]";
+              return `css/[name]-${assetVersion}-[hash][extname]`;
             }
 
             return "assets/[name]-[hash][extname]";
           },
           // Garantir nomes consistentes para chunks
-          chunkFileNames: "js/[name]-[hash].js",
-          entryFileNames: "js/[name]-[hash].js",
+          chunkFileNames: `js/[name]-${assetVersion}-[hash].js`,
+          entryFileNames: `js/[name]-${assetVersion}-[hash].js`,
         },
         // Não incluir assets muito grandes no bundle inicial.
         external: (id: string) => /heavy-assets/.test(id),

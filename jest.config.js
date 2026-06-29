@@ -14,6 +14,14 @@ module.exports = {
     '!src/main.ts',
   ],
   coverageDirectory: './coverage',
+  coverageThreshold: {
+    global: {
+      statements: 20,
+      branches: 15,
+      functions: 20,
+      lines: 20,
+    },
+  },
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '/e2e/'],
 

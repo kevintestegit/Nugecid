@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { FindOptionsWhere, ILike, Repository } from "typeorm";
+import { FindOptionsWhere, ILike, In, Repository } from "typeorm";
 import { readSpreadsheetObjects } from "../../common/utils/spreadsheet.util";
 import { DesarquivamentoTypeOrmEntity } from "../nugecid/infrastructure/entities/desarquivamento.typeorm-entity";
 import { CreateDesarquivamentoUseCase } from "../nugecid/application/use-cases/create-desarquivamento/create-desarquivamento.use-case";
@@ -53,14 +53,48 @@ export class SeiCapturaService {
 
     const capturas: SeiCaptura[] = [];
 
+    // Pre-fetch existing records for batch dedup (avoids N+1)
+    const allSeiNumbers = rows
+      .map((row) => this.mapper.mapRow(row).numeroProcessoSei)
+      .filter(Boolean) as string[];
+    const allPciNumbers = rows
+      .map((row) => this.mapper.mapRow(row).numeroPci)
+      .filter(Boolean) as string[];
+
+    const existingSeiNumbers = new Set<string>();
+    const existingPciNumbers = new Set<string>();
+
+    if (allSeiNumbers.length) {
+      const found = await this.desarquivamentoRepository.find({
+        where: { numeroProcesso: In(allSeiNumbers) },
+        select: ["numeroProcesso"],
+      });
+      for (const f of found) existingSeiNumbers.add(f.numeroProcesso);
+    }
+    if (allPciNumbers.length) {
+      const found = await this.desarquivamentoRepository.find({
+        where: { numeroNicLaudoAuto: In(allPciNumbers) },
+        select: ["numeroNicLaudoAuto"],
+      });
+      for (const f of found) existingPciNumbers.add(f.numeroNicLaudoAuto);
+    }
+
     for (const [index, row] of rows.entries()) {
       const registro = this.mapper.mapRow(row);
       const validacao = this.mapper.validate(registro);
-      const duplicidade = await this.detectarDuplicidade(
-        registro.numeroProcessoSei,
-        registro.numeroPci,
-      );
-      const status = duplicidade.duplicidadeForte
+
+      const duplicidadeForte =
+        (registro.numeroProcessoSei &&
+          existingSeiNumbers.has(registro.numeroProcessoSei)) ||
+        (registro.numeroPci && existingPciNumbers.has(registro.numeroPci));
+      const motivo = duplicidadeForte
+        ? registro.numeroProcessoSei &&
+          existingSeiNumbers.has(registro.numeroProcessoSei)
+          ? `Ja existe desarquivamento para o processo SEI ${registro.numeroProcessoSei}.`
+          : `Ja existe desarquivamento para o PCI ${registro.numeroPci}.`
+        : null;
+
+      const status = duplicidadeForte
         ? SeiCapturaStatus.POSSIVEL_DUPLICIDADE
         : validacao.status;
 
@@ -68,12 +102,10 @@ export class SeiCapturaService {
         this.capturaRepository.create({
           ...registro,
           status,
-          motivoStatus: duplicidade.duplicidadeForte
-            ? duplicidade.motivo
-            : validacao.motivo,
+          motivoStatus: duplicidadeForte ? motivo : validacao.motivo,
           camposAusentes: validacao.camposAusentes,
-          duplicidadeForte: duplicidade.duplicidadeForte,
-          duplicidadeProvavel: duplicidade.duplicidadeProvavel,
+          duplicidadeForte,
+          duplicidadeProvavel: false,
           arquivoOrigem: file.originalname,
           linhaOrigem: index + 2,
           dadosOriginais: row,
@@ -91,6 +123,64 @@ export class SeiCapturaService {
       resumo: this.calcularResumo(salvas),
       capturas: salvas,
     };
+  }
+
+  async criarFromWebhook(
+    payload: {
+      numero: string;
+      titulo: string;
+      link?: string;
+    },
+    criadoPorId: number,
+  ): Promise<SeiCaptura> {
+    const registro = this.mapper.mapWebhook(payload);
+    const validacao = this.mapper.validate(registro);
+    const duplicidade = await this.detectarDuplicidade(
+      registro.numeroProcessoSei,
+      registro.numeroPci,
+    );
+
+    const capturaExistente = registro.numeroProcessoSei
+      ? await this.capturaRepository.findOne({
+          where: { numeroProcessoSei: registro.numeroProcessoSei },
+        })
+      : registro.numeroPci
+        ? await this.capturaRepository.findOne({
+            where: { numeroPci: registro.numeroPci },
+          })
+        : undefined;
+
+    if (capturaExistente) {
+      return capturaExistente;
+    }
+
+    const status = duplicidade.duplicidadeForte
+      ? SeiCapturaStatus.POSSIVEL_DUPLICIDADE
+      : validacao.status;
+
+    const captura = this.capturaRepository.create({
+      ...registro,
+      status,
+      motivoStatus: duplicidade.duplicidadeForte
+        ? duplicidade.motivo
+        : validacao.motivo,
+      camposAusentes: validacao.camposAusentes,
+      duplicidadeForte: duplicidade.duplicidadeForte,
+      duplicidadeProvavel: duplicidade.duplicidadeProvavel,
+      arquivoOrigem: "escavador-seirn",
+      linhaOrigem: null,
+      dadosOriginais: {
+        numero: payload.numero,
+        titulo: payload.titulo,
+        link: payload.link ?? "",
+      },
+      criadoPorId,
+      aprovadoPorId: null,
+      desarquivamentoId: null,
+      importadoEm: null,
+    });
+
+    return this.capturaRepository.save(captura);
   }
 
   async listar(query: QuerySeiCapturasDto) {

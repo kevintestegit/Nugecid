@@ -23,352 +23,21 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { Copy, Printer, Database, CheckCircle } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { api } from "@/services/api";
+import { dispatchAppNavigate } from "@/lib/navigation/navigationEvents";
+import {
+  scvClasses,
+  type CduFacet,
+} from "@/components/custodia/scvClassification";
+import {
+  catalogacaoSchemas,
+  findCatalogacaoSchema,
+  getCatalogacaoOptionLabel,
+} from "@/components/custodia/catalogacaoSchemas";
 
 const QR_CODE_TARGET_URL = import.meta.env.VITE_QR_CODE_TARGET_URL || "";
 
 const QR_CODE_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAADIAQMAAACXljzdAAAABlBMVEX///8AAABVwtN+AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAA/ElEQVRYhd2Y0Q6FMAhD4cv9c7jSdpqZ+G4vLotynpqxjhnxGkcj8F6R52Civk2QazwkNYn0JaMTSlvk1Fr2ZOYahX9CZlCnO1ElziB51qgXkVNgZ0nn7iFe5Ir5yi1jSQ7qXGaeTbllTOB7M7MIl52bEi4a5jlmCyh10hoSmASML5ZHhJzCkqhrkDtIKjuhDxOC0O7p27RNScTlCMqNJ7ASLQm9beaUYdMQXAlbA3Q8Okt5CnmSFSzHvHeXKTkoLaSQHY/82pJIJ9avpHTrr91IsxtdYq9aNCen1tQPhNru26ZEhah1Mybyie5O/d2xJiy86LsUcaVzJa/xAxr8HJc3ZfzyAAAAAElFTkSuQmCC";
-
-type CduFacet = {
-  code: string;
-  label: string;
-  appliesTo?: string[];
-  requiresDescription?: boolean;
-};
-
-type CduSubdivision = {
-  code: string;
-  label: string;
-};
-
-type CduGroup = {
-  code: string;
-  label: string;
-  subdivisions?: CduSubdivision[];
-  facets?: CduFacet[];
-};
-
-type CduClass = {
-  code: string;
-  label: string;
-  groups: CduGroup[];
-};
-
-const cduClasses: CduClass[] = [
-  {
-    code: "100",
-    label: "Biológico",
-    groups: [
-      {
-        code: "100.1",
-        label: "Sangue",
-        subdivisions: [
-          { code: "100.1.11", label: "Sangue líquido" },
-          { code: "100.1.12", label: "Sangue seco" },
-          { code: "100.1.13", label: "Sangue disperso" },
-        ],
-        facets: [
-          {
-            code: "(A)",
-            label: "Amostra para exame de DNA",
-            appliesTo: ["100.1.11", "100.1.12", "100.1.13"],
-          },
-          {
-            code: "(B)",
-            label: "Exame toxicológico",
-            appliesTo: ["100.1.11", "100.1.12", "100.1.13"],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    code: "200",
-    label: "Documentoscopia",
-    groups: [
-      {
-        code: "200.1",
-        label: "Documento de papel",
-        subdivisions: [
-          { code: "200.1.1", label: "Documento original" },
-          { code: "200.1.2", label: "Documento falso" },
-        ],
-        facets: [
-          {
-            code: "(X)",
-            label: "Documento com indícios de falsificação",
-            appliesTo: ["200.1.2"],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    code: "300",
-    label: "Drogas",
-    groups: [
-      {
-        code: "300.1",
-        label: "Entorpecente",
-        subdivisions: [
-          { code: "300.1.1", label: "Maconha" },
-          { code: "300.1.2", label: "Cocaína" },
-          { code: "300.1.3", label: "Outros entorpecentes" },
-        ],
-        facets: [
-          {
-            code: "(D)",
-            label: "Droga para exame toxicológico",
-            appliesTo: ["300.1.1", "300.1.2", "300.1.3"],
-          },
-        ],
-      },
-    ],
-  },
-
-  // =========================
-  // 900 – Vestígios Balísticos
-  // =========================
-  {
-    code: "900",
-    label: "Vestígios Balísticos (Custódia PCIRN)",
-    groups: [
-      // NÍVEL 1
-      {
-        code: "900",
-        label: "VESTÍGIOS BALÍSTICOS",
-        facets: [
-          {
-            code: "[Descrição]",
-            label:
-              "Conjunto de materiais, armas, munições, projéteis e resíduos provenientes de disparos de armas de fogo, coletados em locais de crime ou exames laboratoriais.",
-            requiresDescription: true,
-          },
-        ],
-      },
-
-      // NÍVEL 2 — 901
-      {
-        code: "901",
-        label: "Armas de fogo e partes correlatas",
-        subdivisions: [
-          // NÍVEL 3
-          { code: "901.1", label: "Armas de fogo completas" },
-
-          // NÍVEL 4 — 901.11 (curta) + (1)(2)
-          { code: "901.11", label: "Arma de fogo curta" },
-
-          // NÍVEL 4 — 901.12 (longa) + (3)…(8)
-          { code: "901.12", label: "Arma de fogo longa" },
-
-          // 901.2 / 901.21 / 901.22
-          {
-            code: "901.2",
-            label: "Armas artesanais, adulteradas ou modificadas",
-          },
-          { code: "901.21", label: "Caseira" },
-          { code: "901.22", label: "Com alteração significativa" },
-
-          // 901.3 (partes) e seus itens
-          { code: "901.3", label: "Partes e componentes" },
-          { code: "901.31", label: "Cano" },
-          { code: "901.32", label: "Tambor" },
-          { code: "901.33", label: "Ferrolho" },
-          { code: "901.34", label: "Gatilho" },
-
-          // 901.4
-          { code: "901.4", label: "Fragmentos ou peças isoladas de arma" },
-        ],
-        facets: [
-          // Descrição do grupo
-          {
-            code: "[Descrição]",
-            label: "Vestígios de maior volume e peso.",
-            requiresDescription: true,
-          },
-
-          // NÍVEL 4 — 901.11
-          { code: "(1)", label: "Pistola", appliesTo: ["901.11"] },
-          { code: "(2)", label: "Revólver", appliesTo: ["901.11"] },
-
-          // NÍVEL 4 — 901.12
-          { code: "(3)", label: "Espingarda", appliesTo: ["901.12"] },
-          { code: "(4)", label: "Fuzil", appliesTo: ["901.12"] },
-          { code: "(5)", label: "Rifle", appliesTo: ["901.12"] },
-          { code: "(6)", label: "Carabina", appliesTo: ["901.12"] },
-          { code: "(7)", label: "Metralhadora", appliesTo: ["901.12"] },
-          { code: "(8)", label: "Submetralhadora", appliesTo: ["901.12"] },
-        ],
-      },
-
-      // NÍVEL 2 — 902
-      {
-        code: "902",
-        label: "Cartuchos e estojos",
-        facets: [
-          {
-            code: "[Descrição]",
-            label:
-              "Vestígios médios, armazenados individualmente em cápsulas ou envelopes.",
-            requiresDescription: true,
-          },
-        ],
-        subdivisions: [
-          { code: "902.1", label: "Cartuchos completos (não deflagrados)" },
-          { code: "902.2", label: "Estojos deflagrados" },
-          { code: "902.3", label: "Estojos deformados ou fragmentados" },
-          { code: "902.4", label: "Conjuntos de estojos de um mesmo caso" },
-        ],
-      },
-
-      // NÍVEL 2 — 903
-      {
-        code: "903",
-        label: "Projéteis",
-        facets: [
-          {
-            code: "[Descrição]",
-            label:
-              "Corpos metálicos e seus fragmentos, coletados em locais, vítimas ou alvos.",
-            requiresDescription: true,
-          },
-        ],
-        subdivisions: [
-          { code: "903.1", label: "Projéteis íntegros" },
-          { code: "903.11", label: "Ponta ojival" },
-          { code: "903.12", label: "ponta plana" },
-          { code: "903.13", label: "ponta oca" },
-          { code: "903.14", label: "perfurante" },
-          { code: "903.15", label: "traçante" },
-          { code: "903.16", label: "fragmentável" },
-
-          { code: "903.2", label: "Projéteis deformados" },
-          { code: "903.21", label: "expandido" },
-          { code: "903.22", label: "achatado" },
-          { code: "903.23", label: "fragmentando" },
-          { code: "903.24", label: "raspado" },
-          { code: "903.25", label: "ricocheteado" },
-          { code: "903.26", label: "fundido (ou derretido parcialmente)" },
-          { code: "903.27", label: "encamisado deformado" },
-          {
-            code: "903.28",
-            label: "projétil sem jaqueta (chumbo nu ou deformado)",
-          },
-
-          { code: "903.3", label: "Fragmentos de projéteis" },
-
-          { code: "903.4", label: "Núcleos, camisas e jaquetas de projéteis" },
-          { code: "903.41", label: "Núcleos" },
-          { code: "903.42", label: "camisas" },
-          { code: "903.43", label: "jaquetas de projéteis" },
-        ],
-      },
-
-      // NÍVEL 2 — 904
-      {
-        code: "904",
-        label: "Componentes de munição",
-        facets: [
-          {
-            code: "[Descrição]",
-            label: "Partes isoladas de munição, geralmente pequenas e leves.",
-            requiresDescription: true,
-          },
-        ],
-        subdivisions: [
-          { code: "904.1", label: "Espoletas" },
-          { code: "904.2", label: "Pólvora e resíduos propelentes" },
-          { code: "904.3", label: "Fragmentos metálicos e núcleos de chumbo" },
-          { code: "904.4", label: "Combinações de componentes" },
-        ],
-      },
-
-      // NÍVEL 2 — 905
-      {
-        code: "905",
-        label: "Vestígios de disparo e impacto",
-        facets: [
-          {
-            code: "[Descrição]",
-            label: "Materiais impactados ou contaminados por disparos.",
-            requiresDescription: true,
-          },
-        ],
-        subdivisions: [
-          { code: "905.1", label: "Perfurações e marcas de impacto" },
-
-          {
-            code: "905.2",
-            label:
-              "Fragmentos de material atingido (vidro, metal, madeira etc.)",
-          },
-          { code: "905.21", label: "vidro" },
-          { code: "905.22", label: "metal" },
-          { code: "905.23", label: "alumínio" },
-          { code: "905.24", label: "madeira" },
-          { code: "905.25", label: "plástico" },
-          { code: "905.26", label: "têxtil" },
-
-          {
-            code: "905.3",
-            label: "Vestígios aderidos a superfícies ou veículos",
-          },
-          { code: "905.4", label: "Vestígios provenientes de ricochete" },
-        ],
-      },
-
-      // NÍVEL 2 — 906
-      {
-        code: "906",
-        label: "Vestígios laboratoriais e comparativos",
-        facets: [
-          {
-            code: "[Descrição]",
-            label: "Amostras e padrões usados em análises técnicas.",
-            requiresDescription: true,
-          },
-        ],
-        subdivisions: [
-          { code: "906.1", label: "Projéteis e estojos padrão de teste" },
-          { code: "906.2", label: "Matrizes e microimpressões comparativas" },
-          { code: "906.3", label: "Vestígios simulados ou de calibração" },
-        ],
-      },
-
-      // NÍVEL 2 — 907
-      {
-        code: "907",
-        label: "Resíduos e microvestígios",
-        facets: [
-          {
-            code: "[Descrição]",
-            label:
-              "Os menores vestígios, geralmente coletados com swab, fita ou aspiração.",
-            requiresDescription: true,
-          },
-        ],
-        subdivisions: [
-          {
-            code: "907.1",
-            label: "Resíduos de disparo (GSR – Gunshot Residue)",
-          },
-          {
-            code: "907.2",
-            label: "Micropartículas metálicas (chumbo, cobre, bário etc.)",
-          },
-          {
-            code: "907.3",
-            label: "Depósitos de pólvora em tecidos ou objetos",
-          },
-          {
-            code: "907.4",
-            label: "Vestígios combinados (mistos ou indeterminados)",
-          },
-        ],
-      },
-    ],
-  },
-];
 
 const delegacias = [
   "1ª DP (PLANTÃO - ZONA SUL)",
@@ -421,12 +90,15 @@ const escapeHtml = (value: string) =>
     .replace(/'/g, "&#39;");
 
 const CustodiaBalistica: React.FC = () => {
-  const [mainClass, setMainClass] = useState<string>(cduClasses[0]?.code ?? "");
-  const [groupCode, setGroupCode] = useState<string>("");
+  const [mainClass, setMainClass] = useState<string>(scvClasses[0]?.code ?? "");
+  const [groupCode, setGroupCode] = useState<string>(
+    scvClasses[0]?.groups[0]?.code ?? "",
+  );
   const [subdivisionCode, setSubdivisionCode] = useState<string>("");
   const [selectedFacets, setSelectedFacets] = useState<string[]>([]);
   const [vestigioNumber, setVestigioNumber] = useState<string>("");
   const [casoNumber, setCasoNumber] = useState<string>("");
+  const [tipoVestigio, setTipoVestigio] = useState<string>("");
   const [categoria, setCategoria] = useState<string>("");
   const [delegacia, setDelegacia] = useState<string>("");
   const [facetDescriptions, setFacetDescriptions] = useState<
@@ -439,7 +111,7 @@ const CustodiaBalistica: React.FC = () => {
   const [saved, setSaved] = useState<boolean>(false);
 
   const selectedClass = useMemo(
-    () => cduClasses.find((cduClass) => cduClass.code === mainClass),
+    () => scvClasses.find((cduClass) => cduClass.code === mainClass),
     [mainClass],
   );
 
@@ -448,7 +120,86 @@ const CustodiaBalistica: React.FC = () => {
     [selectedClass, groupCode],
   );
 
+  const selectedSubdivision = useMemo(
+    () =>
+      selectedGroup?.subdivisions?.find(
+        (subdivision) => subdivision.code === subdivisionCode,
+      ),
+    [selectedGroup, subdivisionCode],
+  );
+
   const availableSubdivisions = selectedGroup?.subdivisions ?? [];
+
+  const availableCatalogacaoSchemas = useMemo(() => {
+    return catalogacaoSchemas.filter((schema) => {
+      if (schema.classCode !== mainClass) {
+        return false;
+      }
+
+      if (selectedGroup?.code && schema.subclassCode) {
+        const matchesGroup =
+          schema.subclassCode === selectedGroup.code ||
+          schema.subclassLabel === selectedGroup.label;
+
+        if (!matchesGroup) {
+          return false;
+        }
+      }
+
+      if (selectedSubdivision?.label) {
+        const matchesSubdivision =
+          schema.typeLabel === selectedSubdivision.label ||
+          selectedSubdivision.label.includes(schema.typeLabel);
+
+        if (!matchesSubdivision) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [mainClass, selectedGroup, selectedSubdivision]);
+
+  const tipoVestigioOptions = useMemo(
+    () => availableCatalogacaoSchemas.map(getCatalogacaoOptionLabel),
+    [availableCatalogacaoSchemas],
+  );
+
+  const selectedCatalogacaoSchema = useMemo(() => {
+    if (tipoVestigio) {
+      const [subclassLabel, typeLabel] = tipoVestigio.split(" - ");
+      return findCatalogacaoSchema({
+        classeCatalogacao: mainClass,
+        subclasseCatalogacao: subclassLabel,
+        tipoCatalogacao: typeLabel,
+      });
+    }
+
+    return (
+      findCatalogacaoSchema({
+        classeCatalogacao: mainClass,
+        subclasseCatalogacao: selectedGroup?.code ?? selectedGroup?.label,
+        tipoCatalogacao: selectedSubdivision?.label,
+      }) ?? availableCatalogacaoSchemas[0]
+    );
+  }, [
+    tipoVestigio,
+    mainClass,
+    selectedGroup,
+    selectedSubdivision,
+    availableCatalogacaoSchemas,
+  ]);
+
+  const selectedCatalogacaoLabels = useMemo(() => {
+    return {
+      subclasseCatalogacao:
+        selectedGroup?.label || selectedCatalogacaoSchema?.subclassLabel || "",
+      tipoCatalogacao:
+        selectedSubdivision?.label ||
+        selectedCatalogacaoSchema?.typeLabel ||
+        "",
+    };
+  }, [selectedGroup, selectedSubdivision, selectedCatalogacaoSchema]);
 
   const availableFacets = useMemo(() => {
     if (!selectedGroup?.facets?.length) return [];
@@ -464,7 +215,10 @@ const CustodiaBalistica: React.FC = () => {
   }, [selectedGroup, subdivisionCode]);
 
   useEffect(() => {
-    setGroupCode("");
+    const firstGroupCode =
+      scvClasses.find((cduClass) => cduClass.code === mainClass)?.groups[0]
+        ?.code ?? "";
+    setGroupCode(firstGroupCode);
     setSubdivisionCode("");
     setSelectedFacets([]);
   }, [mainClass]);
@@ -485,6 +239,19 @@ const CustodiaBalistica: React.FC = () => {
       );
     }
   }, [availableFacets]);
+
+  useEffect(() => {
+    if (!tipoVestigioOptions.length) {
+      setTipoVestigio("");
+      return;
+    }
+
+    setTipoVestigio((previous) =>
+      previous && tipoVestigioOptions.includes(previous)
+        ? previous
+        : tipoVestigioOptions[0],
+    );
+  }, [tipoVestigioOptions]);
 
   useEffect(() => {
     if (!copied) return;
@@ -535,7 +302,7 @@ const CustodiaBalistica: React.FC = () => {
 
   const classificationCode = useMemo(() => {
     const base =
-      subdivisionCode || groupCode || mainClass || cduClasses[0]?.code || "";
+      subdivisionCode || groupCode || mainClass || scvClasses[0]?.code || "";
 
     if (!base) return "";
 
@@ -700,34 +467,29 @@ const CustodiaBalistica: React.FC = () => {
         delegacia: delegacia || null,
         mesReferencia: referenceMonth || null,
         etiquetaCompleta: labelPreview,
-        status: "ativo",
+        classeCatalogacao: selectedCatalogacaoSchema?.classCode ?? mainClass,
+        subclasseCatalogacao:
+          selectedCatalogacaoLabels.subclasseCatalogacao || null,
+        tipoCatalogacao: selectedCatalogacaoLabels.tipoCatalogacao || null,
+        schemaVersao: selectedCatalogacaoSchema?.version ?? null,
+        status: "catalogacao_pendente",
       };
 
-      await api.post("/vestigios", payload);
+      const response = await api.post("/vestigios", payload);
+      const createdVestigioId =
+        response.data?.data?.id ?? response.data?.id ?? null;
 
       setSaved(true);
-      toast.success("Sucesso", "Vestígio salvo no banco de dados com sucesso!");
+      toast.success(
+        "Sucesso",
+        "Vestígio enviado para catalogação com sucesso!",
+      );
 
-      // Limpar o formulário após 1.5 segundos para dar tempo de ver a mensagem de sucesso
-      setTimeout(() => {
-        // Resetar campos de número
-        setVestigioNumber("");
-        setCasoNumber("");
-
-        // Resetar seleções
-        setMainClass("");
-        setGroupCode("");
-        setSubdivisionCode("");
-        setSelectedFacets([]);
-        setFacetDescriptions({});
-
-        // Resetar categoria e delegacia (manter referenceMonth para facilitar)
-        setCategoria("");
-        setDelegacia("");
-
-        // Resetar estado de salvamento
-        setSaved(false);
-      }, 1500);
+      dispatchAppNavigate({
+        to: createdVestigioId
+          ? `/custodia/catalogacao?vestigioId=${encodeURIComponent(createdVestigioId)}`
+          : "/custodia/catalogacao",
+      });
     } catch (error: unknown) {
       console.error("Erro ao salvar vestígio:", error);
       const message = axios.isAxiosError(error)
@@ -750,6 +512,9 @@ const CustodiaBalistica: React.FC = () => {
     categoria,
     delegacia,
     referenceMonth,
+    selectedCatalogacaoSchema,
+    selectedCatalogacaoLabels.subclasseCatalogacao,
+    selectedCatalogacaoLabels.tipoCatalogacao,
   ]);
 
   const referenceSuffixPreview = monthSuffix ? `-${monthSuffix}` : "";
@@ -757,9 +522,9 @@ const CustodiaBalistica: React.FC = () => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Etiquetas SCV de Custódia Balística</CardTitle>
+        <CardTitle>Etiquetas SCV de Custódia de Vestígios</CardTitle>
         <CardDescription>
-          Configure a classificação e gere etiquetas padronizadas para os
+          Configure a classificação geral e gere etiquetas padronizadas para os
           vestígios.
         </CardDescription>
       </CardHeader>
@@ -774,13 +539,13 @@ const CustodiaBalistica: React.FC = () => {
             automaticamente no formato:
             <br />
             <span className="font-mono text-sm">
-              901.1(2)
+              910
               <br />
               VG-4102-1025
               <br />
               CA-4305-1025
               <br />
-              BALIS
+              BALISTICA
               <br />
               3º DP (NATAL)
             </span>
@@ -795,22 +560,23 @@ const CustodiaBalistica: React.FC = () => {
                   Seleção SCV
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Escolha a classe principal e os níveis adequados ao vestígio.
+                  Escolha os níveis da classificação decimal adequados ao
+                  vestígio.
                 </p>
               </header>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="cdu-classe">Classe principal</Label>
+                  <Label htmlFor="cdu-classe">Nível 1</Label>
                   <Select
                     value={mainClass}
                     onValueChange={(value) => setMainClass(value)}
                   >
                     <SelectTrigger id="cdu-classe">
-                      <SelectValue placeholder="Selecione a classe" />
+                      <SelectValue placeholder="Selecione o nível 1" />
                     </SelectTrigger>
                     <SelectContent>
-                      {cduClasses.map((cduClass) => (
+                      {scvClasses.map((cduClass) => (
                         <SelectItem key={cduClass.code} value={cduClass.code}>
                           {cduClass.code} - {cduClass.label}
                         </SelectItem>
@@ -820,14 +586,14 @@ const CustodiaBalistica: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cdu-grupo">Nível 1</Label>
+                  <Label htmlFor="cdu-grupo">Nível 2</Label>
                   <Select
                     disabled={!selectedClass}
                     value={groupCode}
                     onValueChange={(value) => setGroupCode(value)}
                   >
                     <SelectTrigger id="cdu-grupo">
-                      <SelectValue placeholder="Selecione o grupo" />
+                      <SelectValue placeholder="Selecione o nível 2" />
                     </SelectTrigger>
                     <SelectContent>
                       {(selectedClass?.groups ?? []).map((group) => (
@@ -840,14 +606,14 @@ const CustodiaBalistica: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cdu-subdivisao">Nível 2</Label>
+                  <Label htmlFor="cdu-subdivisao">Nível 3</Label>
                   <Select
                     disabled={!availableSubdivisions.length}
                     value={subdivisionCode}
                     onValueChange={(value) => setSubdivisionCode(value)}
                   >
                     <SelectTrigger id="cdu-subdivisao">
-                      <SelectValue placeholder="Selecione a subdivisao" />
+                      <SelectValue placeholder="Selecione o nível 3" />
                     </SelectTrigger>
                     <SelectContent>
                       {availableSubdivisions.map((subdivision) => (
@@ -966,6 +732,30 @@ const CustodiaBalistica: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="tipo-vestigio">Tipo dos vestígios</Label>
+                  <Select
+                    disabled={!tipoVestigioOptions.length}
+                    value={tipoVestigio}
+                    onValueChange={(value) => setTipoVestigio(value)}
+                  >
+                    <SelectTrigger id="tipo-vestigio">
+                      <SelectValue placeholder="Selecione o tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tipoVestigioOptions.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCatalogacaoSchema
+                      ? "A categoria selecionada define a ficha de catalogação."
+                      : "Nenhum tipo de catalogação disponível para a seleção atual."}
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="categoria">Categoria</Label>
                   <Input
                     id="categoria"
@@ -1012,7 +802,7 @@ const CustodiaBalistica: React.FC = () => {
                   <Label>Prévia do código SCV</Label>
                   <Input
                     readOnly
-                    value={classificationCode || "Selecione a estrutura CDU"}
+                    value={classificationCode || "Selecione a estrutura SCV"}
                   />
                 </div>
               </div>
@@ -1095,7 +885,7 @@ const CustodiaBalistica: React.FC = () => {
                 ) : (
                   <>
                     <Database className="mr-2 h-4 w-4" />
-                    Inserir no Banco de Vestígios
+                    Inserir para catalogação
                   </>
                 )}
               </Button>
@@ -1117,8 +907,8 @@ const CustodiaBalistica: React.FC = () => {
                 os testes. (apenas dentro da rede PCI-servidores)
               </li>
               <li>
-                Marque os complementos disponíveis para detalhar o tipo de arma
-                (ex.: pistola).
+                Marque os complementos disponíveis quando a classificação exigir
+                uma descrição adicional.
               </li>
             </ul>
           </aside>

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan } from "typeorm";
@@ -10,6 +11,7 @@ import { Repository, MoreThan } from "typeorm";
 import { BlockedIp } from "./entities/blocked-ip.entity";
 import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
 import { User } from "../users/entities/user.entity";
+import { MailService } from "../mail/mail.service";
 
 export interface IpUserInfo {
   id: number;
@@ -59,6 +61,8 @@ export class SecurityService {
     private readonly auditoriaRepository: Repository<Auditoria>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @Optional()
+    private readonly mailService?: MailService,
   ) {}
 
   /**
@@ -127,6 +131,12 @@ export class SecurityService {
 
     this.logger.warn(
       `IP ${dto.ipAddress} bloqueado por usuário ${dto.blockedBy}. Razão: ${dto.reason || "Não especificada"}`,
+    );
+
+    void this.mailService?.sendIpBlockedNotification(
+      dto.ipAddress,
+      dto.reason ?? "",
+      dto.blockedBy,
     );
 
     return blocked;
@@ -267,8 +277,9 @@ export class SecurityService {
     const userAgentRows: Array<{ ip_address: string; user_agent: string }> =
       await this.auditoriaRepository
         .createQueryBuilder("a")
-        .select("DISTINCT a.ipAddress", "ip_address")
+        .select("a.ipAddress", "ip_address")
         .addSelect("a.userAgent", "user_agent")
+        .distinct(true)
         .where("a.action = :action", { action: AuditAction.LOGIN })
         .andWhere("a.timestamp > :since", { since })
         .andWhere("a.ipAddress IN (:...ips)", { ips: topIpAddresses })

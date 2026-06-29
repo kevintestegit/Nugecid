@@ -16,6 +16,7 @@ import type { StringValue } from "ms";
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { AuditHashService } from "../audit/audit-hash.service";
 import { RedisService } from "../redis/redis.service";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
@@ -81,6 +82,7 @@ export class AuthService implements OnModuleInit {
     private readonly roleRepository: Repository<Role>,
     @InjectRepository(Auditoria)
     private readonly auditoriaRepository: Repository<Auditoria>,
+    private readonly auditHashService: AuditHashService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
@@ -599,7 +601,8 @@ export class AuthService implements OnModuleInit {
         success,
         error,
       );
-      const audit = this.auditoriaRepository.create(auditData);
+      const auditWithHash = await this.auditHashService.prepareHash(auditData);
+      const audit = this.auditoriaRepository.create(auditWithHash);
       await this.auditoriaRepository.save(audit);
     } catch (auditError) {
       this.logger.error(
@@ -622,7 +625,8 @@ export class AuthService implements OnModuleInit {
         ipAddress,
         userAgent,
       );
-      const audit = this.auditoriaRepository.create(auditData);
+      const auditWithHash = await this.auditHashService.prepareHash(auditData);
+      const audit = this.auditoriaRepository.create(auditWithHash);
       await this.auditoriaRepository.save(audit);
     } catch (auditError) {
       this.logger.error(

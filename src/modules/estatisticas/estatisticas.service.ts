@@ -481,7 +481,7 @@ export class EstatisticasService {
       });
     }
 
-    return query.getMany();
+    return query.take(5000).getMany();
   }
 
   async generateRelatorioPdf(filtros?: {

@@ -798,6 +798,16 @@ const DesarquivamentosPage: React.FC = () => {
     setCurrentPage(1);
   };
 
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setTipoDesarquivamentoFilter("all");
+    setInstitutoFilter("all");
+    setRequerenteFilter("all");
+    setDateRange({ startDate: null, endDate: null });
+    setCurrentPage(1);
+  };
+
   const handleOpenDetails = useMemo(
     () => (id: number) => setDetailId(id || null),
     [],
@@ -977,6 +987,7 @@ const DesarquivamentosPage: React.FC = () => {
         institutoFilter={institutoFilter}
         requerenteFilter={requerenteFilter}
         onClearAtencaoNecessariaFilter={clearAtencaoNecessariaFilter}
+        onClearAllFilters={clearAllFilters}
         onSearch={handleSearch}
         onStatusFilter={handleStatusFilter}
         onDateRangeChange={handleDateRangeChange}

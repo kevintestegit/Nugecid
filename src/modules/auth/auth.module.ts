@@ -17,6 +17,7 @@ import { AuthService } from "./auth.service";
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { AuditoriaModule } from "../audit/auditoria.module";
 import { SecurityModule } from "../security/security.module";
 
 import { LocalStrategy } from "./strategies/local.strategy";
@@ -31,6 +32,7 @@ import { WebAuthGuard } from "./guards/web-auth.guard";
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role, Auditoria]),
+    forwardRef(() => AuditoriaModule),
     forwardRef(() => SecurityModule),
     PassportModule.register({
       defaultStrategy: "jwt",

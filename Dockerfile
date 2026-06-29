@@ -46,15 +46,19 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/assets ./src/assets
 COPY --from=builder /app/frontend/src/components/img ./frontend/src/components/img
 
-# Create necessary directories and set ownership
+# Create writable directories and set ownership only where the app writes files
 RUN mkdir -p /app/uploads /app/backups && \
-    chown -R appuser:appgroup /app
+    chown -R appuser:appgroup /app/uploads /app/backups
 
 # Switch to non-root user
 USER appuser
 
 # Expose port
 EXPOSE 3000
+
+# Healthcheck (standalone docker run; compose also defines one)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||'3000')+'/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Start application
 CMD ["node", "dist/src/main.js"]

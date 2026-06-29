@@ -112,6 +112,9 @@ export class Notificacao {
   @Column({ type: "text", nullable: true })
   link: string;
 
+  @Column({ name: "expires_at", type: "timestamp", nullable: true })
+  expiresAt: Date;
+
   // Campos de auditoria
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;

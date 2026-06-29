@@ -20,11 +20,17 @@ import { VestigiosService } from "./vestigios.service";
 import { CreateVestigioDto } from "./dto/create-vestigio.dto";
 import { UpdateVestigioDto } from "./dto/update-vestigio.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { RoleType } from "../users/enums/role-type.enum";
+import { User } from "../users/entities/user.entity";
 
 @ApiTags("vestigios")
 @Controller("vestigios")
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth("JWT-auth")
+@Roles(RoleType.ADMIN, RoleType.COORDENADOR, RoleType.NUGECID_OPERATOR)
 export class VestigiosController {
   constructor(private readonly vestigiosService: VestigiosService) {}
 
@@ -81,24 +87,45 @@ export class VestigiosController {
   @Patch(":id")
   @ApiOperation({ summary: "Atualizar vestígio" })
   @ApiResponse({ status: 200, description: "Vestígio atualizado" })
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
   update(
     @Param("id") id: string,
     @Body() updateVestigioDto: UpdateVestigioDto,
+    @CurrentUser() currentUser: User,
   ) {
-    return this.vestigiosService.update(id, updateVestigioDto);
+    return this.vestigiosService.update(id, updateVestigioDto, currentUser.id);
   }
 
   @Patch(":id/status")
   @ApiOperation({ summary: "Atualizar status do vestígio" })
   @ApiResponse({ status: 200, description: "Status atualizado" })
-  updateStatus(@Param("id") id: string, @Body("status") status: string) {
-    return this.vestigiosService.updateStatus(id, status);
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
+  updateStatus(
+    @Param("id") id: string,
+    @Body("status") status: string,
+    @CurrentUser() currentUser: User,
+  ) {
+    return this.vestigiosService.updateStatus(id, status, currentUser.id);
+  }
+
+  @Delete("catalogacao/pendentes")
+  @ApiOperation({
+    summary: "Esvaziar fila de vestígios pendentes de catalogação",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Vestígios pendentes de catalogação removidos",
+  })
+  @Roles(RoleType.ADMIN)
+  clearCatalogacaoPendente() {
+    return this.vestigiosService.clearCatalogacaoPendente();
   }
 
   @Delete(":id")
   @ApiOperation({ summary: "Remover vestígio" })
   @ApiResponse({ status: 200, description: "Vestígio removido" })
-  remove(@Param("id") id: string) {
-    return this.vestigiosService.remove(id);
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR)
+  remove(@Param("id") id: string, @CurrentUser() currentUser: User) {
+    return this.vestigiosService.remove(id, currentUser.id);
   }
 }

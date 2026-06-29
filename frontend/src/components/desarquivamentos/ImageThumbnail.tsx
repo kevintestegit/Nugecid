@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { api } from "@/services/api";
 
 interface ImageThumbnailProps {
   desarquivamentoId: number | null;
@@ -38,34 +39,33 @@ export const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
 
         // Se tem previewUrl, usar ela (vem do backend com a URL correta)
         if (previewUrl) {
-          const response = await fetch(previewUrl, {
-            credentials: "include",
+          const response = await api.get(previewUrl, {
+            responseType: "blob",
             signal: controller.signal,
+            baseURL: "",
           });
-          if (!response.ok) throw new Error("Erro ao carregar imagem");
-          blob = await response.blob();
+          blob = response.data;
         } else if (desarquivamentoId) {
           // Anexo de solicitação
-          const response = await fetch(
-            `/api/nugecid/${desarquivamentoId}/anexos/${anexoId}/view`,
+          const response = await api.get(
+            `/nugecid/${desarquivamentoId}/anexos/${anexoId}/view`,
             {
-              credentials: "include",
+              responseType: "blob",
               signal: controller.signal,
             },
           );
-          if (!response.ok) throw new Error("Erro ao carregar imagem");
-          blob = await response.blob();
+          blob = response.data;
         } else if (numeroProcesso) {
           // Anexo de processo - usar rota de processo
-          const response = await fetch(
+          const response = await api.get(
             buildProcessoPreviewUrl(numeroProcesso, anexoId),
             {
-              credentials: "include",
+              responseType: "blob",
               signal: controller.signal,
+              baseURL: "",
             },
           );
-          if (!response.ok) throw new Error("Erro ao carregar imagem");
-          blob = await response.blob();
+          blob = response.data;
         } else {
           throw new Error(
             "Nem desarquivamentoId nem numeroProcesso fornecidos",

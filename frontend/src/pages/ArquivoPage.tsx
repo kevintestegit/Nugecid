@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -15,11 +21,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
 import { Badge } from "@/components/ui/Badge";
 import { NovaPastaModal } from "@/components/arquivos/NovaPastaModal";
 import { EditarPastaModal } from "@/components/arquivos/EditarPastaModal";
 
 import {
+  ChevronLeft,
+  ChevronRight,
   FolderOpen,
   Upload,
   Filter,
@@ -66,6 +81,137 @@ interface Caixa {
   observacoes?: string;
 }
 
+interface ArquivoRibeiraSala {
+  id: string;
+  titulo: string;
+  descricao: string;
+  fotos: string[];
+}
+
+interface ArquivoRibeiraEtiqueta {
+  foto: string;
+  arquivo: string;
+  sala: string;
+  caixas: string[];
+  controles: string[];
+  periodos: string[];
+  classificacao: string;
+  tipoDocumento: string;
+  confiancaMedia: number | null;
+  textoResumo: string;
+}
+
+const ARQUIVO_RIBEIRA_ETIQUETAS_JSON =
+  "/assets/arquivo-ribeira/arquivo-ribeira-etiquetas.json";
+const ARQUIVO_RIBEIRA_ETIQUETAS_CSV =
+  "/assets/arquivo-ribeira/arquivo-ribeira-etiquetas.csv";
+
+const arquivoRibeiraSalas: ArquivoRibeiraSala[] = [
+  {
+    id: "instituto-identificacao",
+    titulo: "Sala Instituto de Identificação",
+    descricao: "Fotos classificadas pelo OCR como Instituto de Identificação.",
+    fotos: [
+      "IMG_8215",
+      "IMG_8219",
+      "IMG_8220",
+      "IMG_8221",
+      "IMG_8222",
+      "IMG_8223",
+      "IMG_8225",
+      "IMG_8226",
+      "IMG_8228",
+      "IMG_8231",
+      "IMG_8234",
+      "IMG_8235",
+      "IMG_8236",
+      "IMG_8238",
+      "IMG_8240",
+      "IMG_8241",
+      "IMG_8242",
+      "IMG_8247",
+      "IMG_8248",
+      "IMG_8250",
+      "IMG_8251",
+      "IMG_8252",
+      "IMG_8257",
+      "IMG_8258",
+      "IMG_8259",
+      "IMG_8264",
+      "IMG_8265",
+      "IMG_8266",
+      "IMG_8267",
+      "IMG_8268",
+      "IMG_8269",
+      "IMG_8270",
+      "IMG_8274",
+      "IMG_8275",
+    ],
+  },
+  {
+    id: "iml",
+    titulo: "Sala do IML",
+    descricao: "Fotos classificadas pelo OCR como IML.",
+    fotos: [
+      "IMG_8199",
+      "IMG_8201",
+      "IMG_8202",
+      "IMG_8208",
+      "IMG_8209",
+      "IMG_8211",
+      "IMG_8212",
+      "IMG_8213",
+      "IMG_8214",
+      "IMG_8218",
+      "IMG_8237",
+      "IMG_8239",
+      "IMG_8271",
+    ],
+  },
+  {
+    id: "a-classificar",
+    titulo: "Fotos a classificar",
+    descricao:
+      "Fotos com texto detectado, mas sem sala identificada com segurança.",
+    fotos: [
+      "IMG_8198",
+      "IMG_8200",
+      "IMG_8203",
+      "IMG_8204",
+      "IMG_8205",
+      "IMG_8206",
+      "IMG_8207",
+      "IMG_8216",
+      "IMG_8217",
+      "IMG_8224",
+      "IMG_8227",
+      "IMG_8229",
+      "IMG_8230",
+      "IMG_8232",
+      "IMG_8243",
+      "IMG_8244",
+      "IMG_8245",
+      "IMG_8246",
+      "IMG_8249",
+      "IMG_8254",
+      "IMG_8260",
+      "IMG_8261",
+      "IMG_8262",
+      "IMG_8263",
+      "IMG_8272",
+      "IMG_8273",
+      "IMG_8276",
+      "IMG_8277",
+      "IMG_8278",
+    ],
+  },
+];
+
+const totalArquivoRibeiraFotos = arquivoRibeiraSalas.reduce(
+  (total, sala) => total + sala.fotos.length,
+  0,
+);
+
 const formatFileSize = (bytes?: number): string => {
   if (!bytes || Number.isNaN(bytes)) {
     return "0 B";
@@ -96,6 +242,49 @@ const formatDate = (value?: string): string => {
   return parsed.toLocaleDateString("pt-BR");
 };
 
+const toStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string");
+};
+
+const normalizeArquivoRibeiraEtiqueta = (
+  value: unknown,
+): ArquivoRibeiraEtiqueta | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const row = value as Record<string, unknown>;
+  if (typeof row.foto !== "string" || typeof row.arquivo !== "string") {
+    return null;
+  }
+
+  return {
+    foto: row.foto,
+    arquivo: row.arquivo,
+    sala: typeof row.sala === "string" ? row.sala : "A classificar",
+    caixas: toStringArray(row.caixas),
+    controles: toStringArray(row.controles),
+    periodos: toStringArray(row.periodos),
+    classificacao:
+      typeof row.classificacao === "string" ? row.classificacao : "",
+    tipoDocumento:
+      typeof row.tipoDocumento === "string" ? row.tipoDocumento : "",
+    confiancaMedia:
+      typeof row.confiancaMedia === "number" ? row.confiancaMedia : null,
+    textoResumo: typeof row.textoResumo === "string" ? row.textoResumo : "",
+  };
+};
+
+const formatOcrList = (values: string[]): string =>
+  values.length ? values.join(", ") : "Não identificado";
+
+const formatOcrConfidence = (value: number | null): string =>
+  value === null ? "Sem confiança" : `${Math.round(value * 100)}%`;
+
 const ArquivoPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -104,9 +293,9 @@ const ArquivoPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("todos");
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"pastas" | "planilhas" | "caixas">(
-    "pastas",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "pastas" | "planilhas" | "caixas" | "fotos-ribeira"
+  >("pastas");
   const [deletePastaId, setDeletePastaId] = useState<string | null>(null);
   const [deletePlanilhaItem, setDeletePlanilhaItem] = useState<{
     id: string;
@@ -115,6 +304,17 @@ const ArquivoPage: React.FC = () => {
   const [pendingPlanilhaId, setPendingPlanilhaId] = useState<string | null>(
     null,
   );
+  const [etiquetasOcr, setEtiquetasOcr] = useState<ArquivoRibeiraEtiqueta[]>(
+    [],
+  );
+  const [isLoadingEtiquetasOcr, setIsLoadingEtiquetasOcr] = useState(false);
+  const [etiquetasOcrError, setEtiquetasOcrError] = useState<string | null>(
+    null,
+  );
+  const [previewRibeiraFoto, setPreviewRibeiraFoto] = useState<{
+    salaId: string;
+    foto: string;
+  } | null>(null);
   const [highlightedPlanilhaId, setHighlightedPlanilhaId] = useState<
     string | null
   >(null);
@@ -160,6 +360,58 @@ const ArquivoPage: React.FC = () => {
   );
   const [caixas] = useState<Caixa[]>([]);
 
+  useEffect(() => {
+    if (activeTab !== "fotos-ribeira" || etiquetasOcr.length) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadEtiquetasOcr = async () => {
+      setIsLoadingEtiquetasOcr(true);
+      setEtiquetasOcrError(null);
+
+      try {
+        const response = await fetch(ARQUIVO_RIBEIRA_ETIQUETAS_JSON, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Falha ao carregar dados OCR do Arquivo Ribeira.");
+        }
+
+        const payload: unknown = await response.json();
+        const rows = Array.isArray(payload)
+          ? payload
+              .map(normalizeArquivoRibeiraEtiqueta)
+              .filter((item): item is ArquivoRibeiraEtiqueta => item !== null)
+          : [];
+
+        setEtiquetasOcr(rows);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+
+        setEtiquetasOcrError(
+          err instanceof Error
+            ? err.message
+            : "Falha ao carregar dados OCR do Arquivo Ribeira.",
+        );
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingEtiquetasOcr(false);
+        }
+      }
+    };
+
+    void loadEtiquetasOcr();
+
+    return () => {
+      controller.abort();
+    };
+  }, [activeTab, etiquetasOcr.length]);
+
   const totalPastas = safePastas.length;
   const totalImagens = useMemo(
     () => safePastas.reduce((acc, pasta) => acc + pasta.imagens, 0),
@@ -184,7 +436,8 @@ const ArquivoPage: React.FC = () => {
     if (
       tabFromUrl === "pastas" ||
       tabFromUrl === "planilhas" ||
-      tabFromUrl === "caixas"
+      tabFromUrl === "caixas" ||
+      tabFromUrl === "fotos-ribeira"
     ) {
       setActiveTab(tabFromUrl);
     }
@@ -378,7 +631,7 @@ const ArquivoPage: React.FC = () => {
       toast.success("Planilha adicionada com sucesso!");
     } catch (err) {
       console.error(err);
-      toast.error("Nao foi possivel enviar a planilha.");
+      toast.error("Não foi possível enviar a planilha.");
     } finally {
       event.target.value = "";
     }
@@ -402,6 +655,56 @@ const ArquivoPage: React.FC = () => {
       setDeletePlanilhaItem(null);
     }
   };
+
+  const previewRibeiraSala = previewRibeiraFoto
+    ? arquivoRibeiraSalas.find((sala) => sala.id === previewRibeiraFoto.salaId)
+    : undefined;
+  const previewRibeiraIndex =
+    previewRibeiraSala && previewRibeiraFoto
+      ? previewRibeiraSala.fotos.indexOf(previewRibeiraFoto.foto)
+      : -1;
+  const previewRibeiraCurrentFoto =
+    previewRibeiraSala && previewRibeiraIndex >= 0
+      ? previewRibeiraSala.fotos[previewRibeiraIndex]
+      : undefined;
+
+  const movePreviewRibeiraFoto = useCallback(
+    (direction: -1 | 1) => {
+      if (!previewRibeiraSala || previewRibeiraIndex < 0) {
+        return;
+      }
+
+      const nextIndex =
+        (previewRibeiraIndex + direction + previewRibeiraSala.fotos.length) %
+        previewRibeiraSala.fotos.length;
+
+      setPreviewRibeiraFoto({
+        salaId: previewRibeiraSala.id,
+        foto: previewRibeiraSala.fotos[nextIndex],
+      });
+    },
+    [previewRibeiraIndex, previewRibeiraSala],
+  );
+
+  useEffect(() => {
+    if (!previewRibeiraFoto) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        movePreviewRibeiraFoto(-1);
+      }
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        movePreviewRibeiraFoto(1);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [movePreviewRibeiraFoto, previewRibeiraFoto]);
 
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
@@ -574,6 +877,18 @@ const ArquivoPage: React.FC = () => {
             )}
           >
             Caixas Documentais
+          </Button>
+          <Button
+            variant={activeTab === "fotos-ribeira" ? "default" : "outline"}
+            onClick={() => setActiveTab("fotos-ribeira")}
+            className={cn(
+              activeTab === "fotos-ribeira"
+                ? "bg-primary/90"
+                : "border-border/60 bg-background/70 backdrop-blur",
+              "text-[11px] font-semibold uppercase tracking-[0.08em]",
+            )}
+          >
+            Fotos Ribeira
           </Button>
         </div>
         <div className="flex items-center gap-3">
@@ -839,6 +1154,165 @@ const ArquivoPage: React.FC = () => {
             ) : null}
           </CardContent>
         </Card>
+      )}
+
+      {activeTab === "fotos-ribeira" && (
+        <div className="space-y-6">
+          <Card className="border border-border/60 bg-card/85">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Image className="h-5 w-5 text-primary" />
+                Galeria Arquivo Ribeira
+              </CardTitle>
+              <CardDescription className="text-xs text-muted-foreground">
+                {totalArquivoRibeiraFotos} fotos novas da mudança de prédio,
+                organizadas por sala a partir do OCR local.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border border-border/60 bg-card/85">
+            <CardHeader className="gap-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <FileSpreadsheet className="h-5 w-5 text-primary" />
+                    Etiquetas OCR
+                  </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Dados extraídos das etiquetas pelo PP-OCRv6 local.
+                  </CardDescription>
+                </div>
+                <a
+                  href={ARQUIVO_RIBEIRA_ETIQUETAS_CSV}
+                  download
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border-2 border-border/60 bg-background/70 px-4 text-sm font-semibold text-foreground transition hover:bg-accent/80 focus:outline-none focus:ring-2 focus:ring-ring/50 focus:ring-offset-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Baixar planilha CSV
+                </a>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingEtiquetasOcr ? (
+                <div className="rounded-lg border border-border/60 p-4 text-sm text-muted-foreground">
+                  Carregando etiquetas OCR...
+                </div>
+              ) : etiquetasOcrError ? (
+                <ErrorState
+                  title="Erro ao carregar etiquetas OCR"
+                  description={etiquetasOcrError}
+                />
+              ) : etiquetasOcr.length ? (
+                <div className="overflow-x-auto rounded-lg border border-border/60">
+                  <table className="w-full min-w-[980px] text-left text-sm">
+                    <thead className="bg-muted/50 text-xs uppercase tracking-[0.08em] text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Foto</th>
+                        <th className="px-4 py-3 font-semibold">Sala</th>
+                        <th className="px-4 py-3 font-semibold">Caixas</th>
+                        <th className="px-4 py-3 font-semibold">Controles</th>
+                        <th className="px-4 py-3 font-semibold">Períodos</th>
+                        <th className="px-4 py-3 font-semibold">
+                          Classificação
+                        </th>
+                        <th className="px-4 py-3 font-semibold">
+                          Tipo documento
+                        </th>
+                        <th className="px-4 py-3 font-semibold">Confiança</th>
+                        <th className="px-4 py-3 font-semibold">Texto OCR</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {etiquetasOcr.map((etiqueta) => (
+                        <tr
+                          key={`${etiqueta.foto}-${etiqueta.arquivo}`}
+                          className="align-top transition hover:bg-muted/30"
+                        >
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            {etiqueta.foto}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {etiqueta.sala}
+                          </td>
+                          <td className="px-4 py-3">
+                            {formatOcrList(etiqueta.caixas)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {formatOcrList(etiqueta.controles)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {formatOcrList(etiqueta.periodos)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {etiqueta.classificacao || "Não identificado"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {etiqueta.tipoDocumento || "Não identificado"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {formatOcrConfidence(etiqueta.confiancaMedia)}
+                          </td>
+                          <td className="max-w-[320px] px-4 py-3 text-xs text-muted-foreground">
+                            <span className="line-clamp-3">
+                              {etiqueta.textoResumo ||
+                                "Nenhum texto reconhecido"}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <NoDataAvailable
+                  title="Nenhuma etiqueta OCR disponível"
+                  description="Execute o OCR das fotos Ribeira para gerar os dados das etiquetas."
+                  variant="compact"
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {arquivoRibeiraSalas.map((sala) => (
+            <section key={sala.id} className="space-y-3">
+              <div>
+                <h2 className="text-base font-semibold text-foreground">
+                  {sala.titulo}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  {sala.descricao} {sala.fotos.length} fotos.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {sala.fotos.map((foto) => (
+                  <button
+                    key={foto}
+                    type="button"
+                    aria-label={`Abrir ${foto}`}
+                    onClick={() =>
+                      setPreviewRibeiraFoto({ salaId: sala.id, foto })
+                    }
+                    className="group overflow-hidden rounded-xl border border-border/60 bg-card shadow-[0_16px_38px_-32px_rgba(15,23,42,0.72)] transition hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  >
+                    <img
+                      src={`/assets/arquivo-ribeira/${foto}.jpg`}
+                      alt={`${foto} - ${sala.titulo}`}
+                      loading="lazy"
+                      className="aspect-[4/3] w-full bg-muted object-cover transition duration-300 group-hover:scale-[1.02]"
+                    />
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                      <span className="font-medium text-foreground">
+                        {foto}
+                      </span>
+                      <span className="text-muted-foreground">Abrir</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       )}
 
       {activeTab === "planilhas" && (
@@ -1119,6 +1593,59 @@ const ArquivoPage: React.FC = () => {
           )}
         </div>
       )}
+
+      <Dialog
+        open={Boolean(previewRibeiraCurrentFoto && previewRibeiraSala)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewRibeiraFoto(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[92vh] max-w-6xl gap-3 overflow-hidden border-border/60 bg-card/95 p-4 backdrop-blur sm:p-5">
+          {previewRibeiraCurrentFoto && previewRibeiraSala ? (
+            <>
+              <DialogHeader className="pr-8">
+                <DialogTitle>
+                  Visualização {previewRibeiraCurrentFoto}
+                </DialogTitle>
+                <DialogDescription>
+                  {previewRibeiraIndex + 1} de {previewRibeiraSala.fotos.length}{" "}
+                  - {previewRibeiraSala.titulo}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="relative flex min-h-0 items-center justify-center rounded-lg bg-muted/40">
+                <img
+                  src={`/assets/arquivo-ribeira/${previewRibeiraCurrentFoto}.jpg`}
+                  alt={`${previewRibeiraCurrentFoto} ampliada - ${previewRibeiraSala.titulo}`}
+                  className="max-h-[72vh] w-auto max-w-full object-contain"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Foto anterior"
+                  onClick={() => movePreviewRibeiraFoto(-1)}
+                  className="absolute left-3 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full border-white/40 bg-background/85 shadow-lg backdrop-blur"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label="Próxima foto"
+                  onClick={() => movePreviewRibeiraFoto(1)}
+                  className="absolute right-3 top-1/2 h-11 w-11 -translate-y-1/2 rounded-full border-white/40 bg-background/85 shadow-lg backdrop-blur"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <NovaPastaModal
         isOpen={canManageArquivos && showUploadModal}

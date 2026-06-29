@@ -8,6 +8,11 @@ import { Repository, LessThanOrEqual, In } from "typeorm";
 import { SystemAnnouncement, AnnouncementViewed } from "../entities";
 import { CreateAnnouncementDto, UpdateAnnouncementDto } from "../dto";
 import { User } from "../../users/entities/user.entity";
+import {
+  PaginationParams,
+  PaginatedResult,
+  buildPaginatedResult,
+} from "../../../common/utils/pagination.util";
 
 @Injectable()
 export class AnnouncementsService {
@@ -51,7 +56,15 @@ export class AnnouncementsService {
   /**
    * Lista todos os avisos (admin)
    */
-  async findAll(includeInactive = false): Promise<SystemAnnouncement[]> {
+  async findAll(includeInactive?: boolean): Promise<SystemAnnouncement[]>;
+  async findAll(
+    includeInactive: boolean,
+    pagination: PaginationParams,
+  ): Promise<PaginatedResult<SystemAnnouncement>>;
+  async findAll(
+    includeInactive = false,
+    pagination?: PaginationParams,
+  ): Promise<SystemAnnouncement[] | PaginatedResult<SystemAnnouncement>> {
     const queryBuilder = this.announcementRepository
       .createQueryBuilder("announcement")
       .leftJoinAndSelect("announcement.createdBy", "createdBy")
@@ -59,6 +72,14 @@ export class AnnouncementsService {
 
     if (!includeInactive) {
       queryBuilder.andWhere("announcement.active = :active", { active: true });
+    }
+
+    if (pagination) {
+      const [items, total] = await queryBuilder
+        .skip((pagination.page - 1) * pagination.limit)
+        .take(pagination.limit)
+        .getManyAndCount();
+      return buildPaginatedResult(items, total, pagination);
     }
 
     return queryBuilder.getMany();

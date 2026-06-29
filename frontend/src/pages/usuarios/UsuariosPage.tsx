@@ -8,7 +8,6 @@ import UsuariosTable from "@/components/usuarios/UsuariosTable";
 import DeleteUserModal from "@/components/usuarios/DeleteUserModal";
 import CreateUserModal from "@/components/usuarios/CreateUserModal";
 import { PageError } from "@/components/ui/ErrorMessage";
-import { getStoredUser } from "@/utils/tokenStorage";
 
 const UsuariosPage: React.FC = () => {
   const [queryParams, setQueryParams] = useState<UsersQueryParams>({
@@ -30,15 +29,6 @@ const UsuariosPage: React.FC = () => {
 
   // Redirecionar se não tiver permissão
   if (!canViewUsers) {
-    // DEBUG: Log detalhado
-    console.error("❌ Acesso negado à página de usuários", {
-      canViewUsers,
-      canManageUsers,
-      authUser: (window as unknown as Record<string, unknown>).__authUser,
-      localStorage_user: getStoredUser(),
-      cookie_auth: "httpOnly (not accessible from JS)",
-    });
-
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -49,9 +39,9 @@ const UsuariosPage: React.FC = () => {
           <p className="text-muted-foreground">
             Você não tem permissão para acessar esta página.
           </p>
-          <div className="mt-4 text-xs text-muted-foreground/80">
-            <p>Abra o Console (F12) para ver detalhes do erro</p>
-          </div>
+          <p className="mt-2 text-sm text-muted-foreground/80">
+            Caso acredite que isso é um engano, contate um administrador.
+          </p>
         </div>
       </div>
     );

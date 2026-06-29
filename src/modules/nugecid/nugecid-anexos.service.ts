@@ -6,7 +6,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { FindOptionsWhere, Repository } from "typeorm";
 import { randomUUID } from "crypto";
 import * as path from "path";
 
@@ -42,6 +42,11 @@ export interface AnexoOcrAnalysisResult {
   signatures: OcrDetectedSignature[];
 }
 
+type DesarquivamentoAccessRecord = Pick<
+  DesarquivamentoTypeOrmEntity,
+  "id" | "numeroProcesso" | "criadoPorId" | "responsavelId"
+>;
+
 @Injectable()
 export class NugecidAnexosService {
   private readonly logger = new Logger(NugecidAnexosService.name);
@@ -66,14 +71,10 @@ export class NugecidAnexosService {
     tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
     anexarAoProcesso: boolean = false,
   ): Promise<any> {
-    // Verificar se o desarquivamento existe
-    const desarquivamento = await this.desarquivamentoRepository.findOne({
-      where: { id: desarquivamentoId },
-    });
-
-    if (!desarquivamento) {
-      throw new NotFoundException("Desarquivamento não encontrado");
-    }
+    const desarquivamento = await this.assertCanAccessDesarquivamento(
+      desarquivamentoId,
+      user,
+    );
 
     // Validar tipo de arquivo (tamanho e MIME type básico)
     this.validateFile(file);
@@ -158,7 +159,6 @@ export class NugecidAnexosService {
       usuarioId: anexo.usuarioId,
       nomeOriginal: anexo.nomeOriginal,
       nomeArquivo: anexo.nomeArquivo,
-      caminhoArquivo: anexo.caminhoArquivo,
       tipoMime: anexo.tipoMime,
       tamanhoBytes: anexo.tamanhoBytes,
       descricao: anexo.descricao,
@@ -205,16 +205,13 @@ export class NugecidAnexosService {
 
   async findAnexosByDesarquivamento(
     desarquivamentoId: number,
+    user: User,
     tipoAnexo?: "desarquivamento" | "rearquivamento",
   ): Promise<any[]> {
-    // Buscar o desarquivamento para pegar o numeroProcesso
-    const desarquivamento = await this.desarquivamentoRepository.findOne({
-      where: { id: desarquivamentoId },
-    });
-
-    if (!desarquivamento) {
-      throw new NotFoundException("Desarquivamento não encontrado");
-    }
+    const desarquivamento = await this.assertCanAccessDesarquivamento(
+      desarquivamentoId,
+      user,
+    );
 
     const where: any[] = [];
 
@@ -239,6 +236,7 @@ export class NugecidAnexosService {
     const anexos = await this.anexoRepository.find({
       where,
       order: { createdAt: "DESC" },
+      take: 100,
     });
 
     return anexos.map((anexo) => this.mapAnexoResponse(anexo));
@@ -249,9 +247,14 @@ export class NugecidAnexosService {
    */
   async findAnexosByProcesso(
     numeroProcesso: string,
+    user: User,
     tipoAnexo?: "desarquivamento" | "rearquivamento",
   ): Promise<any[]> {
-    const where: any = { numeroProcesso };
+    const normalizedNumeroProcesso = await this.assertCanAccessProcesso(
+      numeroProcesso,
+      user,
+    );
+    const where: any = { numeroProcesso: normalizedNumeroProcesso };
     if (tipoAnexo) {
       where.tipoAnexo = tipoAnexo;
     }
@@ -259,6 +262,7 @@ export class NugecidAnexosService {
     const anexos = await this.anexoRepository.find({
       where,
       order: { createdAt: "DESC" },
+      take: 100,
     });
 
     return anexos.map((anexo) => this.mapAnexoResponse(anexo));
@@ -316,10 +320,15 @@ export class NugecidAnexosService {
   async getAnexoOcrAnalysisByProcesso(
     id: number,
     numeroProcesso: string,
+    user: User,
   ): Promise<AnexoOcrAnalysisResult> {
+    const normalizedNumeroProcesso = await this.assertCanAccessProcesso(
+      numeroProcesso,
+      user,
+    );
     const anexo = await this.findAnexoByIdWithOcr(id);
 
-    if (anexo.numeroProcesso !== numeroProcesso.trim()) {
+    if (anexo.numeroProcesso !== normalizedNumeroProcesso) {
       throw new NotFoundException("Anexo do processo não encontrado");
     }
 
@@ -343,7 +352,10 @@ export class NugecidAnexosService {
   async getAnexoOcrAnalysisByDesarquivamento(
     id: number,
     desarquivamentoId: number,
+    user: User,
   ): Promise<AnexoOcrAnalysisResult> {
+    await this.assertCanAccessDesarquivamento(desarquivamentoId, user);
+
     const anexo = await this.findAnexoByIdWithOcrForDesarquivamento(
       id,
       desarquivamentoId,
@@ -365,46 +377,45 @@ export class NugecidAnexosService {
     };
   }
 
-  async downloadAnexo(id: number): Promise<{
-    arquivo: {
-      buffer: Buffer;
-      size: number;
-      contentType?: string;
-    };
-    anexo: DesarquivamentoAnexoTypeOrmEntity;
-  }> {
-    const anexo = await this.findAnexoById(id);
-    const arquivo = await this.storageService.getObject(anexo.caminhoArquivo, {
-      legacyAbsolutePath: path.isAbsolute(anexo.caminhoArquivo)
-        ? anexo.caminhoArquivo
-        : undefined,
-      contentType: anexo.tipoMime,
-    });
-
-    return { arquivo, anexo };
+  private resolveAnexoLegacyPath(caminhoArquivo: string): string | undefined {
+    if (!path.isAbsolute(caminhoArquivo)) return undefined;
+    const storageRoot = path.resolve(process.cwd(), "uploads");
+    const absolutePath = path.resolve(caminhoArquivo);
+    if (
+      !absolutePath.startsWith(storageRoot + path.sep) &&
+      absolutePath !== storageRoot
+    ) {
+      throw new BadRequestException("Caminho de arquivo inválido.");
+    }
+    return absolutePath;
   }
 
-  async streamAnexo(id: number): Promise<{
-    arquivo: StorageObjectStream;
-    anexo: DesarquivamentoAnexoTypeOrmEntity;
+  private async getAnexoObject(
+    anexo: DesarquivamentoAnexoTypeOrmEntity,
+  ): Promise<{
+    buffer: Buffer;
+    size: number;
+    contentType?: string;
   }> {
-    const anexo = await this.findAnexoById(id);
-    const arquivo = await this.storageService.getObjectStream(
-      anexo.caminhoArquivo,
-      {
-        legacyAbsolutePath: path.isAbsolute(anexo.caminhoArquivo)
-          ? anexo.caminhoArquivo
-          : undefined,
-        contentType: anexo.tipoMime,
-      },
-    );
+    return this.storageService.getObject(anexo.caminhoArquivo, {
+      legacyAbsolutePath: this.resolveAnexoLegacyPath(anexo.caminhoArquivo),
+      contentType: anexo.tipoMime,
+    });
+  }
 
-    return { arquivo, anexo };
+  private async getAnexoObjectStream(
+    anexo: DesarquivamentoAnexoTypeOrmEntity,
+  ): Promise<StorageObjectStream> {
+    return this.storageService.getObjectStream(anexo.caminhoArquivo, {
+      legacyAbsolutePath: this.resolveAnexoLegacyPath(anexo.caminhoArquivo),
+      contentType: anexo.tipoMime,
+    });
   }
 
   async downloadAnexoByDesarquivamento(
     id: number,
     desarquivamentoId: number,
+    user: User,
   ): Promise<{
     arquivo: {
       buffer: Buffer;
@@ -413,16 +424,13 @@ export class NugecidAnexosService {
     };
     anexo: DesarquivamentoAnexoTypeOrmEntity;
   }> {
+    await this.assertCanAccessDesarquivamento(desarquivamentoId, user);
+
     const anexo = await this.findAnexoByIdForDesarquivamento(
       id,
       desarquivamentoId,
     );
-    const arquivo = await this.storageService.getObject(anexo.caminhoArquivo, {
-      legacyAbsolutePath: path.isAbsolute(anexo.caminhoArquivo)
-        ? anexo.caminhoArquivo
-        : undefined,
-      contentType: anexo.tipoMime,
-    });
+    const arquivo = await this.getAnexoObject(anexo);
 
     return { arquivo, anexo };
   }
@@ -430,23 +438,18 @@ export class NugecidAnexosService {
   async streamAnexoByDesarquivamento(
     id: number,
     desarquivamentoId: number,
+    user: User,
   ): Promise<{
     arquivo: StorageObjectStream;
     anexo: DesarquivamentoAnexoTypeOrmEntity;
   }> {
+    await this.assertCanAccessDesarquivamento(desarquivamentoId, user);
+
     const anexo = await this.findAnexoByIdForDesarquivamento(
       id,
       desarquivamentoId,
     );
-    const arquivo = await this.storageService.getObjectStream(
-      anexo.caminhoArquivo,
-      {
-        legacyAbsolutePath: path.isAbsolute(anexo.caminhoArquivo)
-          ? anexo.caminhoArquivo
-          : undefined,
-        contentType: anexo.tipoMime,
-      },
-    );
+    const arquivo = await this.getAnexoObjectStream(anexo);
 
     return { arquivo, anexo };
   }
@@ -454,6 +457,7 @@ export class NugecidAnexosService {
   async downloadAnexoByProcesso(
     id: number,
     numeroProcesso: string,
+    user: User,
   ): Promise<{
     arquivo: {
       buffer: Buffer;
@@ -462,12 +466,17 @@ export class NugecidAnexosService {
     };
     anexo: DesarquivamentoAnexoTypeOrmEntity;
   }> {
-    const normalizedNumeroProcesso = numeroProcesso.trim();
-    const { arquivo, anexo } = await this.downloadAnexo(id);
+    const normalizedNumeroProcesso = await this.assertCanAccessProcesso(
+      numeroProcesso,
+      user,
+    );
+    const anexo = await this.findAnexoById(id);
 
     if (anexo.numeroProcesso !== normalizedNumeroProcesso) {
       throw new NotFoundException("Anexo do processo não encontrado");
     }
+
+    const arquivo = await this.getAnexoObject(anexo);
 
     return { arquivo, anexo };
   }
@@ -475,17 +484,22 @@ export class NugecidAnexosService {
   async streamAnexoByProcesso(
     id: number,
     numeroProcesso: string,
+    user: User,
   ): Promise<{
     arquivo: StorageObjectStream;
     anexo: DesarquivamentoAnexoTypeOrmEntity;
   }> {
-    const normalizedNumeroProcesso = numeroProcesso.trim();
-    const { arquivo, anexo } = await this.streamAnexo(id);
+    const normalizedNumeroProcesso = await this.assertCanAccessProcesso(
+      numeroProcesso,
+      user,
+    );
+    const anexo = await this.findAnexoById(id);
 
     if (anexo.numeroProcesso !== normalizedNumeroProcesso) {
-      arquivo.stream.destroy();
       throw new NotFoundException("Anexo do processo não encontrado");
     }
+
+    const arquivo = await this.getAnexoObjectStream(anexo);
 
     return { arquivo, anexo };
   }
@@ -534,6 +548,7 @@ export class NugecidAnexosService {
     desarquivamentoId: number,
     user: User,
   ): Promise<void> {
+    await this.assertCanAccessDesarquivamento(desarquivamentoId, user);
     await this.findAnexoByIdForDesarquivamento(id, desarquivamentoId);
     await this.deleteAnexo(id, user);
   }
@@ -600,8 +615,91 @@ export class NugecidAnexosService {
     descricao: string,
     user: User,
   ): Promise<any> {
+    await this.assertCanAccessDesarquivamento(desarquivamentoId, user);
     await this.findAnexoByIdForDesarquivamento(id, desarquivamentoId);
     return this.updateAnexoDescricao(id, descricao, user);
+  }
+
+  private async findDesarquivamentoOrThrow(
+    desarquivamentoId: number,
+  ): Promise<DesarquivamentoTypeOrmEntity> {
+    const desarquivamento = await this.desarquivamentoRepository.findOne({
+      where: { id: desarquivamentoId },
+    });
+
+    if (!desarquivamento) {
+      throw new NotFoundException("Desarquivamento não encontrado");
+    }
+
+    return desarquivamento;
+  }
+
+  private async assertCanAccessDesarquivamento(
+    desarquivamentoId: number,
+    user: User,
+  ): Promise<DesarquivamentoTypeOrmEntity> {
+    const desarquivamento =
+      await this.findDesarquivamentoOrThrow(desarquivamentoId);
+
+    if (!this.canAccessDesarquivamento(desarquivamento, user)) {
+      throw new NotFoundException("Desarquivamento não encontrado");
+    }
+
+    return desarquivamento;
+  }
+
+  private async assertCanAccessProcesso(
+    numeroProcesso: string,
+    user: User,
+  ): Promise<string> {
+    const normalizedNumeroProcesso = numeroProcesso.trim();
+    const where: FindOptionsWhere<DesarquivamentoTypeOrmEntity>[] =
+      this.hasFullNugecidAccess(user)
+        ? [{ numeroProcesso: normalizedNumeroProcesso }]
+        : [
+            { numeroProcesso: normalizedNumeroProcesso, criadoPorId: user.id },
+            {
+              numeroProcesso: normalizedNumeroProcesso,
+              responsavelId: user.id,
+            },
+          ];
+
+    const desarquivamento = await this.desarquivamentoRepository.findOne({
+      where,
+    });
+
+    if (!desarquivamento) {
+      throw new NotFoundException("Processo não encontrado");
+    }
+
+    return normalizedNumeroProcesso;
+  }
+
+  private canAccessDesarquivamento(
+    desarquivamento: DesarquivamentoAccessRecord,
+    user: User,
+  ): boolean {
+    return (
+      this.hasFullNugecidAccess(user) ||
+      desarquivamento.criadoPorId === user.id ||
+      desarquivamento.responsavelId === user.id
+    );
+  }
+
+  private hasFullNugecidAccess(user: User): boolean {
+    if (user.isAdmin() || user.isCoordenador()) {
+      return true;
+    }
+
+    const roleNames = [user.role?.name]
+      .filter((roleName): roleName is string => Boolean(roleName))
+      .map((roleName) => roleName.trim().toLowerCase());
+
+    return roleNames.some((roleName) =>
+      ["admin", "coordenador", "nugecid_viewer", "nugecid_operator"].includes(
+        roleName,
+      ),
+    );
   }
 
   private buildStorageKey(fileName: string): string {

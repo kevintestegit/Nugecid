@@ -32,6 +32,7 @@ import {
   PreviewAttachment,
 } from "@/components/desarquivamentos/ImagePreviewModal";
 import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
+import { api } from "@/services/api";
 
 const PrateleiraDetailPage: React.FC = () => {
   const navigate = useNavigate();
@@ -111,15 +112,13 @@ const PrateleiraDetailPage: React.FC = () => {
           controllers.push(controller);
 
           try {
-            const response = await fetch(sourceUrl, {
-              credentials: "include",
+            const response = await api.get(sourceUrl, {
+              responseType: "blob",
               signal: controller.signal,
+              baseURL: "",
             });
-            if (!response.ok) {
-              return null;
-            }
 
-            const blob = await response.blob();
+            const blob = response.data;
             const objectUrl = URL.createObjectURL(blob);
             nextObjectUrls.push(objectUrl);
 
@@ -288,15 +287,12 @@ const PrateleiraDetailPage: React.FC = () => {
   };
 
   const downloadFileWithAuth = async (fileUrl: string, fileName: string) => {
-    const response = await fetch(fileUrl, {
-      credentials: "include",
+    const response = await api.get(fileUrl, {
+      responseType: "blob",
+      baseURL: "",
     });
 
-    if (!response.ok) {
-      throw new Error("Erro ao baixar arquivo");
-    }
-
-    const blob = await response.blob();
+    const blob = response.data;
     const objectUrl = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = objectUrl;

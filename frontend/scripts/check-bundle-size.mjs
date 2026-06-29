@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-const distAssetsDir = path.resolve(process.cwd(), "dist", "assets");
+const distDir = path.resolve(process.cwd(), "dist");
 const limits = {
   js: 900_000, // 0.9 MB por asset JS
   css: 250_000, // 0.25 MB por asset CSS
@@ -25,13 +25,48 @@ const extensionToType = (filename) => {
   return "other";
 };
 
-const files = readdirSync(distAssetsDir)
-  .filter((file) => !file.endsWith(".map"))
-  .map((file) => {
-    const filePath = path.join(distAssetsDir, file);
+const walk = (dir) => {
+  let entries = [];
+  let nested;
+  try {
+    nested = readdirSync(dir);
+  } catch {
+    return entries;
+  }
+  for (const name of nested) {
+    const full = path.join(dir, name);
+    let stat;
+    try {
+      stat = statSync(full);
+    } catch {
+      continue;
+    }
+    if (stat.isDirectory()) {
+      entries = entries.concat(walk(full));
+    } else {
+      entries.push(full);
+    }
+  }
+  return entries;
+};
+
+const files = walk(distDir)
+  .filter((filePath) => !filePath.endsWith(".map"))
+  .map((filePath) => {
     const size = statSync(filePath).size;
-    return { file, size, type: extensionToType(file) };
+    return {
+      file: path.relative(distDir, filePath),
+      size,
+      type: extensionToType(filePath),
+    };
   });
+
+if (files.length === 0) {
+  console.error(
+    `[bundle-size] Nenhum asset encontrado em ${distDir}. Rode \`npm run build\` antes.`,
+  );
+  process.exit(1);
+}
 
 const oversized = files.filter((entry) => {
   if (entry.type === "other") return false;

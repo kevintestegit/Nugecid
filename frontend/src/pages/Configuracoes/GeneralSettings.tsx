@@ -516,6 +516,7 @@ export const GeneralSettings: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">Automático</SelectItem>
+                <SelectItem value="brasil">Brasil</SelectItem>
                 <SelectItem value="saoJoao">São João</SelectItem>
                 <SelectItem value="worldCup2026">Copa 2026</SelectItem>
                 <SelectItem value="mothersDay">Dia das Mães</SelectItem>

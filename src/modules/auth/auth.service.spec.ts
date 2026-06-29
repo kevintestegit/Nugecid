@@ -8,6 +8,7 @@ import { AuthService } from "./auth.service";
 import { User } from "../users/entities/user.entity";
 import { Role } from "../users/entities/role.entity";
 import { Auditoria } from "../audit/entities/auditoria.entity";
+import { AuditHashService } from "../audit/audit-hash.service";
 import { RedisService } from "../redis/redis.service";
 import { LoginDto } from "./dto/login.dto";
 
@@ -67,6 +68,14 @@ describe("AuthService", () => {
     keys: jest.fn().mockResolvedValue([]),
   };
 
+  const mockAuditHashService = {
+    prepareHash: jest.fn().mockImplementation(async (data) => ({
+      ...data,
+      previousHash: "genesis",
+      hash: "mock-hash",
+    })),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,6 +91,10 @@ describe("AuthService", () => {
         {
           provide: getRepositoryToken(Auditoria),
           useValue: mockAuditoriaRepository,
+        },
+        {
+          provide: AuditHashService,
+          useValue: mockAuditHashService,
         },
         {
           provide: JwtService,

@@ -20,7 +20,18 @@ describe("NugecidLogo", () => {
     window.localStorage.clear();
   });
 
+  it("renderiza o tema Brasil por padrao quando nao ha preferencia salva", () => {
+    const { container } = render(<NugecidLogo />);
+
+    const image = container.querySelector("img");
+
+    expect(image).toHaveAttribute("src", "/nugecid_logo_animada_brasil.webp");
+    expect(image).toHaveAttribute("alt", "NUGECID");
+  });
+
   it("gera ids de pattern diferentes para cada instancia", () => {
+    window.localStorage.setItem("nugecid-logo-preference", "standard");
+
     const { container } = render(
       <div>
         <NugecidLogo />
@@ -54,6 +65,7 @@ describe("NugecidLogo", () => {
   it("alterna Sao Joao e Copa em junho no modo automatico", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-03T12:00:00-03:00"));
+    window.localStorage.setItem("nugecid-logo-preference", "auto");
 
     const { container, rerender } = render(<NugecidLogo />);
 

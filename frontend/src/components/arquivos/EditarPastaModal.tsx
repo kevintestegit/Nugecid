@@ -167,7 +167,7 @@ export const EditarPastaModal: React.FC<EditarPastaModalProps> = ({
 
   return createPortal(
     <div className={theme === "dark" ? "dark" : ""}>
-      modalContent
+      {modalContent}
     </div>,
     document.body
   );

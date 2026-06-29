@@ -33,6 +33,26 @@ Object.defineProperty(HTMLMediaElement.prototype, "play", {
   },
 });
 
+Object.defineProperty(HTMLElement.prototype, "hasPointerCapture", {
+  configurable: true,
+  value: () => false,
+});
+
+Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
+  configurable: true,
+  value: () => undefined,
+});
+
+Object.defineProperty(HTMLElement.prototype, "releasePointerCapture", {
+  configurable: true,
+  value: () => undefined,
+});
+
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+  configurable: true,
+  value: () => undefined,
+});
+
 const shouldSuppress = (args: unknown[]): boolean => {
   const text = args.map((item) => String(item ?? "")).join(" ");
   return (

@@ -15,6 +15,11 @@ import {
 } from "../dto";
 import { User } from "../../users/entities/user.entity";
 import { SyncRealtimeService } from "../../sync/sync-realtime.service";
+import {
+  PaginationParams,
+  PaginatedResult,
+  buildPaginatedResult,
+} from "../../../common/utils/pagination.util";
 
 @Injectable()
 export class ProjetosService {
@@ -72,16 +77,33 @@ export class ProjetosService {
     return this.findOne(savedProjeto.id, criadorId);
   }
 
-  async findAll(userId: number): Promise<Projeto[]> {
-    return this.projetoRepository
+  async findAll(userId: number): Promise<Projeto[]>;
+  async findAll(
+    userId: number,
+    pagination: PaginationParams,
+  ): Promise<PaginatedResult<Projeto>>;
+  async findAll(
+    userId: number,
+    pagination?: PaginationParams,
+  ): Promise<Projeto[] | PaginatedResult<Projeto>> {
+    const queryBuilder = this.projetoRepository
       .createQueryBuilder("projeto")
       .leftJoinAndSelect("projeto.criador", "criador")
       .leftJoinAndSelect("projeto.membros", "membros")
       .leftJoinAndSelect("membros.usuario", "membroUsuario")
       .where("projeto.criadorId = :userId", { userId })
       .orWhere("membros.usuarioId = :userId", { userId })
-      .orderBy("projeto.updatedAt", "DESC")
-      .getMany();
+      .orderBy("projeto.updatedAt", "DESC");
+
+    if (pagination) {
+      const [items, total] = await queryBuilder
+        .skip((pagination.page - 1) * pagination.limit)
+        .take(pagination.limit)
+        .getManyAndCount();
+      return buildPaginatedResult(items, total, pagination);
+    }
+
+    return queryBuilder.getMany();
   }
 
   async findOne(id: number, userId: number): Promise<Projeto> {

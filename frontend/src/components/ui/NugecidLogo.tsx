@@ -613,6 +613,19 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
   }, [showAnimation, theme]);
 
   const themeConfig = {
+    brasil: {
+      colors: [
+        "#009A44",
+        "#0033A0",
+        "#FFCC00",
+        "#009A44",
+        "#0033A0",
+        "#FFCC00",
+        "#009A44",
+      ],
+      patternStroke: "rgba(255, 255, 255, 0.25)",
+      patternCircle: "rgba(255, 255, 255, 0.35)",
+    },
     worldCup2026: {
       colors: [
         "#22C55E",
@@ -1009,6 +1022,24 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
   );
 
   if (showText) {
+    if (theme === "brasil") {
+      return (
+        <div
+          className={
+            className
+              ? `inline-flex items-center overflow-visible ${className}`
+              : "inline-flex items-center overflow-visible"
+          }
+        >
+          <img
+            src="/nugecid_logo_animada_brasil.webp"
+            alt="NUGECID"
+            className="h-full w-auto object-contain"
+          />
+        </div>
+      );
+    }
+
     const shouldRenderCanvas = showAnimation && (theme === "worldCup2026" || theme === "saoJoao");
 
     return (

@@ -7,6 +7,7 @@ import React, {
   useState,
   ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { User, LoginDto, UserRole } from "@/types";
 import axios from "axios";
 import { apiService } from "@/services/api";
@@ -32,28 +33,54 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getSafeLoginErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    if (status) {
+      return `Falha no login (status ${status})`;
+    }
+
+    return error.code ? `Falha no login (${error.code})` : "Falha no login";
+  }
+
+  return error instanceof Error ? error.message : "Falha no login";
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentUserIdRef = useRef<number | null>(null);
 
   const isAuthenticated = !!user;
 
-  const updateUser = useCallback((nextUser: User | null) => {
-    setUserState(nextUser);
+  const updateUser = useCallback(
+    (nextUser: User | null) => {
+      const previousUserId = currentUserIdRef.current;
+      const nextUserId = nextUser?.id ?? null;
 
-    if (nextUser) {
-      setStoredUser(nextUser);
-    } else {
-      removeStoredUser();
-    }
+      if (previousUserId !== null && previousUserId !== nextUserId) {
+        queryClient.clear();
+      }
 
-    setMonitoringUser(nextUser);
-  }, []);
+      currentUserIdRef.current = nextUserId;
+      setUserState(nextUser);
+
+      if (nextUser) {
+        setStoredUser(nextUser);
+      } else {
+        removeStoredUser();
+      }
+
+      setMonitoringUser(nextUser);
+    },
+    [queryClient],
+  );
 
   const clearRefreshTimer = useCallback(() => {
     if (!refreshTimerRef.current) return;
@@ -184,7 +211,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(response.message || "Erro ao fazer login");
       }
     } catch (error) {
-      console.error("Erro no login", error);
+      console.error("Erro no login:", getSafeLoginErrorMessage(error));
       throw error;
     }
   };

@@ -182,6 +182,7 @@ const TermoDesarquivamentoPreviewPage: React.FC = () => {
             ref={iframeRef}
             title="Pré-visualização do termo de desarquivamento"
             srcDoc={previewHtml}
+            sandbox="allow-same-origin"
             className="h-[calc(100vh-18rem)] min-h-[720px] w-full bg-white"
             onLoad={() => setIsIframeReady(true)}
           />

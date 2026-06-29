@@ -354,7 +354,7 @@ export const EnhancedConfirmDialog: React.FC<EnhancedConfirmDialogProps> = ({
 
   return createPortal(
     <div className={theme === "dark" ? "dark" : ""}>
-      modalContent
+      {modalContent}
     </div>,
     document.body
   );

@@ -512,56 +512,64 @@ function createSignatureTable(data: DesarquivamentoDocxData): Table {
   });
 }
 
+const RN_LOGO_PATHS = [
+  path.resolve(process.cwd(), "src/assets/images/Brasão-RN.png"),
+  path.resolve(process.cwd(), "frontend/src/components/img/Brasão-RN.png"),
+];
+
+const ITEP_LOGO_PATHS = [
+  path.resolve(process.cwd(), "src/assets/images/Brasão-ITEP.png"),
+  path.resolve(process.cwd(), "frontend/src/components/img/Brasão-ITEP.png"),
+];
+
+let rnLogoPromise: Promise<Buffer | null> | undefined;
+let itepLogoPromise: Promise<Buffer | null> | undefined;
+
+function loadLogo(
+  candidates: string[],
+  label: string,
+  logger: Logger,
+): Promise<Buffer | null> {
+  return (async () => {
+    for (const logoPath of candidates) {
+      try {
+        await fs.promises.access(logoPath);
+        const buffer = await fs.promises.readFile(logoPath);
+        logger.log(`Logo ${label} carregada de: ${logoPath}`);
+        return buffer;
+      } catch {
+        // Tentar próximo caminho
+      }
+    }
+    logger.warn(
+      `Logo ${label} não encontrada em nenhum dos caminhos esperados`,
+    );
+    return null;
+  })();
+}
+
+function loadRnLogo(logger: Logger): Promise<Buffer | null> {
+  if (!rnLogoPromise) {
+    rnLogoPromise = loadLogo(RN_LOGO_PATHS, "RN", logger);
+  }
+  return rnLogoPromise;
+}
+
+function loadItepLogo(logger: Logger): Promise<Buffer | null> {
+  if (!itepLogoPromise) {
+    itepLogoPromise = loadLogo(ITEP_LOGO_PATHS, "ITEP", logger);
+  }
+  return itepLogoPromise;
+}
+
 export async function generateDesarquivamentoDocx(
   data: DesarquivamentoDocxData,
   logger: Logger,
 ): Promise<Buffer> {
-  // Carregar logos
-  let rnLogoBuffer: Buffer | null = null;
-  let itepLogoBuffer: Buffer | null = null;
-
-  // Tentar múltiplos caminhos para os logos
-  const possibleRnPaths = [
-    path.resolve(process.cwd(), "src/assets/images/Brasão-RN.png"),
-    path.resolve(process.cwd(), "frontend/src/components/img/Brasão-RN.png"),
-  ];
-
-  const possibleItepPaths = [
-    path.resolve(process.cwd(), "src/assets/images/Brasão-ITEP.png"),
-    path.resolve(process.cwd(), "frontend/src/components/img/Brasão-ITEP.png"),
-  ];
-
-  for (const logoPath of possibleRnPaths) {
-    try {
-      if (fs.existsSync(logoPath)) {
-        rnLogoBuffer = fs.readFileSync(logoPath);
-        logger.log(`Logo RN carregada de: ${logoPath}`);
-        break;
-      }
-    } catch {
-      // Tentar próximo caminho
-    }
-  }
-
-  if (!rnLogoBuffer) {
-    logger.warn("Logo RN não encontrada em nenhum dos caminhos esperados");
-  }
-
-  for (const logoPath of possibleItepPaths) {
-    try {
-      if (fs.existsSync(logoPath)) {
-        itepLogoBuffer = fs.readFileSync(logoPath);
-        logger.log(`Logo ITEP carregada de: ${logoPath}`);
-        break;
-      }
-    } catch {
-      // Tentar próximo caminho
-    }
-  }
-
-  if (!itepLogoBuffer) {
-    logger.warn("Logo ITEP não encontrada em nenhum dos caminhos esperados");
-  }
+  const [rnLogoBuffer, itepLogoBuffer] = await Promise.all([
+    loadRnLogo(logger),
+    loadItepLogo(logger),
+  ]);
 
   const doc = new Document({
     sections: [

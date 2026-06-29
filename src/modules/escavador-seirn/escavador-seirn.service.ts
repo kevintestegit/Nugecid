@@ -16,6 +16,7 @@ import {
 import { EscavadorStatus } from "./types";
 import { StartEscavadorDto } from "./dto/start-escavador.dto";
 import { HookEscavadorDto } from "./dto/hook-escavador.dto";
+import { SeiCapturaService } from "../sei/sei-captura.service";
 
 interface EscavadorWebhookHeaders {
   authorization?: string;
@@ -34,6 +35,7 @@ export class EscavadorSeirnService implements OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly notificacoesService: NotificacoesService,
+    private readonly seiCapturaService: SeiCapturaService,
   ) {}
 
   async getStatus(): Promise<EscavadorStatus> {
@@ -118,7 +120,7 @@ export class EscavadorSeirnService implements OnModuleDestroy {
     }
 
     const sanitizedLink = this.sanitizeExternalHttpUrl(data.link);
-    await this.emitNotification(
+    const capturaId = await this.registrarCapturaSei(
       data.numero,
       data.titulo,
       sanitizedLink,
@@ -129,7 +131,7 @@ export class EscavadorSeirnService implements OnModuleDestroy {
     this.status.lastLink = sanitizedLink;
     this.status.lastChangeAt = new Date();
 
-    return { ok: true };
+    return { ok: true, capturaId };
   }
 
   private validateWebhookAuth(
@@ -164,20 +166,6 @@ export class EscavadorSeirnService implements OnModuleDestroy {
         throw new ForbiddenException("Assinatura inválida para webhook");
       }
 
-      return;
-    }
-
-    const allowLegacyToken =
-      (this.configService.get<string>("ESCAVADOR_WEBHOOK_ALLOW_LEGACY_TOKEN") ||
-        process.env.ESCAVADOR_WEBHOOK_ALLOW_LEGACY_TOKEN) === "true";
-    const legacyBearer = (
-      headers.authorization?.replace(/^Bearer\s+/i, "") || ""
-    ).trim();
-
-    if (allowLegacyToken && legacyBearer && legacyBearer === secret) {
-      this.logger.warn(
-        "Webhook do escavador usando autenticação legada por Bearer token; migrar para assinatura HMAC",
-      );
       return;
     }
 
@@ -286,7 +274,12 @@ export class EscavadorSeirnService implements OnModuleDestroy {
         this.status.lastLink = sanitizedLink;
         if (isNew) {
           this.status.lastChangeAt = new Date();
-          await this.emitNotification(numero, titulo, sanitizedLink, usuarioId);
+          await this.registrarCapturaSei(
+            numero,
+            titulo,
+            sanitizedLink,
+            usuarioId,
+          );
         }
       }
     });
@@ -314,6 +307,31 @@ export class EscavadorSeirnService implements OnModuleDestroy {
     };
   }
 
+  private async registrarCapturaSei(
+    numero: string,
+    titulo: string,
+    link: string | undefined,
+    usuarioId: number,
+  ): Promise<string | undefined> {
+    try {
+      const sanitizedLink = this.sanitizeExternalHttpUrl(link);
+      await this.emitNotification(numero, titulo, sanitizedLink, usuarioId);
+      const captura = await this.seiCapturaService.criarFromWebhook(
+        { numero, titulo, link: sanitizedLink },
+        usuarioId,
+      );
+      this.logger.log(
+        `Captura SEI criada para usuário ${usuarioId} sobre processo ${numero}: ${captura.id}`,
+      );
+      return captura.id;
+    } catch (error) {
+      this.logger.error(
+        `Falha ao criar captura SEI para ${usuarioId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return undefined;
+    }
+  }
+
   private async emitNotification(
     numero: string,
     titulo: string,
@@ -335,9 +353,9 @@ export class EscavadorSeirnService implements OnModuleDestroy {
       this.logger.log(
         `Notificação criada para usuário ${usuarioId} sobre processo ${numero}`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Falha ao criar notificação para ${usuarioId}: ${error?.message || error}`,
+        `Falha ao criar notificação para ${usuarioId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

@@ -42,6 +42,9 @@ const envSchema = z.object({
   EMAIL_USER: z.string().optional(),
   EMAIL_PASSWORD: z.string().optional(),
   EMAIL_FROM: z.string().optional(),
+  ADMIN_EMAIL: z.string().optional(),
+  DATABASE_POOL_MAX: z.string().regex(/^\d+$/).optional(),
+  DATABASE_POOL_MIN: z.string().regex(/^\d+$/).optional(),
   SENTRY_DSN: z.string().optional(),
   SENTRY_ENVIRONMENT: z.string().optional(),
   STORAGE_DRIVER: z.enum(["local", "s3"]).optional(),
@@ -208,12 +211,14 @@ export function validateEnvironment(): void {
     throw new Error("[ENV] SESSION_SECURE deve ser true em produção.");
   }
 
-  const failOpenFlags = ["OCR_FAIL_OPEN", "SEARCH_FAIL_OPEN"].filter(
-    (key) => normalized[key] === "true",
-  );
+  const failOpenFlags = [
+    "OCR_FAIL_OPEN",
+    "SEARCH_FAIL_OPEN",
+    "CLAMAV_FAIL_OPEN",
+  ].filter((key) => normalized[key] === "true");
   if (failOpenFlags.length > 0) {
     throw new Error(
-      `[ENV] OCR_FAIL_OPEN e SEARCH_FAIL_OPEN devem ser false em produção: ${failOpenFlags.join(", ")}`,
+      `[ENV] OCR_FAIL_OPEN, SEARCH_FAIL_OPEN e CLAMAV_FAIL_OPEN devem ser false em produção: ${failOpenFlags.join(", ")}`,
     );
   }
 

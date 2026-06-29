@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Header,
   HttpCode,
@@ -43,12 +44,17 @@ import {
   RestoreUserUseCase,
   GetUserStatisticsUseCase,
   GetRolesUseCase,
+  ChangePasswordUseCase,
 } from "./application/use-cases";
 
 // DTOs
 import { CreateUserDto } from "./application/dto/create-user.dto";
 import { UpdateUserDto } from "./application/dto/update-user.dto";
-import { QueryUsersDto, UpdateUserSettingsDto } from "./application/dto";
+import {
+  QueryUsersDto,
+  UpdateUserSettingsDto,
+  ChangePasswordDto,
+} from "./application/dto";
 import { UpdateUserPreferenceDto } from "./dto/user-preference.dto";
 
 // Services
@@ -77,6 +83,8 @@ import { RoleMapper } from "./infrastructure/mappers/role.mapper";
 // Utils
 import { FileValidator } from "../../common/utils/file-validator";
 import { AntivirusService } from "../security/antivirus.service";
+import { Auditoria, AuditAction } from "../audit/entities/auditoria.entity";
+import { AuditHashService } from "../audit/audit-hash.service";
 
 @ApiTags("Usuários")
 @Controller("users")
@@ -96,13 +104,17 @@ export class UsersController {
     private readonly restoreUserUseCase: RestoreUserUseCase,
     private readonly getUserStatisticsUseCase: GetUserStatisticsUseCase,
     private readonly getRolesUseCase: GetRolesUseCase,
+    private readonly changePasswordUseCase: ChangePasswordUseCase,
     @InjectRepository(RoleEntity)
     private readonly rolesRepo: Repository<RoleEntity>,
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(Auditoria)
+    private readonly auditoriaRepository: Repository<Auditoria>,
     private readonly configService: ConfigService,
     private readonly userPreferencesService: UserPreferencesService,
     private readonly antivirusService: AntivirusService,
+    private readonly auditHashService: AuditHashService,
   ) {
     this.uploadRoot = this.configService.get<string>(
       "UPLOAD_PATH",
@@ -124,6 +136,14 @@ export class UsersController {
     });
 
     return url.toString();
+  }
+
+  private canViewUserDetails(currentUser: User, targetUserId: number): boolean {
+    return (
+      currentUser.id === targetUserId ||
+      currentUser.isAdmin() ||
+      currentUser.isCoordenador()
+    );
   }
 
   @Get()
@@ -149,40 +169,39 @@ export class UsersController {
   })
   async findAll(@Query() query: QueryUsersDto & { active?: string }) {
     // Mapear parâmetro 'active' do frontend para 'ativo' do backend
-    const mappedQuery = {
+    const mappedQuery: QueryUsersDto = {
       ...query,
       ativo: query.active !== undefined ? query.active === "true" : query.ativo,
     };
 
-    const result = await this.getUsersUseCase.execute(mappedQuery as any);
+    const result = await this.getUsersUseCase.execute(mappedQuery);
 
     // Caso paginado (objeto com users + meta)
-    if (Array.isArray((result as any).users)) {
-      const pag = result as any;
-      const items = pag.users.map((u: any) => UserMapper.toEntity(u));
+    if (!Array.isArray(result)) {
+      const items = result.users.map((u) => UserMapper.toEntity(u));
       return {
         success: true,
         data: items,
         meta: {
-          total: pag.total || items.length,
-          page: pag.page || query.page || 1,
-          limit: pag.limit || query.limit || items.length,
-          totalPages: pag.totalPages || 1,
-          hasNext: (pag.page || 1) < (pag.totalPages || 1),
-          hasPrev: (pag.page || 1) > 1,
+          total: result.total || items.length,
+          page: result.page || query.page || 1,
+          limit: result.limit || query.limit || items.length,
+          totalPages: result.totalPages || 1,
+          hasNext: (result.page || 1) < (result.totalPages || 1),
+          hasPrev: (result.page || 1) > 1,
         },
       };
     }
 
     // Caso não paginado (array simples)
-    const users = result as any[];
+    const items = result.map((user) => UserMapper.toEntity(user));
     return {
       success: true,
-      data: users.map((user) => UserMapper.toEntity(user)),
+      data: items,
       meta: {
-        total: users.length,
+        total: items.length,
         page: 1,
-        limit: users.length,
+        limit: items.length,
         totalPages: 1,
         hasNext: false,
         hasPrev: false,
@@ -212,40 +231,39 @@ export class UsersController {
   @ApiResponse({ status: 200, description: "Lista de usuários" })
   async findAllApi(@Query() query: QueryUsersDto & { active?: string }) {
     // Mapear parâmetro 'active' do frontend para 'ativo' do backend
-    const mappedQuery = {
+    const mappedQuery: QueryUsersDto = {
       ...query,
       ativo: query.active !== undefined ? query.active === "true" : query.ativo,
     };
 
-    const result = await this.getUsersUseCase.execute(mappedQuery as any);
+    const result = await this.getUsersUseCase.execute(mappedQuery);
 
     // Caso paginado (objeto com users + meta)
-    if (Array.isArray((result as any).users)) {
-      const pag = result as any;
-      const items = pag.users.map((u: any) => UserMapper.toEntity(u));
+    if (!Array.isArray(result)) {
+      const items = result.users.map((u) => UserMapper.toEntity(u));
       return {
         success: true,
         data: items,
         meta: {
-          total: pag.total || items.length,
-          page: pag.page || query.page || 1,
-          limit: pag.limit || query.limit || items.length,
-          totalPages: pag.totalPages || 1,
-          hasNext: (pag.page || 1) < (pag.totalPages || 1),
-          hasPrev: (pag.page || 1) > 1,
+          total: result.total || items.length,
+          page: result.page || query.page || 1,
+          limit: result.limit || query.limit || items.length,
+          totalPages: result.totalPages || 1,
+          hasNext: (result.page || 1) < (result.totalPages || 1),
+          hasPrev: (result.page || 1) > 1,
         },
       };
     }
 
     // Caso não paginado (array simples)
-    const users = result as any[];
+    const items = result.map((user) => UserMapper.toEntity(user));
     return {
       success: true,
-      data: users.map((user) => UserMapper.toEntity(user)),
+      data: items,
       meta: {
-        total: users.length,
+        total: items.length,
         page: 1,
-        limit: users.length,
+        limit: items.length,
         totalPages: 1,
         hasNext: false,
         hasPrev: false,
@@ -407,6 +425,48 @@ export class UsersController {
     };
   }
 
+  @Patch("me/password")
+  @ApiOperation({ summary: "Altera a senha do usuário logado" })
+  @ApiResponse({
+    status: 200,
+    description: "Senha alterada com sucesso",
+  })
+  @ApiResponse({
+    status: 400,
+    description: "Senha atual incorreta ou nova senha inválida",
+  })
+  async changeMyPassword(
+    @CurrentUser() currentUser: User,
+    @Body() body: ChangePasswordDto,
+  ) {
+    await this.changePasswordUseCase.execute(currentUser.id, body);
+
+    try {
+      const auditData = Auditoria.createResourceAudit(
+        currentUser.id,
+        AuditAction.UPDATE,
+        "auth",
+        currentUser.id,
+        { action: "TROCA_DE_SENHA" },
+        "",
+        "users-controller",
+      );
+      const auditWithHash = await this.auditHashService.prepareHash(auditData);
+      await this.auditoriaRepository.save(
+        this.auditoriaRepository.create(auditWithHash),
+      );
+    } catch {
+      this.logger.warn(
+        `[AUDIT] Falha ao registrar troca de senha do usuário ${currentUser.id}`,
+      );
+    }
+
+    return {
+      success: true,
+      message: "Senha alterada com sucesso",
+    };
+  }
+
   @Get("roles/:id/settings")
   @Roles("admin")
   @ApiOperation({ summary: "Obtém configurações do perfil (role)" })
@@ -536,11 +596,17 @@ export class UsersController {
   @Get(":id")
   @ApiOperation({ summary: "Busca usuário por ID" })
   @ApiResponse({ status: 200, description: "Dados do usuário" })
+  @ApiResponse({ status: 403, description: "Acesso negado" })
   @ApiResponse({ status: 404, description: "Usuário não encontrado" })
   async findOne(
     @Param("id", ParseUserIdPipe) id: number,
+    @CurrentUser() currentUser: User,
     @Request() req: ExpressRequest,
   ) {
+    if (!this.canViewUserDetails(currentUser, id)) {
+      throw new ForbiddenException("Acesso negado para este usuário");
+    }
+
     const user = await this.getUserByIdUseCase.execute(id);
     const userEntity = UserMapper.toEntity(user);
 

@@ -295,8 +295,8 @@ export class AuthController {
         );
       }
 
-      // Se for requisição web, redireciona
-      return res.redirect("/");
+      // Se for requisição web, redireciona para /dashboard
+      return res.redirect("/dashboard");
     } catch (error) {
       this.logger.error(`Erro no login: ${error.message}`);
 
@@ -473,14 +473,16 @@ export class AuthController {
   @Post("refresh")
   @IsPublic()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Renovar token JWT usando refresh token" })
+  @ApiOperation({
+    summary:
+      "Renovar token JWT usando refresh token (lido apenas do cookie httpOnly)",
+  })
   @ApiResponse({
     status: 200,
     description: "Token renovado com sucesso",
     schema: {
       type: "object",
       properties: {
-        accessToken: { type: "string" },
         expiresIn: { type: "string" },
       },
     },
@@ -490,14 +492,15 @@ export class AuthController {
     description: "Refresh token inválido ou expirado",
   })
   async refreshToken(
-    @Body() body: { refreshToken?: string },
     @Request() req: ExpressRequest,
     @Response() res: ExpressResponse,
   ) {
     try {
+      // Refresh token lido SOMENTE do cookie httpOnly para prevenir replay
+      // caso o token seja exfiltrado (XSS, logs, etc.). Body-based fallback
+      // removido por exigir transporte em superfície atacável.
       const refreshToken =
-        req.cookies?.[AuthController.REFRESH_TOKEN_COOKIE_NAME] ??
-        body.refreshToken;
+        req.cookies?.[AuthController.REFRESH_TOKEN_COOKIE_NAME];
 
       if (!refreshToken) {
         throw new UnauthorizedException("Refresh token ausente");
@@ -611,7 +614,7 @@ export class AuthController {
   }
 }
 
-@ApiTags("Autenticação")
+@ApiTags("Autenticação (DEPRECATED)")
 @Controller("v2/auth")
 export class AuthV2Controller {
   private readonly logger = new Logger(AuthV2Controller.name);
@@ -623,7 +626,9 @@ export class AuthV2Controller {
   @UseGuards(IpBlockerGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: "Login API v2 - Retorna JWT com expiração de 50 minutos",
+    summary:
+      "[DEPRECATED] Login API v2 — prefira POST /auth/login (httpOnly cookie).",
+    deprecated: true,
   })
   @ApiResponse({
     status: 200,
@@ -650,6 +655,9 @@ export class AuthV2Controller {
     @Ip() ipAddress: string,
     @Headers("user-agent") userAgent: string,
   ) {
+    this.logger.warn(
+      `[DEPRECATED] POST /v2/auth/login chamado. Migrar cliente para POST /auth/login (httpOnly cookie).`,
+    );
     try {
       const result = await this.authService.loginV2(
         loginDto,

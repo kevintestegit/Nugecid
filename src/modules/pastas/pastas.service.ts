@@ -36,6 +36,11 @@ import {
 } from "../storage/storage.service";
 import { SearchService } from "../search/search.service";
 import { readSpreadsheetMatrix } from "../../common/utils/spreadsheet.util";
+import {
+  PaginationParams,
+  PaginatedResult,
+  buildPaginatedResult,
+} from "../../common/utils/pagination.util";
 
 interface PastaFilesPayload {
   imagens?: Express.Multer.File[];
@@ -205,13 +210,24 @@ export class PastasService {
     return pastaCompleta;
   }
 
-  async findAll(userId?: number): Promise<any[]> {
+  async findAll(userId?: number): Promise<any[]>;
+  async findAll(
+    userId: number | undefined,
+    pagination: PaginationParams,
+  ): Promise<PaginatedResult<any>>;
+  async findAll(
+    userId?: number,
+    pagination?: PaginationParams,
+  ): Promise<any[] | PaginatedResult<any>> {
     await this.ensureSchema();
     const cacheVersion = await this.getCacheVersion(
       CACHE_VERSION_KEYS.PASTAS_LIST,
     );
-    const cacheKey = `pastas:list:v${cacheVersion}:u:${userId ?? "all"}`;
-    const cached = await this.getFromCache<any[]>(cacheKey);
+    const paginationKey = pagination
+      ? `:p:${pagination.page}:${pagination.limit}`
+      : ":all";
+    const cacheKey = `pastas:list:v${cacheVersion}:u:${userId ?? "all"}${paginationKey}`;
+    const cached = await this.getFromCache<any>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -246,7 +262,21 @@ export class PastasService {
       });
     }
 
-    const pastas = await queryBuilder.getMany();
+    if (pagination) {
+      queryBuilder = queryBuilder
+        .skip((pagination.page - 1) * pagination.limit)
+        .take(pagination.limit);
+      const [items, total] = await queryBuilder.getManyAndCount();
+      const result = buildPaginatedResult<any>(items, total, pagination);
+      await this.setInCache(
+        cacheKey,
+        result,
+        PastasService.LIST_CACHE_TTL_SECONDS,
+      );
+      return result;
+    }
+
+    const pastas = await queryBuilder.take(100).getMany();
     await this.setInCache(
       cacheKey,
       pastas,

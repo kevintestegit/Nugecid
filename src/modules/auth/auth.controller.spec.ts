@@ -317,11 +317,7 @@ describe("AuthController", () => {
         expiresIn: "50m",
       });
 
-      const result = await controller.refreshToken(
-        { refreshToken: "refresh-from-body" },
-        req,
-        res,
-      );
+      const result = await controller.refreshToken(req, res);
 
       expect(mockAuthService.refreshToken).toHaveBeenCalledWith(
         "refresh-from-cookie",

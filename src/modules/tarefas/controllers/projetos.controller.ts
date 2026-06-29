@@ -29,6 +29,10 @@ import {
   UpdateMembroProjetoDto,
 } from "../dto";
 import { Projeto, MembroProjeto } from "../entities";
+import {
+  PaginatedResult,
+  parsePagination,
+} from "../../../common/utils/pagination.util";
 
 @ApiTags("Projetos")
 @ApiBearerAuth()
@@ -70,8 +74,13 @@ export class ProjetosController {
     status: HttpStatus.UNAUTHORIZED,
     description: "Token de acesso inválido",
   })
-  async findAll(@Request() req: any): Promise<Projeto[]> {
-    return this.projetosService.findAll(req.user.id);
+  async findAll(
+    @Request() req: any,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ): Promise<Projeto[] | PaginatedResult<Projeto>> {
+    const pagination = parsePagination(page, limit);
+    return this.projetosService.findAll(req.user.id, pagination);
   }
 
   @Get(":id")

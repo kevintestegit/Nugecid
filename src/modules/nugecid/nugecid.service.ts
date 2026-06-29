@@ -1047,6 +1047,76 @@ export class NugecidService {
     };
   }
 
+  async getResumoDiario(
+    userId: number,
+    userRoles: string[],
+  ): Promise<{
+    data: { data: string; total: number; itens: any[] }[];
+    totalGeral: number;
+  }> {
+    const isAdminOrCoord = userRoles.some((r) =>
+      ["admin", "coordenador"].includes(r.toLowerCase()),
+    );
+
+    const qb = this.desarquivamentoRepository
+      .createQueryBuilder("d")
+      .select([
+        "d.id",
+        "d.nomeCompleto",
+        "d.numeroProcesso",
+        "d.status",
+        "d.dataSolicitacao",
+        "d.setorDemandante",
+        "d.createdAt",
+      ])
+      .where("d.deletedAt IS NULL")
+      .andWhere("d.status IN (:...statuses)", {
+        statuses: [
+          StatusDesarquivamentoEnum.SOLICITADO,
+          StatusDesarquivamentoEnum.RETIRADO_PELO_SETOR,
+        ],
+      })
+      .orderBy("d.dataSolicitacao", "DESC")
+      .addOrderBy("d.id", "DESC");
+
+    if (!isAdminOrCoord) {
+      qb.andWhere("(d.criadoPorId = :userId OR d.responsavelId = :userId)", {
+        userId,
+      });
+    }
+
+    const itens = await qb.getMany();
+
+    const grouped = new Map<string, any[]>();
+    for (const item of itens) {
+      const dateKey = item.dataSolicitacao
+        ? new Date(item.dataSolicitacao).toISOString().split("T")[0]
+        : new Date(item.createdAt).toISOString().split("T")[0];
+
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, []);
+      }
+      grouped.get(dateKey)!.push({
+        id: item.id,
+        nomeCompleto: item.nomeCompleto,
+        numeroProcesso: item.numeroProcesso,
+        status: item.status,
+        dataSolicitacao: item.dataSolicitacao,
+        setorDemandante: item.setorDemandante,
+      });
+    }
+
+    const data = Array.from(grouped.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, itens]) => ({
+        data: date,
+        total: itens.length,
+        itens,
+      }));
+
+    return { data, totalGeral: itens.length };
+  }
+
   private consolidateViewEntries<T extends { action: string; userId: number }>(
     auditorias: T[],
   ): T[] {

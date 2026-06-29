@@ -64,6 +64,7 @@ import {
   isBusinessHistoricoEntry,
   type HistoricoMessageTone,
 } from "@/utils/desarquivamentoHistoricoMessages";
+import { api } from "@/services/api";
 
 const DetalhesDesarquivamentoPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -232,13 +233,13 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
   const handleDownloadTermo = (format: "pdf" | "docx") => {
     if (!id || isNaN(Number(id))) {
-      toast.error("Identificador invalido para o termo.");
+      toast.error("Identificador inválido para o termo.");
       return;
     }
 
     if (!canGerarTermo) {
       toast.error(
-        "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.",
+        "Somente solicitações com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos.",
       );
       return;
     }
@@ -258,7 +259,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         const message =
           error instanceof Error
             ? error.message
-            : "Nao foi possivel gerar o termo.";
+            : "Não foi possível gerar o termo.";
         toast.error(message);
       },
     });
@@ -283,11 +284,11 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
       // Se anexo tem URL (vem do backend com URL correta), usar ela
       if (anexo.url) {
-        const response = await fetch(anexo.url, {
-          credentials: "include",
+        const response = await api.get(anexo.url, {
+          responseType: "blob",
+          baseURL: "",
         });
-        if (!response.ok) throw new Error("Erro ao baixar anexo");
-        blob = await response.blob();
+        blob = response.data;
       } else if (anexo.desarquivamentoId) {
         // Anexo de solicitação
         blob = await downloadAnexoMutation.mutateAsync({
@@ -296,14 +297,14 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         });
       } else if (anexo.numeroProcesso) {
         // Anexo de processo
-        const response = await fetch(
+        const response = await api.get(
           buildProcessoAnexoUrl(anexo.numeroProcesso, anexoId, "download"),
           {
-            credentials: "include",
+            responseType: "blob",
+            baseURL: "",
           },
         );
-        if (!response.ok) throw new Error("Erro ao baixar anexo");
-        blob = await response.blob();
+        blob = response.data;
       } else {
         throw new Error("Anexo sem vínculo válido");
       }
@@ -338,11 +339,11 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
 
       // Se anexo tem previewUrl (URL correta do backend), usar ela
       if (anexo.previewUrl) {
-        const response = await fetch(anexo.previewUrl, {
-          credentials: "include",
+        const response = await api.get(anexo.previewUrl, {
+          responseType: "blob",
+          baseURL: "",
         });
-        if (!response.ok) throw new Error("Erro ao carregar visualização");
-        blob = await response.blob();
+        blob = response.data;
       } else if (anexo.desarquivamentoId) {
         // Anexo de solicitação
         blob = await viewAnexoMutation.mutateAsync({
@@ -351,14 +352,14 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
         });
       } else if (anexo.numeroProcesso) {
         // Anexo de processo
-        const response = await fetch(
+        const response = await api.get(
           buildProcessoAnexoUrl(anexo.numeroProcesso, anexo.id, "view"),
           {
-            credentials: "include",
+            responseType: "blob",
+            baseURL: "",
           },
         );
-        if (!response.ok) throw new Error("Erro ao carregar visualização");
-        blob = await response.blob();
+        blob = response.data;
       } else {
         throw new Error("Anexo sem vínculo válido");
       }
@@ -641,7 +642,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                   }
                   title={
                     !canGerarTermo
-                      ? "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
+                      ? "Somente solicitações com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
                       : undefined
                   }
                   disabled={!canGerarTermo}
@@ -655,7 +656,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                   onClick={() => handleDownloadTermo("pdf")}
                   title={
                     !canGerarTermo
-                      ? "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
+                      ? "Somente solicitações com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
                       : undefined
                   }
                   disabled={downloadPdfMutation.isPending || !canGerarTermo}
@@ -669,7 +670,7 @@ const DetalhesDesarquivamentoPage: React.FC = () => {
                   onClick={() => handleDownloadTermo("docx")}
                   title={
                     !canGerarTermo
-                      ? "Somente solicitacoes com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
+                      ? "Somente solicitações com status DESARQUIVADO ou REARQUIVAMENTO_SOLICITADO podem gerar termos."
                       : undefined
                   }
                   disabled={downloadDocxMutation.isPending || !canGerarTermo}

@@ -146,13 +146,6 @@ const ConfiguracoesPage: React.FC = () => {
         {activeTab === "seguranca" && isCoordenador && <SecuritySettings />}
         {activeTab === "usuario" && <UserSettings />}
       </div>
-
-      <div className="flex justify-end">
-        <p className="rounded-xl border border-border/60 bg-card/70 px-4 py-3 text-sm text-muted-foreground shadow-sm">
-          Cada seção salva suas alterações de forma independente quando o
-          backend correspondente estiver disponível.
-        </p>
-      </div>
     </div>
   );
 };

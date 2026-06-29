@@ -32,6 +32,11 @@ import { Response } from "express";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { NugecidAnexosService } from "../nugecid-anexos.service";
 import { DesarquivamentoAnexoTypeOrmEntity } from "../infrastructure/entities/desarquivamento-anexo.typeorm-entity";
+import { User } from "../../users/entities/user.entity";
+
+type AuthenticatedRequest = {
+  user: User;
+};
 
 function pipeArquivo(
   res: Response,
@@ -47,6 +52,12 @@ function pipeArquivo(
 @ApiBearerAuth()
 export class AnexosController {
   constructor(private readonly anexosService: NugecidAnexosService) {}
+
+  private sanitizeContentDisposition(filename: string): string {
+    const sanitized = filename.replace(/[\r\n]/g, "_").replace(/"/g, "'");
+    const encoded = encodeURIComponent(sanitized).replace(/'/g, "%27");
+    return `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
+  }
 
   @Post("upload")
   @ApiOperation({ summary: "Fazer upload de anexo para desarquivamento" })
@@ -101,7 +112,7 @@ export class AnexosController {
     @Body("tipoAnexo")
     tipoAnexo: "desarquivamento" | "rearquivamento" = "desarquivamento",
     @Body("anexarAoProcesso") anexarAoProcesso: string | boolean = false,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ success: boolean; data: any }> {
     // Converter string "true"/"false" para boolean
     const anexarProcesso =
@@ -134,10 +145,12 @@ export class AnexosController {
   })
   async findAnexosByDesarquivamento(
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
+    @Request() req: AuthenticatedRequest,
     @Query("tipo") tipo?: "desarquivamento" | "rearquivamento",
   ): Promise<{ success: boolean; data: any[] }> {
     const anexos = await this.anexosService.findAnexosByDesarquivamento(
       desarquivamentoId,
+      req.user,
       tipo,
     );
     return {
@@ -154,10 +167,12 @@ export class AnexosController {
   async getAnexoOcrAnalysis(
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
     @Param("id", ParseIntPipe) id: number,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ success: boolean; data: any }> {
     const data = await this.anexosService.getAnexoOcrAnalysisByDesarquivamento(
       id,
       desarquivamentoId,
+      req.user,
     );
     return {
       success: true,
@@ -198,7 +213,7 @@ export class AnexosController {
     @Param("id", ParseIntPipe) id: number,
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
     @Body("descricao") descricao: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ success: boolean; data: any }> {
     const anexo =
       await this.anexosService.updateAnexoDescricaoByDesarquivamento(
@@ -226,18 +241,20 @@ export class AnexosController {
   async downloadAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
+    @Request() req: AuthenticatedRequest,
     @Res() res: Response,
   ): Promise<void> {
     const { arquivo, anexo } =
       await this.anexosService.streamAnexoByDesarquivamento(
         id,
         desarquivamentoId,
+        req.user,
       );
 
     res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${anexo.nomeOriginal}"`,
+      this.sanitizeContentDisposition(anexo.nomeOriginal),
     );
     pipeArquivo(res, arquivo);
   }
@@ -259,12 +276,14 @@ export class AnexosController {
   async viewAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
+    @Request() req: AuthenticatedRequest,
     @Res() res: Response,
   ): Promise<void> {
     const { arquivo, anexo } =
       await this.anexosService.streamAnexoByDesarquivamento(
         id,
         desarquivamentoId,
+        req.user,
       );
 
     // Verificar se é um tipo suportado para visualização inline
@@ -300,7 +319,7 @@ export class AnexosController {
   async deleteAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("desarquivamentoId", ParseIntPipe) desarquivamentoId: number,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
   ): Promise<void> {
     return this.anexosService.deleteAnexoByDesarquivamento(
       id,
@@ -318,6 +337,12 @@ export class AnexosController {
 export class AnexosProcessoController {
   constructor(private readonly anexosService: NugecidAnexosService) {}
 
+  private sanitizeContentDisposition(filename: string): string {
+    const sanitized = filename.replace(/[\r\n]/g, "_").replace(/"/g, "'");
+    const encoded = encodeURIComponent(sanitized).replace(/'/g, "%27");
+    return `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
+  }
+
   @Get()
   @ApiOperation({ summary: "Listar anexos de um processo" })
   @ApiParam({
@@ -332,10 +357,12 @@ export class AnexosProcessoController {
   })
   async findAnexosByProcesso(
     @Param("numeroProcesso") numeroProcesso: string,
+    @Request() req: AuthenticatedRequest,
     @Query("tipo") tipo?: "desarquivamento" | "rearquivamento",
   ): Promise<{ success: boolean; data: any[] }> {
     const anexos = await this.anexosService.findAnexosByProcesso(
       numeroProcesso,
+      req.user,
       tipo,
     );
     return {
@@ -352,10 +379,12 @@ export class AnexosProcessoController {
   async getAnexoOcrAnalysis(
     @Param("id", ParseIntPipe) id: number,
     @Param("numeroProcesso") numeroProcesso: string,
+    @Request() req: AuthenticatedRequest,
   ): Promise<{ success: boolean; data: any }> {
     const data = await this.anexosService.getAnexoOcrAnalysisByProcesso(
       id,
       numeroProcesso,
+      req.user,
     );
     return {
       success: true,
@@ -376,18 +405,19 @@ export class AnexosProcessoController {
   async downloadAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("numeroProcesso") numeroProcesso: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Res() res: Response,
   ): Promise<void> {
     const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
       id,
       numeroProcesso,
+      req.user,
     );
 
     res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${anexo.nomeOriginal}"`,
+      this.sanitizeContentDisposition(anexo.nomeOriginal),
     );
     pipeArquivo(res, arquivo);
   }
@@ -411,12 +441,13 @@ export class AnexosProcessoController {
   async viewAnexo(
     @Param("id", ParseIntPipe) id: number,
     @Param("numeroProcesso") numeroProcesso: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Res() res: Response,
   ): Promise<void> {
     const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
       id,
       numeroProcesso,
+      req.user,
     );
 
     if (!anexo.canPreview()) {
@@ -439,6 +470,12 @@ export class AnexosProcessoController {
 export class AnexosProcessoQueryController {
   constructor(private readonly anexosService: NugecidAnexosService) {}
 
+  private sanitizeContentDisposition(filename: string): string {
+    const sanitized = filename.replace(/[\r\n]/g, "_").replace(/"/g, "'");
+    const encoded = encodeURIComponent(sanitized).replace(/'/g, "%27");
+    return `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`;
+  }
+
   private getNumeroProcesso(numeroProcesso?: string): string {
     const normalized = numeroProcesso?.trim();
     if (!normalized) {
@@ -451,11 +488,13 @@ export class AnexosProcessoQueryController {
   @Get()
   @ApiOperation({ summary: "Listar anexos de um processo via query string" })
   async findAnexosByProcesso(
+    @Request() req: AuthenticatedRequest,
     @Query("numeroProcesso") numeroProcesso?: string,
     @Query("tipo") tipo?: "desarquivamento" | "rearquivamento",
   ): Promise<{ success: boolean; data: any[] }> {
     const anexos = await this.anexosService.findAnexosByProcesso(
       this.getNumeroProcesso(numeroProcesso),
+      req.user,
       tipo,
     );
 
@@ -472,11 +511,13 @@ export class AnexosProcessoQueryController {
   })
   async getAnexoOcrAnalysis(
     @Param("id", ParseIntPipe) id: number,
+    @Request() req: AuthenticatedRequest,
     @Query("numeroProcesso") numeroProcesso?: string,
   ): Promise<{ success: boolean; data: any }> {
     const data = await this.anexosService.getAnexoOcrAnalysisByProcesso(
       id,
       this.getNumeroProcesso(numeroProcesso),
+      req.user,
     );
 
     return {
@@ -491,18 +532,20 @@ export class AnexosProcessoQueryController {
   })
   async downloadAnexo(
     @Param("id", ParseIntPipe) id: number,
+    @Request() req: AuthenticatedRequest,
     @Res() res: Response,
     @Query("numeroProcesso") numeroProcesso?: string,
   ): Promise<void> {
     const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
       id,
       this.getNumeroProcesso(numeroProcesso),
+      req.user,
     );
 
     res.setHeader("Content-Type", arquivo.contentType || anexo.tipoMime);
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${anexo.nomeOriginal}"`,
+      this.sanitizeContentDisposition(anexo.nomeOriginal),
     );
     pipeArquivo(res, arquivo);
   }
@@ -513,12 +556,14 @@ export class AnexosProcessoQueryController {
   })
   async viewAnexo(
     @Param("id", ParseIntPipe) id: number,
+    @Request() req: AuthenticatedRequest,
     @Res() res: Response,
     @Query("numeroProcesso") numeroProcesso?: string,
   ): Promise<void> {
     const { arquivo, anexo } = await this.anexosService.streamAnexoByProcesso(
       id,
       this.getNumeroProcesso(numeroProcesso),
+      req.user,
     );
 
     if (!anexo.canPreview()) {
