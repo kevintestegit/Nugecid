@@ -3,6 +3,11 @@
 .vercel
 .claude
 .superpowers/
+.github/
+.opencode/skills/
+.playwright-mcp/
+.serena/
+.codex
 
 # Node
 node_modules/
@@ -14,6 +19,7 @@ build/
 .cache/
 playwright-report/
 test-results/
+performance-report.json
 
 # Editor configs
 .vscode/
@@ -34,15 +40,22 @@ coverage/
 .env
 .env.*
 !.env.example
-webscraping-service/.env.example
 
 # Backups (contain PII and password hashes)
 backups/
 *.sql.bak
+backup_full_*.sql
+backup_full_*.tar.gz
 
-# Uploads / backups
+# Uploads
 uploads/
-backups/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local auxiliary service
+webscraping-service/
 
 # SSL certificates (never commit private keys)
 docker/postgres/certs/*.key
