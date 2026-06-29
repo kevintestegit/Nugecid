@@ -52,7 +52,7 @@
     "tailwindcss-animate": "^1.0.7",
     "yet-another-react-lightbox": "^3.25.0",
     "zod": "^3.22.4",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@tanstack/react-query-devtools": "^5.8.4",
