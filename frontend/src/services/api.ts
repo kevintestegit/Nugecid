@@ -316,7 +316,10 @@ export class ApiService {
   }
 
   async getPrintCandidates(
-    params?: Pick<QueryDesarquivamentoDto, "page" | "limit" | "sortBy" | "sortOrder">,
+    params?: Pick<
+      QueryDesarquivamentoDto,
+      "page" | "limit" | "sortBy" | "sortOrder"
+    >,
   ): Promise<PaginatedResponse<DesarquivamentoPrintCandidate>> {
     try {
       const response: AxiosResponse<
@@ -571,9 +574,7 @@ export class ApiService {
 
   async deleteUser(id: number): Promise<DeleteResponse> {
     const response: AxiosResponse<DeleteResponse | undefined> =
-      await this.api.delete(
-        `/users/${id}`,
-      );
+      await this.api.delete(`/users/${id}`);
     if (response.data && typeof response.data === "object") {
       return response.data;
     }

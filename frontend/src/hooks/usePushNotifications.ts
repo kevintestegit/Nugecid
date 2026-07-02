@@ -18,10 +18,7 @@ export const usePushNotifications = () => {
         return;
       }
 
-      if (
-        !preferences?.pushEnabled ||
-        Notification.permission !== "granted"
-      ) {
+      if (!preferences?.pushEnabled || Notification.permission !== "granted") {
         await pushSubscriptionService.detachCurrentSubscription();
         return;
       }

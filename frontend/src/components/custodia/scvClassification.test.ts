@@ -3,98 +3,151 @@ import { describe, expect, it } from "vitest";
 import { scvClasses } from "@/components/custodia/scvClassification";
 
 describe("scvClasses", () => {
-  it("segue a ordem macro definida no documento de classificação", () => {
+  const criminalistica = () => scvClasses.find((item) => item.code === "100");
+
+  it("contém os 3 institutos do documento de classificação", () => {
     expect(scvClasses.map((item) => `${item.code} ${item.label}`)).toEqual([
-      "1 Biológico",
-      "2 Papiloscópico",
-      "3 Químico-Toxicológico/Drogas",
-      "4 Genética Forense",
-      "5 Antropologia Forense",
-      "6 Arqueologia Forense",
-      "7 Odontologia Legal",
-      "8 Medicina Legal",
-      "800 Documental",
-      "10 Perícia Merceológica",
-      "11 Perícia em Eletro-eletrônico (Informática)",
-      "900 Balística",
-      "13 Geral",
+      "000 Identificação",
+      "100 Criminalística",
+      "200 Medicina Legal",
     ]);
   });
 
-  it("mantém os níveis de classificação na ordem do documento", () => {
-    const groupsByClass = Object.fromEntries(
-      scvClasses.map((item) => [
-        item.code,
-        item.groups.map((group) => `${group.code} ${group.label}`),
-      ]),
-    );
+  it("Instituto 100 Criminalística possui 9 grupos (disciplinas)", () => {
+    const criminalistica = scvClasses.find((item) => item.code === "100");
+    const groups = criminalistica?.groups ?? [];
+    expect(groups).toHaveLength(9);
+    expect(groups.map((g) => g.code)).toEqual([
+      "101",
+      "102",
+      "103",
+      "104",
+      "105",
+      "106",
+      "107",
+      "108",
+      "109",
+    ]);
+  });
 
-    expect(groupsByClass).toMatchObject({
-      "1": [
-        "101 Fluidos Corporais",
-        "1.2 Tecidos Sólidos e Estruturas Celulares",
-        "1.3 Materiais Biológicos Diversos (Animais e Vegetal)",
-      ],
-      "2": ["2.1 Papiloscopia"],
-      "3": [
-        "3.1 Tóxicos",
-        "3.2 Farmacêuticos",
-        "3.3 Estimulantes",
-        "3.4 Alucinógenos",
-        "3.5 Canabinoides",
-        "3.6 Outras Drogas de Abuso e Acessórios",
-      ],
-      "4": [
-        "4.1 Vestígios de Alto Teor de DNA",
-        "4.2 Vestígios de Médio Teor de DNA",
-        "4.3 Vestígios de Baixo Teor de DNA ou Degradado",
-      ],
-      "800": [
-        "801 Documentos de Identificação",
-        "9.2 Títulos Oficiais",
-        "9.3 Cédulas e Moedas",
-        "9.4 Documentos Manuscritos",
-        "9.5 Documentos Datilografados e Impressos",
-        "9.6 Documentos Eletrônicos e Digitais",
-        "9.7 Documentos Contábeis e Financeiros",
-        "9.8 Documentos Audiovisuais",
-        "9.9 Registros Documentais em Outras Superfícies",
-      ],
-      "900": [
-        "901 Quanto à Origem (Elementos Essenciais do Disparo)",
-        "12.2 Quanto aos Resíduos do Disparo",
-        "12.3 Quanto aos Efeitos do Disparo no Alvo",
-        "12.4 Vestígios Associados",
+  it("Instituto 200 Medicina Legal possui 7 grupos (disciplinas)", () => {
+    const medLegal = scvClasses.find((item) => item.code === "200");
+    const groups = medLegal?.groups ?? [];
+    expect(groups).toHaveLength(7);
+    expect(groups.map((g) => g.code)).toEqual([
+      "201",
+      "202",
+      "203",
+      "204",
+      "205",
+      "206",
+      "207",
+    ]);
+  });
+
+  it("Instituto 000 Identificação possui 1 grupo", () => {
+    const identificacao = scvClasses.find((item) => item.code === "000");
+    expect(identificacao?.groups).toHaveLength(1);
+    expect(identificacao?.groups[0].code).toBe("001");
+  });
+
+  it("mantém apenas os códigos biológicos definidos no documento", () => {
+    const biologia = criminalistica()?.groups.find((g) => g.code === "101");
+
+    expect(biologia?.subdivisions?.map(({ code }) => code)).toEqual([
+      "101.1",
+      "101.2",
+      "101.3",
+      "101.4",
+      "101.5",
+      "101.6",
+    ]);
+    expect(biologia?.subdivisions?.[0]).toMatchObject({
+      code: "101.1",
+      label: "Humana",
+      subdivisions: [{ code: "101.11", label: "Vestígio Hematológico" }],
+    });
+    expect(biologia?.subdivisions?.[5]).toMatchObject({
+      code: "101.6",
+      label: "Vestígio Genético",
+      subdivisions: [
+        { code: "101.61", label: "DNA Humano" },
+        { code: "101.62", label: "DNA Animal" },
+        { code: "101.63", label: "DNA Vegetal" },
+        { code: "101.66", label: "Perfil Genético Misto" },
       ],
     });
   });
 
-  it("representa filhos de papiloscopia como nível 3", () => {
-    const papiloscopico = scvClasses.find((item) => item.code === "2");
-    const groups = papiloscopico?.groups ?? [];
+  it("corrige o prefixo e preserva os níveis da Toxicologia", () => {
+    const toxicologia = criminalistica()?.groups.find((g) => g.code === "103");
+    const entorpecentes = toxicologia?.subdivisions?.[0];
 
-    expect(groups.find((group) => group.code === "2.1")?.subdivisions).toEqual([
-      { code: "2.1.1", label: "Dactiloscopia" },
-      { code: "2.1.2", label: "Quiroscopia" },
-      { code: "2.1.3", label: "Podoscopia" },
+    expect(entorpecentes?.subdivisions?.map(({ code }) => code)).toEqual([
+      "103.11",
+      "103.12",
+      "103.13",
+      "103.14",
+      "103.15",
     ]);
+    expect(entorpecentes?.subdivisions?.[3]).toMatchObject({
+      code: "103.14",
+      label: "Canabinoides",
+      subdivisions: [{ code: "103.141", label: "Benzodiazepínicos" }],
+    });
+    expect(entorpecentes?.subdivisions?.[4].subdivisions?.at(-1)?.code).toBe(
+      "103.154",
+    );
   });
 
-  it("preserva classificações de quarto nível da balística como subdivisões selecionáveis", () => {
-    const balistica = scvClasses.find((item) => item.code === "900");
-    const origem = balistica?.groups.find((group) => group.code === "901");
-
-    expect(origem?.subdivisions).toEqual(
-      expect.arrayContaining([
-        {
-          code: "901.211",
-          label: "Elementos da Munição Deflagrada - Estojos",
-        },
-        {
-          code: "901.212",
-          label: "Elementos da Munição Deflagrada - Projéteis",
-        },
-      ]),
+  it("remove duplicações e corrige prefixos evidentes do documento", () => {
+    const meioAmbiente = criminalistica()?.groups.find(
+      (group) => group.code === "104",
     );
+    expect(meioAmbiente?.subdivisions?.map(({ code }) => code)).toEqual([
+      "104.1",
+      "104.2",
+      "104.3",
+      "104.4",
+      "104.5",
+      "104.6",
+      "104.7",
+      "104.8",
+      "104.9",
+      "104.10",
+    ]);
+
+    const medicinaLegal = scvClasses.find(({ code }) => code === "200");
+    const psiquiatria = medicinaLegal?.groups.find(
+      ({ code }) => code === "201",
+    );
+    const psicologia = medicinaLegal?.groups.find(({ code }) => code === "202");
+    expect(psiquiatria?.subdivisions?.map(({ code }) => code)).toEqual([
+      "201.1",
+      "201.2",
+      "201.3",
+      "201.4",
+      "201.5",
+      "201.6",
+      "201.7",
+      "201.8",
+      "201.9",
+      "201.10",
+    ]);
+    expect(psicologia?.subdivisions?.at(-1)?.code).toBe("202.10");
+  });
+
+  it("109 Armamentos possui 6 grupos com subdivisions", () => {
+    const armamentos = criminalistica()?.groups.find((g) => g.code === "109");
+    expect(armamentos?.subdivisions).toHaveLength(6);
+
+    const armas = armamentos?.subdivisions?.find((s) => s.code === "109.1");
+    expect(armas?.subdivisions).toEqual([
+      { code: "109.11", label: "Arma Curta" },
+      { code: "109.12", label: "Arma Longa" },
+    ]);
+
+    const projeteis = armamentos?.subdivisions?.find((s) => s.code === "109.2");
+    expect(projeteis?.subdivisions).toHaveLength(8);
   });
 });

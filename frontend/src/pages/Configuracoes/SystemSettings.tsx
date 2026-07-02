@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -27,7 +27,6 @@ import {
   CheckCircle,
 } from "lucide-react";
 import backupService, { BackupListItem } from "@/services/backupService";
-import escavadorService, { EscavadorStatus } from "@/services/escavadorService";
 import { toast } from "sonner";
 import { LinearProgress, MultiStepProgress } from "@/components/ui/ProgressBar";
 import { ErrorMessage, getErrorMessage } from "@/components/ui/ErrorMessage";
@@ -37,22 +36,6 @@ type RestoreStep = {
   label: string;
   description: string;
   status: RestoreStepStatus;
-};
-
-const sanitizeHttpUrl = (value?: string): string | null => {
-  if (!value) {
-    return null;
-  }
-
-  try {
-    const parsed = new URL(value.trim());
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    return parsed.toString();
-  } catch {
-    return null;
-  }
 };
 
 export const SystemSettings: React.FC = () => {
@@ -102,19 +85,11 @@ export const SystemSettings: React.FC = () => {
   ]);
   const [confirmationText, setConfirmationText] = useState("");
   const [backupError, setBackupError] = useState<unknown>(null);
-  const [escavadorStatus, setEscavadorStatus] =
-    useState<EscavadorStatus | null>(null);
-  const [isLoadingEscavador, setIsLoadingEscavador] = useState(false);
-  const safeEscavadorLink = useMemo(
-    () => sanitizeHttpUrl(escavadorStatus?.lastLink),
-    [escavadorStatus?.lastLink],
-  );
   const hasRestoreError = restoreSteps.some((step) => step.status === "error");
 
   // Carregar configurações ao montar o componente
   useEffect(() => {
     loadSettings();
-    loadEscavadorStatus();
   }, []);
 
   // Carregar configurações do backend
@@ -136,18 +111,6 @@ export const SystemSettings: React.FC = () => {
       });
     } finally {
       setIsLoadingSettings(false);
-    }
-  };
-
-  const loadEscavadorStatus = async () => {
-    setIsLoadingEscavador(true);
-    try {
-      const status = await escavadorService.getStatus();
-      setEscavadorStatus(status);
-    } catch (error: unknown) {
-      console.error("Erro ao carregar escavador:", error);
-    } finally {
-      setIsLoadingEscavador(false);
     }
   };
 
@@ -559,85 +522,6 @@ export const SystemSettings: React.FC = () => {
                 }
               />
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Escavador SEIRN */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
-            <CardTitle className="text-lg">Escavador SEIRN</CardTitle>
-            <CardDescription>
-              Monitora “Recebidos” no SEI e gera notificações internas.
-            </CardDescription>
-          </div>
-          <Badge variant={escavadorStatus?.running ? "default" : "secondary"}>
-            {escavadorStatus?.running ? "Rodando" : "Parado"}
-          </Badge>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              onClick={loadEscavadorStatus}
-              disabled={isLoadingEscavador}
-            >
-              {isLoadingEscavador ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Atualizar status
-            </Button>
-            {escavadorStatus?.lastProcess && (
-              <Badge variant="outline">
-                Último: {escavadorStatus.lastProcess}
-              </Badge>
-            )}
-          </div>
-
-          {escavadorStatus?.lastOutput && (
-            <div className="text-sm text-muted-foreground">
-              Última linha: <code>{escavadorStatus.lastOutput}</code>
-            </div>
-          )}
-          <div className="text-sm text-muted-foreground space-y-1">
-            <div>
-              <span className="font-semibold">Último processo conhecido:</span>{" "}
-              {escavadorStatus?.lastProcess || "—"}
-            </div>
-            {escavadorStatus?.lastTitle && (
-              <div>
-                <span className="font-semibold">Título:</span>{" "}
-                {escavadorStatus.lastTitle}
-              </div>
-            )}
-            {escavadorStatus?.lastLink && (
-              <div>
-                <span className="font-semibold">Link:</span>{" "}
-                {safeEscavadorLink ? (
-                  <a
-                    href={safeEscavadorLink}
-                    className="text-blue-600 underline"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {safeEscavadorLink}
-                  </a>
-                ) : (
-                  <span className="text-amber-700">
-                    link inválido bloqueado
-                  </span>
-                )}
-              </div>
-            )}
-            {escavadorStatus?.lastChangeAt && (
-              <div>
-                Última mudança:{" "}
-                {new Date(escavadorStatus.lastChangeAt).toLocaleString()}
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>

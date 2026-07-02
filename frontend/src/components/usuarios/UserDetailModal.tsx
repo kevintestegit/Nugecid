@@ -81,7 +81,9 @@ const UserDetailModal: React.FC<UserDetailModalProps> = ({
                 <h3 className="text-lg font-semibold text-foreground">
                   Detalhes do Usuário
                 </h3>
-                <p className="text-sm text-muted-foreground">Informações completas</p>
+                <p className="text-sm text-muted-foreground">
+                  Informações completas
+                </p>
               </div>
             </div>
             <button

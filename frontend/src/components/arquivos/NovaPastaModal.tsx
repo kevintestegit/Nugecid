@@ -106,12 +106,7 @@ export const NovaPastaModal: React.FC<NovaPastaModalProps> = ({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
-          <FormField
-            id="nome"
-            label="Nome"
-            required
-            error={fieldErrors.nome}
-          >
+          <FormField id="nome" label="Nome" required error={fieldErrors.nome}>
             <Input
               id="nome"
               value={nome}

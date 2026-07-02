@@ -576,7 +576,7 @@ export class NugecidController {
   }
 
   @Get()
-  @Roles(RoleType.ADMIN, RoleType.USUARIO)
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR, RoleType.USUARIO)
   @ApiOperation({ summary: "Listar desarquivamentos com filtros e paginação" })
   @ApiQuery({ type: QueryDesarquivamentoDto })
   @ApiBearerAuth()
@@ -612,7 +612,7 @@ export class NugecidController {
   }
 
   @Get("impressao/candidatos")
-  @Roles(RoleType.ADMIN, RoleType.USUARIO)
+  @Roles(RoleType.ADMIN, RoleType.COORDENADOR, RoleType.USUARIO)
   @ApiOperation({
     summary: "Listar candidatos elegíveis para impressão do termo de entrega",
   })
@@ -647,6 +647,9 @@ export class NugecidController {
         tipoDocumento: item.tipoDocumento,
         status: item.status,
         dataDesarquivamentoSAG: item.dataDesarquivamentoSAG,
+        pdfUrl: `/api/nugecid/${item.id}/termo-pdf`,
+        previewUrl: `/api/nugecid/${item.id}/termo-preview`,
+        detailUrl: `/api/nugecid/${item.id}`,
       })),
       meta: {
         page: result.page,

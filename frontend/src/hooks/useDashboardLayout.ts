@@ -160,16 +160,16 @@ export const useDashboardLayout = () => {
 
   // Resetar para layout padrão
   const resetLayout = useCallback(async () => {
-    const confirmed = window.confirm(
-      "Tem certeza que deseja restaurar o layout padrão? Esta ação não pode ser desfeita.",
-    );
-
-    if (!confirmed) return;
-
-    await saveLayout(DEFAULT_DASHBOARD_CARDS);
-    toast.success(
-      "Layout restaurado!",
-      "O dashboard foi restaurado para o padrão.",
+    toast.confirm(
+      "Restaurar layout padrão?",
+      "Esta ação não pode ser desfeita.",
+      async () => {
+        await saveLayout(DEFAULT_DASHBOARD_CARDS);
+        toast.success(
+          "Layout restaurado!",
+          "O dashboard foi restaurado para o padrão.",
+        );
+      },
     );
   }, [saveLayout]);
 

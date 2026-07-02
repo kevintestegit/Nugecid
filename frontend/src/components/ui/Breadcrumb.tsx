@@ -53,7 +53,9 @@ const Breadcrumb: React.FC<BreadcrumbProps> = ({
               <span
                 className={cn(
                   "flex items-center gap-1",
-                  isLast ? "text-foreground font-medium" : "text-muted-foreground",
+                  isLast
+                    ? "text-foreground font-medium"
+                    : "text-muted-foreground",
                 )}
               >
                 {isHome && <Home className="h-4 w-4" />}

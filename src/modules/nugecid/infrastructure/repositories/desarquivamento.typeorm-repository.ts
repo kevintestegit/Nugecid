@@ -71,7 +71,7 @@ export class DesarquivamentoTypeOrmRepository
     }
 
     this.logger.log(
-      `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | dadosAdicionais=${entity.dadosAdicionais || "VAZIO"}`,
+      `[REPOSITORY] Persistindo desarquivamento - tipo_desarquivamento=${entity.tipoDesarquivamento} | temDadosAdicionais=${Boolean(entity.dadosAdicionais)}`,
     );
     const savedEntity = await this.repository.save(entity);
 

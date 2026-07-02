@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import CatalogacaoVestigiosPage from "@/pages/CatalogacaoVestigiosPage";
@@ -36,24 +36,24 @@ vi.mock("sonner", () => ({
 
 const pendingVestigio = {
   id: "vest-1",
-  codigoScv: "2.1.1",
-  classePrincipal: "2",
-  grupoCodigo: "2.1",
-  subdivisaoCodigo: "2.1.1",
+  codigoScv: "101.11",
+  classePrincipal: "101",
+  grupoCodigo: "101.1",
+  subdivisaoCodigo: "101.11",
   facetas: [],
   facetasDescricoes: {},
   numeroVestigio: "123",
   numeroCaso: "456",
-  categoria: "Papiloscópico - Geral",
+  categoria: "Biologia - Geral",
   delegacia: "1a DP",
   mesReferencia: "2026-06",
-  etiquetaCompleta: "2.1.1\nVG-123-0626",
+  etiquetaCompleta: "101.11\nVG-123-0626",
   status: "catalogacao_pendente",
   observacoes: "",
-  classeCatalogacao: "2",
-  subclasseCatalogacao: "Papiloscopia",
-  tipoCatalogacao: "Dactiloscopia",
-  schemaVersao: "ccvc-2026-06",
+  classeCatalogacao: "101",
+  subclasseCatalogacao: "Biologia",
+  tipoCatalogacao: "Geral",
+  schemaVersao: "ccvc-2026-07",
   metadadosGerais: {},
   metadadosEspecificos: {},
   criadoPor: {
@@ -65,11 +65,22 @@ const pendingVestigio = {
   updatedAt: "2026-06-16T13:00:00.000Z",
 };
 
+const BancoDestino = () => {
+  const location = useLocation();
+  return <p>Destino: {`${location.pathname}${location.search}`}</p>;
+};
+
 const renderPage = (initialEntries = ["/custodia/catalogacao"]) =>
   render(
     <MemoryRouter initialEntries={initialEntries}>
       <ThemeProvider>
-        <CatalogacaoVestigiosPage />
+        <Routes>
+          <Route
+            path="/custodia/catalogacao"
+            element={<CatalogacaoVestigiosPage />}
+          />
+          <Route path="/custodia/banco-vestigios" element={<BancoDestino />} />
+        </Routes>
       </ThemeProvider>
     </MemoryRouter>,
   );
@@ -106,7 +117,7 @@ describe("CatalogacaoVestigiosPage", () => {
       await screen.findByRole("heading", { name: /catalogação de vestígios/i }),
     ).toBeInTheDocument();
     // O label do schema agora eh "{classLabel} - Geral".
-    expect(screen.getAllByText(/Papiloscópico/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Biologia/).length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue("VG-123-0626")).toBeInTheDocument();
   });
 
@@ -147,6 +158,12 @@ describe("CatalogacaoVestigiosPage", () => {
         }),
       );
     });
+
+    expect(
+      await screen.findByText(
+        "Destino: /custodia/banco-vestigios?vestigioId=vest-1",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("seleciona o vestigio indicado na URL ao abrir a catalogacao", async () => {

@@ -102,7 +102,9 @@ const DeleteUserModal: React.FC<DeleteUserModalProps> = ({
                       <span className="text-sm font-medium text-muted-foreground">
                         Nome:
                       </span>
-                      <span className="text-sm text-foreground">{user.nome}</span>
+                      <span className="text-sm text-foreground">
+                        {user.nome}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm font-medium text-muted-foreground">

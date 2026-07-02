@@ -39,9 +39,11 @@ describe("BackupService", () => {
     process.chdir(tempRoot);
     mkdirSync(path.join(tempRoot, "backups"), { recursive: true });
     service = new BackupService(createConfigService());
+    jest.spyOn(service["logger"], "log").mockImplementation(() => {});
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     process.chdir(originalCwd);
     rmSync(tempRoot, { recursive: true, force: true });
   });

@@ -4,7 +4,9 @@ import { afterEach, vi } from "vitest";
 import { NugecidLogo } from "@/components/ui/NugecidLogo";
 
 const parseTranslateYAndScale = (transform: string): [number, number] => {
-  const match = transform.match(/translate\([^,]+,\s*([\d.-]+)\) scale\(([\d.-]+)\)/);
+  const match = transform.match(
+    /translate\([^,]+,\s*([\d.-]+)\) scale\(([\d.-]+)\)/,
+  );
 
   if (!match) {
     throw new Error(`Transform invalido: ${transform}`);
@@ -88,9 +90,7 @@ describe("NugecidLogo", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-04T12:00:00-03:00"));
     window.localStorage.setItem("nugecid-logo-preference", "worldCup2026");
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
-      null,
-    );
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 
     const { container } = render(<NugecidLogo />);
 
@@ -107,9 +107,7 @@ describe("NugecidLogo", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-04T12:00:00-03:00"));
     window.localStorage.setItem("nugecid-logo-preference", "worldCup2026");
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
-      null,
-    );
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
 
     const { container } = render(<NugecidLogo />);
 
@@ -161,9 +159,11 @@ describe("NugecidLogo", () => {
       quadraticCurveTo: vi.fn(),
       closePath: vi.fn(),
       fillRect: vi.fn(),
-      clearRect: vi.fn((x: number, y: number, width: number, height: number) => {
-        operations.push(`clearRect:${x}:${y}:${width}:${height}`);
-      }),
+      clearRect: vi.fn(
+        (x: number, y: number, width: number, height: number) => {
+          operations.push(`clearRect:${x}:${y}:${width}:${height}`);
+        },
+      ),
       setTransform: (
         a?: number | DOMMatrix2DInit,
         b?: number,
@@ -186,7 +186,10 @@ describe("NugecidLogo", () => {
       globalAlpha: 1,
     };
 
-    vi.spyOn(HTMLCanvasElement.prototype, "getBoundingClientRect").mockReturnValue({
+    vi.spyOn(
+      HTMLCanvasElement.prototype,
+      "getBoundingClientRect",
+    ).mockReturnValue({
       bottom: 82,
       height: 82,
       left: 0,
@@ -201,7 +204,9 @@ describe("NugecidLogo", () => {
       context as unknown as CanvasRenderingContext2D,
     );
     vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
-    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => undefined);
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(
+      () => undefined,
+    );
 
     render(<NugecidLogo />);
 

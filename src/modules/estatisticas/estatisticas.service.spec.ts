@@ -94,6 +94,7 @@ describe("EstatisticasService", () => {
       repoMock as unknown as Repository<DesarquivamentoTypeOrmEntity>,
       cacheManagerMock as unknown as Cache,
     );
+    jest.spyOn(service["logger"], "error").mockImplementation(() => undefined);
   });
 
   const configurePlaywrightSuccess = (): {

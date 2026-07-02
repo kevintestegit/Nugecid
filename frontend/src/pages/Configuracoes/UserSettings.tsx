@@ -18,13 +18,7 @@ import {
   Switch,
   Badge,
 } from "@/components/ui";
-import {
-  User,
-  Lock,
-  Settings,
-  Upload,
-  Trash2,
-} from "lucide-react";
+import { User, Lock, Settings, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { apiService } from "@/services/api";
 import { UserSettings as UserSettingsType } from "@/types";
@@ -406,12 +400,12 @@ export const UserSettings: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleChangePassword} noValidate className="space-y-4">
-            <FormField
-              id="senha-atual"
-              label="Senha atual"
-              required
-            >
+          <form
+            onSubmit={handleChangePassword}
+            noValidate
+            className="space-y-4"
+          >
+            <FormField id="senha-atual" label="Senha atual" required>
               <Input
                 id="senha-atual"
                 type="password"
@@ -465,9 +459,7 @@ export const UserSettings: React.FC = () => {
                 disabled={!canSubmitPassword}
                 className="w-full md:w-auto"
               >
-                {isSubmittingPassword
-                  ? "Alterando..."
-                  : "Alterar senha"}
+                {isSubmittingPassword ? "Alterando..." : "Alterar senha"}
               </Button>
             </div>
           </form>

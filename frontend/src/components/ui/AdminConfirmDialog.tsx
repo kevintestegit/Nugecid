@@ -301,10 +301,8 @@ const AdminConfirmDialog: React.FC<AdminConfirmDialogProps> = ({
   );
 
   return createPortal(
-    <div className={theme === "dark" ? "dark" : ""}>
-      {modalContent}
-    </div>,
-    document.body
+    <div className={theme === "dark" ? "dark" : ""}>{modalContent}</div>,
+    document.body,
   );
 };
 

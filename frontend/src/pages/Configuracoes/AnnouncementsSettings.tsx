@@ -224,16 +224,29 @@ export const AnnouncementsSettings: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Tem certeza que deseja excluir este aviso?")) return;
-
-    try {
-      await apiService.deleteAnnouncement(id);
-      toast.success("Aviso excluído com sucesso!");
-      await loadAnnouncements();
-    } catch (error: unknown) {
-      console.error("Erro ao excluir aviso:", error);
-      toast.error("Erro ao excluir aviso");
-    }
+    toast.warning("Excluir este aviso?", {
+      description: "Esta ação não pode ser desfeita.",
+      duration: 10000,
+      action: {
+        label: "Confirmar",
+        onClick: () => {
+          void (async () => {
+            try {
+              await apiService.deleteAnnouncement(id);
+              toast.success("Aviso excluído com sucesso!");
+              await loadAnnouncements();
+            } catch (error: unknown) {
+              console.error("Erro ao excluir aviso:", error);
+              toast.error("Erro ao excluir aviso");
+            }
+          })();
+        },
+      },
+      cancel: {
+        label: "Cancelar",
+        onClick: () => undefined,
+      },
+    });
   };
 
   const handleToggleActive = async (announcement: Announcement) => {

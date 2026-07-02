@@ -24,6 +24,8 @@ describe("NovaPastaModal", () => {
     );
 
     expect(screen.getByText("Nova Pasta/Prateleira")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Criar Pasta" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Criar Pasta" }),
+    ).toBeInTheDocument();
   });
 });

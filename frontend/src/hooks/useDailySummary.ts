@@ -39,8 +39,7 @@ export function useDailySummary() {
 
   const { data, isLoading } = useQuery<ResumoDiarioResponse>({
     queryKey: ["resumo-diario"],
-    queryFn: () =>
-      api.get("/nugecid/resumo-diario").then((res) => res.data),
+    queryFn: () => api.get("/nugecid/resumo-diario").then((res) => res.data),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     enabled: !isDismissedToday(),

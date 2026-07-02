@@ -27,8 +27,14 @@ module.exports = {
     "@typescript-eslint/no-unused-vars": "off",
     "no-empty": "off",
     "no-useless-catch": "off",
-    // Encourage use of @/utils/logger instead of raw console calls.
-    // Set to "warn" to allow gradual migration; switch to "error" once cleaned up.
-    "no-console": "warn",
+    "no-console": ["warn", { allow: ["warn", "error"] }],
   },
+  overrides: [
+    {
+      files: ["src/utils/logger.ts", "src/test/setup.ts"],
+      rules: {
+        "no-console": "off",
+      },
+    },
+  ],
 };

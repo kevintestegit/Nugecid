@@ -67,7 +67,9 @@ const NotificacoesPage: React.FC = () => {
   const fetchNotificacoes = useNotificacoesStore(
     (state) => state.fetchNotificacoes,
   );
-  const upsertHistorico = useNotificacoesStore((state) => state.upsertHistorico);
+  const upsertHistorico = useNotificacoesStore(
+    (state) => state.upsertHistorico,
+  );
   const marcarComoLida = useNotificacoesStore((state) => state.marcarComoLida);
   const marcarTodasComoLidas = useNotificacoesStore(
     (state) => state.marcarTodasComoLidas,
@@ -236,9 +238,7 @@ const NotificacoesPage: React.FC = () => {
   };
 
   const handleBulkMarkRead = async () => {
-    await Promise.all(
-      Array.from(selectedIds).map((id) => marcarComoLida(id)),
-    );
+    await Promise.all(Array.from(selectedIds).map((id) => marcarComoLida(id)));
     setSelectedIds(new Set());
   };
 
@@ -550,8 +550,7 @@ const NotificacoesPage: React.FC = () => {
               {/* Items */}
               <div className="divide-y divide-border/60">
                 {historico.map((notificacao) => {
-                  const destination =
-                    getNotificationDestination(notificacao);
+                  const destination = getNotificationDestination(notificacao);
                   const isClickable = Boolean(destination);
                   const timeAgo = formatDistanceToNow(
                     new Date(notificacao.createdAt),

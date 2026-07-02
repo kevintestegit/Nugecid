@@ -401,7 +401,8 @@ export class DesarquivamentoDomain {
     // UsuÃ¡rios com role especÃ­fica podem acessar
     if (
       upperCaseUserRoles.includes("NUGECID_VIEWER") ||
-      upperCaseUserRoles.includes("NUGECID_OPERATOR")
+      upperCaseUserRoles.includes("NUGECID_OPERATOR") ||
+      upperCaseUserRoles.includes("COORDENADOR")
     ) {
       return true;
     }

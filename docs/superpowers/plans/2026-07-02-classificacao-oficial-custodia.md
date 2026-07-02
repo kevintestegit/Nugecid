@@ -16,7 +16,7 @@
 - Modify: `frontend/src/components/custodia/scvClassification.test.ts`
 - Modify: `frontend/src/components/custodia/catalogacaoSchemas.test.ts`
 
-- [ ] **Step 1: Escrever testes inicialmente falhos para a árvore**
+- [x] **Step 1: Escrever testes inicialmente falhos para a árvore**
 
 Adicionar expectativas que comprovem:
 
@@ -27,9 +27,10 @@ expect(toxicologiaCodes).toEqual(
 expect(toxicologiaCodes).not.toEqual(
   expect.arrayContaining(["102.14", "102.141", "102.15", "102.154"]),
 );
-expect(meioAmbienteCodes).not.toEqual(
-  expect.arrayContaining(["104.11", "104.19"]),
-);
+expect(meioAmbienteGroupCodes).toEqual([
+  "104.1", "104.2", "104.3", "104.4", "104.5",
+  "104.6", "104.7", "104.8", "104.9", "104.10",
+]);
 expect(psiquiatriaCodes).toEqual(
   expect.arrayContaining(["201.1", "201.10"]),
 );
@@ -37,7 +38,7 @@ expect(psiquiatriaCodes.some((code) => code.startsWith("200."))).toBe(false);
 expect(psicologiaCodes).toContain("202.10");
 ```
 
-- [ ] **Step 2: Escrever testes inicialmente falhos para schemas**
+- [x] **Step 2: Escrever testes inicialmente falhos para schemas**
 
 ```ts
 expect(catalogacaoSchemas.filter((schema) => schema.id === "107-tecnologia"))
@@ -60,7 +61,7 @@ expect(findCatalogacaoSchema({ classeCatalogacao: "207" })?.categories.periciais
   ]);
 ```
 
-- [ ] **Step 3: Executar os testes e confirmar as falhas**
+- [x] **Step 3: Executar os testes e confirmar as falhas**
 
 Run: `cd frontend && npm test -- --run src/components/custodia/scvClassification.test.ts src/components/custodia/catalogacaoSchemas.test.ts`
 
@@ -72,15 +73,15 @@ Expected: FAIL nos códigos ainda incorretos, no schema duplicado de Tecnologia 
 - Modify: `frontend/src/components/custodia/scvClassification.ts`
 - Test: `frontend/src/components/custodia/scvClassification.test.ts`
 
-- [ ] **Step 1: Aplicar as correções mínimas nos dados**
+- [x] **Step 1: Aplicar as correções mínimas nos dados**
 
 Renumerar Toxicologia para `103`, remover duplicações `104.11`–`104.19`, omitir `109.45`, `109.46` e `109.69`, usar `201.1`–`201.10` uma vez e corrigir `203.10` de Psicologia para `202.10`. Não atribuir códigos às categorias biológicas sem código oficial.
 
-- [ ] **Step 2: Normalizar apenas erros textuais autorizados**
+- [x] **Step 2: Normalizar apenas erros textuais autorizados**
 
 Usar grafia correta nas opções apresentadas ao usuário, incluindo `Fotografia`, `Interruptor`, `Redutor`, `Combustíveis`, `Metanfetamina`, `deflagrado`, `rigidez`, `Amputação múltipla`, `Pele` e `nível`.
 
-- [ ] **Step 3: Executar o teste da árvore**
+- [x] **Step 3: Executar o teste da árvore**
 
 Run: `cd frontend && npm test -- --run src/components/custodia/scvClassification.test.ts`
 
@@ -95,7 +96,7 @@ Expected: PASS.
 - Modify if required: `frontend/src/components/custodia/balistica.test.tsx`
 - Modify if required: `frontend/src/pages/CatalogacaoVestigiosPage.test.tsx`
 
-- [ ] **Step 1: Remover a definição duplicada de Tecnologia**
+- [x] **Step 1: Remover a definição duplicada de Tecnologia**
 
 Manter uma única entrada:
 
@@ -103,7 +104,7 @@ Manter uma única entrada:
 { id: "107-tecnologia", classCode: "107", classLabel: "Tecnologia", subclassLabel: "Tecnologia", typeLabel: "Geral" }
 ```
 
-- [ ] **Step 2: Usar os critérios textuais oficiais de 206 e 207**
+- [x] **Step 2: Usar os critérios textuais oficiais de 206 e 207**
 
 ```ts
 const CRITERIOS_206 = [
@@ -123,7 +124,11 @@ const CRITERIOS_207 = [
 
 Não criar opções que o documento não fornece.
 
-- [ ] **Step 3: Executar os testes direcionados**
+- [x] **Step 3: Renderizar os níveis hierárquicos disponíveis**
+
+Renderizar seletores encadeados a partir do nível 3 e persistir o código selecionado mais profundo sem alterar o contrato da API.
+
+- [x] **Step 4: Executar os testes direcionados**
 
 Run: `cd frontend && npm test -- --run src/components/custodia/scvClassification.test.ts src/components/custodia/catalogacaoSchemas.test.ts src/components/custodia/balistica.test.tsx src/pages/CatalogacaoVestigiosPage.test.tsx`
 
@@ -134,31 +139,31 @@ Expected: PASS.
 **Files:**
 - Verify only: `frontend/`
 
-- [ ] **Step 1: Executar typecheck**
+- [x] **Step 1: Executar typecheck**
 
 Run: `cd frontend && npm run typecheck`
 
 Expected: exit 0.
 
-- [ ] **Step 2: Executar lint**
+- [x] **Step 2: Executar lint**
 
 Run: `cd frontend && npm run lint`
 
 Expected: exit 0 ou somente problemas preexistentes documentados fora dos arquivos alterados.
 
-- [ ] **Step 3: Executar formatação**
+- [x] **Step 3: Executar formatação**
 
 Run: `cd frontend && npm run format -- --check`
 
 Expected: exit 0; se o script não aceitar `--check`, usar o verificador configurado no projeto sem reformatar arquivos alheios.
 
-- [ ] **Step 4: Executar build**
+- [x] **Step 4: Executar build**
 
 Run: `cd frontend && npm run build`
 
 Expected: exit 0.
 
-- [ ] **Step 5: Conferir o escopo final**
+- [x] **Step 5: Conferir o escopo final**
 
 Run: `git diff --check && git status --short`
 

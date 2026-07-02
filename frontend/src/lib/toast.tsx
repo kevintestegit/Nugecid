@@ -32,6 +32,29 @@ export const toast = {
     });
   },
 
+  confirm: (
+    message: string,
+    description: string,
+    onConfirm: () => void | Promise<void>,
+  ) => {
+    const id = sonnerToast.warning(message, {
+      description,
+      duration: 10000,
+      icon: <AlertTriangle className="w-5 h-5" />,
+      action: {
+        label: "Confirmar",
+        onClick: () => {
+          sonnerToast.dismiss(id);
+          void onConfirm();
+        },
+      },
+      cancel: {
+        label: "Cancelar",
+        onClick: () => sonnerToast.dismiss(id),
+      },
+    });
+  },
+
   loading: (message: string) => {
     return sonnerToast.loading(message);
   },

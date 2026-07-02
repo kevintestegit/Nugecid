@@ -126,10 +126,25 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
     };
 
     const particleSystem: Particle[] = [];
-    
-    const worldCupPalette = ["#009a44", "#0033a0", "#d81e05", "#ffcd00", "#7b2cbf", "#f107a3"];
-    const saoJoaoPalette = ["#f97316", "#facc15", "#ef4444", "#ea580c", "#eab308", "#ffffff"];
-    const activePalette = theme === "saoJoao" ? saoJoaoPalette : worldCupPalette;
+
+    const worldCupPalette = [
+      "#009a44",
+      "#0033a0",
+      "#d81e05",
+      "#ffcd00",
+      "#7b2cbf",
+      "#f107a3",
+    ];
+    const saoJoaoPalette = [
+      "#f97316",
+      "#facc15",
+      "#ef4444",
+      "#ea580c",
+      "#eab308",
+      "#ffffff",
+    ];
+    const activePalette =
+      theme === "saoJoao" ? saoJoaoPalette : worldCupPalette;
 
     const getRatio = () => window.devicePixelRatio || 1;
 
@@ -145,7 +160,8 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
     const project = (x: number, y: number, z: number) => {
       const escala = fDistancia / (fDistancia + z);
       const pX = centroProjecaoX + (x - centroProjecaoX) * escala;
-      const pSoloY = horizonteProjecaoY + (soloProjecaoY - horizonteProjecaoY) * escala;
+      const pSoloY =
+        horizonteProjecaoY + (soloProjecaoY - horizonteProjecaoY) * escala;
       const pY = pSoloY - (soloProjecaoY - y) * escala;
 
       return {
@@ -158,7 +174,9 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
     const spawnConfetti = () => {
       for (let index = 0; index < 90; index += 1) {
         particleSystem.push({
-          x: metaAlvo.x + (Math.random() * metaAlvo.largura - metaAlvo.largura / 2) * 0.8,
+          x:
+            metaAlvo.x +
+            (Math.random() * metaAlvo.largura - metaAlvo.largura / 2) * 0.8,
           y: metaAlvo.y - metaAlvo.altura * 0.5,
           z: metaAlvo.z,
           vx: Math.random() * 5 - 2.5,
@@ -176,7 +194,12 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       }
     };
 
-    let estadoAnimacao: "ressaltar" | "preparar" | "rematar" | "celebrar" | "fade" = "ressaltar";
+    let estadoAnimacao:
+      | "ressaltar"
+      | "preparar"
+      | "rematar"
+      | "celebrar"
+      | "fade" = "ressaltar";
     let contadorFrames = 0;
     let contagemRessaltos = 0;
     let temporizadorEstado = 0;
@@ -218,7 +241,7 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       );
       sphereGradient.addColorStop(0, "#ffffff");
       sphereGradient.addColorStop(0.7, "#f1f5f9");
-      sphereGradient.addColorStop(1, '#cbd5e1');
+      sphereGradient.addColorStop(1, "#cbd5e1");
 
       context.beginPath();
       context.arc(0, 0, rProjetado, 0, Math.PI * 2);
@@ -226,7 +249,10 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       context.fill();
 
       const rotZ = bolaFisica.z * 0.04;
-      const rotY = estadoAnimacao === "ressaltar" ? contadorFrames * 0.025 : bolaFisica.z * 0.045;
+      const rotY =
+        estadoAnimacao === "ressaltar"
+          ? contadorFrames * 0.025
+          : bolaFisica.z * 0.045;
 
       context.save();
       context.rotate(rotY);
@@ -243,8 +269,18 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
         context.rotate((index * Math.PI * 2) / 3 + rotZ);
         context.beginPath();
         context.moveTo(0, -rProjetado * 0.15);
-        context.quadraticCurveTo(rProjetado * 0.35, -rProjetado * 0.2, rProjetado * 0.75, -rProjetado * 0.4);
-        context.quadraticCurveTo(rProjetado * 0.55, -rProjetado * 0.7, 0, -rProjetado * 0.5);
+        context.quadraticCurveTo(
+          rProjetado * 0.35,
+          -rProjetado * 0.2,
+          rProjetado * 0.75,
+          -rProjetado * 0.4,
+        );
+        context.quadraticCurveTo(
+          rProjetado * 0.55,
+          -rProjetado * 0.7,
+          0,
+          -rProjetado * 0.5,
+        );
         context.closePath();
         context.fillStyle = panelColors[index];
         context.fill();
@@ -253,7 +289,12 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
 
       context.restore();
 
-      const shineGradient = context.createLinearGradient(0, -rProjetado, 0, rProjetado);
+      const shineGradient = context.createLinearGradient(
+        0,
+        -rProjetado,
+        0,
+        rProjetado,
+      );
       shineGradient.addColorStop(0, "rgba(255, 255, 255, 0.45)");
       shineGradient.addColorStop(0.35, "rgba(255, 255, 255, 0.05)");
       shineGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
@@ -427,24 +468,54 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       context.fillStyle = "#ef4444";
       context.beginPath();
       context.moveTo(x - flameW, y - 3 * scale);
-      context.quadraticCurveTo(x - flameW * 1.4, y - flameH * 0.5, x, y - flameH);
-      context.quadraticCurveTo(x + flameW * 1.4, y - flameH * 0.5, x + flameW, y - 3 * scale);
+      context.quadraticCurveTo(
+        x - flameW * 1.4,
+        y - flameH * 0.5,
+        x,
+        y - flameH,
+      );
+      context.quadraticCurveTo(
+        x + flameW * 1.4,
+        y - flameH * 0.5,
+        x + flameW,
+        y - 3 * scale,
+      );
       context.closePath();
       context.fill();
 
       context.fillStyle = "#f97316";
       context.beginPath();
       context.moveTo(x - flameW * 0.7, y - 3 * scale);
-      context.quadraticCurveTo(x - flameW * 1.0, y - flameH * 0.45, x, y - flameH * 0.8);
-      context.quadraticCurveTo(x + flameW * 1.0, y - flameH * 0.45, x + flameW * 0.7, y - 3 * scale);
+      context.quadraticCurveTo(
+        x - flameW * 1.0,
+        y - flameH * 0.45,
+        x,
+        y - flameH * 0.8,
+      );
+      context.quadraticCurveTo(
+        x + flameW * 1.0,
+        y - flameH * 0.45,
+        x + flameW * 0.7,
+        y - 3 * scale,
+      );
       context.closePath();
       context.fill();
 
       context.fillStyle = "#facc15";
       context.beginPath();
       context.moveTo(x - flameW * 0.4, y - 3 * scale);
-      context.quadraticCurveTo(x - flameW * 0.6, y - flameH * 0.35, x, y - flameH * 0.6);
-      context.quadraticCurveTo(x + flameW * 0.6, y - flameH * 0.35, x + flameW * 0.4, y - 3 * scale);
+      context.quadraticCurveTo(
+        x - flameW * 0.6,
+        y - flameH * 0.35,
+        x,
+        y - flameH * 0.6,
+      );
+      context.quadraticCurveTo(
+        x + flameW * 0.6,
+        y - flameH * 0.35,
+        x + flameW * 0.4,
+        y - 3 * scale,
+      );
       context.closePath();
       context.fill();
       context.restore();
@@ -555,7 +626,9 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
     };
 
     const drawConfetti = () => {
-      const sortedParticles = [...particleSystem].sort((left, right) => right.z - left.z);
+      const sortedParticles = [...particleSystem].sort(
+        (left, right) => right.z - left.z,
+      );
       for (const particle of sortedParticles) {
         const proj = project(particle.x, particle.y, particle.z);
         if (proj.scale <= 0) {
@@ -583,9 +656,12 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.save();
-      context.scale(canvas.width / larguraVirtual, canvas.height / alturaVirtual);
-      
-      if (theme === 'saoJoao') {
+      context.scale(
+        canvas.width / larguraVirtual,
+        canvas.height / alturaVirtual,
+      );
+
+      if (theme === "saoJoao") {
         if (bolaFisica.z >= 65) {
           drawPlayer();
           drawFire();
@@ -596,7 +672,7 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       } else {
         drawBall();
       }
-      
+
       drawConfetti();
       context.restore();
       animationFrameId = window.requestAnimationFrame(frame);
@@ -871,42 +947,94 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
   const WorldCupElements = ({ compact = false }) => (
     <g transform={compact ? "translate(0, 0)" : "translate(0, 0)"}>
       <g fill="#eab308">
-        <g transform={compact ? "translate(11, 9) scale(0.55)" : "translate(55, 11) scale(0.72)"}>
+        <g
+          transform={
+            compact
+              ? "translate(11, 9) scale(0.55)"
+              : "translate(55, 11) scale(0.72)"
+          }
+        >
           <path d="M 0 -6 L 1.8 -1.8 L 6 -1.8 L 2.6 0.8 L 3.8 5 L 0 2.6 L -3.8 5 L -2.6 0.8 L -6 -1.8 L -1.8 -1.8 Z" />
         </g>
-        <g transform={compact ? "translate(18, 5) scale(0.65)" : "translate(75, 8) scale(0.82)"}>
+        <g
+          transform={
+            compact
+              ? "translate(18, 5) scale(0.65)"
+              : "translate(75, 8) scale(0.82)"
+          }
+        >
           <path d="M 0 -6 L 1.8 -1.8 L 6 -1.8 L 2.6 0.8 L 3.8 5 L 0 2.6 L -3.8 5 L -2.6 0.8 L -6 -1.8 L -1.8 -1.8 Z" />
         </g>
-        <g transform={compact ? "translate(25, 2) scale(0.75)" : "translate(100, 6) scale(0.95)"}>
+        <g
+          transform={
+            compact
+              ? "translate(25, 2) scale(0.75)"
+              : "translate(100, 6) scale(0.95)"
+          }
+        >
           <path d="M 0 -6 L 1.8 -1.8 L 6 -1.8 L 2.6 0.8 L 3.8 5 L 0 2.6 L -3.8 5 L -2.6 0.8 L -6 -1.8 L -1.8 -1.8 Z" />
         </g>
-        <g transform={compact ? "translate(32, 5) scale(0.65)" : "translate(125, 8) scale(0.82)"}>
+        <g
+          transform={
+            compact
+              ? "translate(32, 5) scale(0.65)"
+              : "translate(125, 8) scale(0.82)"
+          }
+        >
           <path d="M 0 -6 L 1.8 -1.8 L 6 -1.8 L 2.6 0.8 L 3.8 5 L 0 2.6 L -3.8 5 L -2.6 0.8 L -6 -1.8 L -1.8 -1.8 Z" />
         </g>
-        <g transform={compact ? "translate(39, 9) scale(0.55)" : "translate(145, 11) scale(0.72)"}>
+        <g
+          transform={
+            compact
+              ? "translate(39, 9) scale(0.55)"
+              : "translate(145, 11) scale(0.72)"
+          }
+        >
           <path d="M 0 -6 L 1.8 -1.8 L 6 -1.8 L 2.6 0.8 L 3.8 5 L 0 2.6 L -3.8 5 L -2.6 0.8 L -6 -1.8 L -1.8 -1.8 Z" />
         </g>
       </g>
 
       <path
-        d={compact ? "M 2 31 Q 17 27 32 31" : "M 5 68 Q 50 62 100 67 T 170 58 Q 130 68 80 70 T 5 68"}
+        d={
+          compact
+            ? "M 2 31 Q 17 27 32 31"
+            : "M 5 68 Q 50 62 100 67 T 170 58 Q 130 68 80 70 T 5 68"
+        }
         fill="#10B981"
       />
       <path
-        d={compact ? "M 4 34 Q 18 30 31 34" : "M 15 72 Q 60 66 110 70 T 178 61 L 180 63 Q 120 73 60 75 T 15 72"}
+        d={
+          compact
+            ? "M 4 34 Q 18 30 31 34"
+            : "M 15 72 Q 60 66 110 70 T 178 61 L 180 63 Q 120 73 60 75 T 15 72"
+        }
         fill="#047857"
         opacity="0.8"
       />
 
-      <g transform={compact ? "translate(29, 16) scale(0.42)" : "translate(164, 44) scale(0.7)"}>
+      <g
+        transform={
+          compact
+            ? "translate(29, 16) scale(0.42)"
+            : "translate(164, 44) scale(0.7)"
+        }
+      >
         <path
           d="M 0,8 L 10,0 L 20,8 L 20,16 C 20,20 10,23 10,23 C 10,23 0,20 0,16 Z"
           fill="#0033a0"
           stroke="#facc15"
           strokeWidth="1.2"
         />
-        <path d="M 10,3 L 10,19 M 4,11 L 16,11" stroke="#ffffff" strokeWidth="2" />
-        <path d="M 10,4 L 10,18 M 5,11 L 15,11" stroke="#10b981" stroke-width="0.8" />
+        <path
+          d="M 10,3 L 10,19 M 4,11 L 16,11"
+          stroke="#ffffff"
+          strokeWidth="2"
+        />
+        <path
+          d="M 10,4 L 10,18 M 5,11 L 15,11"
+          stroke="#10b981"
+          stroke-width="0.8"
+        />
         <g fill="#facc15" transform="translate(0, -5) scale(0.8)">
           <path d="M 3,2 L 4,4 L 6,4 L 4.5,5 L 5,7 L 3,6 L 1,7 L 1.5,5 L 0,4 L 2,4 Z" />
           <path d="M 12,0 L 13,2 L 15,2 L 13.5,3 L 14,5 L 12,4 L 10,5 L 10.5,3 L 9,2 L 11,2 Z" />
@@ -1040,7 +1168,8 @@ export const NugecidLogo: React.FC<NugecidLogoProps> = ({
       );
     }
 
-    const shouldRenderCanvas = showAnimation && (theme === "worldCup2026" || theme === "saoJoao");
+    const shouldRenderCanvas =
+      showAnimation && (theme === "worldCup2026" || theme === "saoJoao");
 
     return (
       <div

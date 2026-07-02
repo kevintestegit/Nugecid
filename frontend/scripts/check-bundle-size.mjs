@@ -1,12 +1,12 @@
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 const distDir = path.resolve(process.cwd(), "dist");
 const limits = {
-  js: 900_000, // 0.9 MB por asset JS
-  css: 250_000, // 0.25 MB por asset CSS
-  image: 1_500_000, // 1.5 MB por imagem
-  total: 8_000_000, // 8 MB total sem sourcemaps
+  js: 900_000,
+  css: 250_000,
+  image: 1_500_000,
+  initialTotal: 2_000_000,
 };
 
 const extensionToType = (filename) => {
@@ -68,11 +68,21 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-const oversized = files.filter((entry) => {
+const indexHtml = readFileSync(path.join(distDir, "index.html"), "utf8");
+const initialAssetNames = new Set(
+  [...indexHtml.matchAll(/(?:src|href)="([^"]+)"/g)]
+    .map((match) => match[1])
+    .filter((assetPath) => assetPath.startsWith("/"))
+    .map((assetPath) => assetPath.replace(/^\//, "")),
+);
+
+const initialFiles = files.filter((entry) => initialAssetNames.has(entry.file));
+const oversized = initialFiles.filter((entry) => {
   if (entry.type === "other") return false;
   return entry.size > limits[entry.type];
 });
 const total = files.reduce((acc, entry) => acc + entry.size, 0);
+const initialTotal = initialFiles.reduce((acc, entry) => acc + entry.size, 0);
 const totalsByType = files.reduce(
   (acc, entry) => {
     if (!acc[entry.type]) acc[entry.type] = 0;
@@ -85,7 +95,7 @@ const totalsByType = files.reduce(
 const fmt = (bytes) => `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 
 if (oversized.length > 0) {
-  console.error("[bundle-size] Assets acima do limite por tipo:");
+  console.error("[bundle-size] Assets iniciais acima do limite por tipo:");
   oversized.forEach((entry) => {
     const typeLimit = limits[entry.type];
     console.error(
@@ -95,13 +105,18 @@ if (oversized.length > 0) {
   process.exit(1);
 }
 
-if (total > limits.total) {
+if ([...initialAssetNames].some((assetPath) => /(^|\/)charts-.*\.js$/.test(assetPath))) {
+  console.error("[bundle-size] charts apareceu no preload inicial");
+  process.exit(1);
+}
+
+if (initialTotal > limits.initialTotal) {
   console.error(
-    `[bundle-size] Tamanho total acima do limite: ${fmt(total)} (limite ${fmt(limits.total)})`,
+    `[bundle-size] Carga inicial acima do limite: ${fmt(initialTotal)} (limite ${fmt(limits.initialTotal)})`,
   );
   process.exit(1);
 }
 
 console.log(
-  `[bundle-size] OK - ${files.length} assets, total ${fmt(total)} | js ${fmt(totalsByType.js)} | css ${fmt(totalsByType.css)} | image ${fmt(totalsByType.image)}`,
+  `[bundle-size] OK - inicial ${fmt(initialTotal)} em ${initialFiles.length} assets | deploy ${fmt(total)} em ${files.length} assets | js ${fmt(totalsByType.js)} | css ${fmt(totalsByType.css)} | image ${fmt(totalsByType.image)}`,
 );

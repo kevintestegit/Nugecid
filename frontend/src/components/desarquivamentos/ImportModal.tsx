@@ -18,6 +18,7 @@ import {
   FileWarning,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -148,7 +149,7 @@ export const ImportModal = ({
                                 )
                                 .join("\n");
                               navigator.clipboard.writeText(errosTexto);
-                              alert(
+                              toast.success(
                                 "Erros copiados para área de transferência!",
                               );
                             }}
