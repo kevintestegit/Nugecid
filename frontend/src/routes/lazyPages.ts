@@ -67,9 +67,6 @@ export const projetoDetailPage = createLazyPage(
   () => import("@/pages/ProjetoDetailPage"),
 );
 export const kanbanPage = createLazyPage(() => import("@/pages/KanbanPage"));
-export const searchIconTestPage = createLazyPage(
-  () => import("@/components/test/SearchIconTest"),
-);
 export const notFoundPage = createLazyPage(
   () => import("@/pages/NotFoundPage"),
 );
@@ -124,6 +121,5 @@ export const preloadByPath: Record<string, () => Promise<unknown>> = {
   "/sobre": sobrePage.preload,
   "/notificacoes": notificacoesPage.preload,
   "/auditoria": auditoriaPage.preload,
-  "/test-icons": searchIconTestPage.preload,
   "*": notFoundPage.preload,
 };

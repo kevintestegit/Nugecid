@@ -29,13 +29,6 @@ vi.mock("@/services/backupService", () => ({
   default: backupServiceMock,
 }));
 
-vi.mock("@/services/escavadorService", () => ({
-  __esModule: true,
-  default: {
-    getStatus: vi.fn().mockResolvedValue(null),
-  },
-}));
-
 vi.mock("sonner", () => ({
   toast: toastMock,
 }));

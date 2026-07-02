@@ -41,14 +41,12 @@ export const FormField: React.FC<FormFieldProps> = ({
 }) => {
   const errorId = error ? `${id}-error` : undefined;
   const helperId = helperText ? `${id}-helper` : undefined;
-  const describedBy = [helperId, errorId].filter(Boolean).join(" ") || undefined;
+  const describedBy =
+    [helperId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label
-        htmlFor={id}
-        className="block text-sm font-medium text-foreground"
-      >
+      <label htmlFor={id} className="block text-sm font-medium text-foreground">
         {label}
         {required && (
           <span className="ml-0.5 text-destructive" aria-hidden="true">
@@ -56,17 +54,11 @@ export const FormField: React.FC<FormFieldProps> = ({
           </span>
         )}
       </label>
-      <FieldSlot
-        describedBy={describedBy}
-        invalid={Boolean(error)}
-      >
+      <FieldSlot describedBy={describedBy} invalid={Boolean(error)}>
         {children}
       </FieldSlot>
       {helperText && !error && (
-        <p
-          id={helperId}
-          className="text-xs text-muted-foreground"
-        >
+        <p id={helperId} className="text-xs text-muted-foreground">
           {helperText}
         </p>
       )}

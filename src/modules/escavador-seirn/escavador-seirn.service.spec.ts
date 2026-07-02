@@ -37,6 +37,7 @@ describe("EscavadorSeirnService", () => {
       mockNotificacoesService,
       mockSeiCapturaService,
     );
+    jest.spyOn(service["logger"], "log").mockImplementation(() => {});
     jest.spyOn(service["logger"], "warn").mockImplementation(() => {});
     jest.spyOn(service["logger"], "error").mockImplementation(() => {});
     jest.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
@@ -151,5 +152,13 @@ describe("EscavadorSeirnService", () => {
     ).rejects.toThrow(
       new ForbiddenException("Webhook do escavador não autorizado"),
     );
+  });
+
+  it("não expõe controle de processo local", () => {
+    const localProcessApi = service as unknown as Record<string, unknown>;
+
+    expect(localProcessApi.start).toBeUndefined();
+    expect(localProcessApi.stop).toBeUndefined();
+    expect(localProcessApi.getStatus).toBeUndefined();
   });
 });

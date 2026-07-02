@@ -280,14 +280,13 @@ export class ImportRegistrosUseCase {
   }
 
   private async saveRegistro(
-    dto: ImportRegistroDto,
+    _dto: ImportRegistroDto,
     _userId: number,
   ): Promise<void> {
     // Aqui você integraria com o repositório para salvar o registro
     // Por enquanto, apenas simula o salvamento
-    this.logger.debug(
-      `Salvando registro: ${dto.nomeCompleto} - ${dto.numDocumento}`,
-    );
+    // LGPD: nomeCompleto e numDocumento nao sao registrados em logs.
+    this.logger.debug(`Salvando registro importado`);
 
     // Simular delay de salvamento
     await new Promise((resolve) => setTimeout(resolve, 10));

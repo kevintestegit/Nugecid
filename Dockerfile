@@ -2,6 +2,10 @@
 FROM node:24-alpine AS builder
 
 WORKDIR /app
+ENV NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_LOGLEVEL=error \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
 # Copy package files
 COPY package*.json ./
@@ -19,16 +23,25 @@ RUN npm run build:backend
 FROM node:24-alpine
 
 WORKDIR /app
+ENV NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_LOGLEVEL=error \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
 
-# Install PostgreSQL client for backups and OCR runtime dependencies
-RUN apk add --no-cache \
+# Install PostgreSQL client for backups and OCR runtime dependencies.
+# Keep apk cache only during this layer to avoid postgresql-common trigger warnings,
+# then remove it before the layer is committed.
+RUN mkdir -p /usr/share/man && \
+    apk update && \
+    apk add \
     postgresql-client \
     ocrmypdf \
     tesseract-ocr \
     tesseract-ocr-data-por \
     qpdf \
     ghostscript \
-    unpaper
+    unpaper && \
+    rm -rf /var/cache/apk/* /usr/share/man
 
 # Create non-root user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

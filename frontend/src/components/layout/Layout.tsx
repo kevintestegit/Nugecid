@@ -247,12 +247,12 @@ const Layout: React.FC = () => {
             icon: ClipboardList,
             current: location.pathname === "/custodia/catalogacao",
           },
-          // {
-          //   name: "Banco de Vestígios",
-          //   href: "/custodia/banco-vestigios",
-          //   icon: Database,
-          //   current: location.pathname === "/custodia/banco-vestigios",
-          // },
+          {
+            name: "Banco de Vestígios",
+            href: "/custodia/banco-vestigios",
+            icon: Database,
+            current: location.pathname === "/custodia/banco-vestigios",
+          },
         ],
       },
       {

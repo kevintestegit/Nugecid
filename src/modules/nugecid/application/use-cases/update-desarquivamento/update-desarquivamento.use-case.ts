@@ -94,8 +94,9 @@ export class UpdateDesarquivamentoUseCase {
     this.logger.log(
       `[NUGECID] Iniciando atualização de desarquivamento ID: ${request.id} por usuário ${request.userId}`,
     );
-    this.logger.log(
-      `[NUGECID] dadosAdicionais recebido no use case: ${request.dadosAdicionais || "VAZIO"}`,
+    // LGPD: dadosAdicionais nao e registrado em logs.
+    this.logger.debug(
+      `[NUGECID] Atualizacao recebida - temDadosAdicionais=${Boolean(request.dadosAdicionais)}`,
     );
     this.logger.log(
       `[NUGECID] Campos instituto/requerente: instituto=${request.instituto}, requerente=${request.requerente}`,

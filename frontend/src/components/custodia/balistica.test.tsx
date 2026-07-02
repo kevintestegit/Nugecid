@@ -53,8 +53,23 @@ describe("CustodiaBalistica", () => {
 
     render(<CustodiaBalistica />);
 
+    // Seleciona instituto 100 (Criminalística)
+    await user.click(screen.getByLabelText("Nível 1"));
+    await user.click(screen.getAllByText("100 - Criminalística").at(-1)!);
+
+    // Seleciona disciplina 101 (Biologia)
+    await user.click(screen.getByLabelText("Nível 2"));
+    await user.click(screen.getAllByText("101 - Biologia").at(-1)!);
+
+    // Seleciona subdivisão 101.1 (Humana)
     await user.click(screen.getByLabelText("Nível 3"));
-    await user.click(screen.getByText("101.11 - Sangue - Líquido"));
+    await user.click(screen.getAllByText("101.1 - Humana").at(-1)!);
+
+    // Seleciona subdivisão 101.11 (Vestígio Hematológico)
+    await user.click(screen.getByLabelText("Nível 4"));
+    await user.click(
+      screen.getAllByText("101.11 - Vestígio Hematológico").at(-1)!,
+    );
 
     await user.click(
       screen.getByRole("button", { name: /inserir para catalogação/i }),
@@ -66,10 +81,10 @@ describe("CustodiaBalistica", () => {
         expect.objectContaining({
           codigoScv: "101.11",
           status: "catalogacao_pendente",
-          classeCatalogacao: "1",
-          subclasseCatalogacao: "Fluidos Corporais",
-          tipoCatalogacao: "Sangue - Líquido",
-          schemaVersao: "ccvc-2026-06",
+          classeCatalogacao: "101",
+          subclasseCatalogacao: "Biologia",
+          tipoCatalogacao: "Vestígio Hematológico",
+          schemaVersao: "ccvc-2026-07",
         }),
       );
       expect(mocks.dispatchAppNavigate).toHaveBeenCalledWith({

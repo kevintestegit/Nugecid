@@ -1,6 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { MailerService } from "@nestjs-modules/mailer";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import * as nodemailer from "nodemailer";
+import { type Transporter } from "nodemailer";
+
+const MAIL_TRANSPORTER = "MAIL_TRANSPORTER";
 
 interface EmailConfig {
   host?: string;
@@ -17,15 +20,30 @@ export class MailService {
   private readonly fromAddress: string;
   private readonly enabled: boolean;
   private readonly adminEmail: string | undefined;
+  private readonly transporter?: Transporter;
 
   constructor(
-    private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
+    @Optional()
+    @Inject(MAIL_TRANSPORTER)
+    transporter?: Transporter,
   ) {
     const email = this.configService.get<EmailConfig>("app.email");
     this.fromAddress = email?.from ?? "noreply@itep.rn.gov.br";
     this.enabled = Boolean(email?.host);
     this.adminEmail = this.configService.get<string>("ADMIN_EMAIL");
+    this.transporter =
+      transporter ??
+      (this.enabled
+        ? nodemailer.createTransport({
+            host: email?.host,
+            port: email?.port ?? 587,
+            secure: email?.secure ?? false,
+            auth: email?.user
+              ? { user: email.user, pass: email?.password }
+              : undefined,
+          })
+        : undefined);
   }
 
   isEnabled(): boolean {
@@ -38,7 +56,7 @@ export class MailService {
     text: string,
     html?: string,
   ): Promise<boolean> {
-    if (!this.enabled) {
+    if (!this.enabled || !this.transporter) {
       this.logger.debug(
         `Email desabilitado (EMAIL_HOST não configurado). Assunto: "${subject}"`,
       );
@@ -46,7 +64,7 @@ export class MailService {
     }
 
     try {
-      await this.mailerService.sendMail({
+      await this.transporter.sendMail({
         from: this.fromAddress,
         to,
         subject,

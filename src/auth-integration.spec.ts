@@ -42,8 +42,12 @@ describe("Auth Integration Tests", () => {
       .overrideGuard(IpBlockerGuard)
       .useValue({ canActivate: () => true })
       .compile();
+    jest
+      .spyOn(moduleFixture.get(AuthController)["logger"], "error")
+      .mockImplementation(() => undefined);
 
     app = moduleFixture.createNestApplication();
+    app.useLogger(false);
     app.use((req: any, _res: any, next: () => void) => {
       req.session = req.session || {};
       next();
@@ -53,6 +57,7 @@ describe("Auth Integration Tests", () => {
 
   afterAll(async () => {
     await app.close();
+    jest.restoreAllMocks();
   });
 
   it("POST /auth/login deve retornar payload de sucesso quando credenciais são válidas", async () => {

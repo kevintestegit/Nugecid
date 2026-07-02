@@ -38,7 +38,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
                   onClick={item.onClick}
                   className={cn(
                     "hover:text-foreground/90 transition-colors",
-                    !item.onClick && "cursor-default hover:text-muted-foreground",
+                    !item.onClick &&
+                      "cursor-default hover:text-muted-foreground",
                   )}
                 >
                   {item.label}
@@ -53,7 +54,9 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
           {description && (
-            <p className="text-sm text-muted-foreground max-w-2xl">{description}</p>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              {description}
+            </p>
           )}
         </div>
       </div>

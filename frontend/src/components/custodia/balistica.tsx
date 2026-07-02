@@ -27,6 +27,7 @@ import { dispatchAppNavigate } from "@/lib/navigation/navigationEvents";
 import {
   scvClasses,
   type CduFacet,
+  type CduSubdivision,
 } from "@/components/custodia/scvClassification";
 import {
   catalogacaoSchemas,
@@ -94,7 +95,7 @@ const CustodiaBalistica: React.FC = () => {
   const [groupCode, setGroupCode] = useState<string>(
     scvClasses[0]?.groups[0]?.code ?? "",
   );
-  const [subdivisionCode, setSubdivisionCode] = useState<string>("");
+  const [subdivisionPath, setSubdivisionPath] = useState<string[]>([]);
   const [selectedFacets, setSelectedFacets] = useState<string[]>([]);
   const [vestigioNumber, setVestigioNumber] = useState<string>("");
   const [casoNumber, setCasoNumber] = useState<string>("");
@@ -120,36 +121,45 @@ const CustodiaBalistica: React.FC = () => {
     [selectedClass, groupCode],
   );
 
-  const selectedSubdivision = useMemo(
-    () =>
-      selectedGroup?.subdivisions?.find(
-        (subdivision) => subdivision.code === subdivisionCode,
-      ),
-    [selectedGroup, subdivisionCode],
-  );
+  const subdivisionLevels = useMemo(() => {
+    const levels: Array<{
+      options: CduSubdivision[];
+      value: string;
+      selected?: CduSubdivision;
+    }> = [];
+    let options = selectedGroup?.subdivisions ?? [];
 
-  const availableSubdivisions = selectedGroup?.subdivisions ?? [];
+    for (let depth = 0; options.length; depth += 1) {
+      const value = subdivisionPath[depth] ?? "";
+      const selected = options.find((option) => option.code === value);
+      levels.push({ options, value, selected });
+      if (!selected) break;
+      options = selected.subdivisions ?? [];
+    }
+
+    return levels;
+  }, [selectedGroup, subdivisionPath]);
+
+  const selectedSubdivisions = useMemo(
+    () =>
+      subdivisionLevels.flatMap(({ selected }) => (selected ? [selected] : [])),
+    [subdivisionLevels],
+  );
+  const selectedSubdivision = selectedSubdivisions.at(-1);
+  const subdivisionCode = selectedSubdivision?.code ?? "";
 
   const availableCatalogacaoSchemas = useMemo(() => {
     return catalogacaoSchemas.filter((schema) => {
-      if (schema.classCode !== mainClass) {
+      if (schema.classCode !== groupCode) {
         return false;
       }
 
-      if (selectedGroup?.code && schema.subclassCode) {
-        const matchesGroup =
-          schema.subclassCode === selectedGroup.code ||
-          schema.subclassLabel === selectedGroup.label;
-
-        if (!matchesGroup) {
-          return false;
-        }
-      }
-
-      if (selectedSubdivision?.label) {
-        const matchesSubdivision =
-          schema.typeLabel === selectedSubdivision.label ||
-          selectedSubdivision.label.includes(schema.typeLabel);
+      if (schema.subclassCode) {
+        const matchesSubdivision = selectedSubdivisions.some(
+          (subdivision) =>
+            schema.subclassCode === subdivision.code ||
+            schema.subclassLabel === subdivision.label,
+        );
 
         if (!matchesSubdivision) {
           return false;
@@ -158,7 +168,7 @@ const CustodiaBalistica: React.FC = () => {
 
       return true;
     });
-  }, [mainClass, selectedGroup, selectedSubdivision]);
+  }, [groupCode, selectedSubdivisions]);
 
   const tipoVestigioOptions = useMemo(
     () => availableCatalogacaoSchemas.map(getCatalogacaoOptionLabel),
@@ -169,7 +179,7 @@ const CustodiaBalistica: React.FC = () => {
     if (tipoVestigio) {
       const [subclassLabel, typeLabel] = tipoVestigio.split(" - ");
       return findCatalogacaoSchema({
-        classeCatalogacao: mainClass,
+        classeCatalogacao: groupCode,
         subclasseCatalogacao: subclassLabel,
         tipoCatalogacao: typeLabel,
       });
@@ -177,14 +187,14 @@ const CustodiaBalistica: React.FC = () => {
 
     return (
       findCatalogacaoSchema({
-        classeCatalogacao: mainClass,
+        classeCatalogacao: groupCode,
         subclasseCatalogacao: selectedGroup?.code ?? selectedGroup?.label,
         tipoCatalogacao: selectedSubdivision?.label,
       }) ?? availableCatalogacaoSchemas[0]
     );
   }, [
     tipoVestigio,
-    mainClass,
+    groupCode,
     selectedGroup,
     selectedSubdivision,
     availableCatalogacaoSchemas,
@@ -219,12 +229,12 @@ const CustodiaBalistica: React.FC = () => {
       scvClasses.find((cduClass) => cduClass.code === mainClass)?.groups[0]
         ?.code ?? "";
     setGroupCode(firstGroupCode);
-    setSubdivisionCode("");
+    setSubdivisionPath([]);
     setSelectedFacets([]);
   }, [mainClass]);
 
   useEffect(() => {
-    setSubdivisionCode("");
+    setSubdivisionPath([]);
     setSelectedFacets([]);
   }, [groupCode]);
 
@@ -467,7 +477,7 @@ const CustodiaBalistica: React.FC = () => {
         delegacia: delegacia || null,
         mesReferencia: referenceMonth || null,
         etiquetaCompleta: labelPreview,
-        classeCatalogacao: selectedCatalogacaoSchema?.classCode ?? mainClass,
+        classeCatalogacao: selectedCatalogacaoSchema?.classCode ?? groupCode,
         subclasseCatalogacao:
           selectedCatalogacaoLabels.subclasseCatalogacao || null,
         tipoCatalogacao: selectedCatalogacaoLabels.tipoCatalogacao || null,
@@ -605,28 +615,41 @@ const CustodiaBalistica: React.FC = () => {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="cdu-subdivisao">Nível 3</Label>
-                  <Select
-                    disabled={!availableSubdivisions.length}
-                    value={subdivisionCode}
-                    onValueChange={(value) => setSubdivisionCode(value)}
-                  >
-                    <SelectTrigger id="cdu-subdivisao">
-                      <SelectValue placeholder="Selecione o nível 3" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSubdivisions.map((subdivision) => (
-                        <SelectItem
-                          key={subdivision.code}
-                          value={subdivision.code}
-                        >
-                          {subdivision.code} - {subdivision.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {subdivisionLevels.map(({ options, value }, index) => {
+                  const level = index + 3;
+                  const id = `cdu-subdivisao-${level}`;
+
+                  return (
+                    <div key={level} className="space-y-2">
+                      <Label htmlFor={id}>Nível {level}</Label>
+                      <Select
+                        value={value}
+                        onValueChange={(nextValue) =>
+                          setSubdivisionPath((previous) => [
+                            ...previous.slice(0, index),
+                            nextValue,
+                          ])
+                        }
+                      >
+                        <SelectTrigger id={id}>
+                          <SelectValue
+                            placeholder={`Selecione o nível ${level}`}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {options.map((subdivision) => (
+                            <SelectItem
+                              key={subdivision.code}
+                              value={subdivision.code}
+                            >
+                              {subdivision.code} - {subdivision.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })}
               </div>
 
               {!!availableFacets.length && (

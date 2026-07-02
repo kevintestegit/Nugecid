@@ -39,8 +39,16 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
 
   createTypeOrmOptions(): TypeOrmModuleOptions {
     // .env primeiro, depois .env.local pode sobrescrever
-    dotenvConfig({ path: join(process.cwd(), ".env"), override: false });
-    dotenvConfig({ path: join(process.cwd(), ".env.local"), override: true });
+    dotenvConfig({
+      path: join(process.cwd(), ".env"),
+      override: false,
+      quiet: true,
+    });
+    dotenvConfig({
+      path: join(process.cwd(), ".env.local"),
+      override: true,
+      quiet: true,
+    });
     const environment = process.env.NODE_ENV || "development";
 
     // Helper: lê primeiro do ConfigService, depois de process.env

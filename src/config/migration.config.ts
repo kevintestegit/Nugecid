@@ -1,7 +1,7 @@
 import { DataSource } from "typeorm";
 import * as dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 function buildSslConfig(): false | Record<string, unknown> {
   if (process.env.DATABASE_SSL !== "true") return false;

@@ -45,6 +45,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/Dialog";
+import { extractVestigiosFromResponse } from "@/components/custodia/vestigiosResponse";
 
 type Vestigio = {
   id: string;
@@ -131,12 +132,7 @@ const BancoVestigios: React.FC = () => {
 
       const response = await api.get("/vestigios", { params });
 
-      // A API retorna { success, data, ... } então pegamos response.data.data
-      const vestígiosData = response.data.data || response.data;
-
-      // Garantir que sempre temos um array
-      const data = Array.isArray(vestígiosData) ? vestígiosData : [];
-      setVestigios(data);
+      setVestigios(extractVestigiosFromResponse<Vestigio>(response.data));
     } catch (error) {
       console.error("Erro ao carregar vestígios:", error);
       toast.error("Erro", "Não foi possível carregar os vestígios");
@@ -179,18 +175,20 @@ const BancoVestigios: React.FC = () => {
   }, [pendingVestigioId, searchParams, setSearchParams, vestigios]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja remover este vestígio?")) {
-      return;
-    }
-
-    try {
-      await api.delete(`/vestigios/${id}`);
-      toast.success("Sucesso", "Vestígio removido com sucesso");
-      fetchVestigios();
-    } catch (error) {
-      console.error("Erro ao remover vestígio:", error);
-      toast.error("Erro", "Não foi possível remover o vestígio");
-    }
+    toast.confirm(
+      "Remover este vestígio?",
+      "Esta ação não pode ser desfeita.",
+      async () => {
+        try {
+          await api.delete(`/vestigios/${id}`);
+          toast.success("Sucesso", "Vestígio removido com sucesso");
+          fetchVestigios();
+        } catch (error) {
+          console.error("Erro ao remover vestígio:", error);
+          toast.error("Erro", "Não foi possível remover o vestígio");
+        }
+      },
+    );
   };
 
   const handleViewDetails = (vestigio: Vestigio) => {
@@ -396,6 +394,12 @@ const BancoVestigios: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="catalogacao_pendente">
+                    Pendente de catalogação
+                  </SelectItem>
+                  <SelectItem value="catalogado">Catalogado</SelectItem>
+                  <SelectItem value="em_analise">Em análise</SelectItem>
+                  <SelectItem value="finalizado">Finalizado</SelectItem>
                   <SelectItem value="ativo">Ativo</SelectItem>
                   <SelectItem value="arquivado">Arquivado</SelectItem>
                   <SelectItem value="descartado">Descartado</SelectItem>

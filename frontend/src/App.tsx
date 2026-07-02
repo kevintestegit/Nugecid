@@ -38,7 +38,6 @@ import {
   projetosPage,
   projetoDetailPage,
   kanbanPage,
-  searchIconTestPage,
   custodiaVestigiosPage,
   bancoVestigiosPage,
   catalogacaoVestigiosPage,
@@ -275,14 +274,6 @@ const App: React.FC = () => {
               </ProtectedRoute>
             }
           />
-
-          {/* Teste de ícones - apenas em dev */}
-          {import.meta.env.DEV && (
-            <Route
-              path="test-icons"
-              element={renderLazyRoute(searchIconTestPage.Component)}
-            />
-          )}
         </Route>
 
         {/* Página 404 para rotas não encontradas */}

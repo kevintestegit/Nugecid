@@ -98,13 +98,23 @@ const ChecklistView: React.FC<ChecklistViewProps> = ({
   };
 
   const handleDeleteItem = async (itemId: number) => {
-    if (!confirm("Excluir este item?")) return;
-    try {
-      await kanbanService.deleteChecklistItem(itemId);
-      onUpdate();
-    } catch (error) {
-      toast.error("Erro ao excluir item");
-    }
+    toast.warning("Excluir este item?", {
+      duration: 10000,
+      action: {
+        label: "Confirmar",
+        onClick: () => {
+          void (async () => {
+            try {
+              await kanbanService.deleteChecklistItem(itemId);
+              onUpdate();
+            } catch (error) {
+              toast.error("Erro ao excluir item");
+            }
+          })();
+        },
+      },
+      cancel: { label: "Cancelar", onClick: () => undefined },
+    });
   };
 
   return (
@@ -126,7 +136,9 @@ const ChecklistView: React.FC<ChecklistViewProps> = ({
 
       {/* Progress Bar */}
       <div className="flex items-center gap-3">
-        <div className="text-xs font-medium text-muted-foreground w-8">{progress}%</div>
+        <div className="text-xs font-medium text-muted-foreground w-8">
+          {progress}%
+        </div>
         <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-blue-600 transition-all duration-500 ease-out"
@@ -233,13 +245,23 @@ export const ChecklistSection: React.FC<ChecklistSectionProps> = ({
   };
 
   const handleDeleteChecklist = async (id: number) => {
-    if (!confirm("Excluir este checklist e todos os seus itens?")) return;
-    try {
-      await kanbanService.deleteChecklist(id);
-      fetchChecklists();
-    } catch (error) {
-      toast.error("Erro ao excluir checklist");
-    }
+    toast.warning("Excluir este checklist e todos os seus itens?", {
+      duration: 10000,
+      action: {
+        label: "Confirmar",
+        onClick: () => {
+          void (async () => {
+            try {
+              await kanbanService.deleteChecklist(id);
+              fetchChecklists();
+            } catch (error) {
+              toast.error("Erro ao excluir checklist");
+            }
+          })();
+        },
+      },
+      cancel: { label: "Cancelar", onClick: () => undefined },
+    });
   };
 
   if (loading) return null;

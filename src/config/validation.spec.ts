@@ -129,10 +129,15 @@ describe("validateEnvironment", () => {
     process.env.NODE_ENV = "development";
     process.env.MAIL_HOST = "smtp.local";
     delete process.env.EMAIL_HOST;
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
 
     validateEnvironment();
 
     expect(process.env.EMAIL_HOST).toBe("smtp.local");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[ENV][DEPRECATED] MAIL_HOST is deprecated; use EMAIL_HOST.",
+    );
+    warnSpy.mockRestore();
   });
 
   it("aceita BACKUP_HTTP_RESTORE_ENABLED booleano válido", () => {

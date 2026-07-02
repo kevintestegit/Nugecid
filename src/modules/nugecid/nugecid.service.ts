@@ -141,7 +141,7 @@ export class NugecidService {
     }
 
     this.logger.log(
-      `Desarquivamento criado: ${saved.numeroNicLaudoAuto} por ${currentUser.usuario}`,
+      `Desarquivamento criado - ID: ${saved.id} por ${currentUser.usuario}`,
     );
     this.desarquivamentoEffectsPublisher.publishEntityChange({
       action: "created",
@@ -565,7 +565,7 @@ export class NugecidService {
     );
 
     this.logger.log(
-      `Desarquivamento atualizado: ${updated.numeroNicLaudoAuto} por ${currentUser.usuario}`,
+      `Desarquivamento atualizado - ID: ${updated.id} por ${currentUser.usuario}`,
     );
     this.desarquivamentoEffectsPublisher.publishEntityChange({
       action: "updated",
@@ -615,7 +615,7 @@ export class NugecidService {
     );
 
     this.logger.log(
-      `Desarquivamento removido: ${desarquivamento.numeroNicLaudoAuto} por ${currentUser.usuario}`,
+      `Desarquivamento removido - ID: ${desarquivamento.id} por ${currentUser.usuario}`,
     );
 
     await this.bumpPerformanceCacheVersions();
@@ -736,7 +736,7 @@ export class NugecidService {
     );
 
     this.logger.log(
-      `Desarquivamento restaurado: ${desarquivamento.numeroNicLaudoAuto} por ${currentUser.usuario}`,
+      `Desarquivamento restaurado - ID: ${desarquivamento.id} por ${currentUser.usuario}`,
     );
     this.desarquivamentoEffectsPublisher.publishEntityChange({
       action: "restored",

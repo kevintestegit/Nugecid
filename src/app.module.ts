@@ -66,8 +66,8 @@ import { Vestigio } from "./modules/vestigios/entities/vestigio.entity";
 import { Notificacao } from "./modules/notificacoes/entities/notificacao.entity";
 import { PlanilhaControle } from "./modules/planilhas/entities/planilha-controle.entity";
 
-dotenvConfig({ path: ".env", override: false });
-dotenvConfig({ path: ".env.local", override: true });
+dotenvConfig({ path: ".env", override: false, quiet: true });
+dotenvConfig({ path: ".env.local", override: true, quiet: true });
 validateEnvironment();
 const queueFeatureEnabled = process.env.FEATURE_QUEUE_ENABLED === "true";
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Save, RefreshCw, Trash2 } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   Card,
@@ -13,6 +13,13 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { Textarea } from "@/components/ui/Textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
 import { EnhancedConfirmDialog } from "@/components/ui/EnhancedConfirmDialog";
 import { api } from "@/services/api";
@@ -27,6 +34,7 @@ import {
   getCatalogacaoOptionLabel,
   splitMetadataByCategories,
 } from "@/components/custodia/catalogacaoSchemas";
+import { extractVestigiosFromResponse } from "@/components/custodia/vestigiosResponse";
 
 type Vestigio = {
   id: string;
@@ -78,6 +86,23 @@ const renderFieldInput = (
     );
   }
 
+  if (field.type === "select" && field.options?.length) {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={field.name}>
+          <SelectValue placeholder="Selecione..." />
+        </SelectTrigger>
+        <SelectContent>
+          {field.options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+
   return (
     <Input
       id={field.name}
@@ -94,33 +119,8 @@ const normalizeMetadataValues = (values: Record<string, string>) =>
     Object.entries(values).map(([key, value]) => [key, value.trim()]),
   );
 
-const readDataProperty = (value: unknown): unknown => {
-  if (!value || typeof value !== "object") {
-    return undefined;
-  }
-
-  return (value as { data?: unknown }).data;
-};
-
-const extractVestigiosFromResponse = (payload: unknown): Vestigio[] => {
-  if (Array.isArray(payload)) {
-    return payload as Vestigio[];
-  }
-
-  const firstData = readDataProperty(payload);
-  if (Array.isArray(firstData)) {
-    return firstData as Vestigio[];
-  }
-
-  const nestedData = readDataProperty(firstData);
-  if (Array.isArray(nestedData)) {
-    return nestedData as Vestigio[];
-  }
-
-  return [];
-};
-
 const CatalogacaoVestigiosPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [vestigios, setVestigios] = useState<Vestigio[]>([]);
   const [selectedVestigioId, setSelectedVestigioId] = useState<string | null>(
@@ -158,7 +158,7 @@ const CatalogacaoVestigiosPage: React.FC = () => {
       const response = await api.get("/vestigios", {
         params: { status: "catalogacao_pendente" },
       });
-      const items = extractVestigiosFromResponse(response.data);
+      const items = extractVestigiosFromResponse<Vestigio>(response.data);
       setVestigios(items);
       setSelectedVestigioId((current) => current ?? items[0]?.id ?? null);
     } catch (fetchError) {
@@ -227,35 +227,36 @@ const CatalogacaoVestigiosPage: React.FC = () => {
 
     // Migra valores legados das etiquetas para os campos canônicos da planilha,
     // quando ainda não houver valor preenchido.
-    const legacyDefaults: Record<CatalogacaoCategoria, Record<string, string>> =
-      {
-        identificacao: {
-          codigoVestigio:
-            baseDefaults.identificacao.codigoVestigio ??
-            extractLabelLine(selectedVestigio.etiquetaCompleta, "VG-"),
-          numeroCatalogacao:
-            baseDefaults.identificacao.numeroCatalogacao ??
-            selectedVestigio.id,
-          denominacaoVestigio:
-            baseDefaults.identificacao.denominacaoVestigio ??
-            (selectedVestigio.categoria ||
-              selectedVestigio.tipoCatalogacao ||
-              ""),
-          localOrigem:
-            baseDefaults.identificacao.localOrigem ??
-            selectedVestigio.delegacia ??
-            "",
-        },
-        tecnicas: {
-          ...baseDefaults.tecnicas,
-          tipoVestigio:
-            baseDefaults.tecnicas.tipoVestigio ??
-            selectedVestigio.tipoCatalogacao ??
-            "",
-        },
-        periciais: { ...baseDefaults.periciais },
-        controle: { ...baseDefaults.controle },
-      };
+    const legacyDefaults: Record<
+      CatalogacaoCategoria,
+      Record<string, string>
+    > = {
+      identificacao: {
+        codigoVestigio:
+          baseDefaults.identificacao.codigoVestigio ??
+          extractLabelLine(selectedVestigio.etiquetaCompleta, "VG-"),
+        numeroCatalogacao:
+          baseDefaults.identificacao.numeroCatalogacao ?? selectedVestigio.id,
+        denominacaoVestigio:
+          baseDefaults.identificacao.denominacaoVestigio ??
+          (selectedVestigio.categoria ||
+            selectedVestigio.tipoCatalogacao ||
+            ""),
+        localOrigem:
+          baseDefaults.identificacao.localOrigem ??
+          selectedVestigio.delegacia ??
+          "",
+      },
+      tecnicas: {
+        ...baseDefaults.tecnicas,
+        tipoVestigio:
+          baseDefaults.tecnicas.tipoVestigio ??
+          selectedVestigio.tipoCatalogacao ??
+          "",
+      },
+      periciais: { ...baseDefaults.periciais },
+      controle: { ...baseDefaults.controle },
+    };
 
     setCategoryValues(legacyDefaults);
   }, [selectedVestigioId, selectedVestigio, selectedSchema]);
@@ -288,7 +289,10 @@ const CatalogacaoVestigiosPage: React.FC = () => {
         metadadosEspecificos: normalizeMetadataValues(metadadosEspecificos),
       });
 
-      toast.success("Catalogação salva", "Vestígio encaminhado como catalogado.");
+      toast.success(
+        "Catalogação salva",
+        "Vestígio encaminhado como catalogado.",
+      );
 
       setVestigios((current) =>
         current.filter((item) => item.id !== selectedVestigio.id),
@@ -298,9 +302,14 @@ const CatalogacaoVestigiosPage: React.FC = () => {
           return current;
         }
 
-        const remaining = vestigios.filter((item) => item.id !== selectedVestigio.id);
+        const remaining = vestigios.filter(
+          (item) => item.id !== selectedVestigio.id,
+        );
         return remaining[0]?.id ?? null;
       });
+      navigate(
+        `/custodia/banco-vestigios?vestigioId=${encodeURIComponent(selectedVestigio.id)}`,
+      );
     } catch (saveError) {
       console.error("Erro ao salvar catalogacao:", saveError);
       toast.error("Erro ao salvar", "Não foi possível concluir a catalogação.");
@@ -336,13 +345,12 @@ const CatalogacaoVestigiosPage: React.FC = () => {
     }
   };
 
-  const totalFields =
-    selectedSchema
-      ? CATEGORIA_ORDEM.reduce(
-          (acc, cat) => acc + (selectedSchema.categories[cat]?.length ?? 0),
-          0,
-        )
-      : 0;
+  const totalFields = selectedSchema
+    ? CATEGORIA_ORDEM.reduce(
+        (acc, cat) => acc + (selectedSchema.categories[cat]?.length ?? 0),
+        0,
+      )
+    : 0;
 
   const filledFields = CATEGORIA_ORDEM.reduce(
     (acc, cat) =>

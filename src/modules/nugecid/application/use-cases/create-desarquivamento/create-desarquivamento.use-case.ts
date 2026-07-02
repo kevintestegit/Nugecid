@@ -96,17 +96,9 @@ export class CreateDesarquivamentoUseCase {
     this.logger.log(
       `[NUGECID] Iniciando criação de desarquivamento para usuário ${sanitizedRequest.criadoPorId}`,
     );
-    this.logger.log(
-      `[NUGECID] dadosAdicionais recebido: ${sanitizedRequest.dadosAdicionais || "VAZIO"}`,
-    );
+    // LGPD: dados pessoais (dadosAdicionais, nomeCompleto) nao sao registrados em logs.
     this.logger.debug(
-      `[NUGECID] Dados recebidos: ${JSON.stringify({
-        tipoDesarquivamento: sanitizedRequest.tipoDesarquivamento,
-        nomeCompleto: sanitizedRequest.nomeCompleto,
-        numeroProcesso: sanitizedRequest.numeroProcesso,
-        urgente: sanitizedRequest.urgente,
-        dadosAdicionais: sanitizedRequest.dadosAdicionais,
-      })}`,
+      `[NUGECID] Payload de criacao recebido (sem dados pessoais): tipo=${sanitizedRequest.tipoDesarquivamento} | urgente=${sanitizedRequest.urgente} | temDadosAdicionais=${Boolean(sanitizedRequest.dadosAdicionais)}`,
     );
 
     try {
@@ -171,13 +163,13 @@ export class CreateDesarquivamentoUseCase {
       });
 
       this.logger.log(
-        `[NUGECID] Desarquivamento criado com sucesso - ID: ${savedDesarquivamento.id.value}, NIC/Laudo: ${savedDesarquivamento.numeroNicLaudoAuto}`,
+        `[NUGECID] Desarquivamento criado com sucesso - ID: ${savedDesarquivamento.id.value}`,
       );
 
       // Retornar resposta
       const response = this.mapToResponse(savedDesarquivamento);
       this.logger.debug(
-        `[NUGECID] Resposta gerada: ${JSON.stringify({ id: response.id, codigoBarras: response.codigoBarras, status: response.status })}`,
+        `[NUGECID] Resposta gerada: ${JSON.stringify({ id: response.id, status: response.status })}`,
       );
 
       return response;

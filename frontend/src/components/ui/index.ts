@@ -11,7 +11,6 @@ export {
   CardHeader,
   CardTitle,
 } from "./Card";
-export { ConfirmDialog } from "./ConfirmDialog";
 export { Input } from "./Input";
 export { Label } from "./Label";
 export { PageLoading, TableLoading, ButtonLoading } from "./Loading";
@@ -67,7 +66,6 @@ export { Checkbox } from "./Checkbox";
 export { Alert, AlertTitle, AlertDescription } from "./Alert";
 export { Textarea } from "./Textarea";
 export { Switch } from "./Switch";
-export { DateRangePicker } from "./DateRangePicker";
 export { DateRangeInput } from "./DateRangeInput";
 export type { DateRange } from "./DateRangeInput";
 export { Popover, PopoverContent, PopoverTrigger } from "./Popover";

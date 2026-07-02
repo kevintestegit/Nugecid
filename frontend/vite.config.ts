@@ -34,36 +34,6 @@ export default defineConfig(() => {
       })
     : [];
   const plugins = [react(), ...sentryPlugins];
-  const chunkGroups = {
-    vendor: ["react", "react-dom", "react-router-dom"],
-    ui: [
-      "@radix-ui/react-alert-dialog",
-      "@radix-ui/react-dialog",
-      "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-select",
-      "@radix-ui/react-toast",
-      "class-variance-authority",
-      "clsx",
-      "tailwind-merge",
-    ],
-    forms: ["react-hook-form", "@hookform/resolvers", "zod"],
-    charts: ["recharts"],
-    dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
-    date: ["date-fns"],
-    utils: ["axios", "lucide-react"],
-  } satisfies Record<string, string[]>;
-  const manualChunkEntries = Object.entries(chunkGroups);
-  const manualChunks = (moduleId: string) => {
-    const matchedGroup = manualChunkEntries.find(([, dependencies]) =>
-      dependencies.some(
-        (dependency) =>
-          moduleId.includes(`/node_modules/${dependency}/`) ||
-          moduleId.includes(`\\node_modules\\${dependency}\\`),
-      ),
-    );
-
-    return matchedGroup?.[0];
-  };
 
   return {
     plugins,
@@ -98,11 +68,13 @@ export default defineConfig(() => {
       outDir: "dist",
       sourcemap: sourcemap || sentryPluginEnabled,
       target: "esnext",
-      minify: "terser",
+      minify: "oxc",
       cssMinify: true,
       rollupOptions: {
+        checks: {
+          pluginTimings: false,
+        },
         output: {
-          manualChunks,
           // Separar código CSS em chunks menores
           assetFileNames: (assetInfo) => {
             const assetName = assetInfo.name ?? "";
@@ -122,17 +94,6 @@ export default defineConfig(() => {
       },
       // Otimizações de chunk
       chunkSizeWarningLimit: 500,
-      // Terser options para melhor minificação
-      terserOptions: {
-        compress: {
-          drop_console: true,
-          drop_debugger: true,
-          pure_funcs: ["console.log", "console.info", "console.debug"],
-        },
-        mangle: {
-          safari10: true,
-        },
-      },
     },
     // Otimizações de CSS
     css: {

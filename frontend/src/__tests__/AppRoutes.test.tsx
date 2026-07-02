@@ -54,7 +54,6 @@ vi.mock("@/routes/lazyPages", () => {
     projetosPage: page("Projetos page"),
     projetoDetailPage: page("Projeto detail page"),
     kanbanPage: page("Kanban page"),
-    searchIconTestPage: page("Search icon test page"),
     custodiaVestigiosPage: page("Custodia page"),
     bancoVestigiosPage: page("Banco vestigios page"),
     catalogacaoVestigiosPage: page("Catalogacao vestigios page"),

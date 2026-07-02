@@ -84,7 +84,9 @@ export class PushSubscriptionService {
       registration.installing ?? registration.waiting ?? registration.active;
 
     if (!worker) {
-      throw new Error("Nenhum Service Worker de notificações foi inicializado.");
+      throw new Error(
+        "Nenhum Service Worker de notificações foi inicializado.",
+      );
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -145,7 +147,9 @@ export class PushSubscriptionService {
         await this.waitForWorkerActivation(registration);
       const readyRegistration = await navigator.serviceWorker.ready;
 
-      return readyRegistration.active ? readyRegistration : activatedRegistration;
+      return readyRegistration.active
+        ? readyRegistration
+        : activatedRegistration;
     } catch (error) {
       throw new Error(
         `Falha ao registrar o Service Worker de notificações: ${extractErrorMessage(

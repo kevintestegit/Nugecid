@@ -96,8 +96,7 @@ vi.mock("@/services/api", () => ({
     exportDesarquivamentos: vi.fn(),
     getDesarquivamentos: (...args: unknown[]) =>
       getDesarquivamentosMock(...args),
-    getPrintCandidates: (...args: unknown[]) =>
-      getPrintCandidatesMock(...args),
+    getPrintCandidates: (...args: unknown[]) => getPrintCandidatesMock(...args),
   },
 }));
 

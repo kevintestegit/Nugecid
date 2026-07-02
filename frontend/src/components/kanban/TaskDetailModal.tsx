@@ -343,7 +343,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               {/* Description */}
               <div className="group">
                 <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <AlignLeft className="w-4 h-4 text-muted-foreground/70" /> Descrição
+                  <AlignLeft className="w-4 h-4 text-muted-foreground/70" />{" "}
+                  Descrição
                 </h3>
                 <div className="text-base text-foreground/90 leading-relaxed whitespace-pre-line pl-0 min-h-[60px]">
                   {task.descricao || (
@@ -370,7 +371,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-muted-foreground/70" /> Atividade
+                    <Activity className="w-4 h-4 text-muted-foreground/70" />{" "}
+                    Atividade
                   </h3>
                 </div>
 
@@ -606,7 +608,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             {h.acao}
                           </span>
                           {h.campo && (
-                            <span className="text-muted-foreground"> {h.campo}</span>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              {h.campo}
+                            </span>
                           )}
                         </p>
                         <span className="text-[10px] text-muted-foreground/70">

@@ -178,6 +178,20 @@ describe("AuthContext", () => {
     expect(apiServiceMock.logout).toHaveBeenCalledTimes(1);
   });
 
+  it("não chama profile de novo quando refresh anônimo falha", async () => {
+    apiServiceMock.getCurrentUser.mockRejectedValue(makeAxios401Error());
+    apiServiceMock.refreshToken.mockRejectedValue(makeAxios401Error());
+
+    renderAuth();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("anon");
+    });
+
+    expect(apiServiceMock.refreshToken).toHaveBeenCalledTimes(1);
+    expect(apiServiceMock.getCurrentUser).toHaveBeenCalledTimes(1);
+  });
+
   it("limpa cache do React Query ao fazer logout", async () => {
     apiServiceMock.getCurrentUser.mockResolvedValue({
       success: true,

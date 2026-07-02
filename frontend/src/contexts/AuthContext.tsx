@@ -99,6 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           },
           45 * 60 * 1000,
         );
+        return true;
       } else {
         throw new Error("Failed to refresh token");
       }
@@ -109,12 +110,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setTimeout(() => {
           void refreshTokens();
         }, 30000);
-        return;
+        return false;
       }
 
       clearAuth();
       updateUser(null);
       clearRefreshTimer();
+      return false;
     }
   }, [clearRefreshTimer, updateUser]);
 
@@ -154,7 +156,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         if (axios.isAxiosError(error) && error.response?.status === 401) {
-          await refreshTokens();
+          const refreshed = await refreshTokens();
+          if (!refreshed) {
+            clearAuth();
+            updateUser(null);
+            return;
+          }
+
           const refreshedResponse = await apiService.getCurrentUser({
             skipAuthRedirect: true,
           });

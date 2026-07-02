@@ -108,7 +108,7 @@ export class DeleteDesarquivamentoUseCase {
     this.logger.log(`[DELETE_USE_CASE] ✅ Desarquivamento encontrado:`);
     this.logger.log(`[DELETE_USE_CASE]   - ID: ${desarquivamento.id?.value}`);
     this.logger.log(
-      `[DELETE_USE_CASE]   - NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
+      `[DELETE_USE_CASE]   - ID interno: ${desarquivamento.id?.value ?? "N/A"}`,
     );
     this.logger.log(
       `[DELETE_USE_CASE]   - Status: ${desarquivamento.status?.value}`,
@@ -275,7 +275,7 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] ✅ ID excluído: ${desarquivamento.id?.value}`,
       );
       this.logger.log(
-        `[DELETE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
+        `[DELETE_USE_CASE] ✅ ID interno: ${desarquivamento.id?.value ?? "N/A"}`,
       );
       this.logger.log(`[DELETE_USE_CASE] ✅ Usuário: ${userId}`);
       this.logger.log(
@@ -345,7 +345,7 @@ export class DeleteDesarquivamentoUseCase {
         `[DELETE_USE_CASE] ✅ ID excluído permanentemente: ${desarquivamento.id?.value}`,
       );
       this.logger.log(
-        `[DELETE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
+        `[DELETE_USE_CASE] ✅ ID interno: ${desarquivamento.id?.value ?? "N/A"}`,
       );
       this.logger.log(
         `[DELETE_USE_CASE] ✅ Timestamp final: ${endTime.toISOString()}`,
@@ -448,7 +448,7 @@ export class RestoreDesarquivamentoUseCase {
       throw new Error(`Desarquivamento com ID ${request.id} não encontrado`);
     }
     this.logger.log(
-      `[RESTORE_USE_CASE] ✅ Desarquivamento encontrado: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
+      `[RESTORE_USE_CASE] ✅ Desarquivamento encontrado - ID interno: ${desarquivamento.id?.value ?? "N/A"}`,
     );
 
     // Verificar se está excluído
@@ -489,7 +489,7 @@ export class RestoreDesarquivamentoUseCase {
       );
       this.logger.log(`[RESTORE_USE_CASE] 📋 ID: ${request.id}`);
       this.logger.log(
-        `[RESTORE_USE_CASE] 🏷️ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
+        `[RESTORE_USE_CASE] 🏷️ ID interno: ${desarquivamento.id?.value ?? "N/A"}`,
       );
 
       // Restaurar registro usando o método restore do repositório TypeORM
@@ -508,7 +508,7 @@ export class RestoreDesarquivamentoUseCase {
       );
       this.logger.log(`[RESTORE_USE_CASE] ✅ ID restaurado: ${request.id}`);
       this.logger.log(
-        `[RESTORE_USE_CASE] ✅ NIC/Laudo: ${desarquivamento.numeroNicLaudoAuto || "N/A"}`,
+        `[RESTORE_USE_CASE] ✅ ID interno: ${desarquivamento.id?.value ?? "N/A"}`,
       );
       this.logger.log(`[RESTORE_USE_CASE] ✅ Usuário: ${request.userId}`);
       this.logger.log(

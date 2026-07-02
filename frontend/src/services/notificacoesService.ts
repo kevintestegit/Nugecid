@@ -200,7 +200,6 @@ export class NotificacoesService {
     >(`${this.baseUrl}/verificar-atrasadas`);
     return unwrap<{ notificacoesCriadas: number }>(response);
   }
-
 }
 
 // Instância singleton do serviço

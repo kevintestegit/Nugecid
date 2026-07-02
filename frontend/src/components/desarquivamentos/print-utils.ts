@@ -53,7 +53,10 @@ export const escapeHtml = (value: unknown): string => {
 export const fetchRelatedRecords = async (
   id: number,
 ): Promise<RelatedRecord[]> => {
-  const response = await apiService.get<{ success: boolean; data: RelatedRecord[] }>(`/nugecid/${id}/related`);
+  const response = await apiService.get<{
+    success: boolean;
+    data: RelatedRecord[];
+  }>(`/nugecid/${id}/related`);
   return response.data.success ? response.data.data : [];
 };
 

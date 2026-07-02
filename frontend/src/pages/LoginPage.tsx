@@ -162,7 +162,6 @@ const LoginPage: React.FC = () => {
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                        tabIndex={-1}
                         aria-label={
                           showPassword ? "Ocultar senha" : "Mostrar senha"
                         }
